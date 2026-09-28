@@ -11,12 +11,14 @@ To share it, turn on **GitHub Pages** for this repo (Settings → Pages → depl
 
 | | Keyboard | Touch / mouse |
 |---|---|---|
-| Rise | `↑`, `W` or `Space` | Hold your finger **above** Jesus |
-| Steer | `←` `→` or `A` `D` | Hold your finger to His **left / right** |
+| Rise | Hold `↑`, `W` or `Space` | **Tap** above Jesus: each tap is one push |
+| Steer | Hold `←` `→` or `A` `D` | **Tap** to His left / right |
 | Pause | `P` / `Esc` | ⏸ button |
 | Mute | `M` | 🔊 button |
 
 ## Rules
+
+- On touch screens, holding your finger down does nothing. Every tap is a single push toward where you tapped, so hovering and landing gently takes rhythm.
 
 - Rising and steering use up **Glory**. If it runs out, He drifts back down to earth.
 - Land on the seat **gently**: the ↑↓ and ↔ speed readouts turn green when you're slow enough. Come in too fast and you bounce off.

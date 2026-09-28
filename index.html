@@ -23,7 +23,11 @@
     color: var(--ink);
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
   }
   canvas {
     display: block;
@@ -55,6 +59,7 @@
     max-height: 100%;
     overflow-y: auto;
     box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
   }
   .card h1 {
     margin: 0 0 2px;
@@ -99,6 +104,7 @@
     font-size: 0.85em;
   }
   #ovBtn {
+    touch-action: manipulation;
     margin-top: 14px;
     font-family: inherit;
     font-size: 1.25rem;
@@ -182,6 +188,10 @@ const LAND_VX = 30;       // max sideways speed for a gentle landing
 const CRASH_V = 150;      // falling faster than this onto the ground = crash
 const BURN_UP = 8;        // glory per second while rising
 const BURN_SIDE = 3;      // glory per second while steering
+const TAP_IMPULSE = 62;   // speed kick from one tap (touch / mouse)
+const TAP_COST = 3;       // glory spent per tap
+const TAP_GAP = 0.09;     // fastest tap rate: about 11 taps a second
+const MAX_RISE = 240;     // taps can't push Him upward faster than this
 const PAD_Y = 240;        // top surface of the seat at the Father's right hand
 
 // Jesus's collision box relative to his feet (top of his cloud)
@@ -237,7 +247,7 @@ function newJesus() {
     x, y: groundY(x) - J_BOTTOM, vx: 0, vy: 0,
     grounded: true, launched: false, glory: 100,
     face: 'calm', thrust: { up: false, left: false, right: false },
-    restMsgCd: 0, hitCd: 0,
+    restMsgCd: 0, hitCd: 0, tapCd: 0, tapFx: 0, tapDir: { up: false, left: false, right: false },
   };
 }
 
@@ -808,13 +818,6 @@ function getInput() {
     left: keys.has('ArrowLeft') || keys.has('KeyA'),
     right: keys.has('ArrowRight') || keys.has('KeyD'),
   };
-  // Touch / mouse: hold where you want Jesus to go
-  if (pointer.active && jesus) {
-    const dx = pointer.x - jesus.x;
-    if (pointer.y < jesus.y + 10) inp.up = true;
-    if (dx < -28) inp.left = true;
-    if (dx > 28) inp.right = true;
-  }
   return inp;
 }
 
@@ -832,6 +835,7 @@ function updateJesus(dt) {
   if (j.thrust.left) { ax -= SIDE; j.glory -= BURN_SIDE * cfg.burn * dt; }
   if (j.thrust.right) { ax += SIDE; j.glory -= BURN_SIDE * cfg.burn * dt; }
   j.glory = Math.max(0, j.glory);
+  applyTaps(j);
 
   // Wind carries the cloud, but barely touches it on the ground
   const alt = clamp((groundY(j.x) - (j.y + J_BOTTOM)) / 60, 0, 1);
@@ -842,6 +846,15 @@ function updateJesus(dt) {
   j.vy += ay * dt;
   j.x += j.vx * dt;
   j.y += j.vy * dt;
+
+  // A tap shows raised arms / sparkles briefly, without adding continuous thrust
+  j.tapCd = Math.max(0, j.tapCd - dt);
+  if (j.tapFx > 0) {
+    j.tapFx -= dt;
+    j.thrust.up = j.thrust.up || j.tapDir.up;
+    j.thrust.left = j.thrust.left || j.tapDir.left;
+    j.thrust.right = j.thrust.right || j.tapDir.right;
+  }
 
   // Thrust sparkles
   if (j.thrust.up && Math.random() < dt * 40) {
@@ -898,6 +911,32 @@ function updateJesus(dt) {
   if (bounceT > 0) j.face = 'oops';
   else if (j.thrust.up && j.vy > -20) j.face = 'effort';
   else j.face = 'calm';
+}
+
+// Touch / mouse: each tap gives one kick toward where you tapped.
+// Holding does nothing, so hovering and landing take rhythm.
+function applyTaps(j) {
+  while (tapQueue.length) {
+    const tp = tapQueue.shift();
+    if (j.glory <= 0 || j.tapCd > 0) continue;
+    const dx = tp.x - j.x, dy = tp.y - (j.y - 30);
+    const len = Math.hypot(dx, dy) || 1;
+    let ix = dx / len, iy = Math.min(0, dy / len);   // never pushes Him down
+    if (iy === 0 && Math.abs(ix) < 0.3) iy = -1;      // tap right below Him = straight up
+    const n = Math.hypot(ix, iy);
+    ix /= n; iy /= n;
+    j.vx += ix * TAP_IMPULSE * 0.7;
+    j.vy = Math.max(j.vy + iy * TAP_IMPULSE, -MAX_RISE);
+    j.glory = Math.max(0, j.glory - TAP_COST * cfg.burn);
+    j.tapCd = TAP_GAP;
+    j.tapFx = 0.18;
+    j.tapDir = { up: iy < -0.3, left: ix < -0.3, right: ix > 0.3 };
+    for (let i = 0; i < 8; i++) {
+      spawn(j.x + rand(-20, 20), j.y + 14, -ix * 60 + rand(-20, 20), -iy * 70 + rand(0, 30), 0.6,
+        Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', rand(2, 4));
+    }
+    sfx.puff();
+  }
 }
 
 function collide(j, s, L) {
@@ -1025,7 +1064,7 @@ function titleScreen() {
      <ul>
        <li>Guide Jesus on His cloud up to <b>the right hand of the Father</b> and settle <b>gently</b> onto the golden seat.</li>
        <li><b>Keyboard:</b> <kbd>&uarr;</kbd> / <kbd>Space</kbd> to rise, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to steer.</li>
-       <li><b>Touch:</b> hold your finger where you want Him to go &mdash; above Him to rise, to either side to steer.</li>
+       <li><b>Touch:</b> <b>tap</b> to give Him a push toward where you tap &mdash; above Him to rise, beside Him to drift sideways. Holding won't help: find the rhythm!</li>
        <li>Watch the <b>wind</b> and the <b>Glory</b> meter. Too fast and you'll bounce off!</li>
        <li>The disciples are watching&hellip;</li>
      </ul>
@@ -1039,12 +1078,14 @@ function startLevel() {
   jesus = newJesus();
   storms = makeStorms(cfg.storms);
   particles = [];
+  tapQueue.length = 0;
+  ripples.length = 0;
   shockT = bounceT = flashT = shakeT = 0;
   gust = 0; gustTarget = 0; gustTimer = 0;
   state = 'play';
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
-  if (level === 1) setTimeout(() => { if (state === 'play' && !jesus.launched) showMessage('Hold ↑ / Space or touch above Him to rise'); }, 2300);
+  if (level === 1) setTimeout(() => { if (state === 'play' && !jesus.launched) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap above Him to rise' : 'Hold ↑ / Space (or click) to rise'); }, 2300);
 }
 
 function endScreens(dt) {
@@ -1085,7 +1126,8 @@ function togglePause() {
 //  Input
 // ============================================================
 const keys = new Set();
-const pointer = { active: false, id: null, x: 0, y: 0 };
+const tapQueue = [];
+const ripples = [];
 
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
@@ -1096,7 +1138,7 @@ window.addEventListener('keydown', (e) => {
   keys.add(e.code);
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
-window.addEventListener('blur', () => { keys.clear(); pointer.active = false; });
+window.addEventListener('blur', () => keys.clear());
 
 function toPlayfield(e) {
   return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
@@ -1110,17 +1152,22 @@ canvas.addEventListener('pointerdown', (e) => {
     if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
   }
   if (state !== 'play') return;
-  pointer.active = true; pointer.id = e.pointerId; pointer.x = p.x; pointer.y = p.y;
-  canvas.setPointerCapture(e.pointerId);
+  if (tapQueue.length < 4) tapQueue.push({ x: p.x, y: p.y });
+  ripples.push({ x: p.x, y: p.y, t: 0 });
 });
-canvas.addEventListener('pointermove', (e) => {
-  if (!pointer.active || e.pointerId !== pointer.id) return;
-  const p = toPlayfield(e);
-  pointer.x = p.x; pointer.y = p.y;
-});
-const endPointer = (e) => { if (e.pointerId === pointer.id) pointer.active = false; };
-canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', endPointer);
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
 
 function hudButtons() {
   return [
@@ -1180,6 +1227,16 @@ const sfx = {
     // A little "hallelujah" arpeggio and a held chord
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, i * 0.13));
     [523.25, 659.25, 783.99].forEach((f) => { this.tone(f, 1.8, 'sine', 0.12, 0.55); this.tone(f * 1.005, 1.8, 'sine', 0.08, 0.55); });
+  },
+  puff() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.35, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
   fail() { [392, 349.2, 293.7].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.2, i * 0.18)); },
@@ -1456,13 +1513,11 @@ function render() {
   for (const s of slots) if (s.row === 1) drawDisciple(s);
   drawStreaks();
 
-  // Touch steering guide
-  if (pointer.active && state === 'play' && jesus) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.setLineDash([5, 7]);
-    ctx.beginPath(); ctx.moveTo(jesus.x, jesus.y - 30); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 14, 0, TAU); ctx.fill();
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
   }
 
   drawMessage();
@@ -1501,6 +1556,7 @@ function update(dt) {
   flashT = Math.max(0, flashT - dt);
   shakeT = Math.max(0, shakeT - dt);
   message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
   endScreens(dt);
   const th = state === 'play' && jesus ? (jesus.thrust.up ? 1 : 0) + (jesus.thrust.left || jesus.thrust.right ? 0.4 : 0) : 0;
   sfx.thrust(th);
