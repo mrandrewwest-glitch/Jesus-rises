@@ -167,8 +167,11 @@
 </div>
 
 <script src="bible.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
 
 // Scripture shown in this game, in every version the menu offers.
 // Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
@@ -1929,6 +1932,7 @@ function updateInn(dt) {
 // ============================================================
 function win() {
   state = 'win';
+  syncAmbience();
   phase = 'frame'; sub = 'finale';
   totalScore += lastScore.score;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('samaritanBest', best); } catch (e) {} }
@@ -1942,6 +1946,7 @@ function win() {
 
 function fail(reason) {
   state = 'fail';
+  syncAmbience();
   failReason = reason;
   TRAV.mood = 'dismay'; SAM.mood = 'worried';
   if (donk) donk.stopT = 99;
@@ -1954,126 +1959,6 @@ function showMessage(text) { message = { text, t: 2.2 }; }
 // ============================================================
 //  Sound (tiny WebAudio synth)
 // ============================================================
-// ============================================================
-//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
-//  (motif after Handel's Messiah, 1741, public domain)
-// ============================================================
-const VOWELS = {             // formant frequencies for each sung vowel
-  a: [800, 1150, 2900],      // "Hal", "jah"
-  e: [500, 1750, 2600],      // "le"
-  u: [350, 700, 2500],       // "lu"
-  o: [450, 800, 2830],       // "oh"
-};
-const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
-function noteFreq(n) {
-  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
-  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
-  return 440 * Math.pow(2, semis / 12);
-}
-
-// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
-const SCORE_WIN = [
-  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
-  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
-  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
-  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
-  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
-  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
-];
-const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
-const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
-const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
-
-// One choir part sung legato: a few detuned voices through vowel formant filters
-function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
-  const total = score.reduce((s, n) => s + n[1], 0) * beat;
-  const end = t0 + total;
-  const env = ac.createGain();
-  env.gain.setValueAtTime(0.0001, t0);
-  env.connect(out);
-  const formants = [0, 1, 2].map((k) => {
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
-    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
-    bp.connect(g); g.connect(env);
-    return bp;
-  });
-  const voices = [];
-  for (let v = 0; v < 3; v++) {
-    const o = ac.createOscillator();
-    o.type = 'sawtooth';
-    const lfo = ac.createOscillator(), depth = ac.createGain();
-    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
-    lfo.connect(depth); depth.connect(o.detune);
-    o.detune.value = (v - 1) * 9;
-    formants.forEach((f) => o.connect(f));
-    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
-    voices.push(o);
-  }
-  let t = t0, first = true;
-  for (const [vowel, beats, ...notes] of score) {
-    const d = beats * beat;
-    if (!vowel) {
-      env.gain.setTargetAtTime(0.0001, t, 0.04);
-      first = true; t += d; continue;
-    }
-    const f = noteFreq(notes[part]);
-    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
-    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
-    // consonant: a quick dip in volume at the start of each syllable
-    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
-    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
-    first = false;
-    t += d;
-  }
-  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
-  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
-  env.gain.setTargetAtTime(0.0001, end, 0.18);
-}
-
-// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
-function organ(ac, out, t0, beat, score, vol) {
-  let t = t0;
-  for (const [vowel, beats, ...notes] of score) {
-    const d = beats * beat;
-    if (vowel) {
-      for (const n of notes) {
-        const f = noteFreq(n);
-        const g = ac.createGain();
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.linearRampToValueAtTime(vol, t + 0.03);
-        g.gain.setValueAtTime(vol, t + d - 0.04);
-        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
-        g.connect(out);
-        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
-          const o = ac.createOscillator(), og = ac.createGain();
-          o.frequency.value = f * h; og.gain.value = a;
-          o.connect(og); og.connect(g);
-          o.start(t); o.stop(t + d + 0.1);
-        });
-      }
-    }
-    t += d;
-  }
-}
-
-// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
-function playHeaven(ac, out, t0, piece) {
-  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
-  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
-  const opts = { swell: piece === 'win', droop: piece === 'fail' };
-  const vols = [0.2, 0.14, 0.13, 0.16];
-  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
-  organ(ac, out, t0, beat, score, 0.045);
-}
-
-// A single sung note for each tap, pitched higher the higher Jesus is
-function playTapNote(ac, out, t0, height) {
-  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
-  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
-  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
-}
-
 const sfx = {
   ctx: null, master: null, thrustGain: null, noise: null, muted: false,
   init() {
@@ -2085,6 +1970,7 @@ const sfx = {
       this.master.gain.value = this.muted ? 0 : 0.5;
       const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
       this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -2102,6 +1988,7 @@ const sfx = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
   },
   thrust(level) {
     if (!this.thrustGain) return;
@@ -2119,12 +2006,12 @@ const sfx = {
     o.connect(g); g.connect(this.master);
     o.start(t0); o.stop(t0 + dur + 0.05);
   },
-  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
-  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
   tap(height) {
     if (!this.ctx) return;
     this.puff(0.15);
-    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+    Music.tap(height);
   },
   puff(vol = 0.35) {
     if (!this.ctx) return;
@@ -2137,7 +2024,7 @@ const sfx = {
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
-  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  fail() { if (this.ctx) Music.fail(); },
   thunder() {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
@@ -2150,6 +2037,14 @@ const sfx = {
   },
 };
 
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
 // A few small extra effects built from the same helpers
 Object.assign(sfx, {
   coinTap() { this.tone(988, 0.08, 'triangle', 0.18); },
@@ -2159,9 +2054,9 @@ Object.assign(sfx, {
   baa() { this.tone(390, 0.14, 'sawtooth', 0.07, 0, 340); this.tone(370, 0.32, 'sawtooth', 0.07, 0.15, 300); },
   eek() { this.tone(660, 0.16, 'sine', 0.12, 0, 990); },
   scurry() { for (let k = 0; k < 6; k++) this.tone(260 + k * 30, 0.05, 'triangle', 0.1, k * 0.09); },
-  healNote(h) { if (this.ctx) playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, 0.3 + h * 0.7); },
-  healed() { if (this.ctx) { playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, 0.6); playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.2, 1); } },
-  pickup() { if (this.ctx) playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, 0.85); },
+  healNote(h) { if (this.ctx) Music.tap(0.3 + h * 0.7); },
+  healed() { if (this.ctx) { Music.tap(0.6); Music.render(this.ctx, Music.out, this.ctx.currentTime + 0.2, 'tap', Music.theme, 1); } },
+  pickup() { if (this.ctx) Music.tap(0.85); },
 });
 
 // ============================================================
@@ -2193,6 +2088,7 @@ ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2();
 
 function titleScreen() {
   state = 'title';
+  syncAmbience();
   phase = 'frame'; sub = '';
   script = null;
   cfg = makeConfig(1);
@@ -2224,6 +2120,7 @@ function resetLevelState() {
 function startLevel(skipIntro = false) {
   resetLevelState();
   state = 'play';
+  syncAmbience();
   hideOverlay();
   sfx.levelStart();
   if (!skipIntro && !introSeen[level]) {
@@ -2242,6 +2139,7 @@ function retryLevel() {
   resetLevelState();
   tendScore = hadTend;
   state = 'play';
+  syncAmbience();
   hideOverlay();
   sfx.levelStart();
   startRoad();
@@ -2275,6 +2173,7 @@ function endScreens(dt) {
 function togglePause() {
   if (state === 'play') {
     state = 'pause';
+    syncAmbience();
     sfx.thrust(0);
     if (tend) tendUp();
     showOverlay('Paused', `Level ${level} — ${cfg.name}`,
@@ -2282,6 +2181,7 @@ function togglePause() {
       'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
   } else if (state === 'pause') {
     state = 'play';
+    syncAmbience();
     hideOverlay();
   }
 }

@@ -167,8 +167,11 @@
 </div>
 
 <script src="bible.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'joyToTheWorld', instrument: 'pipe', accent: 'harp', ambience: 'night', percussion: false };
 
 // Scripture shown in this game (Luke 2:8-20), in every version the menu offers.
 // Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
@@ -1172,6 +1175,7 @@ function drawParticles() {
 // ============================================================
 function win() {
   state = 'win';
+  syncAmbience();
   const levelBonus = level * 500;
   const score = pts.watch + pts.choir + pts.path + levelBonus;
   totalScore += score;
@@ -1188,6 +1192,7 @@ function win() {
 
 function fail(reason) {
   state = 'fail';
+  syncAmbience();
   failReason = reason;
   sfx.fail();
   endTimer = 1.4;
@@ -1224,6 +1229,7 @@ ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2();
 
 function titleScreen() {
   state = 'title';
+  syncAmbience();
   phase = 'watch';
   cfg = makeConfig(1);
   setupField();
@@ -1253,6 +1259,7 @@ function startLevel() {
   shockT = joyT = flashT = shakeT = fadeT = 0; gloryF = 0;
   stage = 0; stageT = 0;
   state = 'play';
+  syncAmbience();
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
   banner = { key: 'watch', t: 5 };
@@ -1264,6 +1271,7 @@ function startLevel() {
 function retryPart() {
   if (failReason === 'path') {
     state = 'play';
+    syncAmbience();
     hideOverlay();
     startJourney();
     sfx.levelStart();
@@ -1298,11 +1306,13 @@ function endScreens(dt) {
 function togglePause() {
   if (state === 'play') {
     state = 'pause';
+    syncAmbience();
     showOverlay('Paused', `Level ${level} — ${cfg.name}`,
       '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
       'Resume', togglePause, '↻ Restart Level', startLevel);
   } else if (state === 'pause') {
     state = 'play';
+    syncAmbience();
     hideOverlay();
   }
 }
@@ -1382,6 +1392,7 @@ function hudButtons() {
   ];
 }
 
+
 // ============================================================
 //  Heavenly music: a synthesised "Hal-le-lu-jah" choir
 //  (motif after Handel's Messiah, 1741, public domain)
@@ -1398,19 +1409,6 @@ function noteFreq(n) {
   const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
   return 440 * Math.pow(2, semis / 12);
 }
-
-// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
-const SCORE_WIN = [
-  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
-  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
-  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
-  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
-  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
-  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
-];
-const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
-const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
-const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
 
 // One choir part sung legato: a few detuned voices through vowel formant filters
 function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
@@ -1484,24 +1482,6 @@ function organ(ac, out, t0, beat, score, vol) {
     t += d;
   }
 }
-
-// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
-function playHeaven(ac, out, t0, piece) {
-  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
-  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
-  const opts = { swell: piece === 'win', droop: piece === 'fail' };
-  const vols = [0.2, 0.14, 0.13, 0.16];
-  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
-  organ(ac, out, t0, beat, score, 0.045);
-}
-
-// A single sung note for each tap
-function playTapNote(ac, out, t0, height) {
-  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
-  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
-  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
-}
-
 const sfx = {
   ctx: null, master: null, noise: null, muted: false,
   init() {
@@ -1513,6 +1493,7 @@ const sfx = {
       this.master.gain.value = this.muted ? 0 : 0.5;
       const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
       this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -1522,6 +1503,7 @@ const sfx = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
   },
   tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
     if (!this.ctx) return;
@@ -1535,12 +1517,12 @@ const sfx = {
     o.connect(g); g.connect(this.master);
     o.start(t0); o.stop(t0 + dur + 0.05);
   },
-  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
-  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
   tap(height) {
     if (!this.ctx) return;
     this.puff(0.15);
-    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+    Music.tap(height);
   },
   puff(vol = 0.35) {
     if (!this.ctx) return;
@@ -1553,7 +1535,7 @@ const sfx = {
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
-  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  fail() { if (this.ctx) Music.fail(); },
   thunder() {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
@@ -1597,9 +1579,17 @@ const sfx = {
     if (!this.ctx) return;
     this.thunder();
     for (let i = 0; i < 6; i++) this.tone(1200 + i * 260, 0.9, 'sine', 0.05, i * 0.07);
-    playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.3, 'start');
+    Music.render(this.ctx, Music.out, this.ctx.currentTime + 0.3, 'start', Music.theme);
   },
 };
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
 
 // ============================================================
 //  Rendering: the night field
