@@ -1,6 +1,6 @@
 # Stories of Jesus ✨
 
-40 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
+37 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
 Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files, libraries or build step.
 
@@ -18,7 +18,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 - **Bible version:** pick **KJV, NKJV, NIV or NLT** on the menu. Every verse in every game is quoted word for word in the chosen version and credited to its publisher. The shared code is in `bible.js`, and each game keeps its own `VERSES` table.
 - **Sound:** the shared engine in `music.js` uses a harp and a shepherd's pipe. Each game has its own public-domain hymn tune (Amazing Grace, Jesus Loves Me, Joy to the World, O Come All Ye Faithful, Ode to Joy, the Doxology or the Hallelujah) and a soft background sound (sea, birdsong, crowd, wind, night, campfire or market). The background sound only plays during play.
 
-## The Life of Jesus (23 games, in story order)
+## The Life of Jesus (20 games, in story order)
 
 | Game | Story | What you do | File |
 |---|---|---|---|
@@ -41,9 +41,6 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 | **Cleansing the Temple** | My Father's house · John 2:16 | Clear the market stalls from the temple courts, but don't disturb the people praying. | `cleansing-temple.html` |
 | **Washing Feet** | Love one another · John 13:5 | Scrub off the mud, pop out the pebbles and clean under every toenail. So satisfying! | `washing-feet.html` |
 | **He Is Risen** | The empty tomb · Matthew 28:6 | Tap in time with the music to roll away the stone on Easter morning. | `empty-tomb.html` |
-| **The Road to Emmaus** | Our hearts burned · Luke 24:32 | Walk with the stranger at sunset, and know Him when He breaks the bread. | `road-to-emmaus.html` |
-| **Thomas Believes** | My Lord and my God · John 20:28 | Gather the clues and testimonies until Thomas meets the risen Jesus. | `doubting-thomas.html` |
-| **Breakfast on the Beach** | 153 fish · John 21:11 | Catch exactly 153 fish, then cook breakfast with Jesus by the fire. | `breakfast-beach.html` |
 | **Jesus Rises** | The Ascension · Acts 1:9 | Guide Jesus on His cloud up to the right hand of the Father. Mind the wind and land gently! | `jesus-rises.html` |
 
 ## Parables Jesus Told (17 games)
