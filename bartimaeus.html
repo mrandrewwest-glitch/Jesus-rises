@@ -1,0 +1,2161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#e9cf98">
+<title>Blind Bartimaeus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8a7d63;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Blind Bartimaeus</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script>
+'use strict';
+
+// Scripture shown in this game (Mark 10:46-52), looked up in the chosen version.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  mercy:    { ref: 'Mark 10:47', KJV: 'Jesus, thou son of David, have mercy on me.', NKJV: 'Jesus, Son of David, have mercy on me!', NIV: 'Jesus, Son of David, have mercy on me!', NLT: 'Jesus, Son of David, have mercy on me!' },
+  hush:     { ref: 'Mark 10:48', KJV: 'Many charged him that he should hold his peace: but he cried the more a great deal', NKJV: 'Many warned him to be quiet; but he cried out all the more', NIV: 'Many rebuked him and told him to be quiet, but he shouted all the more', NLT: '‘Be quiet!’ many of the people yelled at him. But he only shouted louder' },
+  called:   { ref: 'Mark 10:49', KJV: 'Be of good comfort, rise; he calleth thee.', NKJV: 'Be of good cheer. Rise, He is calling you.', NIV: 'Cheer up! On your feet! He’s calling you.', NLT: 'Cheer up... Come on, he’s calling you!' },
+  garment:  { ref: 'Mark 10:50', KJV: 'He, casting away his garment, rose, and came to Jesus.', NKJV: 'Throwing aside his garment, he rose and came to Jesus.', NIV: 'Throwing his cloak aside, he jumped to his feet and came to Jesus.', NLT: 'Bartimaeus threw aside his coat, jumped up, and came to Jesus.' },
+  whatWilt: { ref: 'Mark 10:51', KJV: 'What wilt thou that I should do unto thee?', NKJV: 'What do you want Me to do for you?', NIV: 'What do you want me to do for you?', NLT: 'What do you want me to do for you?' },
+  sight:    { ref: 'Mark 10:51', KJV: 'Lord, that I might receive my sight.', NKJV: 'Rabboni, that I may receive my sight.', NIV: 'Rabbi, I want to see.', NLT: 'My Rabbi... I want to see!' },
+  whole:    { ref: 'Mark 10:52', KJV: 'Go thy way; thy faith hath made thee whole.', NKJV: 'Go your way; your faith has made you well.', NIV: 'Go... your faith has healed you.', NLT: 'Go, for your faith has healed you.' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const mainCtx = canvas.getContext('2d');
+let ctx = mainCtx;       // drawing target: the blurry world layer or the screen
+const off = document.createElement('canvas');   // low-resolution world layer = blurry eyes
+const offCtx = off.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  if (bart && state !== 'play') bart.x = W / 2;
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const ROAD_Y = 588;       // where the procession walks
+const BART_Y = 872;       // where Bartimaeus sits by the wayside
+const MEET_Y = 606;       // where he stands before Jesus
+const ROW_NEAR = 805, ROW_FAR = 655;   // the rows of bystanders between him and the road
+const P_START = 0.2;      // procession progress when the level starts (0 = far right, 1 = far left)
+const ZONE0 = 0.34, ZONE1 = 0.66;      // Jesus is in earshot between these
+const TAP_GAP = 0.11;     // fastest shout rate
+const BART_HALF = 13;     // his half-width when squeezing through the crowd
+const PERSON_HALF = 15;   // a bystander's half-width (at scale 1)
+const BLUR_PX = 2;        // how blurry his eyes are (CSS pixels)
+
+const LEVEL_NAMES = [
+  'The Road to Jericho',
+  'By the Wayside',
+  'A Great Multitude',
+  'Market Day',
+  'Passover Pilgrims',
+  'The City of Palms',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Jericho Road ${n}`,
+    walkT: Math.max(34 - (n - 1) * 4, 17),            // seconds for the procession to cross
+    gain: Math.max(9.5 - (n - 1) * 0.7, 6.5),          // voice per shout
+    decay: 5 + (n - 1) * 1.6,                          // voice fades per second
+    noiseAmp: Math.min(0.3 + (n - 1) * 0.15, 0.95),    // how loud the crowd gets
+    noiseDecay: 11,                                    // extra fade at full crowd noise
+    hushGap: [Math.max(4.5 - (n - 1) * 0.6, 1.8), Math.max(7.5 - (n - 1) * 0.9, 3.2)],
+    hushWarn: Math.max(1.2 - (n - 1) * 0.15, 0.55),    // time a husher spends turning round
+    hushDur: Math.min(1.3 + (n - 1) * 0.15, 2),
+    hushHit: Math.min(16 + (n - 1) * 4, 32),
+    maxHush: n >= 4 ? 2 : 1,
+    rows: Math.min(2 + n, 6),
+    spacing: Math.max(52 - (n - 1), 48),               // < 56 so a full row can't be slipped through
+    gapSlots: n <= 2 ? 2 : n === 3 ? -1 : 1,           // -1 = rows alternate wide and narrow gaps
+    amp: Math.min(36 + (n - 1) * 12, 90),              // how far the rows sway
+    omega: Math.min(0.55 + (n - 1) * 0.18, 1.4),
+    part: n <= 2 ? 22 : 14,                            // how far the crowd parts as time goes on
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let phase = 'cry';        // cry | called | walk | meet (inside 'play')
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('bartimaeusBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;                // global clock
+let lt = 0;               // time since the level began
+let phaseT = 0;
+let voice = 0;            // the Voice meter, 0..100
+let noise = 0;            // crowd noise, 0..1
+let noisePh = [0, 0];
+let prog = P_START;       // procession progress
+let walking = true;       // is the procession moving?
+let clarity = 0;          // 0 = blind and blurry, 1 = bright and clear
+let tapCd = 0, shoutT = 0, hushT = 3, muffled = 0, bumps = 0, walkTime = 0;
+let rowT = 0;             // time the crowd has been parting
+let noiseMsgCd = 0, chatterCd = 0;
+let bart = null, jesus = null, cloak = null;
+let rows = [], procession = [];
+let particles = [], bubbles = [], shoutFx = [], ripples = [];
+let message = { text: '', t: 0 };
+let caption = null;
+let flashT = 0, shakeT = 0;
+let endTimer = 0;
+let lastScore = null;
+let heardScore = { early: 0, patient: 0 };
+let meetStep = 0;
+let queuedMove = null;
+
+// ============================================================
+//  People
+// ============================================================
+const LOOKS = [
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55', scarf: '#e8dcc0' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: true,  skin: '#b87a48' },
+  { robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { robe: '#5a6475', hair: '#2a1a0e', beard: true,  skin: '#c88e5a', scarf: '#c9b27a' },
+  { robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678', scarf: '#f1e4c8' },
+  { robe: '#4b7f4b', hair: '#2d1b0f', beard: true,  skin: '#bf8150' },
+  { robe: '#b08a2e', hair: '#1c120b', beard: true,  skin: '#c78f5c', scarf: '#d8c7a0' },
+  { robe: '#2f8fbf', hair: '#3b2414', beard: false, skin: '#d49c6a', scarf: '#f4d7a0' },
+  { robe: '#c7703a', hair: '#24170c', beard: false, skin: '#b9804e', scarf: '#9fc2d8' },
+  { robe: '#8f5a9e', hair: '#5a3a20', beard: false, skin: '#e0ae80' },
+];
+let personCount = 0;
+function makePerson(x, y, s) {
+  const look = LOOKS[Math.floor(Math.random() * LOOKS.length)];
+  return {
+    ...look, i: personCount++, x, y, s, baseX: x,
+    mood: 'watch', switchT: 0, delay: rand(0.05, 0.5),
+    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU),
+    lookX: x, lookY: y - 200, hush: null, shockT: 0, bob: 0, part: 0,
+  };
+}
+
+function rowY(k) { return cfg.rows > 1 ? lerp(ROW_NEAR, ROW_FAR, k / (cfg.rows - 1)) : ROW_NEAR; }
+function rowScale(y) { return lerp(0.78, 1.0, (y - ROW_FAR) / (ROW_NEAR - ROW_FAR)); }
+function bartScale(y) { return lerp(0.82, 1.2, clamp((y - MEET_Y) / (BART_Y - MEET_Y), 0, 1)); }
+
+// Rows of bystanders. Each row has one gap; in the walk phase the row sways and the
+// people beside the gap slowly step aside ("the crowd parts").
+function makeRows() {
+  const list = [];
+  for (let k = 0; k < cfg.rows; k++) {
+    const y = rowY(k), s = rowScale(y);
+    const slots = cfg.gapSlots === -1 ? (k % 2 ? 1 : 2) : cfg.gapSlots;
+    // gaps wander from side to side so the path zig-zags
+    const gapC = W / 2 + (k === 0 ? rand(-0.18, 0.18) : rand(-0.3, 0.3)) * W;
+    const sp = cfg.spacing;
+    const people = [];
+    const x0 = -offX - cfg.amp - 90, x1 = W + offX + cfg.amp + 90;
+    const jMin = Math.floor((x0 - gapC) / sp) - 1, jMax = Math.ceil((x1 - gapC) / sp) + 1;
+    for (let j = jMin; j <= jMax; j++) {
+      const bx = slots === 2 ? gapC + (j + 0.5) * sp : gapC + j * sp;
+      if (slots === 2 && (j === -1 || j === 0)) continue;
+      if (slots === 1 && j === 0) continue;
+      const p = makePerson(bx + rand(-2, 2), y + rand(-3, 3), s * rand(0.95, 1.05));
+      p.d = (bx - gapC) / sp;                       // slot distance from the gap
+      p.partF = Math.sign(p.d) * Math.max(0, 1 - (Math.abs(p.d) - (slots / 2 + 0.5)) / 2);
+      people.push(p);
+    }
+    list.push({ k, y, s, gapC, slots, people, dir: Math.random() < 0.5 ? -1 : 1, omega: cfg.omega * rand(0.85, 1.15), shift: 0 });
+  }
+  return list;
+}
+
+// Jesus's disciples and the great number of people walking with Him
+function makeProcession() {
+  const offs = [[-64, 8], [-34, -8], [40, 5], [70, -9], [100, 7], [132, -5], [166, 3], [198, -8]];
+  return offs.map(([dx, dy]) => ({ ...makePerson(0, ROAD_Y + dy, 0.7), dx }));
+}
+
+function crowdTarget(p, inRow) {
+  if (state === 'title' || state === 'pause') return p.mood;
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (p.shockT > 0) return 'shock';
+  if (inRow && p.hush) return p.hush.stage === 'turn' ? 'turn' : 'shh';
+  if (phase === 'cry') return noise > 0.62 && !inRow ? 'wow' : 'watch';
+  if (phase === 'called' || phase === 'meet') return 'wow';
+  return 'watch';
+}
+
+function updatePerson(p, dt, inRow) {
+  const want = crowdTarget(p, inRow);
+  if (want !== p.mood) {
+    p.switchT += dt;
+    if (p.switchT > p.delay || want === 'turn' || want === 'shh' || want === 'shock') { p.mood = want; p.switchT = 0; }
+  } else p.switchT = 0;
+  p.blinkT -= dt;
+  if (p.blinkT <= 0) { p.blink = 0.13; p.blinkT = rand(1.5, 5); }
+  if (p.blink > 0) p.blink -= dt;
+  p.shockT = Math.max(0, p.shockT - dt);
+  // who they look at
+  const lookBart = inRow && (p.hush || phase !== 'cry' || state === 'win');
+  if (lookBart && bart) { p.lookX = bart.x; p.lookY = bart.y - 60; }
+  else if (jesus) { p.lookX = jesus.x; p.lookY = jesus.y - 50; }
+}
+
+function drawPerson(p) {
+  const mood = p.mood, s = p.s;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + p.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(p.x, p.y - jump * s - p.bob);
+  ctx.scale(s, s);
+
+  const sleeve = shade(p.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  // Look toward whoever they are watching
+  const wx = p.x, wy = p.y - 52 * s;
+  const dx = p.lookX - wx, dy = p.lookY - wy;
+  const len = Math.hypot(dx, dy) || 1;
+  const lx = dx / len, ly = dy / len;
+
+  // Arms raised for joy / pointing in wonder
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + p.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && p.i % 3 === 0) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = p.robe;
+  ctx.strokeStyle = shade(p.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Resting arms
+  if (mood === 'watch' || mood === 'turn' || (mood === 'wow' && p.i % 3 !== 0)) {
+    if (mood === 'turn') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); }   // folded arms
+    else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'shh') {
+    arm(-11, -32, -15, -12);
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = p.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (p.scarf) {
+    ctx.fillStyle = p.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(p.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = p.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Beard
+  if (p.beard) {
+    ctx.fillStyle = p.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(p, mood === 'turn' ? 'doubt' : mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'shh') {
+    arm(11, -32, 3, hy + 11);                        // a finger to the lips: "Shh!"
+    ctx.strokeStyle = p.skin; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(2, hy + 10); ctx.lineTo(1, hy + 3); ctx.stroke();
+  } else if (mood === 'dismay' && p.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = p.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'shh':
+      eyes(3.5, 4, 2);
+      brows(-5, -8, -5, -8);
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.2, 2.6, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  Bartimaeus
+// ============================================================
+const B_SKIN = '#c68a58', B_HAIR = '#8d7b68', B_TUNIC = '#a7a27a', B_CLOAK = '#7b5236', B_STRIPE = '#e8d9b0';
+
+function newBart() {
+  return { x: W / 2, y: BART_Y, pose: 'sit', mood: 'blind', back: false, cloak: true, row: -1, tw: null, bob: 0 };
+}
+
+function drawCloakCloth(w, h) {
+  ctx.fillStyle = B_CLOAK;
+  roundRect(-w / 2, -h / 2, w, h, 6); ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = B_STRIPE; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (const f of [-0.32, -0.2, 0.2, 0.32]) { ctx.moveTo(f * w, -h); ctx.lineTo(f * w, h); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBart(b) {
+  const s = bartScale(b.y);
+  ctx.save();
+  ctx.translate(b.x, b.y - b.bob);
+  ctx.scale(s, s);
+  const arm = (x1, y1, x2, y2, col = shade(B_TUNIC, -25)) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = B_SKIN; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  // soft shadow
+  ctx.fillStyle = 'rgba(80,55,20,0.22)';
+  ctx.beginPath(); ctx.ellipse(0, 1, 30, 7, 0, 0, TAU); ctx.fill();
+
+  let hy;
+  if (b.pose === 'sit') {
+    hy = -60;
+    // his walking staff and begging bowl
+    ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(33, 0); ctx.lineTo(24, -80); ctx.stroke();
+    ctx.fillStyle = '#b86b3a';
+    ctx.beginPath(); ctx.ellipse(-30, -4, 11, 5, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#8a4a24'; ctx.beginPath(); ctx.ellipse(-30, -4, 11, 3, 0, 0, TAU); ctx.fill();
+    if (state === 'title' || phase === 'cry') {   // a few coins
+      ctx.fillStyle = '#f2c94c';
+      ctx.beginPath(); ctx.arc(-33, -5, 2, 0, TAU); ctx.arc(-27, -5, 2, 0, TAU); ctx.fill();
+    }
+    // crossed legs and feet
+    ctx.fillStyle = B_TUNIC; ctx.strokeStyle = shade(B_TUNIC, -40); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -9, 27, 10, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = B_SKIN;
+    ctx.beginPath(); ctx.ellipse(-19, -3, 6, 3.5, 0, 0, TAU); ctx.ellipse(19, -3, 6, 3.5, 0, 0, TAU); ctx.fill();
+    // body
+    ctx.fillStyle = B_TUNIC;
+    ctx.beginPath();
+    ctx.moveTo(-17, -12); ctx.quadraticCurveTo(-17, -36, -11, -43);
+    ctx.quadraticCurveTo(0, -47, 11, -43); ctx.quadraticCurveTo(17, -36, 17, -12);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // the garment (his outer cloak), open at the front
+    if (b.cloak) {
+      ctx.fillStyle = B_CLOAK;
+      ctx.beginPath();
+      ctx.moveTo(-22, -9); ctx.quadraticCurveTo(-23, -38, -12, -46);
+      ctx.quadraticCurveTo(0, -50, 12, -46); ctx.quadraticCurveTo(23, -38, 22, -9);
+      ctx.lineTo(7, -12); ctx.lineTo(5, -42); ctx.lineTo(-5, -42); ctx.lineTo(-7, -12);
+      ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.strokeStyle = B_STRIPE; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (const x of [-17, -12, 12, 17]) { ctx.moveTo(x, -50); ctx.lineTo(x * 1.1, -5); }
+      ctx.stroke();
+      ctx.restore();
+    }
+    const sleeve = b.cloak ? shade(B_CLOAK, -15) : shade(B_TUNIC, -25);
+    if (b.mood === 'hopeful') { arm(-12, -38, -26, -72, sleeve); arm(12, -38, 26, -72, sleeve); }
+    else if (b.mood !== 'shout') { arm(-12, -38, -17, -15, sleeve); arm(12, -38, 17, -15, sleeve); }
+    drawBartHead(b, hy);
+    if (b.mood === 'shout') { arm(-12, -38, -9, hy + 10, sleeve); arm(12, -38, 9, hy + 10, sleeve); }
+  } else {
+    hy = -57;
+    const stepA = Math.sin(t * 10) * (b.tw ? 3 : 0);
+    // feet
+    ctx.fillStyle = '#8a5a2b';
+    ctx.beginPath(); ctx.ellipse(-7 + stepA, -1, 5, 2.5, 0, 0, TAU); ctx.ellipse(7 - stepA, -1, 5, 2.5, 0, 0, TAU); ctx.fill();
+    // arms stretched out, feeling the way
+    if (b.back) { arm(-12, -34, -25, -46 + stepA); arm(12, -34, 25, -46 - stepA); }
+    // tunic
+    ctx.fillStyle = B_TUNIC; ctx.strokeStyle = shade(B_TUNIC, -40); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-17, 0); ctx.quadraticCurveTo(-16, -30, -11, -38);
+    ctx.quadraticCurveTo(0, -42, 11, -38); ctx.quadraticCurveTo(16, -30, 17, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-15, -18); ctx.quadraticCurveTo(0, -15, 15, -18); ctx.stroke();
+    if (!b.back) {
+      if (b.mood === 'healed') {
+        const wave = Math.sin(t * 9) * 4;
+        arm(-11, -33, -25 + wave, -68); arm(11, -33, 25 - wave, -68);
+      } else if (b.mood === 'hopeful') { arm(-11, -33, -26, -68); arm(11, -33, 26, -68); }
+      else { arm(-11, -33, -15, -13); arm(11, -33, 15, -13); }
+    }
+    drawBartHead(b, hy);
+  }
+  ctx.restore();
+}
+
+function drawBartHead(b, hy) {
+  if (b.back) {
+    // seen from behind as he walks toward Jesus
+    ctx.fillStyle = B_SKIN;
+    ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+    ctx.fillStyle = B_HAIR;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#efe3c4';
+    ctx.beginPath(); ctx.arc(0, hy - 3, 16, Math.PI * 1.02, Math.PI * 1.98); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#b89a5c'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, hy - 3); ctx.lineTo(16, hy - 3); ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = B_SKIN;
+  ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  // head cloth
+  ctx.fillStyle = '#efe3c4';
+  ctx.beginPath(); ctx.arc(0, hy - 2, 16.5, Math.PI * 0.98, Math.PI * 2.02); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#b89a5c'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, hy - 3); ctx.quadraticCurveTo(0, hy - 7, 16, hy - 3); ctx.stroke();
+  // grey beard
+  ctx.fillStyle = B_HAIR;
+  ctx.beginPath();
+  ctx.moveTo(-14, hy + 1);
+  ctx.quadraticCurveTo(-13, hy + 21, 0, hy + 22);
+  ctx.quadraticCurveTo(13, hy + 21, 14, hy + 1);
+  ctx.quadraticCurveTo(8, hy + 8, 0, hy + 8);
+  ctx.quadraticCurveTo(-8, hy + 8, -14, hy + 1);
+  ctx.fill();
+
+  const ex = 5.5, ey = hy;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  ctx.lineCap = 'round';
+  const closedEyes = (up) => {       // gentle closed eyes: he cannot see
+    ctx.strokeStyle = dark; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const sx of [-ex, ex]) {
+      ctx.moveTo(sx - 3.5, ey);
+      ctx.quadraticCurveTo(sx, ey + (up ? -3 : 3), sx + 3.5, ey);
+    }
+    ctx.stroke();
+  };
+  const brows = (inner, outer) => {
+    ctx.strokeStyle = '#6e5e4c'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + outer); ctx.lineTo(-ex + 3, ey + inner);
+    ctx.moveTo(ex - 3, ey + inner); ctx.lineTo(ex + 4, ey + outer);
+    ctx.stroke();
+  };
+  const cheeks = () => {
+    ctx.fillStyle = 'rgba(255,120,120,0.4)';
+    ctx.beginPath(); ctx.arc(-10, hy + 4, 3, 0, TAU); ctx.arc(10, hy + 4, 3, 0, TAU); ctx.fill();
+  };
+  switch (b.mood) {
+    case 'shout':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      ctx.beginPath();          // eyes squeezed shut with effort
+      ctx.moveTo(-ex - 3, ey - 2.5); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2.5);
+      ctx.moveTo(ex + 3, ey - 2.5); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2.5);
+      ctx.stroke();
+      brows(-9, -8);
+      ctx.fillStyle = '#7a2e22';
+      ctx.beginPath(); ctx.ellipse(0, mouthY + 1, 5.5, 6.5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#d9606a';
+      ctx.beginPath(); ctx.ellipse(0, mouthY + 4.5, 3.2, 2, 0, 0, TAU); ctx.fill();
+      break;
+    case 'hopeful':
+      closedEyes(true); brows(-9, -8); cheeks();
+      ctx.fillStyle = '#7a2e22';
+      ctx.beginPath(); ctx.moveTo(-6, mouthY - 2); ctx.arc(0, mouthY - 2, 6, 0, Math.PI); ctx.closePath(); ctx.fill();
+      break;
+    case 'sad':
+      closedEyes(false); brows(-9, -5);
+      ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke();
+      break;
+    case 'healed': {
+      // eyes wide open, and shining!
+      for (const sx of [-ex, ex]) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.ellipse(sx, ey - 1, 4.2, 5.4, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#5a3a1c';
+        ctx.beginPath(); ctx.arc(sx, ey - 0.5, 2.6, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(sx + 1, ey - 2, 1, 0, TAU); ctx.fill();
+      }
+      brows(-10, -10); cheeks();
+      ctx.fillStyle = '#7a2e22';
+      ctx.beginPath(); ctx.moveTo(-6.5, mouthY - 2); ctx.arc(0, mouthY - 2, 6.5, 0, Math.PI); ctx.closePath(); ctx.fill();
+      break;
+    }
+    default:   // 'blind': calm, eyes closed
+      closedEyes(false); brows(-7, -7);
+      ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+
+// The cloak he casts away
+function drawCloak(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(c.rot);
+  if (c.landed) { ctx.scale(1, 0.35); drawCloakCloth(58, 34); }
+  else drawCloakCloth(46, 30);
+  ctx.restore();
+}
+
+// ============================================================
+//  Jesus
+// ============================================================
+// j: { x, y, face, pose ('walk' | 'call' | 'open' | 'bless'), side }
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y - (j.bob || 0));
+
+  const up = j.pose === 'bless';
+
+  if (state === 'win' || j.pose === 'call') {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 75);
+    g.addColorStop(0, 'rgba(255,235,150,0.55)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 75, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Sandalled feet
+  const stepA = j.bob ? Math.sin(t * 8) * 2.5 : 0;
+  ctx.fillStyle = '#8a5a2b';
+  ctx.beginPath(); ctx.ellipse(-6 + stepA, 0, 4.5, 2.2, 0, 0, TAU); ctx.ellipse(6 - stepA, 0, 4.5, 2.2, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: open and welcoming; one reaching out to call; one raised to bless
+  const hands = [[-20, -22], [20, -22]];
+  if (j.pose === 'call') { if (j.side < 0) hands[0] = [-23, -34]; else hands[1] = [23, -34]; }
+  if (j.pose === 'open') { hands[0] = [-23, -30]; hands[1] = [23, -30]; }
+  if (up) { if (j.side < 0) hands[0] = [-21, -66]; else hands[1] = [21, -66]; }
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    const raised = hy < -50;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (raised ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (raised ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  Scenery: sky, Jericho, the road
+// ============================================================
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+const bgClouds = Array.from({ length: 6 }, () => ({ f: Math.random(), y: rand(150, 380), w: rand(80, 160), speed: rand(4, 9) }));
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, 520);
+  g.addColorStop(0, '#7cc4ee');
+  g.addColorStop(0.6, '#bfe3f5');
+  g.addColorStop(1, '#fff0cf');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, 540 + offY);
+  // the sun
+  const sx = W * 0.18, sy = 170;
+  const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 120);
+  sg.addColorStop(0, 'rgba(255,248,200,1)'); sg.addColorStop(0.3, 'rgba(255,236,150,0.7)'); sg.addColorStop(1, 'rgba(255,236,150,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 120, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff4b8'; ctx.beginPath(); ctx.arc(sx, sy, 34, 0, TAU); ctx.fill();
+  for (const c of bgClouds) drawCloud(-offX - 150 + c.f * (viewW + 300), c.y, c.w, c.w * 0.3, 'rgba(255,255,255,0.85)', 'rgba(220,235,250,0.7)');
+}
+
+function drawPalm(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const sway = Math.sin(t * 1.3 + x) * 3;
+  ctx.strokeStyle = '#8a6a3e'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, -50, sway, -100); ctx.stroke();
+  ctx.fillStyle = '#5f9a45';
+  for (let i = 0; i < 7; i++) {
+    const a = Math.PI + (i / 6) * Math.PI + Math.sin(t * 1.5 + i) * 0.04;
+    ctx.save(); ctx.translate(sway, -100); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(22, -12, 46, 8); ctx.quadraticCurveTo(22, -2, 0, 0); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#7a4a22';
+  ctx.beginPath(); ctx.arc(sway - 4, -96, 4, 0, TAU); ctx.arc(sway + 4, -95, 4, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawJericho() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // distant hills of Moab
+  ctx.fillStyle = '#d6b88a';
+  ctx.beginPath(); ctx.moveTo(x0, 540);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, 470 + Math.sin(x / 110) * 16 + Math.sin(x / 43) * 6);
+  ctx.lineTo(x1, 540); ctx.fill();
+  // palms behind the wall
+  for (const f of [0.05, 0.22, 0.4, 0.58]) drawPalm(W * f, 530, 0.8);
+  // the city wall with its gate (Jesus is coming out of Jericho)
+  const wx = W * 0.64, top = 448, base = 540;
+  ctx.fillStyle = '#d9b77e'; ctx.strokeStyle = '#a8864e'; ctx.lineWidth = 2;
+  ctx.fillRect(wx, top, x1 - wx, base - top);
+  ctx.beginPath();
+  for (let x = wx; x < x1; x += 26) { ctx.rect(x, top - 12, 14, 12); }
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150,115,60,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let y = top + 18; y < base; y += 18) {
+    ctx.moveTo(wx, y); ctx.lineTo(x1, y);
+    for (let x = wx + ((y / 18) % 2) * 20; x < x1; x += 40) { ctx.moveTo(x, y - 18); ctx.lineTo(x, y); }
+  }
+  ctx.stroke();
+  // tower and gate
+  const gx = W * 0.86;
+  ctx.fillStyle = '#e2c28b';
+  ctx.fillRect(gx - 52, top - 34, 104, base - top + 34);
+  ctx.beginPath();
+  for (let x = gx - 52; x < gx + 52; x += 26) ctx.rect(x, top - 46, 14, 12);
+  ctx.fill();
+  ctx.fillStyle = '#6b4a2a';
+  ctx.beginPath(); ctx.moveTo(gx - 24, base); ctx.lineTo(gx - 24, top + 20); ctx.arc(gx, top + 20, 24, Math.PI, TAU); ctx.lineTo(gx + 24, base); ctx.fill();
+  // palms in front of the wall
+  for (const f of [0.74, 0.97]) drawPalm(W * f, 548, 0.95);
+}
+
+function drawGround() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // sandy plain
+  const g = ctx.createLinearGradient(0, 536, 0, H);
+  g.addColorStop(0, '#e8cf98'); g.addColorStop(1, '#d7b674');
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, 536, x1 - x0, H - 536 + 20);
+  // the road out of Jericho
+  ctx.fillStyle = '#f2e0b4';
+  ctx.beginPath(); ctx.moveTo(x0, 556); ctx.lineTo(x1, 552); ctx.lineTo(x1, 612); ctx.lineTo(x0, 618); ctx.fill();
+  ctx.strokeStyle = 'rgba(170,135,80,0.45)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0, 556); ctx.lineTo(x1, 552); ctx.moveTo(x0, 618); ctx.lineTo(x1, 612); ctx.stroke();
+  // pebbles and tufts of grass by the wayside
+  ctx.fillStyle = 'rgba(160,125,70,0.35)';
+  for (let i = 0; i < 26; i++) {
+    const x = x0 + ((i * 137.5) % (x1 - x0)), y = 630 + ((i * 53) % 260);
+    ctx.beginPath(); ctx.ellipse(x, y, 4, 2, 0, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = '#9aab5a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < 18; i++) {
+    const x = x0 + ((i * 211.3 + 40) % (x1 - x0)), y = 640 + ((i * 97) % 250);
+    ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 11); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8);
+  }
+  ctx.stroke();
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Speech bubbles, captions, messages
+// ============================================================
+// who: 'bart' | 'jesus' | a person object. key: VERSES key, or text: plain words.
+function say(who, opts) { bubbles = bubbles.filter((b) => b.who !== who); bubbles.push({ who, t: opts.dur || 2.2, ...opts }); }
+
+function speakerPos(who) {
+  if (who === 'bart') { const s = bartScale(bart.y); return { x: bart.x, y: bart.y - (bart.pose === 'sit' ? 80 : 78) * s }; }
+  if (who === 'jesus') return { x: jesus.x, y: jesus.y - 76 };
+  return { x: who.x, y: who.y - 75 * who.s };
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawBubble(sx, sy, text, maxW = 240, small = false, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = small ? '600 13px Fredoka, sans-serif' : '600 15px Fredoka, sans-serif';
+  const mw = Math.min(maxW, W - 40);
+  const lines = wrapText(text, mw);
+  const lh = small ? 16 : 19, pad = small ? 7 : 10;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2;
+  const h = lines.length * lh + pad * 2 - 4;
+  const bx = clamp(sx - w / 2, -offX + 8, W + offX - w - 8);
+  let by = sy - h - 14;
+  if (by < 104 - offY) by = 104 - offY;
+  ctx.fillStyle = 'rgba(255,253,244,0.96)'; ctx.strokeStyle = '#c9a13a'; ctx.lineWidth = 2;
+  roundRect(bx, by, w, h, 12); ctx.fill(); ctx.stroke();
+  // tail toward the speaker
+  const tx = clamp(sx, bx + 14, bx + w - 14);
+  if (sy > by + h) {
+    ctx.beginPath(); ctx.moveTo(tx - 8, by + h - 1); ctx.lineTo(sx, Math.min(sy, by + h + 14)); ctx.lineTo(tx + 8, by + h - 1); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillRect(tx - 7, by + h - 3, 14, 3);
+  }
+  ctx.fillStyle = '#4a3512'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, bx + pad, by + pad + i * lh));
+  ctx.restore();
+}
+
+function drawBubbles() {
+  for (const b of bubbles) {
+    const p = speakerPos(b.who);
+    const text = b.key ? Bible.verse(VERSES[b.key]).text : b.text;
+    drawBubble(p.x, p.y, text, b.small ? 150 : 240, b.small, clamp(b.t / 0.3, 0, 1));
+  }
+}
+
+function drawCaption() {
+  if (!caption || caption.t <= 0) return;
+  const v = Bible.verse(VERSES[caption.key]);
+  ctx.save();
+  ctx.globalAlpha = clamp(caption.t / 0.5, 0, 1);
+  const maxW = Math.min(540, W - 30);
+  ctx.font = 'italic 600 16px Fredoka, sans-serif';
+  const lines = wrapText(`"${v.text}"`, maxW - 28);
+  const h = lines.length * 21 + 36;
+  const x = (W - maxW) / 2, y = 150 - offY * 0.5;
+  ctx.fillStyle = 'rgba(255,252,240,0.93)'; ctx.strokeStyle = 'rgba(201,161,58,0.8)'; ctx.lineWidth = 2;
+  roundRect(x, y, maxW, h, 14); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5a4210'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + 10 + i * 21));
+  ctx.font = '600 12px Fredoka, sans-serif'; ctx.fillStyle = '#8a7446';
+  ctx.fillText(`— ${v.cite}`, W / 2, y + h - 20);
+  ctx.restore();
+}
+
+function showMessage(text) { message = { text, t: 2.2 }; }
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, W / 2, H * 0.44);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, H * 0.44);
+  ctx.restore();
+}
+
+// ============================================================
+//  Play: crying out
+// ============================================================
+function inEarshot() { return prog >= ZONE0 && prog <= ZONE1; }
+function hushing() { return rows.some((r) => r.people.some((p) => p.hush && p.hush.stage === 'shh')); }
+
+function shout() {
+  if (tapCd > 0) return;
+  tapCd = TAP_GAP;
+  if (hushing()) {
+    // shouting straight into a "Shh!" only gets you hushed more
+    voice = Math.max(0, voice - 4);
+    muffled++;
+    shoutT = 0.25;
+    if (message.t < 1.2) showMessage('Shh! Wait a moment...');
+    sfx.shh(0.12);
+  } else {
+    voice = Math.min(100, voice + cfg.gain);
+    shoutT = 0.35;
+    shoutFx.push({ t: 0 });
+    sfx.tap(voice / 100);
+  }
+  if (!bubbles.some((b) => b.who === 'bart')) say('bart', { key: 'mercy', dur: 1.6 });
+  else bubbles.find((b) => b.who === 'bart').t = 1.6;
+}
+
+function updateCry(dt) {
+  // crowd noise rises and falls in waves
+  const wave = 0.5 + 0.5 * Math.sin(lt * 0.75 + noisePh[0]) + 0.25 * Math.sin(lt * 2.1 + noisePh[1]);
+  noise = clamp(wave, 0, 1) * cfg.noiseAmp;
+  voice = Math.max(0, voice - (cfg.decay + noise * cfg.noiseDecay) * dt);
+  noiseMsgCd -= dt;
+  if (noise > 0.62 && noiseMsgCd <= 0 && lt > 2) { showMessage('The crowd is loud: cry louder!'); noiseMsgCd = 9; }
+  chatterCd -= dt;
+  if (noise > 0.5 && chatterCd <= 0) {
+    const lines = ['Rabbi!', 'The Teacher!', 'Is it really Him?', 'Make way!', 'There He is!', 'From Nazareth!'];
+    const p = procession[Math.floor(Math.random() * procession.length)];
+    if (p.x > -offX + 20 && p.x < W + offX - 20) say(p, { text: lines[Math.floor(Math.random() * lines.length)], dur: 1.3, small: true });
+    chatterCd = rand(1.2, 2.4);
+  }
+
+  // hushers: someone turns round (a warning), then "Shh!" pushes the voice down
+  hushT -= dt;
+  const active = rows.reduce((n, r) => n + r.people.filter((p) => p.hush).length, 0);
+  if (hushT <= 0 && active < cfg.maxHush) {
+    const pool = [];
+    for (const r of rows) for (const p of r.people) if (!p.hush && Math.abs(p.x - bart.x) < W * 0.42 && p.x > 20 && p.x < W - 20) pool.push(p);
+    if (pool.length) {
+      const p = pool[Math.floor(Math.random() * pool.length)];
+      p.hush = { stage: 'turn', t: cfg.hushWarn * rand(0.9, 1.15) };
+    }
+    hushT = rand(cfg.hushGap[0], cfg.hushGap[1]);
+  }
+  for (const r of rows) for (const p of r.people) {
+    if (!p.hush) continue;
+    p.hush.t -= dt;
+    if (p.hush.t > 0) continue;
+    if (p.hush.stage === 'turn') {
+      p.hush = { stage: 'shh', t: cfg.hushDur };
+      voice = Math.max(0, voice - cfg.hushHit);
+      sfx.shh(0.3);
+      shakeT = 0.12;
+    } else p.hush = null;
+  }
+
+  // the procession walks by
+  prog += dt / cfg.walkT;
+  if (inEarshot() && voice >= 99.5) { heard(); return; }
+  if (prog > ZONE1) fail();
+}
+
+function heard() {
+  phase = 'called'; phaseT = 0;
+  walking = false;
+  heardScore = {
+    early: Math.round(clamp((ZONE1 - prog) / (ZONE1 - ZONE0), 0, 1) * 500),
+    patient: Math.max(0, 300 - muffled * 40),
+  };
+  for (const r of rows) for (const p of r.people) p.hush = null;
+  jesus.pose = 'call'; jesus.side = bart.x < jesus.x ? -1 : 1; jesus.bob = 0;
+  showMessage('Jesus stops and turns!');
+  sfx.chime();
+  flashT = 0.2;
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, TAU), sp = rand(30, 120);
+    spawn(jesus.x, jesus.y - 50, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.3), i % 2 ? '#ffe27a' : '#fff6d0', rand(2, 4));
+  }
+}
+
+// ============================================================
+//  Play: called, walking to Jesus, meeting Him
+// ============================================================
+function nearestRowPerson() {
+  let bestP = null, bd = 1e9;
+  for (const p of rows[0].people) { const d = Math.abs(p.x - bart.x); if (d < bd && d > 30) { bd = d; bestP = p; } }
+  return bestP;
+}
+
+function updateCalled(dt) {
+  const prev = phaseT;
+  phaseT += dt;
+  const at = (s) => prev < s && phaseT >= s;
+  if (at(0.5)) { bart.mood = 'hopeful'; const p = nearestRowPerson(); if (p) say(p, { key: 'called', dur: 3 }); }
+  if (at(2.4)) {
+    // he casts away his garment and rises
+    bart.cloak = false; bart.pose = 'stand'; bart.mood = 'hopeful';
+    cloak = { x: bart.x, y: bart.y - 40, vx: (bart.x < W / 2 ? -1 : 1) * rand(90, 130), vy: -300, rot: 0, vr: rand(5, 8), landed: false };
+    caption = { key: 'garment', t: 4.5 };
+    sfx.puff(0.4);
+    for (let i = 0; i < 16; i++) spawn(bart.x + rand(-20, 20), bart.y - 10, rand(-60, 60), rand(-80, -20), 0.7, '#e8d9b0', rand(2, 4), 120);
+  }
+  if (at(3.6)) {
+    phase = 'walk'; rowT = 0; walkTime = 0;
+    bart.back = true;
+    showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap above him to step forward' : '↑ to step forward, ← → to sidestep');
+    setTimeout(() => { if (state === 'play' && phase === 'walk' && bart.row < 1) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap beside him to sidestep' : 'Find a gap in the crowd!'); }, 2600);
+  }
+}
+
+function updateRows(dt) {
+  if (phase === 'walk' || phase === 'meet') rowT += dt;
+  const ease = clamp(rowT / 8, 0, 1);
+  for (const r of rows) {
+    const newShift = phase === 'cry' || phase === 'called' ? 0 : r.dir * cfg.amp * Math.sin(r.omega * rowT);
+    const vx = (newShift - r.shift) / (dt || 1);
+    r.shift = newShift;
+    r.vx = vx;
+    for (const p of r.people) {
+      p.x = p.baseX + r.shift + p.partF * cfg.part * ease;
+      p.bob = 0;
+    }
+  }
+}
+
+function overlapping(row, x) {
+  if (row < 0 || row >= rows.length) return null;
+  for (const p of rows[row].people) if (Math.abs(p.x - x) < BART_HALF + PERSON_HALF * p.s) return p;
+  return null;
+}
+
+function moveBart(kind) {
+  if (phase !== 'walk') return;
+  if (bart.tw) { queuedMove = kind; return; }
+  const b = bart;
+  if (kind === 'up') {
+    if (b.row >= rows.length - 1) {
+      // past the last row: go to Jesus
+      phase = 'meet'; phaseT = 0; meetStep = 0;
+      const tx = jesus.x + (b.x < jesus.x ? -30 : 30);
+      const d = Math.hypot(tx - b.x, MEET_Y - b.y);
+      b.tw = { x0: b.x, y0: b.y, x1: tx, y1: MEET_Y, t: 0, d: Math.max(0.6, d / 110), kind: 'meet' };
+      return;
+    }
+    b.tw = { x0: b.x, y0: b.y, x1: b.x, y1: rowY(b.row + 1), t: 0, d: 0.24, kind: 'up', row: b.row + 1, from: b.row };
+  } else if (kind === 'down') {
+    if (b.row < 0) return;
+    b.tw = { x0: b.x, y0: b.y, x1: b.x, y1: b.row === 0 ? BART_Y - 10 : rowY(b.row - 1), t: 0, d: 0.24, kind: 'down', row: b.row - 1, from: b.row };
+  } else {
+    const dir = kind === 'left' ? -1 : 1;
+    b.tw = { x0: b.x, y0: b.y, x1: clamp(b.x + dir * 46, 30, W - 30), y1: b.y, t: 0, d: 0.2, kind: 'side', row: b.row, from: b.row };
+  }
+  sfx.step();
+}
+
+function bump(p) {
+  bumps++;
+  p.shockT = 0.9;
+  const lines = ['Oh! Excuse me!', 'Pardon me, friend!', 'Sorry, sorry!', 'Oops! Excuse me!'];
+  showMessage(lines[bumps % lines.length]);
+  sfx.bounce();
+  shakeT = 0.15;
+}
+
+function updateWalk(dt) {
+  const b = bart;
+  walkTime += dt;
+  if (b.tw) {
+    const tw = b.tw;
+    tw.t += dt;
+    const f = clamp(tw.t / tw.d, 0, 1);
+    const e = f * f * (3 - 2 * f);
+    b.x = lerp(tw.x0, tw.x1, e); b.y = lerp(tw.y0, tw.y1, e);
+    b.bob = Math.sin(f * Math.PI) * 6;
+    if (f >= 1) {
+      b.tw = null; b.bob = 0;
+      if (tw.kind === 'bumpBack') { /* done */ }
+      else if (tw.kind === 'meet') { /* handled in updateMeet */ }
+      else {
+        const hit = overlapping(tw.row, b.x);
+        if (hit) {
+          bump(hit);
+          b.tw = { x0: b.x, y0: b.y, x1: tw.x0, y1: tw.y0, t: 0, d: 0.2, kind: 'bumpBack' };
+          b.row = tw.from;
+        } else b.row = tw.row;
+      }
+      if (!b.tw && queuedMove) { const q = queuedMove; queuedMove = null; moveBart(q); }
+    }
+    return;
+  }
+  // the crowd sways and gently nudges him along
+  if (b.row >= 0) {
+    const r = rows[b.row];
+    for (const p of r.people) {
+      const lim = BART_HALF + PERSON_HALF * p.s;
+      if (Math.abs(p.x - b.x) < lim) {
+        const side = r.vx !== 0 ? Math.sign(r.vx) : Math.sign(b.x - p.x) || 1;
+        b.x = p.x + side * (lim + 0.5);
+      }
+    }
+    if (b.x < 30 || b.x > W - 30) {
+      b.x = clamp(b.x, 30, W - 30);
+      const hit = overlapping(b.row, b.x);
+      if (hit) {   // pinned at the edge: step back out of the row
+        bump(hit);
+        b.tw = { x0: b.x, y0: b.y, x1: b.x, y1: b.row === 0 ? BART_Y - 10 : rowY(b.row - 1), t: 0, d: 0.22, kind: 'bumpBack' };
+        b.row--;
+      }
+    }
+  }
+}
+
+function updateMeet(dt) {
+  const b = bart;
+  if (b.tw) {
+    const tw = b.tw;
+    tw.t += dt;
+    const f = clamp(tw.t / tw.d, 0, 1);
+    b.x = lerp(tw.x0, tw.x1, f); b.y = lerp(tw.y0, tw.y1, f);
+    b.bob = Math.abs(Math.sin(tw.t * 9)) * 4;
+    if (f >= 1) { b.tw = null; b.bob = 0; phaseT = 0; }
+    return;
+  }
+  const prev = phaseT;
+  phaseT += dt;
+  const at = (s) => prev < s && phaseT >= s;
+  if (at(0.3)) { jesus.pose = 'open'; say('jesus', { key: 'whatWilt', dur: 2.1 }); }
+  if (at(2.5)) say('bart', { key: 'sight', dur: 2.1 });
+  if (at(4.7)) { jesus.pose = 'bless'; jesus.side = b.x < jesus.x ? -1 : 1; say('jesus', { key: 'whole', dur: 8 }); }
+  if (at(5.4)) win();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  bart.back = false; bart.mood = 'healed';
+  jesus.face = 'joy';
+  const steps = Math.max(0, 400 - bumps * 100);
+  const quick = Math.max(0, 300 - Math.round(walkTime * 12));
+  const levelBonus = level * 500;
+  const score = heardScore.early + heardScore.patient + steps + quick + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('bartimaeusBest', best); } catch (e) {} }
+  lastScore = { early: heardScore.early, patient: heardScore.patient, steps, quick, levelBonus, score };
+  // his eyes are opened: the world bursts into colour
+  flashT = 0.5;
+  const colours = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa', '#ffffff', '#ffd1e8'];
+  for (let i = 0; i < 110; i++) {
+    const a = rand(0, TAU), sp = rand(60, 260);
+    spawn(bart.x, bart.y - 50, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.9, 2), colours[i % colours.length], rand(2.5, 5), 40);
+  }
+  showMessage('He can see!');
+  sfx.win();
+  endTimer = 3.4;
+}
+
+function fail() {
+  state = 'fail';
+  bart.mood = 'sad';
+  for (const r of rows) for (const p of r.people) p.hush = null;
+  bubbles = bubbles.filter((b) => b.who !== 'bart');
+  showMessage('Jesus has passed by...');
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function setupScene() {
+  cfg = makeConfig(level);
+  bart = newBart();
+  rows = makeRows();
+  procession = makeProcession();
+  jesus = { x: 0, y: ROAD_Y, face: 'calm', pose: 'walk', side: -1, bob: 0 };
+  cloak = null;
+  particles = []; bubbles = []; shoutFx = []; ripples = [];
+  caption = null;
+  voice = 0; noise = 0; noisePh = [rand(0, TAU), rand(0, TAU)];
+  prog = P_START; walking = true; clarity = 0;
+  phase = 'cry'; phaseT = 0; lt = 0; rowT = 0;
+  tapCd = 0; shoutT = 0; hushT = level === 1 ? 3.5 : 2.5; muffled = 0; bumps = 0; walkTime = 0;
+  noiseMsgCd = 4; chatterCd = 1;
+  flashT = shakeT = 0;
+  queuedMove = null;
+  placeProcession(0);
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  setupScene();
+  prog = 0.27; placeProcession(0);
+  showOverlay('Blind Bartimaeus', 'Heard by Jesus on the Jericho road',
+    `${verseHTML('mercy')}
+     <ul>
+       <li>Blind Bartimaeus sits begging by the road outside Jericho. <b>Jesus is passing by</b> with a great crowd!</li>
+       <li><b>Tap</b> (or <kbd>Space</kbd>) to cry out. Each shout fills the <b>Voice</b> meter.</li>
+       <li>Some people turn round to <b>hush</b> him. When someone folds their arms and turns, <b>wait</b> until the "Shh!" is over, then cry out again. When the crowd gets noisy, cry louder!</li>
+       <li>Fill the meter while Jesus is <b>near</b> and He will hear you.</li>
+       <li>Then guide Bartimaeus through the crowd to Jesus: <b>tap above</b> him to step forward, <b>beside</b> him to sidestep (<kbd>&uarr;</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd>).</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Cry out!', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  setupScene();
+  state = 'play';
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+  if (level === 1) setTimeout(() => { if (state === 'play' && phase === 'cry' && voice < 10) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap to cry out to Jesus!' : 'Press Space (or click) to cry out!'); }, 2300);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('He can see!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('whole')}
+       <p class="score">Heard in time: <b>${s.early}</b><br>Patient crying: <b>${s.patient}</b><br>Gentle steps: <b>${s.steps}</b><br>Came quickly: <b>${s.quick}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Cry out again!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Jesus went by before He heard. Don't give up! Keep the Voice meter full as He comes near, and wait out each "Shh!"</p>
+       ${verseHTML('hush')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    sfx.thrust(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (phase === 'cry') {
+    if (['Space', 'Enter', 'ArrowUp', 'KeyW'].includes(e.code)) shout();
+  } else if (phase === 'walk') {
+    if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) moveBart('up');
+    else if (['ArrowDown', 'KeyS'].includes(e.code)) moveBart('down');
+    else if (['ArrowLeft', 'KeyA'].includes(e.code)) moveBart('left');
+    else if (['ArrowRight', 'KeyD'].includes(e.code)) moveBart('right');
+  }
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function handleTap(p) {
+  if (phase === 'cry') { shout(); return; }
+  if (phase !== 'walk') return;
+  const dx = p.x - bart.x, dy = p.y - (bart.y - 40 * bartScale(bart.y));
+  if (Math.abs(dx) > 34 && Math.abs(dx) > Math.abs(dy) * 0.9) moveBart(dx < 0 ? 'left' : 'right');
+  else if (dy > 50) moveBart('down');
+  else moveBart('up');
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  handleTap(p);
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each shout, pitched higher the fuller his voice
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      // a soft crowd murmur that follows the crowd noise
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.9;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  thrust(level) {            // crowd murmur level
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.2);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.12);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  // "Shhh!": a soft hiss
+  shh(vol = 0.3) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 3800; hp.Q.value = 1.2;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.06);
+    g.gain.setValueAtTime(vol, t0 + 0.3); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+    src.connect(hp); hp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.65);
+  },
+  chime() { this.tone(880, 0.6, 'sine', 0.22); this.tone(1320, 0.7, 'sine', 0.18, 0.12); this.tone(1760, 0.9, 'sine', 0.14, 0.24); },
+  step() { this.tone(320, 0.08, 'triangle', 0.1, 0, 250); },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+};
+
+// ============================================================
+//  Rendering
+// ============================================================
+function placeProcession(dt) {
+  jesus.x = lerp(W + 90, -90, prog);
+  jesus.bob = walking || state === 'fail' ? Math.abs(Math.sin(t * 8)) * 2 : 0;
+  for (const p of procession) {
+    p.x = jesus.x + p.dx;
+    p.bob = walking || state === 'fail' ? Math.abs(Math.sin(t * 8 + p.phase)) * 2 : 0;
+  }
+}
+
+// Everything Bartimaeus "sees": drawn into the low-resolution, dim layer
+function drawWorld() {
+  drawSky();
+  drawJericho();
+  drawGround();
+  // procession (far to near) with Jesus
+  const walkers = [...procession.map((p) => ({ y: p.y, draw: () => drawPerson(p) })), { y: jesus.y + 1, draw: () => drawJesus(jesus) }];
+  walkers.sort((a, b) => a.y - b.y).forEach((w) => w.draw());
+  if (cloak && cloak.landed) drawCloak(cloak);
+  // rows of bystanders, far to near, with Bartimaeus slotted in by depth
+  let bartDrawn = false;
+  for (let k = rows.length - 1; k >= 0; k--) {
+    const r = rows[k];
+    if (!bartDrawn && bart.y < r.y - 1) { drawBart(bart); bartDrawn = true; }
+    for (const p of r.people) if (p.x > -offX - 40 && p.x < W + offX + 40) drawPerson(p);
+  }
+  if (!bartDrawn) drawBart(bart);
+  if (cloak && !cloak.landed) drawCloak(cloak);
+}
+
+// Clear overlays: things the player must read, and the light of Jesus
+function drawSharp() {
+  // the light of Jesus shines through his blindness
+  if (clarity < 1) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.5);
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const g = ctx.createRadialGradient(jesus.x, jesus.y - 45, 4, jesus.x, jesus.y - 45, 95);
+    g.addColorStop(0, `rgba(255,240,170,${(0.55 + pulse * 0.2) * (1 - clarity)})`);
+    g.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(jesus.x, jesus.y - 45, 95, 0, TAU); ctx.fill();
+    ctx.restore();
+    // a golden halo you can always make out
+    ctx.strokeStyle = `rgba(255,214,90,${0.9 * (1 - clarity)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(jesus.x, jesus.y - 56 - jesus.bob, 15, 0, TAU); ctx.stroke();
+  }
+
+  // hushers: turning round (warning), then "Shh!"
+  for (const r of rows) for (const p of r.people) {
+    if (!p.hush) continue;
+    const x = p.x, y = p.y - 84 * p.s;
+    if (p.hush.stage === 'turn') {
+      const a = 0.6 + 0.4 * Math.sin(t * 14);
+      ctx.fillStyle = `rgba(255,250,235,${a})`; ctx.strokeStyle = '#b07a2a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8a5a10'; ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('!', x, y + 1);
+    } else {
+      const wob = Math.sin(t * 20) * 2;
+      ctx.fillStyle = 'rgba(255,245,245,0.97)'; ctx.strokeStyle = '#c0504d'; ctx.lineWidth = 2.5;
+      roundRect(x - 27 + wob, y - 14, 54, 26, 12); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#b03a36'; ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Shh!', x + wob, y);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // his cry going out: golden rings from his mouth
+  const bs = bartScale(bart.y);
+  for (const f of shoutFx) {
+    const a = 1 - f.t / 0.6;
+    ctx.strokeStyle = `rgba(255,205,70,${a})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(bart.x, bart.y - 52 * bs, 16 + f.t * 90, -Math.PI * 0.85, -Math.PI * 0.15); ctx.stroke();
+  }
+
+  // the Voice meter beside him
+  if (phase === 'cry' && (state === 'play' || state === 'fail' || state === 'pause')) drawVoiceMeter();
+
+  drawParticles();
+  drawBubbles();
+  drawCaption();
+
+  // gap hint during the walk: a soft glow on the next row's gap
+  if (phase === 'walk' && state === 'play' && bart.row < rows.length - 1) {
+    const r = rows[bart.row + 1];
+    const gx = r.gapC + r.shift;
+    ctx.fillStyle = `rgba(255,230,140,${0.25 + 0.15 * Math.sin(t * 5)})`;
+    ctx.beginPath(); ctx.ellipse(gx, r.y - 2, 24, 7, 0, 0, TAU); ctx.fill();
+  }
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 1.6})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+}
+
+function drawVoiceMeter() {
+  const x = bart.x + 54, top = 758, h = 118, w = 18;
+  const full = voice / 100;
+  const near = inEarshot();
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,252,240,0.9)'; ctx.strokeStyle = near ? '#e0a526' : '#b8a57a'; ctx.lineWidth = 2.5;
+  roundRect(x - 3, top - 3, w + 6, h + 6, 10); ctx.fill(); ctx.stroke();
+  const g = ctx.createLinearGradient(0, top + h, 0, top);
+  g.addColorStop(0, '#f7c948'); g.addColorStop(1, '#fff1a8');
+  ctx.fillStyle = hushing() && Math.sin(t * 16) > 0 ? '#e57373' : g;
+  if (full > 0) { roundRect(x, top + h * (1 - full), w, h * full, 7); ctx.fill(); }
+  // crowd noise shown as a grey mist creeping up the meter
+  ctx.fillStyle = 'rgba(120,110,100,0.35)';
+  roundRect(x, top + h * (1 - noise * 0.6), w, h * noise * 0.6, 7); ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.font = '700 11px Fredoka, sans-serif';
+  ctx.fillStyle = '#5a4210';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeText('VOICE', x + w / 2, top - 8); ctx.fillText('VOICE', x + w / 2, top - 8);
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + voice
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#4a3510';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Blind Bartimaeus' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  const walkingNow = phase !== 'cry' && state !== 'title';
+  ctx.fillText(walkingNow ? 'BUMPS' : 'VOICE', 12, 48);
+  ctx.shadowBlur = 0;
+  if (walkingNow) {
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillText(`${bumps}`, 60, 49);
+  } else {
+    ctx.fillStyle = 'rgba(90,66,16,0.25)';
+    roundRect(58, 38, 130, 13, 6.5); ctx.fill();
+    const gg = ctx.createLinearGradient(58, 0, 188, 0);
+    gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8');
+    ctx.fillStyle = gg;
+    if (voice > 0) { roundRect(58, 38, 130 * voice / 100, 13, 6.5); ctx.fill(); }
+  }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: where Jesus is on the road, and how loud the crowd is
+  const rx = viewW - 12, tw = 140, tl = rx - tw, ty = 36;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.font = '700 12px Fredoka, sans-serif';
+  let label = 'JESUS IS COMING', col = '#4a3510';
+  if (phase === 'cry' && inEarshot()) { label = 'HE IS NEAR: CRY OUT!'; col = Math.sin(t * 8) > -0.3 ? '#2b8a3e' : '#4a3510'; }
+  if (phase === 'cry' && prog > ZONE1) { label = 'HE HAS PASSED BY'; col = '#a33'; }
+  if (phase !== 'cry') { label = state === 'win' ? 'HE CAN SEE!' : 'JESUS IS CALLING'; col = '#2b8a3e'; }
+  ctx.fillStyle = col;
+  ctx.fillText(label, rx, 20);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(90,66,16,0.22)';
+  roundRect(tl, ty - 4, tw, 8, 4); ctx.fill();
+  const zx0 = tl + (1 - ZONE1) * tw, zx1 = tl + (1 - ZONE0) * tw;
+  ctx.fillStyle = 'rgba(240,190,60,0.85)';
+  roundRect(zx0, ty - 4, zx1 - zx0, 8, 4); ctx.fill();
+  // Bartimaeus in the middle
+  ctx.fillStyle = '#7b5236';
+  ctx.beginPath(); ctx.arc(tl + tw / 2, ty + 9, 4, 0, TAU); ctx.fill();
+  // Jesus's dot moving right to left
+  const jx = tl + clamp(1 - prog, 0, 1) * tw;
+  ctx.fillStyle = '#fffdf2'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(jx, ty, 7, 0, TAU); ctx.fill(); ctx.stroke();
+  if (phase === 'cry') {
+    ctx.font = '600 11px Fredoka, sans-serif'; ctx.fillStyle = '#4a3510';
+    ctx.fillText('CROWD', tl - 6, ty + 28);
+    ctx.fillStyle = 'rgba(90,66,16,0.22)';
+    roundRect(tl, ty + 20, tw, 8, 4); ctx.fill();
+    ctx.fillStyle = noise > 0.62 ? '#d9480f' : '#9a8a6a';
+    if (noise > 0.01) { roundRect(tl, ty + 20, tw * noise, 8, 4); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+function render() {
+  // The world is drawn small then stretched: that is how blurry his eyes are.
+  const blurPx = lerp(BLUR_PX, 0, clarity);
+  const k = Math.max(1, blurPx * dpr);
+  const ow = Math.max(1, Math.round(canvas.width / k)), oh = Math.max(1, Math.round(canvas.height / k));
+  if (off.width !== ow || off.height !== oh) { off.width = ow; off.height = oh; }
+  const f = ow / canvas.width;
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+
+  ctx = offCtx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, ow, oh);
+  ctx.setTransform(scale * f, 0, 0, scale * f, (offX + sx) * scale * f, (offY + sy) * scale * f);
+  drawWorld();
+
+  ctx = mainCtx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(off, 0, 0, ow, oh, 0, 0, canvas.width, canvas.height);
+
+  // dim, greyed and shadowed at the edges until his eyes are opened
+  const dim = 1 - clarity;
+  if (dim > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.globalAlpha = 0.72 * dim;
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = `rgba(30,24,45,${0.3 * dim})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2, cy = canvas.height * 0.6, R = Math.hypot(canvas.width, canvas.height) * 0.62;
+    const vg = ctx.createRadialGradient(cx, cy, R * 0.35, cx, cy, R);
+    vg.addColorStop(0, 'rgba(15,10,25,0)');
+    vg.addColorStop(1, `rgba(15,10,25,${0.6 * dim})`);
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawSharp();
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  for (const c of bgClouds) { c.f += (c.speed * dt) / (W + 300); if (c.f > 1) c.f -= 1; }
+  updateParticles(dt);
+  if (state === 'play') {
+    lt += dt;
+    tapCd = Math.max(0, tapCd - dt);
+    if (phase === 'cry') updateCry(dt);
+    else if (phase === 'called') updateCalled(dt);
+    else if (phase === 'walk') updateWalk(dt);
+    else if (phase === 'meet') updateMeet(dt);
+  } else if (state === 'fail') {
+    prog += dt / cfg.walkT;               // He walks on down the road
+  } else if (state === 'win') {
+    clarity = Math.min(1, clarity + dt / 1.4);
+    if (Math.random() < dt * 14) {
+      const colours = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa'];
+      spawn(rand(-offX, W + offX), rand(-offY, H * 0.5), rand(-10, 10), rand(20, 50), 2, colours[Math.floor(Math.random() * colours.length)], rand(2, 4));
+    }
+  }
+  if (state !== 'pause') {
+    if (state === 'play' || state === 'title' || state === 'fail') placeProcession(dt);
+    if (state === 'play' || state === 'fail' || state === 'win') updateRows(dt);
+    for (const r of rows) for (const p of r.people) updatePerson(p, dt, true);
+    for (const p of procession) updatePerson(p, dt, false);
+  }
+  // Bartimaeus's face
+  if (state === 'play' && phase === 'cry') bart.mood = shoutT > 0 ? 'shout' : 'blind';
+  shoutT = Math.max(0, shoutT - dt);
+  // the cast-away cloak
+  if (cloak && !cloak.landed) {
+    cloak.vy += 700 * dt; cloak.x += cloak.vx * dt; cloak.y += cloak.vy * dt; cloak.rot += cloak.vr * dt;
+    if (cloak.vy > 0 && cloak.y > BART_Y - 6) { cloak.y = BART_Y - 6; cloak.landed = true; cloak.rot = 0; sfx.puff(0.15); }
+  }
+  for (let i = shoutFx.length - 1; i >= 0; i--) { shoutFx[i].t += dt; if (shoutFx[i].t > 0.6) shoutFx.splice(i, 1); }
+  for (let i = bubbles.length - 1; i >= 0; i--) { bubbles[i].t -= dt; if (bubbles[i].t <= 0) bubbles.splice(i, 1); }
+  if (caption) caption.t -= dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.thrust(state === 'play' && phase === 'cry' ? 0.15 + noise * 0.6 : 0);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

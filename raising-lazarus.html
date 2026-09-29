@@ -1,0 +1,2206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#9fd3f2">
+<title>Lazarus, Come Forth!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Lazarus, Come Forth!</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script>
+'use strict';
+
+// Scripture shown in this game, in every version the menu offers.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  resurrection: { ref: 'John 11:25', KJV: 'I am the resurrection, and the life: he that believeth in me, though he were dead, yet shall he live.', NKJV: 'I am the resurrection and the life. He who believes in Me, though he may die, he shall live.', NIV: 'I am the resurrection and the life. The one who believes in me will live, even though they die.', NLT: 'I am the resurrection and the life. Anyone who believes in me will live, even after dying.' },
+  wept:      { ref: 'John 11:35', KJV: 'Jesus wept.', NKJV: 'Jesus wept.', NIV: 'Jesus wept.', NLT: 'Then Jesus wept.' },
+  stone:     { ref: 'John 11:39', KJV: 'Take ye away the stone.', NKJV: 'Take away the stone.', NIV: 'Take away the stone.', NLT: 'Roll the stone aside.' },
+  comeForth: { ref: 'John 11:43', KJV: 'Lazarus, come forth.', NKJV: 'Lazarus, come forth!', NIV: 'Lazarus, come out!', NLT: 'Lazarus, come out!' },
+  loose:     { ref: 'John 11:44', KJV: 'Loose him, and let him go.', NKJV: 'Loose him, and let him go.', NIV: 'Take off the grave clothes and let him go.', NLT: 'Unwrap him and let him go!' },
+  win:       { ref: 'John 11:43–44', KJV: 'Lazarus, come forth. And he that was dead came forth... Jesus saith unto them, Loose him, and let him go.', NKJV: '‘Lazarus, come forth!’ And he who had died came out... Jesus said to them, ‘Loose him, and let him go.’', NIV: '‘Lazarus, come out!’ The dead man came out... Jesus said to them, ‘Take off the grave clothes and let him go.’', NLT: '‘Lazarus, come out!’ And the dead man came out... Jesus told them, ‘Unwrap him and let him go!’' },
+  martha:    { ref: 'John 11:21', KJV: 'Lord, if thou hadst been here, my brother had not died.', NKJV: 'Lord, if You had been here, my brother would not have died.', NIV: 'Lord... if you had been here, my brother would not have died.', NLT: 'Lord, if only you had been here, my brother would not have died.' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => { f = clamp(f, 0, 1); return f * f * (3 - 2 * f); };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const GY = 610;           // where the back row stands (tomb, Jesus, helpers)
+const FRONT_Y = 855;      // where the front row of friends stands
+const LEAD = 1.1;         // seconds before the first heave beat
+const LZ_S = 3.1;         // Lazarus's size while being unwrapped
+const LZ_Y = 815;         // his feet while being unwrapped
+const SWIPE_MIN = 52;     // how far a swipe must travel along a strip (px)
+
+const LEVEL_NAMES = [
+  'A Friend in Bethany',
+  'The Sisters Send Word',
+  'Four Days Waiting',
+  'The Heavy Stone',
+  'All Bethany Watching',
+  'For the Glory of God',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Bethany ${n}`,
+    beat: Math.max(0.5, 0.82 - (n - 1) * 0.06),              // seconds between heaves
+    perfectWin: Math.max(0.055, 0.095 - (n - 1) * 0.008),     // timing windows (s)
+    goodWin: Math.max(0.12, 0.19 - (n - 1) * 0.014),
+    heavy: 1 + (n - 1) * 0.18,                                // the stone gets heavier
+    rollback: 0.015 + (n - 1) * 0.006,                        // how fast it rolls back when nobody heaves
+    stoneTime: Math.max(14, 26 - (n - 1) * 2.4),
+    bodyStrips: Math.min(2 + n, 8),                           // plus two on his head
+    knots: n >= 3 ? Math.min(n - 2, 4) : 0,                   // strips that take two swipes
+    unwrapTime: Math.max(9, 17 - (n - 1) * 1.6),
+    sway: n >= 4 ? Math.min((n - 3) * 16, 50) : 0,            // Lazarus wobbles about
+    randomDir: n >= 2,
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let phase = 'intro';      // intro | stone | call | unwrap | done
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('lazarusBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let phaseT = 0;
+let st = null;            // the stone (part 1)
+let uw = null;            // the unwrapping (part 3)
+let lz = null;            // Lazarus himself
+let particles = [];
+let flyers = [];          // strips of cloth flying away
+let pops = [];            // floating "Perfect!" words
+let bubble = null;        // Jesus's speech bubble
+let banner = null;        // "Jesus wept." banner
+let message = { text: '', t: 0 };
+let shockT = 0, laughT = 0, missT = 0, flashT = 0, shakeT = 0;
+let endTimer = 0;
+let lastScore = null;
+let failReason = '';
+
+function newStone() {
+  return {
+    T: 0, p: 0, v: 0, S: 35, lastK: -1, tickK: -1,
+    perfect: 0, good: 0, miss: 0, streak: 0, timeLeft: cfg.stoneTime,
+    pushT: 0, ringFx: 0, judge: null,
+  };
+}
+
+function newLazarus() {
+  return { x: 0, y: GY, s: 1, alpha: 0, spinT: 0, spinDur: 0.5, spins: 1, hop: 0, free: false, blink: 0, blinkT: 2, hair: '#3a2716' };
+}
+
+function newUnwrap() {
+  // Two strips round his head (with a gap for his eyes) and more round his body
+  const strips = [{ top: -76, bot: -61 }, { top: -52, bot: -40 }];
+  const n = cfg.bodyStrips, y0 = -40, y1 = 2;
+  for (let i = 0; i < n; i++) strips.push({ top: lerp(y0, y1, i / n), bot: lerp(y0, y1, (i + 1) / n) });
+  strips.forEach((s, i) => {
+    s.i = i; s.gone = false; s.loose = false; s.knot = false; s.wob = 0;
+    s.dir = cfg.randomDir ? (Math.random() < 0.5 ? -1 : 1) : (i % 2 ? -1 : 1);
+  });
+  // Knots only on body strips
+  const body = strips.slice(2).sort(() => Math.random() - 0.5);
+  for (let k = 0; k < cfg.knots && k < body.length; k++) body[k].knot = true;
+  return { strips, total: strips.length, removed: 0, timeLeft: cfg.unwrapTime, stroke: null, hintT: level === 1 ? 3.5 : 0, keyCd: 0, knotsDone: 0 };
+}
+
+// ============================================================
+//  Layout of the scene
+// ============================================================
+function sceneLayout() {
+  const narrow = W < 700;
+  const doorX = narrow ? W * 0.5 : W * 0.6;
+  const R = 62;
+  const roll = narrow ? Math.min(150, W - doorX - R - 24) : 170;
+  const p = st ? st.p : 0;
+  const stoneX = doorX + roll * ease(p) * 0.15 + roll * p * 0.85;
+  const jesusX = narrow ? 50 : Math.max(50, doorX - 330);
+  // once the stone is away the helpers stand beside it if there's room, else by the door
+  const helpersRight = doorX + roll + R + 100 < W - 20;
+  return {
+    doorX, R, roll, stoneX, jesusX, helpersRight, narrow,
+    front: [W * 0.09, W * 0.24, W * 0.76, W * 0.91],
+  };
+}
+
+// Where Lazarus stands to be unwrapped: out in front, never hiding Jesus
+function lazarusSpot() {
+  const L = sceneLayout();
+  const cx = L.narrow ? W / 2 : (L.jesusX + L.doorX) / 2 + 10;
+  return { x: cx + (cfg.sway ? Math.sin(t * 1.3) * cfg.sway : 0), y: LZ_Y };
+}
+
+// ============================================================
+//  People: Martha, Mary, neighbours and the men who move the stone
+// ============================================================
+const FRIENDS = [
+  { name: 'Martha',  robe: '#c9745a', hair: '#2e1d10', skin: '#cf9866', scarf: '#efe3c4', s: 1.2 },
+  { name: 'Mary',    robe: '#8e5bb5', hair: '#4a2a14', skin: '#e0aa7a', scarf: '#6f95d1', s: 1.2 },
+  { name: 'Neighbour', robe: '#6b8e3a', hair: '#8a8a8a', beard: true, skin: '#d9a066', s: 1.2 },
+  { name: 'Child',   robe: '#d9a13a', hair: '#6b3f1d', skin: '#e3b184', s: 0.95 },
+];
+const HELPERS = [
+  { name: 'Simon',  robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070' },
+  { name: 'Joel',   robe: '#3c8f86', hair: '#1f140c', beard: true, skin: '#b87a48', scarf: '#e8dcc0' },
+  { name: 'Eli',    robe: '#5a6475', hair: '#4a2f1a', beard: false, skin: '#e3b184' },
+];
+function makePerson(d, i) {
+  return { ...d, i, x: 0, y: 0, s: d.s || 1, lx: 0, ly: -1, mood: 'watch', switchT: 0, delay: rand(0.05, 0.4),
+    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), pose: null, lean: 0 };
+}
+const friends = FRIENDS.map(makePerson);
+const helpers = HELPERS.map((d, i) => makePerson(d, i + 4));
+
+function updatePerson(p, want, dt) {
+  if (want !== p.mood) {
+    p.switchT += dt;
+    if (p.switchT > p.delay) { p.mood = want; p.switchT = 0; }
+  } else p.switchT = 0;
+  p.blinkT -= dt;
+  if (p.blinkT <= 0) { p.blink = 0.13; p.blinkT = rand(1.5, 5); }
+  if (p.blink > 0) p.blink -= dt;
+}
+
+function crowdMood() {
+  if (state === 'title') return 'watch';
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (phase === 'intro') return 'sad';
+  if (phase === 'stone') {
+    if (missT > 0) return 'worried';
+    if (st.streak >= 3) return 'wow';
+    return 'watch';
+  }
+  if (phase === 'call') {
+    if (phaseT < 2.4) return 'watch';
+    return phaseT < 3.6 ? 'shock' : 'wow';
+  }
+  if (phase === 'unwrap') {
+    if (laughT > 0) return 'joy';
+    if (uw.timeLeft < 4) return 'worried';
+    return 'wow';
+  }
+  return 'watch';
+}
+
+function updatePeople(dt) {
+  const m = crowdMood();
+  for (const p of friends) updatePerson(p, m, dt);
+  let hm = m;
+  if (state === 'play' && phase === 'stone') hm = st.pushT > 0 ? 'effort' : (missT > 0 ? 'worried' : 'watch');
+  if (phase === 'intro' && state === 'play') hm = 'watch';
+  for (const p of helpers) updatePerson(p, hm, dt);
+  if (lz) {
+    lz.blinkT -= dt;
+    if (lz.blinkT <= 0) { lz.blink = 0.13; lz.blinkT = rand(1.5, 4); }
+    if (lz.blink > 0) lz.blink -= dt;
+  }
+}
+
+// Place everyone for this frame and point their eyes at what matters
+function placePeople(L) {
+  let fx = L.stoneX, fy = GY - 60;
+  if (phase === 'intro' || state === 'title') { fx = L.jesusX; fy = GY - 60; }
+  if ((phase === 'call' && phaseT > 1.8) || phase === 'unwrap' || state === 'win') { fx = lz.x; fy = lz.y - 50 * lz.s; }
+  friends.forEach((p, k) => {
+    p.x = L.front[k]; p.y = FRONT_Y;
+    if (p.name === 'Child') p.y = FRONT_Y - 4;
+  });
+  // Helpers push the stone in a line, then step back to watch
+  const back = phase === 'call' ? ease(phaseT / 0.9) : (phase === 'unwrap' || phase === 'done' || state === 'win') ? 1 : 0;
+  const pushing = state === 'play' && phase === 'stone';
+  helpers.forEach((p, k) => {
+    const px = L.stoneX - L.R - 16 - k * 30;
+    const sx = L.helpersRight ? L.doorX + L.roll + L.R + 30 + k * 32 : L.doorX - 70 - k * 30;
+    p.x = lerp(phase === 'intro' || state === 'title' ? L.doorX - L.R - 16 - k * 30 : px, sx, back);
+    p.y = GY + 2 + k * 3;
+    p.s = 0.92;
+    p.pose = pushing ? 'push' : null;
+    p.lean = pushing ? 0.16 + (st.pushT > 0 ? 0.1 : 0) : 0;
+  });
+  for (const p of [...friends, ...helpers]) {
+    const dx = fx - p.x, dy = fy - (p.y - 53 * p.s);
+    const len = Math.hypot(dx, dy) || 1;
+    p.lx = dx / len; p.ly = dy / len;
+  }
+}
+
+function drawPerson(p) {
+  const d = p, s = p.s, mood = p.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(p.x, p.y - jump * s);
+  ctx.scale(s, s);
+  if (p.lean) ctx.rotate(p.lean);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const lx = p.lx, ly = p.ly;
+
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 2 === 0 && p.pose !== 'push') {
+    arm(11, -32, 22, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Arms
+  if (p.pose === 'push') {
+    const shove = mood === 'effort' ? 4 : 0;
+    arm(-11, -32, 22 + shove, -36); arm(11, -32, 26 + shove, -28);   // both hands on the stone
+  } else if (mood === 'watch' || mood === 'effort' || (mood === 'wow' && d.i % 2 !== 0)) {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);
+  } else if (mood === 'sad') {
+    if (d.i % 2 === 0) { arm(-11, -32, -15, -12); arm(11, -32, 7, -47); }   // wiping a tear
+    else { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    if (!d.beard) {   // a little hair showing under the head cloth
+      ctx.fillStyle = d.hair;
+      ctx.beginPath(); ctx.moveTo(-13, hy - 6); ctx.quadraticCurveTo(0, hy - 12, 13, hy - 6);
+      ctx.quadraticCurveTo(0, hy - 8, -13, hy - 3); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy' && mood !== 'effort';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  const drop = (x, y, c = '#7cc4f2') => {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 8); ctx.quadraticCurveTo(x + 4, y - 1, x, y); ctx.quadraticCurveTo(x - 4, y - 1, x, y - 8);
+    ctx.fill();
+  };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      drop(14, hy);
+      break;
+    case 'sad': {
+      // Gentle sorrow: eyes cast down, a tear rolling
+      eyes(3.5, 4, 2);
+      if (!blink) {   // heavy eyelids
+        ctx.fillStyle = d.skin;
+        ctx.fillRect(-ex - 4.5, ey - 5, 9, 3.6); ctx.fillRect(ex - 4.5, ey - 5, 9, 3.6);
+      }
+      brows(-10, -6, -10, -6);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      const ty = (t * 9 + d.i * 3) % 10;
+      ctx.globalAlpha = 1 - ty / 10;
+      drop(-ex - 1, ey + 6 + ty);
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case 'effort':
+      // Squeezed eyes and gritted teeth: heave!
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-ex - 3, ey - 3); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 3);
+      ctx.moveTo(ex + 3, ey - 3); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 3);
+      ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 1.5;
+      roundRect(-5, mouthY - 3, 10, 6, 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-5, mouthY); ctx.lineTo(5, mouthY); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,120,120,0.4)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      drop(15, hy - 6);
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  Jesus (standing on the ground, no cloud)
+// ============================================================
+function jesusPose() {
+  if (state === 'win') return { face: 'joy', up: true };
+  if (state === 'title') return { face: 'calm', up: false };
+  if (phase === 'intro') return { face: 'sad', up: false };
+  if (phase === 'call') return { face: phaseT > 0.9 && phaseT < 3.2 ? 'call' : 'calm', up: phaseT > 0.9 && phaseT < 3.6 };
+  if (phase === 'unwrap' && laughT > 0) return { face: 'joy', up: false };
+  if (state === 'fail') return { face: 'calm', up: false };
+  return { face: 'calm', up: false };
+}
+
+function drawJesus(x, y, s) {
+  const { face, up } = jesusPose();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  if (up) {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 80);
+    g.addColorStop(0, 'rgba(255,235,150,0.6)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 80, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Sandals peeping out under the robe
+  ctx.fillStyle = '#8a5a2b';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 5, 2.5, 0, 0, TAU); ctx.ellipse(6, 0, 5, 2.5, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: raised when He calls, open and welcoming otherwise
+  let hands = up ? [[-21, -66], [21, -66]] : [[-20, -22], [20, -22]];
+  if (face === 'sad') hands = [[-6, -28], [6, -28]];            // hands folded in sorrow
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else if (face === 'sad') {
+    // Jesus wept: eyes lowered, one soft tear
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(-4, -54, 2.3, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.moveTo(4 + 2.3 * Math.cos(Math.PI * 0.15), -54 + 2.3 * Math.sin(Math.PI * 0.15));
+    ctx.arc(4, -54, 2.3, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+    ctx.strokeStyle = '#5b3a1f'; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(-6.5, -57); ctx.lineTo(-2, -58.5); ctx.moveTo(6.5, -57); ctx.lineTo(2, -58.5); ctx.stroke();
+    const ty = (t * 5) % 7;
+    ctx.globalAlpha = 1 - ty / 7;
+    ctx.fillStyle = '#7cc4f2';
+    ctx.beginPath(); ctx.moveTo(-5, -52 + ty); ctx.quadraticCurveTo(-2.8, -48 + ty, -5, -47.5 + ty); ctx.quadraticCurveTo(-7.2, -48 + ty, -5, -52 + ty); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (face === 'call') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -46, 2.2, 2.4, 0, 0, TAU); ctx.fill();
+  } else if (face === 'sad') {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(0, -44.5, 2.2, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Lazarus, wrapped in grave clothes (a friendly face peeking out)
+// ============================================================
+function lazarusSilhouette() {
+  ctx.beginPath();
+  ctx.moveTo(-20, 2);
+  ctx.quadraticCurveTo(-21, -24, -18, -38);
+  ctx.quadraticCurveTo(0, -46, 18, -38);
+  ctx.quadraticCurveTo(21, -24, 20, 2);
+  ctx.closePath();
+  ctx.moveTo(17.5, -57); ctx.arc(0, -57, 17.5, 0, TAU);
+}
+
+function lazarusMood() {
+  if (lz.free) return 'joy';
+  if (phase === 'unwrap' && laughT > 0) return 'joy';
+  if (state === 'fail') return 'worried';
+  if (phase === 'call' && phaseT < 3.4) return 'watch';
+  return 'wow';
+}
+
+function drawLazarus() {
+  const L = lz;
+  if (L.alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = L.alpha;
+  ctx.translate(L.x, L.y - L.hop * L.s);
+  // The funny spin: squash sideways as he twirls round
+  let sx = 1;
+  if (L.spinT > 0) {
+    const a = (1 - L.spinT / L.spinDur) * TAU * L.spins;
+    sx = Math.cos(a);
+    if (Math.abs(sx) < 0.12) sx = sx < 0 ? -0.12 : 0.12;
+  }
+  ctx.scale(L.s * sx, L.s);
+
+  const skin = '#d9a066', robe = '#8fb8de', hair = L.hair;
+  const mood = lazarusMood();
+  const armUp = L.free;
+
+  // --- Lazarus underneath: a plain blue robe, ready to go home ---
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(-7, 0, 5.5, 3, 0, 0, TAU); ctx.ellipse(7, 0, 5.5, 3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = robe; ctx.strokeStyle = shade(robe, -45); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-17, -1);
+  ctx.quadraticCurveTo(-17, -28, -12, -38);
+  ctx.quadraticCurveTo(0, -42, 12, -38);
+  ctx.quadraticCurveTo(17, -28, 17, -1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#e0c068'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-15, -18); ctx.quadraticCurveTo(0, -15, 15, -18); ctx.stroke();
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 6.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 3.6, 0, TAU); ctx.fill();
+  };
+  if (armUp) {
+    const wave = Math.sin(t * 9) * 4;
+    arm(-11, -34, -26 + wave, -68); arm(11, -34, 26 - wave, -68);
+  } else {
+    arm(-11, -34, -14, -14); arm(11, -34, 14, -14);
+  }
+  const hy = -56;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+  ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();   // short beard
+  ctx.moveTo(-15, hy + 2);
+  ctx.quadraticCurveTo(-13, hy + 18, 0, hy + 19);
+  ctx.quadraticCurveTo(13, hy + 18, 15, hy + 2);
+  ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+  ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+  ctx.fill();
+  const look = phase === 'unwrap' || state === 'win' ? [0, 0.2] : [-0.3, 0.1];
+  drawFace({ hair, skin, blink: L.blink, i: 1 }, mood, hy, look[0], look[1]);
+
+  // --- The grave clothes on top ---
+  const strips = uw ? uw.strips : null;
+  if (!L.free) {
+    ctx.save();
+    lazarusSilhouette();
+    ctx.clip();
+    const list = strips || defaultStrips();
+    const next = strips ? nextStrip() : null;
+    for (const s of list) {
+      if (s.gone) continue;
+      drawStrip(s, s === next);
+    }
+    ctx.restore();
+    // loose ends and arrows (outside the clip)
+    if (strips && phase === 'unwrap' && state === 'play') {
+      for (const s of list) if (!s.gone) drawStripEnd(s, s === next);
+    }
+  }
+  ctx.restore();
+}
+
+// Before the unwrapping starts he is fully wrapped with the default strips
+function defaultStrips() {
+  const list = [{ top: -76, bot: -61, dir: 1 }, { top: -52, bot: -40, dir: -1 }];
+  for (let i = 0; i < 4; i++) list.push({ top: lerp(-40, 2, i / 4), bot: lerp(-40, 2, (i + 1) / 4), dir: i % 2 ? 1 : -1 });
+  return list;
+}
+
+function drawStrip(s, isNext) {
+  const tilt = (s.dir || 1) * 1.4;
+  const wob = s.wob ? Math.sin(t * 40) * s.wob * 2 : 0;
+  const y0 = s.top - 0.7 + wob, y1 = s.bot + 0.7 + wob;
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, s.loose ? '#fbf3dc' : '#f7f1df');
+  g.addColorStop(1, s.loose ? '#e6d6ae' : '#ddd3b8');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-26, y0 + tilt); ctx.lineTo(26, y0 - tilt); ctx.lineTo(26, y1 - tilt); ctx.lineTo(-26, y1 + tilt);
+  ctx.closePath(); ctx.fill();
+  // the edge of the next layer and little wrap creases
+  ctx.strokeStyle = 'rgba(150,130,90,0.55)'; ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(-26, y1 + tilt); ctx.lineTo(26, y1 - tilt); ctx.stroke();
+  ctx.strokeStyle = 'rgba(170,150,110,0.35)'; ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  for (let x = -18; x <= 18; x += 9) { ctx.moveTo(x - 2, y0 + 1.5); ctx.lineTo(x + 2, y1 - 1.5); }
+  ctx.stroke();
+  if (isNext && phase === 'unwrap' && state === 'play') {
+    ctx.fillStyle = `rgba(255,220,110,${0.18 + 0.12 * Math.sin(t * 6)})`;
+    ctx.fillRect(-26, y0, 52, y1 - y0);
+  }
+  // a knot that needs an extra tug
+  if (s.knot && !s.loose) {
+    const ky = (y0 + y1) / 2;
+    ctx.fillStyle = '#e9dcb8'; ctx.strokeStyle = '#a8946a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(-4.5, ky, 4.5, 2.8, -0.3, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(4.5, ky, 4.5, 2.8, 0.3, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, ky, 2.4, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+}
+
+// The loose end flaps on the side you start from; arrows show the way to swipe
+function drawStripEnd(s, isNext) {
+  const mid = (s.top + s.bot) / 2, hgt = s.bot - s.top;
+  const ex = -s.dir * 19;
+  const flap = Math.sin(t * 8 + s.i) * 3;
+  ctx.fillStyle = '#f3ecd6'; ctx.strokeStyle = 'rgba(150,130,90,0.7)'; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  const th = Math.min(hgt * 0.28, 3.2);
+  ctx.moveTo(ex, mid - th);
+  ctx.quadraticCurveTo(ex - s.dir * 4, mid - th + flap * 0.5, ex - s.dir * 8, mid + flap);
+  ctx.lineTo(ex - s.dir * 7, mid + th * 1.6 + flap);
+  ctx.quadraticCurveTo(ex - s.dir * 3, mid + th + flap * 0.3, ex, mid + th);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // chevrons
+  const a = isNext ? 0.85 : 0.4;
+  const size = clamp(hgt * 0.28, 1.6, 3.2);
+  ctx.strokeStyle = `rgba(200,120,20,${a * (0.7 + 0.3 * Math.sin(t * 6 - s.i))})`;
+  ctx.lineWidth = isNext ? 1.6 : 1.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let k = -1; k <= 1; k++) {
+    const cx = k * 8 + s.dir * ((t * 6) % 3);
+    ctx.moveTo(cx - s.dir * size, mid - size); ctx.lineTo(cx + s.dir * size * 0.4, mid); ctx.lineTo(cx - s.dir * size, mid + size);
+  }
+  ctx.stroke();
+}
+
+// A removed strip twirls away across the screen
+function drawFlyers() {
+  for (const f of flyers) {
+    const a = 1 - f.t / f.life;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rot);
+    ctx.strokeStyle = '#f5efdc'; ctx.lineWidth = f.w; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = 0; k <= 12; k++) {
+      const x = -f.len / 2 + (k / 12) * f.len;
+      const y = Math.sin(k * 0.9 + f.t * 14) * f.w * 0.9;
+      k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(170,150,110,0.6)'; ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Particles, pops and messages
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = flyers.length - 1; i >= 0; i--) {
+    const f = flyers[i];
+    f.t += dt;
+    if (f.t > f.life) { flyers.splice(i, 1); continue; }
+    f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 160 * dt; f.rot += f.vr * dt;
+  }
+  for (let i = pops.length - 1; i >= 0; i--) {
+    pops[i].t += dt;
+    if (pops[i].t > 0.9) pops.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function pop(text, x, y, color = '#7a5200', size = 22) { pops.push({ text, x, y, t: 0, color, size }); }
+function showMessage(text) { message = { text, t: 2.2 }; }
+function say(key, dur = 2.8) { bubble = { key, t: dur, max: dur }; }
+
+// ============================================================
+//  Part 1: roll away the stone (tap on the beat)
+// ============================================================
+function beatTime(k) { return LEAD + k * cfg.beat; }
+
+function heave() {
+  const s = st;
+  if (s.T < LEAD - cfg.goodWin) { pop('Wait for the ring…', ringPos().x, ringPos().y + 70, '#8a5a00', 18); return; }
+  const k = Math.max(0, Math.round((s.T - LEAD) / cfg.beat));
+  const err = s.T - beatTime(k);
+  const L = sceneLayout();
+  const hx = L.stoneX - L.R - 40, hy = GY - 110;
+  let kind;
+  if (k === s.lastK) kind = 'double';
+  else if (Math.abs(err) <= cfg.perfectWin) kind = 'perfect';
+  else if (Math.abs(err) <= cfg.goodWin) kind = 'good';
+  else kind = 'miss';
+  const rp = ringPos();
+  if (kind === 'perfect' || kind === 'good') {
+    s.lastK = k;
+    const perfect = kind === 'perfect';
+    s.S = Math.min(100, s.S + (perfect ? 18 : 10));
+    const disp = (perfect ? 0.075 : 0.045) * (0.55 + s.S / 100 * 0.9) / cfg.heavy;
+    s.v += disp * 4;                      // the stone rolls on a little after each heave
+    s[kind]++; s.streak++;
+    s.pushT = 0.3; s.ringFx = 0.25;
+    s.judge = { text: perfect ? 'Perfect!' : 'Good', t: 0.6 };
+    pop(perfect ? 'HEAVE!' : 'Heave!', hx, hy, perfect ? '#c77700' : '#8a5a00', perfect ? 26 : 21);
+    for (let i = 0; i < (perfect ? 12 : 6); i++) {
+      spawn(L.stoneX - L.R * 0.3 + rand(-20, 20), GY - 4, rand(-60, 20), rand(-90, -30), 0.7, '#d9c7a0', rand(2, 4), 200);
+    }
+    if (perfect) for (let i = 0; i < 8; i++) spawn(rp.x + rand(-30, 30), rp.y + rand(-30, 30), rand(-40, 40), rand(-60, -10), 0.6, '#ffe27a', rand(2, 3.5));
+    shakeT = perfect ? 0.12 : 0.06;
+    sfx.heave(perfect, s.p);
+  } else {
+    s.S = Math.max(0, s.S - 14);
+    s.miss++; s.streak = 0;
+    missT = 0.8;
+    const text = kind === 'double' ? 'Once per beat!' : err < 0 ? 'Too early!' : 'Too late!';
+    s.judge = { text, t: 0.6 };
+    pop('Oof!', hx, hy, '#b0452a', 20);
+    sfx.bounce();
+  }
+}
+
+function ringPos() { return { x: W / 2, y: 300 }; }
+
+function updateStone(dt) {
+  const s = st;
+  s.T += dt;
+  s.timeLeft -= dt;
+  // beat tick
+  const k = Math.floor((s.T - LEAD) / cfg.beat + 1e-6);
+  if (s.T >= LEAD && k > s.tickK) { s.tickK = k; sfx.tick(); }
+  s.S = Math.max(0, s.S - 8 * dt);
+  s.p += s.v * dt;
+  s.v *= Math.exp(-4 * dt);
+  if (s.S < 30 && s.p > 0 && s.p < 1) s.p = Math.max(0, s.p - cfg.rollback * dt * (1 - s.S / 30));
+  s.pushT = Math.max(0, s.pushT - dt);
+  s.ringFx = Math.max(0, s.ringFx - dt);
+  if (s.judge) { s.judge.t -= dt; if (s.judge.t <= 0) s.judge = null; }
+  sfx.thrust(clamp(s.v * 5, 0, 1));
+  if (s.p >= 1) {
+    s.p = 1; s.v = 0;
+    sfx.thrust(0);
+    showMessage('The tomb is open!');
+    setPhase('call');
+    return;
+  }
+  if (s.timeLeft <= 0) { s.timeLeft = 0; fail('stone'); }
+}
+
+// ============================================================
+//  Part 2: "Lazarus, come forth"
+// ============================================================
+function updateCall(dt) {
+  const L = sceneLayout();
+  const T = phaseT;
+  if (T >= 0.9 && T - dt < 0.9) { say('comeForth', 2.6); sfx.call(); flashT = 0.2; }
+  // he appears in the doorway...
+  lz.alpha = clamp((T - 1.7) / 0.6, 0, 1);
+  const f = ease((T - 2.4) / 2.6);
+  const spot = lazarusSpot();
+  lz.x = lerp(L.doorX, spot.x, f);
+  lz.y = lerp(GY - 2, spot.y, f);
+  lz.s = lerp(1, LZ_S, f);
+  // ...and shuffles out in little hops (his feet are bound!)
+  lz.hop = T > 2.4 && T < 5 ? Math.abs(Math.sin(T * 9)) * 3 : 0;
+  if (T > 2.4 && T - dt <= 2.4) { shockT = 1.2; sfx.sparkle(); }
+  if (T > 2.4 && T < 5 && Math.random() < dt * 14) {
+    spawn(lz.x + rand(-20, 20) * lz.s, lz.y - rand(0, 70) * lz.s, rand(-20, 20), rand(-40, -10), 0.9, '#fff6d0', rand(2, 4));
+  }
+  if (T > 2.4 && Math.floor(T * 9 / Math.PI) !== Math.floor((T - dt) * 9 / Math.PI) && T < 5) sfx.shuffle();
+  if (T >= 5.2) {
+    setPhase('unwrap');
+    say('loose', 3);
+    showMessage(matchMedia('(pointer: coarse)').matches ? 'Swipe along the strips!' : 'Swipe the strips (or ← →)!');
+  }
+}
+
+// ============================================================
+//  Part 3: "Loose him, and let him go" (swipe along each strip)
+// ============================================================
+function nextStrip() {
+  if (!uw) return null;
+  for (const s of uw.strips) if (!s.gone) return s;
+  return null;
+}
+
+// Which strip is at this point (playfield coords), if any
+function stripAt(x, y) {
+  const lxp = (x - lz.x) / lz.s, lyp = (y - lz.y) / lz.s;
+  if (Math.abs(lxp) > 48 || lyp < -90 || lyp > 12) return null;
+  let bestS = null, bestD = 1e9;
+  for (const s of uw.strips) {
+    if (s.gone) continue;
+    const d = lyp < s.top ? s.top - lyp : lyp > s.bot ? lyp - s.bot : 0;
+    if (d < bestD) { bestD = d; bestS = s; }
+  }
+  return bestD <= 9 ? bestS : null;
+}
+
+function pullStrip(s) {
+  if (s.gone) return;
+  if (s.knot && !s.loose) {
+    s.loose = true; s.wob = 1;
+    uw.knotsDone++;
+    pop('Knot loosened!', lz.x, lz.y + (s.top + s.bot) / 2 * lz.s - 30, '#8a5a00', 20);
+    sfx.knot();
+    return;
+  }
+  s.gone = true;
+  uw.removed++;
+  laughT = 0.8;
+  lz.spinT = lz.spinDur = 0.5; lz.spins = 1;
+  const y = lz.y + (s.top + s.bot) / 2 * lz.s;
+  flyers.push({ x: lz.x, y, vx: s.dir * rand(420, 560), vy: rand(-220, -120), rot: 0, vr: s.dir * rand(4, 7), t: 0, life: 1.1,
+    len: 44 * lz.s, w: Math.max(6, (s.bot - s.top) * lz.s * 0.45) });
+  for (let i = 0; i < 10; i++) spawn(lz.x + rand(-40, 40), y + rand(-10, 10), s.dir * rand(40, 160), rand(-80, 20), 0.7, i % 2 ? '#fff6d0' : '#ffe27a', rand(2, 4));
+  const word = ['Whee!', 'Wheee!', 'Hee hee!', 'Spin!', 'Whoa!'][uw.removed % 5];
+  pop(word, lz.x + s.dir * 70, y - 20, '#c77700', 22);
+  sfx.whoosh(uw.removed / uw.total);
+  if (uw.removed >= uw.total) unwrapDone();
+}
+
+function wrongWay(s) {
+  if (s) s.wob = 1;
+  showMessage('The other way! Follow the arrows');
+  sfx.bounce();
+}
+
+function strokeCheck(final) {
+  const k = uw.stroke;
+  if (!k || k.used) return;
+  const dx = k.x - k.x0, dy = k.y - k.y0;
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 0.7) {
+    if (final && Math.abs(dx) > 18 && Math.abs(dx) >= Math.abs(dy) * 0.7) {
+      const s = stripAt((k.x0 + k.x) / 2, (k.y0 + k.y) / 2);
+      if (s) pop('Longer swipe!', lz.x, k.y - 30, '#8a5a00', 18);
+    }
+    return;
+  }
+  const s = stripAt((k.x0 + k.x) / 2, (k.y0 + k.y) / 2) || stripAt(k.x0, k.y0);
+  if (!s) return;
+  k.used = true;
+  if (Math.sign(dx) === s.dir) pullStrip(s);
+  else wrongWay(s);
+}
+
+function keyPull(dir) {
+  if (uw.keyCd > 0) return;
+  const s = nextStrip();
+  if (!s) return;
+  if (s.dir === dir) pullStrip(s);
+  else { wrongWay(s); uw.keyCd = 0.35; }
+}
+
+function updateUnwrap(dt) {
+  uw.timeLeft -= dt;
+  uw.hintT = Math.max(0, uw.hintT - dt);
+  uw.keyCd = Math.max(0, uw.keyCd - dt);
+  const spot = lazarusSpot();
+  lz.x = spot.x; lz.y = spot.y;
+  lz.hop = Math.abs(Math.sin(t * 3)) * 0.6;
+  for (const s of uw.strips) s.wob = Math.max(0, s.wob - dt * 3);
+  if (uw.timeLeft <= 0) { uw.timeLeft = 0; fail('unwrap'); }
+}
+
+function unwrapDone() {
+  lz.free = true;
+  lz.spinT = lz.spinDur = 1.4; lz.spins = 3;
+  win();
+}
+
+// ============================================================
+//  Phases, win / fail
+// ============================================================
+function setPhase(p) {
+  phase = p;
+  phaseT = 0;
+  if (p === 'stone') {
+    st = newStone();
+    say('stone', 2.6);
+    showMessage('Part 1: Roll away the stone!');
+  } else if (p === 'call') {
+    lz = newLazarus();
+  } else if (p === 'unwrap') {
+    uw = newUnwrap();
+  }
+}
+
+function win() {
+  state = 'win';
+  phase = 'done';
+  const perf = st.perfect * 40, good = st.good * 20;
+  const stoneTime = Math.round(st.timeLeft * 15);
+  const strips = uw.total * 50 + uw.knotsDone * 30;
+  const unwrapTime = Math.round(uw.timeLeft * 25);
+  const levelBonus = level * 300;
+  const score = perf + good + stoneTime + strips + unwrapTime + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('lazarusBest', best); } catch (e) {} }
+  lastScore = { heave: perf + good, stoneTime, strips, unwrapTime, levelBonus, score };
+  for (let i = 0; i < 80; i++) {
+    const a = rand(0, TAU), sp = rand(60, 240);
+    spawn(lz.x, lz.y - 40 * lz.s, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8', '#b8e6ff'][i % 5], rand(2.5, 5), 40);
+  }
+  showMessage('Lazarus is alive!');
+  sfx.win();
+  endTimer = 2.6;
+}
+
+function fail(reason) {
+  state = 'fail';
+  failReason = reason;
+  sfx.thrust(0);
+  sfx.fail();
+  endTimer = 1.5;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  phase = 'intro';
+  cfg = makeConfig(1);
+  st = null; uw = null; lz = null;
+  showOverlay('Lazarus, Come Forth!', 'A Miracle in Bethany',
+    `${verseHTML('resurrection')}
+     <ul>
+       <li>Jesus has come to Bethany. His friend <b>Lazarus</b> has lain in the tomb four days, and Martha and Mary are very sad.</li>
+       <li><b>Part 1:</b> help the men <b>roll away the stone</b>. Tap <b>on the beat</b>, just as the ring closes, to heave together. <kbd>Space</kbd> / <kbd>&uarr;</kbd> on a keyboard.</li>
+       <li><b>Part 2:</b> listen as Jesus calls His friend&hellip;</li>
+       <li><b>Part 3:</b> <b>unwrap Lazarus!</b> Swipe along each strip of cloth the way its arrows point (<kbd>&larr;</kbd> <kbd>&rarr;</kbd> on a keyboard) before time runs out.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Go to Bethany', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = makeConfig(level);
+  st = newStone();            // resting stone for the intro
+  uw = null;
+  lz = null;
+  particles = []; flyers = []; pops = [];
+  ripples.length = 0;
+  shockT = laughT = missT = flashT = shakeT = 0;
+  bubble = null;
+  state = 'play';
+  phase = 'intro';
+  phaseT = 0;
+  endTimer = 0;
+  const v = Bible.verse(VERSES.wept);
+  banner = { text: v.text, cite: v.cite, t: 3.2, max: 3.2 };
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Lazarus lives!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('win')}
+       <p class="score">Heaving together: <b>${s.heave}</b><br>Stone time left: <b>${s.stoneTime}</b><br>Grave clothes off: <b>${s.strips}</b><br>Unwrap time left: <b>${s.unwrapTime}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const lines = failReason === 'stone'
+      ? ['The stone is too heavy!', 'Heave together! Watch the ring close in, and tap just as it touches the circle. One tap per beat.']
+      : ['Still wrapped up!', 'Poor Lazarus is still in a tangle. Swipe along each strip the way its arrows point. Knots need two tugs!'];
+    showOverlay(lines[0], `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${lines[1]}</p>
+       ${verseHTML('martha')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    sfx.thrust(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const ripples = [];
+
+function skipIntro() {
+  if (phase === 'intro' && phaseT > 0.4) { banner = null; setPhase('stone'); }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  const up = e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW';
+  if (phase === 'intro' && (up || e.code === 'Enter')) skipIntro();
+  else if (phase === 'stone' && up) heave();
+  else if (phase === 'unwrap') {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keyPull(-1);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keyPull(1);
+  }
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  if (phase === 'intro') { skipIntro(); return; }
+  if (phase === 'stone') {
+    heave();
+    ripples.push({ x: p.x, y: p.y, t: 0 });
+  } else if (phase === 'unwrap') {
+    uw.stroke = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y, used: false };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (state !== 'play' || phase !== 'unwrap' || !uw.stroke || uw.stroke.id !== e.pointerId) return;
+  const p = toPlayfield(e);
+  const k = uw.stroke;
+  k.x = p.x; k.y = p.y;
+  if (!k.used && Math.random() < 0.6) spawn(p.x, p.y, rand(-20, 20), rand(-20, 20), 0.4, '#fff6d0', rand(2, 3.5));
+  strokeCheck(false);
+});
+function endStroke(e) {
+  sfx.init();
+  if (state !== 'play' || phase !== 'unwrap' || !uw.stroke || uw.stroke.id !== e.pointerId) return;
+  const p = toPlayfield(e);
+  uw.stroke.x = p.x; uw.stroke.y = p.y;
+  strokeCheck(true);
+  uw.stroke = null;
+}
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', endStroke);
+canvas.addEventListener('pointercancel', endStroke);
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 260; bp.Q.value = 0.9;   // the stone grinding in its groove
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // --- extra effects for this game ---
+  tick() { this.tone(660, 0.06, 'triangle', 0.08); this.tone(110, 0.14, 'sine', 0.22, 0, 70); },
+  heave(perfect, height) {
+    if (!this.ctx) return;
+    this.tone(90, 0.25, 'sine', 0.45, 0, 55);
+    this.puff(0.2);
+    if (perfect) playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  call() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  sparkle() { [0, 0.08, 0.16, 0.24].forEach((d, i) => this.tone([1175, 1480, 1760, 2350][i], 0.35, 'sine', 0.12, d)); },
+  shuffle() { this.tone(180, 0.07, 'triangle', 0.12, 0, 140); },
+  knot() { this.tone(330, 0.12, 'square', 0.08, 0, 440); },
+  whoosh(height) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(500, t0); bp.frequency.exponentialRampToValueAtTime(2600, t0 + 0.28);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.4, t0 + 0.06); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.34);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.4);
+    playTapNote(this.ctx, this.master, t0 + 0.02, height);
+  },
+};
+
+// ============================================================
+//  Rendering: Bethany, the tomb and the stone
+// ============================================================
+const bgClouds = Array.from({ length: 6 }, () => ({ f: Math.random(), y: rand(120, 360), w: rand(80, 160), speed: rand(4, 10) }));
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, GY);
+  g.addColorStop(0, '#8fcaf0');
+  g.addColorStop(0.6, '#bfe3f7');
+  g.addColorStop(1, '#fff0c8');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // the sun, brighter when Lazarus comes out
+  const glory = phase === 'call' || phase === 'unwrap' || state === 'win' ? 1 : 0;
+  const sx = W * 0.14, sy = 170;
+  const glow = ctx.createRadialGradient(sx, sy, 10, sx, sy, 200 + glory * 60);
+  glow.addColorStop(0, 'rgba(255,240,170,0.8)');
+  glow.addColorStop(1, 'rgba(255,240,170,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(sx, sy, 260, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff3b0';
+  ctx.beginPath(); ctx.arc(sx, sy, 40, 0, TAU); ctx.fill();
+  for (const c of bgClouds) {
+    const x = -offX - 160 + ((c.f + t * c.speed / (viewW + 320)) % 1) * (viewW + 320);
+    drawCloud(x, c.y, c.w, c.w * 0.3, 'rgba(255,255,255,0.9)', 'rgba(220,235,250,0.8)');
+  }
+}
+
+function drawOlive(x, y, s, sway = 0) {
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 7 * s; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 6 * s, y - 30 * s, x + sway * 0.5, y - 55 * s); ctx.stroke();
+  ctx.fillStyle = '#7d9460';
+  ctx.beginPath();
+  for (const [dx, dy, r] of [[-18, -60, 18], [0, -72, 20], [18, -60, 17], [-6, -52, 15], [10, -50, 14]]) {
+    ctx.moveTo(x + (dx + sway) * s + r * s, y + dy * s); ctx.arc(x + (dx + sway) * s, y + dy * s, r * s, 0, TAU);
+  }
+  ctx.fill();
+}
+
+function drawPalm(x, y, s) {
+  ctx.strokeStyle = '#8a6a42'; ctx.lineWidth = 8 * s; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 10 * s, y - 60 * s, x + 4 * s, y - 120 * s); ctx.stroke();
+  const tx = x + 4 * s, ty = y - 120 * s;
+  ctx.strokeStyle = '#4f8f3a'; ctx.lineWidth = 7 * s;
+  for (let k = 0; k < 6; k++) {
+    const a = -Math.PI / 2 + (k - 2.5) * 0.55 + Math.sin(t * 1.5 + k) * 0.04;
+    ctx.beginPath(); ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo(tx + Math.cos(a) * 30 * s, ty + Math.sin(a) * 30 * s - 8 * s, tx + Math.cos(a) * 52 * s, ty + Math.sin(a) * 40 * s + 18 * s);
+    ctx.stroke();
+  }
+}
+
+// Little flat-roofed houses of Bethany on the far hill
+function drawHouse(x, y, w, h) {
+  ctx.fillStyle = '#f1e2c2'; ctx.strokeStyle = '#c9b58c'; ctx.lineWidth = 1.5;
+  ctx.fillRect(x, y - h, w, h); ctx.strokeRect(x, y - h, w, h);
+  ctx.fillStyle = '#e2cfa6'; ctx.fillRect(x - 2, y - h - 4, w + 4, 5);
+  ctx.fillStyle = '#8a6a42';
+  roundRect(x + w * 0.4, y - h * 0.55, w * 0.2, h * 0.55, [4, 4, 0, 0]); ctx.fill();
+  ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + w * 0.12, y - h * 0.8, w * 0.14, h * 0.18);
+}
+
+function drawGround(L) {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // distant hills of Judea with Bethany on them
+  ctx.fillStyle = '#b4d596';
+  ctx.beginPath(); ctx.moveTo(x0, GY);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, GY - 110 + Math.sin(x / 110) * 20 + Math.sin(x / 41) * 6);
+  ctx.lineTo(x1, GY); ctx.fill();
+  const hy = (x) => GY - 110 + Math.sin(x / 110) * 20 + Math.sin(x / 41) * 6;
+  for (const [f, w, h] of [[0.03, 34, 26], [0.12, 42, 32], [0.2, 30, 22], [0.84, 36, 26], [0.95, 30, 24]]) {
+    const x = W * f;
+    if (x > L.doorX - 190 && x < L.doorX + 260) continue;
+    drawHouse(x, hy(x + w / 2) + 10, w, h);
+  }
+  drawPalm(W * 0.3 < L.doorX - 150 ? W * 0.3 : L.doorX - 160, GY - 24, 0.8);
+  // grass
+  ctx.fillStyle = '#8cc063';
+  ctx.beginPath(); ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 10) ctx.lineTo(x, GY - 26 + Math.sin(x / 55) * 4);
+  ctx.lineTo(x1, H + 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#79ad52';
+  ctx.fillRect(x0, GY + 20, x1 - x0, H - GY);
+  // a dusty path to the tomb
+  ctx.fillStyle = '#e6d3a4';
+  ctx.beginPath();
+  ctx.moveTo(L.doorX - 60, GY + 4);
+  ctx.quadraticCurveTo(L.doorX - 40, GY + 120, W * 0.5 - 90, H + 10);
+  ctx.lineTo(W * 0.5 + 90, H + 10);
+  ctx.quadraticCurveTo(L.doorX + 50, GY + 120, L.doorX + 60, GY + 4);
+  ctx.closePath(); ctx.fill();
+  // flowers
+  for (let k = 0; k < 14; k++) {
+    const x = W * ((k * 0.137 + 0.05) % 1), y = GY + 40 + ((k * 53) % 180);
+    ctx.fillStyle = ['#ffd84d', '#ff9ec4', '#ffffff'][k % 3];
+    ctx.beginPath(); ctx.arc(x, y, 3.5, 0, TAU); ctx.fill();
+  }
+}
+
+function drawTomb(L) {
+  const { doorX, R } = L;
+  const x0 = doorX - 150, x1 = W + offX + 30;
+  // the rock of the hillside
+  const rg = ctx.createLinearGradient(0, GY - 260, 0, GY);
+  rg.addColorStop(0, '#d3c09c');
+  rg.addColorStop(1, '#a58d6c');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(x0, GY + 6);
+  ctx.quadraticCurveTo(x0 + 10, GY - 150, x0 + 70, GY - 200);
+  ctx.quadraticCurveTo(doorX + 40, GY - 270, x1, GY - 250);
+  ctx.lineTo(x1, GY + 6);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(90,65,40,0.25)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x0 + 40, GY - 150); ctx.lineTo(x0 + 60, GY - 120); ctx.lineTo(x0 + 52, GY - 90);
+  ctx.moveTo(doorX + 90, GY - 220); ctx.lineTo(doorX + 110, GY - 190);
+  ctx.stroke();
+  // grass on top
+  ctx.fillStyle = '#7fb35a';
+  ctx.beginPath();
+  for (let x = x0 + 60; x < x1; x += 14) {
+    const y = x < doorX + 40 ? lerp(GY - 200, GY - 250, (x - x0 - 60) / (doorX - x0 - 20)) : GY - 252 + (x - doorX) * 0.02;
+    ctx.moveTo(x - 7, y + 4); ctx.quadraticCurveTo(x, y - 12, x + 7, y + 4);
+  }
+  ctx.fill();
+  // doorway
+  ctx.fillStyle = '#3a2c1e';
+  roundRect(doorX - 50, GY - 124, 100, 126, [46, 46, 0, 0]); ctx.fill();
+  ctx.strokeStyle = '#7a6448'; ctx.lineWidth = 4;
+  roundRect(doorX - 52, GY - 126, 104, 128, [48, 48, 0, 0]); ctx.stroke();
+  // light from within when Jesus calls
+  if (phase === 'call' || phase === 'unwrap' || state === 'win') {
+    const a = phase === 'call' ? clamp((phaseT - 1.2) / 0.8, 0, 1) : 0.6;
+    const ig = ctx.createRadialGradient(doorX, GY - 50, 5, doorX, GY - 50, 100);
+    ig.addColorStop(0, `rgba(255,245,200,${0.85 * a})`); ig.addColorStop(1, 'rgba(255,245,200,0)');
+    ctx.fillStyle = ig;
+    roundRect(doorX - 50, GY - 124, 100, 126, [46, 46, 0, 0]); ctx.fill();
+  }
+  // groove the stone rolls in, and where it needs to go
+  ctx.fillStyle = 'rgba(60,40,20,0.3)';
+  roundRect(doorX - R - 6, GY - 4, L.roll + 2 * R + 12, 9, 4); ctx.fill();
+  if (phase === 'stone' || phase === 'intro' || state === 'title') {
+    ctx.save();
+    ctx.setLineDash([8, 7]); ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255,250,220,${0.55 + 0.25 * Math.sin(t * 4)})`;
+    ctx.beginPath(); ctx.arc(doorX + L.roll, GY - R, R - 2, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawStone(L) {
+  const sx = L.stoneX, sy = GY - L.R, R = L.R;
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate((sx - L.doorX) / R);
+  const sg = ctx.createRadialGradient(-18, -20, 8, 0, 0, R);
+  sg.addColorStop(0, '#d8d0c0');
+  sg.addColorStop(1, '#8e8575');
+  ctx.fillStyle = sg; ctx.strokeStyle = '#5e584f'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(60,50,40,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.7, 0, TAU); ctx.stroke();
+  ctx.beginPath();
+  for (let k = 0; k < 4; k++) {
+    const a = k * TAU / 4 + 0.4;
+    ctx.moveTo(Math.cos(a) * R * 0.25, Math.sin(a) * R * 0.25); ctx.lineTo(Math.cos(a) * R * 0.6, Math.sin(a) * R * 0.6);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// The heave ring: a golden ring closes onto the circle on every beat
+function drawRing() {
+  const { x, y } = ringPos();
+  const s = st;
+  const P = cfg.beat;
+  const into = s.T - LEAD;
+  const toNext = into < 0 ? -into : (P - (into % P)) % P;
+  const R0 = 36;
+  ctx.save();
+  // base disc
+  ctx.fillStyle = 'rgba(255,250,235,0.85)';
+  ctx.beginPath(); ctx.arc(x, y, R0 + 6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = s.ringFx > 0 ? '#f0a020' : '#c9a24a'; ctx.lineWidth = s.ringFx > 0 ? 6 : 4;
+  ctx.beginPath(); ctx.arc(x, y, R0, 0, TAU); ctx.stroke();
+  // closing ring (only in the last beat before each heave)
+  if (toNext <= P && into > -P) {
+    const r = R0 + (toNext / P) * 70;
+    const near = toNext < cfg.goodWin || (P - toNext) < cfg.goodWin;
+    ctx.strokeStyle = near ? 'rgba(240,160,30,0.95)' : 'rgba(120,90,40,0.55)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#7a5200';
+  ctx.font = `700 ${s.ringFx > 0 ? 20 : 17}px Fredoka, sans-serif`;
+  ctx.fillText('HEAVE', x, y);
+  // judgement
+  if (s.judge) {
+    ctx.globalAlpha = clamp(s.judge.t / 0.3, 0, 1);
+    ctx.font = '700 20px Fredoka, sans-serif';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+    ctx.strokeText(s.judge.text, x, y - 70);
+    ctx.fillStyle = s.judge.text === 'Perfect!' ? '#c77700' : s.judge.text === 'Good' ? '#2b8a3e' : '#b0452a';
+    ctx.fillText(s.judge.text, x, y - 70);
+    ctx.globalAlpha = 1;
+  }
+  if (level === 1 && s.perfect + s.good < 3) {
+    ctx.font = '600 15px Fredoka, sans-serif';
+    ctx.fillStyle = '#5a4210';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    const txt = matchMedia('(pointer: coarse)').matches ? 'Tap as the ring touches!' : 'Tap / Space as the ring touches!';
+    ctx.strokeText(txt, x, y + 62); ctx.fillText(txt, x, y + 62);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Speech bubble, banner, pops, HUD
+// ============================================================
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawBubble(L) {
+  if (!bubble || bubble.t <= 0) return;
+  const text = Bible.verse(VERSES[bubble.key]).text;
+  const a = clamp(bubble.t / 0.3, 0, 1) * clamp((bubble.max - bubble.t) / 0.2, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '600 18px Fredoka, sans-serif';
+  const lines = wrapText(text, 200);
+  const lh = 22;
+  const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 26;
+  const bh = lines.length * lh + 16;
+  const tipX = L.jesusX + 8, tipY = GY - 96;
+  const bx = clamp(tipX - bw * 0.3, 8, W - bw - 8), by = tipY - 14 - bh;
+  ctx.fillStyle = '#fffdf3'; ctx.strokeStyle = '#d9b45a'; ctx.lineWidth = 2.5;
+  roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(clamp(tipX - 8, bx + 12, bx + bw - 24), by + bh - 1);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(clamp(tipX + 10, bx + 22, bx + bw - 12), by + bh - 1);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(clamp(tipX - 8, bx + 12, bx + bw - 24), by + bh);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(clamp(tipX + 10, bx + 22, bx + bw - 12), by + bh);
+  ctx.stroke();
+  ctx.fillStyle = '#5a3a10'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 8 + lh * (i + 0.5)));
+  ctx.restore();
+}
+
+function drawBanner() {
+  if (!banner || banner.t <= 0) return;
+  const a = clamp(banner.t / 0.5, 0, 1) * clamp((banner.max - banner.t) / 0.4, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'italic 700 30px Fredoka, sans-serif';
+  const w = Math.max(ctx.measureText(banner.text).width + 60, 220);
+  const y = 300;
+  ctx.fillStyle = 'rgba(255,252,240,0.9)'; ctx.strokeStyle = 'rgba(200,160,70,0.7)'; ctx.lineWidth = 2.5;
+  roundRect(W / 2 - w / 2, y - 38, w, 76, 20); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#6a4a8a';
+  ctx.fillText(banner.text, W / 2, y - 8);
+  ctx.font = '600 14px Fredoka, sans-serif';
+  ctx.fillStyle = '#8a7a5a';
+  ctx.fillText(banner.cite, W / 2, y + 22);
+  ctx.restore();
+}
+
+function drawPops() {
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (const p of pops) {
+    const a = 1 - p.t / 0.9;
+    ctx.globalAlpha = a;
+    ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+    const y = p.y - p.t * 40;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, p.x, y);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const y = phase === 'unwrap' ? 250 : 185;
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, W / 2, y);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, y);
+  ctx.restore();
+}
+
+// Level 1: a glowing finger-dot shows how to swipe along the first strip
+function drawSwipeHint() {
+  if (!uw || uw.hintT <= 0 || state !== 'play') return;
+  const s = nextStrip();
+  if (!s) return;
+  const f = (t * 0.9) % 1;
+  const y = lz.y + (s.top + s.bot) / 2 * lz.s;
+  const x = lz.x + (-s.dir * 34 + s.dir * 68 * ease(f)) * lz.s;
+  ctx.save();
+  ctx.globalAlpha = clamp(uw.hintT, 0, 1) * (1 - Math.abs(f - 0.5) * 1.2);
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(x, y, 14, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBar(label, x, y, frac, colors, flash) {
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.shadowBlur = 4;
+  ctx.fillText(label, x, y + 10);
+  ctx.shadowBlur = 0;
+  const bx = x + ctx.measureText(label).width + 8;
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(bx, y, 120, 13, 6.5); ctx.fill();
+  const gg = ctx.createLinearGradient(bx, 0, bx + 120, 0);
+  gg.addColorStop(0, colors[0]); gg.addColorStop(1, colors[1]);
+  ctx.fillStyle = flash && Math.sin(t * 10) > 0 ? '#ff6b6b' : gg;
+  if (frac > 0) { roundRect(bx, y, 120 * clamp(frac, 0, 1), 13, 6.5); ctx.fill(); }
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + meter for the current part
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Lazarus, Come Forth!' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title' && phase === 'stone' && st) {
+    drawBar('STRENGTH', 12, 38, st.S / 100, ['#f7c948', '#fff1a8'], st.S < 20);
+  } else if (state !== 'title' && (phase === 'unwrap' || phase === 'done') && uw) {
+    drawBar('UNWRAPPED', 12, 38, uw.removed / uw.total, ['#9fd3f2', '#e8f7ff'], false);
+  }
+
+  // Pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: time left and which part we're in
+  const rx = viewW - 12;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  let part = '', time = null;
+  if (state !== 'title') {
+    if (phase === 'intro') part = 'Bethany';
+    else if (phase === 'stone') { part = 'PART 1 · THE STONE'; time = st.timeLeft; }
+    else if (phase === 'call') part = 'PART 2 · COME FORTH';
+    else { part = 'PART 3 · UNWRAP'; time = uw ? uw.timeLeft : null; }
+  }
+  ctx.font = '600 12px Fredoka, sans-serif';
+  if (part) ctx.fillText(part, rx, 20);
+  if (time !== null) {
+    ctx.font = '700 22px Fredoka, sans-serif';
+    ctx.fillStyle = time < 5 && Math.sin(t * 10) > 0 ? '#c92a2a' : '#5a4210';
+    ctx.fillText(`${Math.ceil(time)}s`, rx, 46);
+  }
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  const L = sceneLayout();
+  placePeople(L);
+  drawSky();
+  drawGround(L);
+  drawTomb(L);
+  drawStone(L);
+  // helpers stand nearest the stone; draw the far one first
+  for (let k = helpers.length - 1; k >= 0; k--) drawPerson(helpers[k]);
+  drawJesus(L.jesusX, GY + 4, 1.25);
+  for (const p of friends) drawPerson(p);
+  if (lz) drawLazarus();
+  drawFlyers();
+  drawParticles();
+  if (state === 'play' && phase === 'stone') drawRing();
+  drawSwipeHint();
+  drawBubble(L);
+  drawPops();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+  // the swipe trail
+  if (uw && uw.stroke && phase === 'unwrap') {
+    const k = uw.stroke;
+    ctx.strokeStyle = 'rgba(255,240,180,0.8)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(k.x0, k.y0); ctx.lineTo(k.x, k.y); ctx.stroke();
+  }
+
+  drawBanner();
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  if (state === 'play') {
+    phaseT += dt;
+    if (phase === 'intro') {
+      if (phaseT > 3.4) setPhase('stone');
+    } else if (phase === 'stone') updateStone(dt);
+    else if (phase === 'call') updateCall(dt);
+    else if (phase === 'unwrap') updateUnwrap(dt);
+  } else if (state === 'win') {
+    if (Math.random() < dt * 14) spawn(lz.x + rand(-60, 60), lz.y - rand(0, 80) * lz.s * 0.4 - 60, rand(-10, 10), -30, 1, '#fff6d0', 3);
+    lz.hop = Math.abs(Math.sin(t * 7)) * 6;
+  }
+  if (lz) lz.spinT = Math.max(0, lz.spinT - dt);
+  if (banner) banner.t -= dt;
+  if (bubble) bubble.t -= dt;
+  shockT = Math.max(0, shockT - dt);
+  laughT = Math.max(0, laughT - dt);
+  missT = Math.max(0, missT - dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
