@@ -1496,21 +1496,25 @@ function resetWorld() {
 
 function titleScreen() {
   state = 'title';
+  syncAmbience();
+  phase = 'build';
   cfg = makeConfig(1);
   resetWorld();
   finishNeighbour();
   for (const [c, r, type] of DEMO_HOUSE) setCell(c, r, { type, owner: 'p', doom: -1 });
+  const num = (n) => `<b style="color:var(--gold-dark);font-size:1.25em;margin-right:6px">${n}.</b>`;
   showOverlay('The Wise Builder', 'Build your house upon the rock',
-    `<p class="verse">"...I will liken him unto a wise man, which built his house upon a rock." &mdash; Matthew 7:24</p>
-     <ul>
-       <li>Build a little house, block by block: <b>stone</b>, <b>wood</b>, <b>logs</b>, <b>windows</b>, a <b>door</b> and a <b>roof</b>.</li>
-       <li><b>Touch:</b> tap a block in the bar, then <b>tap</b> the plot to place it. Tap with the eraser to take one away.</li>
-       <li><b>Keyboard:</b> <kbd>1</kbd>&ndash;<kbd>6</kbd> pick a block, <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> move, <kbd>Space</kbd> place, <kbd>X</kbd> remove, <kbd>Enter</kbd> storm.</li>
-       <li>Blocks need support, and coins are limited. Tick off the goal card, then <b>let the storm come!</b></li>
-       <li>Your neighbour prefers the sand&hellip;</li>
+    `${verseHTML('wiseMan')}
+     <ul style="list-style:none;padding-left:0;font-size:1.05rem">
+       <li>${num(1)}Pick a block, then <b>tap</b> to build.</li>
+       <li>${num(2)}Build on the grey <b>rock</b>, not the sand!</li>
+       <li>${num(3)}Blocks cost <b>coins</b>. Don't run out!</li>
+       <li>${num(4)}Then <b>let the storm come!</b></li>
      </ul>
-     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
-    'Start Building', () => { level = 1; totalScore = 0; startLevel(); });
+     <p style="text-align:center;font-size:0.85rem;color:#7a6640;margin:6px 0 0">Keys: <kbd>1</kbd>&ndash;<kbd>7</kbd> pick &middot; arrows move &middot; <kbd>Space</kbd> build &middot; <kbd>X</kbd> remove &middot; <kbd>Enter</kbd> storm</p>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start', () => { level = 1; totalScore = 0; startLevel(); });
 }
 
 function startLevel() {
@@ -1520,17 +1524,20 @@ function startLevel() {
   buildT = 0; stormT = 0;
   coins = cfg.budget;
   sel = 'stone';
-  cursor = { c: 2, r: groundRow(2) };
-  hover = null;
+  const sp = cfg.spots[cfg.spots.length - 1];
+  cursor = { c: sp.c0, r: groundRow(sp.c0) };
+  hover = null; kbUsed = false;
   ripples.length = 0;
   state = 'play';
   hideOverlay();
+  goalT = 8;
   showMessage(`Level ${level}: ${cfg.name}`);
-  msgQueue = [{ at: 2.4, text: cfg.tip }];
+  msgQueue = [{ at: 2.6, text: cfg.tip }];
   if (level === 1) {
-    msgQueue.push({ at: 5.2, text: matchMedia('(pointer: coarse)').matches ? 'Tap a block below, then tap to build' : 'Pick a block (1-6), then click or press Space' });
+    msgQueue.push({ at: 5.4, text: matchMedia('(pointer: coarse)').matches ? 'Tap a block below, then tap to build' : 'Pick a block (1-7), then click or press Space' });
   }
   sfx.levelStart();
+  syncAmbience();
 }
 
 function endScreens(dt) {
@@ -1539,36 +1546,42 @@ function endScreens(dt) {
   if (endTimer > 0) return;
   if (state === 'win') {
     const s = lastScore;
-    showOverlay('It fell not!', `Level ${level} complete: ${cfg.name}`,
-      `<p class="verse">"And the rain descended, and the floods came, and the winds blew, and beat upon that house; and it fell not: for it was founded upon a rock." &mdash; Matthew 7:25</p>
+    showOverlay(cap(Bible.verse(VERSES.fellNot).text) + '!', `Level ${level} complete: ${cfg.name}`,
+      `${verseHTML('wiseWin')}
        <p class="score">Blocks standing (${s.blocks}/${s.total}): <b>${s.blocksPts}</b><br>Goals met: <b>${s.reqPts}</b><br>Coins saved: <b>${s.coinPts}</b><br>${s.rockPts ? `Built on the rock: <b>${s.rockPts}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
-       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
       'Next Level', () => { level++; startLevel(); });
   } else if (state === 'fail') {
     const f = lastFail;
-    const nudge = f.onRock
-      ? 'Keep your roof close to walls or pillars, and remember: stone stands the flood better than wood.'
-      : 'The flood washed the sand away. Build on the rock!';
     const lost = f.missing.length ? `<br><small>Lost: ${f.missing.join(', ').toLowerCase()}</small>` : '';
-    showOverlay('Oh... no', `Your house fell in the storm (Level ${level})`,
-      `<p style="text-align:center">${nudge}${lost}</p>
-       <p class="verse">"...and it fell: and great was the fall of it." &mdash; Matthew 7:27</p>
-       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+    showOverlay('Oh... no', f.onRock ? 'The storm broke your house' : 'The house on the sand fell down',
+      f.onRock
+        ? `<p style="text-align:center">Keep your roof close to the walls, and use <b>stone</b> down low: wood washes away in the flood.${lost}</p>
+           ${verseHTML('digged')}`
+        : `<p style="text-align:center;font-size:1.2rem"><b>Build on the rock!</b><br><small>The flood washed the sand away. Look for the grey rock.</small></p>
+           ${verseHTML('foolish')}`,
       'Try Again', () => startLevel());
   }
 }
+
+// The ambient bed plays only during active, unmuted play on a visible page
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
 
 function togglePause() {
   if (state === 'play') {
     state = 'pause';
     sfx.thrust(0);
     showOverlay('Paused', `Level ${level}: ${cfg.name}`,
-      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      `<p style="text-align:center">${goalText()}</p><p style="text-align:center">Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>`,
       'Resume', togglePause, '↻ Restart Level', startLevel);
   } else if (state === 'pause') {
     state = 'play';
     hideOverlay();
   }
+  syncAmbience();
 }
 
 // ============================================================
@@ -1576,7 +1589,7 @@ function togglePause() {
 // ============================================================
 function camTarget() {
   const all = state !== 'play' || phase !== 'build' || buildT < 2.2;
-  const x0 = all ? WORLD_L : -1.6 * BS, x1 = all ? 19 * BS : 12.6 * BS;
+  const x0 = all ? WORLD_L : -1.6 * BS, x1 = all ? 21 * BS : 14.4 * BS;
   const zoom = Math.min(1, W / (x1 - x0), (GROUND_Y - 170) / (GROWS * BS));
   const half = (W / 2) / zoom;
   let x = (x0 + x1) / 2;
@@ -1646,9 +1659,10 @@ canvas.addEventListener('pointerdown', (e) => {
   const b = L.btn;
   if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { startStorm(); return; }
   if (p.y > L.top) return;
-  const { c, r } = cellAt(p);
-  if (c >= 0 && c < GCOLS && r >= 0 && r < GROWS) {
-    cursor = { c, r: Math.max(r, groundRow(c)) };
+  const { c, r: rawR } = cellAt(p);
+  if (c >= 0 && c < GCOLS && rawR >= -1 && rawR < GROWS) {
+    const r = Math.max(rawR, groundRow(c));    // a tap on the ground builds right on top of it
+    cursor = { c, r };
     ripples.push({ x: p.x, y: p.y, t: 0 });
     tryPlace(c, r, sel);
   } else if (c >= NB_C0 && c < RIVER_C0 && r >= 0 && r < GROWS && get(c, r)) {
@@ -1665,6 +1679,7 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerleave', () => { hover = null; });
 // iOS only unlocks audio on some gestures, so try again when the finger lifts
 canvas.addEventListener('pointerup', () => sfx.init());
+canvas.addEventListener('pointercancel', () => { hover = null; });
 
 // iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
 // the long-press menu from hijacking rapid taps. The viewport tag is untouched.
@@ -1825,21 +1840,24 @@ function drawTerrain(visL, visR) {
   const c0 = Math.floor(visL / BS) - 1, c1 = Math.ceil(visR / BS) + 1;
   for (let c = c0; c <= c1; c++) {
     const x = c * BS;
-    if (c < cfg.rockCols) {
-      // the rock: the hill on the left and the shelf you may build upon
-      const top = c < 0 ? -2 : -1;
-      for (let r = top; r < 3; r++) drawTex(r === top ? 'rockTop' : 'rock', x, r * BS);
-      ctx.fillStyle = '#5f636c'; ctx.fillRect(x, 3 * BS, BS, 40 * BS);
+    if (c < 0) {
+      // the rocky hill where Jesus teaches
+      for (let r = -2; r < 3; r++) drawTex(r === -2 ? 'rockTop' : 'rock', x, r * BS);
+      ctx.fillStyle = '#5f636c'; ctx.fillRect(x, 3 * BS, BS + 0.8, 40 * BS);
+    } else if (colIsRock(c)) {
+      // a spot of rock poking up out of the sand: build on this!
+      for (let r = -1; r < 3; r++) drawTex(r === -1 ? 'rockSand' : 'rock', x, r * BS);
+      ctx.fillStyle = '#5f636c'; ctx.fillRect(x, 3 * BS, BS + 0.8, 40 * BS);
     } else if (c < RIVER_C0) {
       // sand, washed away row by row in the flood
       const e = er[c] || 0;
-      ctx.fillStyle = '#8f7446'; ctx.fillRect(x, e * BS, BS, 2 * BS - e * BS);
+      ctx.fillStyle = '#8f7446'; ctx.fillRect(x, e * BS, BS + 0.8, 2 * BS - e * BS);
       for (let r = e; r < 2; r++) drawTex(r === e ? 'sandTop' : 'sand', x, r * BS);
-      ctx.fillStyle = e >= 2 ? '#8f7446' : '#c9a060'; ctx.fillRect(x, 2 * BS, BS, 40 * BS);
+      ctx.fillStyle = e >= 2 ? '#8f7446' : '#c9a060'; ctx.fillRect(x, 2 * BS, BS + 0.8, 40 * BS);
     } else {
       // river bed
-      ctx.fillStyle = '#b39159'; ctx.fillRect(x, 2.2 * BS, BS, 40 * BS);
-      ctx.fillStyle = '#9c7c47'; ctx.fillRect(x, 2.2 * BS, BS, 6);
+      ctx.fillStyle = '#b39159'; ctx.fillRect(x, 2.2 * BS, BS + 0.8, 40 * BS);
+      ctx.fillStyle = '#9c7c47'; ctx.fillRect(x, 2.2 * BS, BS + 0.8, 6);
     }
   }
   // a smooth sandy bank down into the river
@@ -1850,10 +1868,32 @@ function drawTerrain(visL, visR) {
   // gentle labels in the ground
   ctx.font = '700 15px Fredoka, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillText('ROCK', cfg.rockCols * BS / 2, 1.2 * BS);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  for (const sp of cfg.spots) ctx.fillText('ROCK', (sp.c0 + sp.w / 2) * BS, 0.7 * BS);
   ctx.fillStyle = 'rgba(140,100,30,0.55)';
-  if ((er[cfg.rockCols + 1] || 0) < 2) ctx.fillText('SAND', (cfg.rockCols + GCOLS) * BS / 2, 1.2 * BS);
+  let run = 0;
+  for (let c = 0; c <= GCOLS; c++) {
+    if (c < GCOLS && !colIsRock(c)) { run++; continue; }
+    if (run >= 3 && (er[c - 1] || 0) < 2) ctx.fillText('SAND', (c - run / 2) * BS, 1.2 * BS);
+    run = 0;
+  }
+
+  // Level 1: a gentle sparkle on the rock
+  if (level === 1 && state === 'play' && phase === 'build' && buildT < 12) {
+    for (const sp of cfg.spots) {
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 0.8 + k / 3) % 1;
+        const x = (sp.c0 + ((k * 0.37 + Math.floor(t * 0.8 + k / 3) * 0.61) % 1) * sp.w) * BS;
+        const y = -BS + 10 + ((k * 0.53) % 1) * 24;
+        const sz = Math.sin(ph * Math.PI) * 7;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath();
+        ctx.moveTo(x, y - sz); ctx.lineTo(x + sz * 0.3, y - sz * 0.3); ctx.lineTo(x + sz, y); ctx.lineTo(x + sz * 0.3, y + sz * 0.3);
+        ctx.lineTo(x, y + sz); ctx.lineTo(x - sz * 0.3, y + sz * 0.3); ctx.lineTo(x - sz, y); ctx.lineTo(x - sz * 0.3, y - sz * 0.3);
+        ctx.fill();
+      }
+    }
+  }
 }
 
 function drawSignpost() {
@@ -1984,7 +2024,7 @@ function lookFor(x, y) {
     const cur = kbUsed ? cursor : hover || cursor;
     tx = (cur.c + 0.5) * BS; ty = -(cur.r + 0.5) * BS;
   } else { tx = houseCentre(); ty = -2 * BS; }
-  if (x === nbX) { tx = 15 * BS; ty = -3 * BS; if (state === 'play' && phase === 'build' && nbIdx >= NB_PLAN.length) tx = x - 200; }
+  if (x === nbX) { tx = 17 * BS; ty = -3 * BS; if (state === 'play' && phase === 'build' && nbIdx >= NB_PLAN.length) tx = x - 200; }
   const dx = tx - x, dy = ty - (y - 52);
   const len = Math.hypot(dx, dy) || 1;
   return { lx: dx / len, ly: dy / len };
@@ -2007,7 +2047,7 @@ function drawBubble(text, wx, wy) {
 }
 
 // ============================================================
-//  Rendering: HUD, goal card, hotbar
+//  Rendering: HUD, goal banner, hotbar
 // ============================================================
 function drawHUD() {
   ctx.save();
@@ -2042,37 +2082,47 @@ function drawHUD() {
       ctx.stroke();
     }
   }
-  if (state !== 'title') drawGoalCard();
+  drawGoalBanner();
   ctx.restore();
 }
 
-function drawGoalCard() {
-  const w = Math.min(232, viewW * 0.48), x = viewW - w - 10, y = 10;
-  const h = 34 + reqs.length * 22;
-  ctx.fillStyle = 'rgba(255,252,240,0.93)';
-  ctx.strokeStyle = 'rgba(224,165,38,0.7)'; ctx.lineWidth = 2.5;
-  roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#a8741a';
-  ctx.font = '700 15px Fredoka, sans-serif';
-  ctx.fillText(phase === 'build' && state === 'play' ? 'Build a house:' : 'Your house:', x + 12, y + 22);
-  reqs.forEach((q, i) => {
-    const ly = y + 34 + i * 22;
-    ctx.fillStyle = q.ok ? '#40a352' : 'rgba(90,66,16,0.15)';
-    roundRect(x + 12, ly, 16, 16, 4); ctx.fill();
-    if (q.ok) {
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x + 16, ly + 8); ctx.lineTo(x + 19, ly + 12); ctx.lineTo(x + 25, ly + 4); ctx.stroke();
-    }
-    ctx.fillStyle = q.ok ? '#2b6e37' : '#5a4210';
-    ctx.font = '600 13px Fredoka, sans-serif';
-    ctx.fillText(q.label, x + 35, ly + 13);
-    if (q.info && !q.ok) {
-      ctx.textAlign = 'right'; ctx.fillStyle = '#a8741a';
-      ctx.fillText(q.info, x + w - 10, ly + 13);
-      ctx.textAlign = 'left';
-    }
-  });
+// The level's goal in one short sentence, shown for a few seconds at the start
+// of each level (and again if the storm is called before the house is ready)
+let bannerBottom = 0;
+function wrapText(text, maxW) {
+  const lines = [];
+  for (const word of text.split(' ')) {
+    const tryLine = lines.length ? lines[lines.length - 1] + ' ' + word : word;
+    if (lines.length && ctx.measureText(tryLine).width <= maxW) lines[lines.length - 1] = tryLine;
+    else lines.push(word);
+  }
+  return lines;
+}
+function drawGoalBanner() {
+  bannerBottom = 0;
+  if (state !== 'play' || phase !== 'build' || goalT <= 0) return;
+  const a = clamp(goalT / 0.5, 0, 1);
+  const w = Math.min(viewW - 20, 600);
+  const x = (viewW - w) / 2, y = 112;
+  const icon = 40;
+  ctx.font = '700 21px Fredoka, sans-serif';
+  const lines = wrapText(goalText(), w - icon - 44);
+  const h = 22 + lines.length * 26;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(x, y, w, h, 18); ctx.fill(); ctx.stroke();
+  // a little house picture
+  const ix = x + 14, iy = y + (h - icon) / 2;
+  drawTex('roof', ix, iy, icon / 2); drawTex('roof', ix + icon / 2, iy, icon / 2);
+  drawTex('door', ix, iy + icon / 2, icon / 2); drawTex('glass', ix + icon / 2, iy + icon / 2, icon / 2);
+  ctx.fillStyle = '#5a4210';
+  ctx.textAlign = 'center';
+  const tx = x + icon + 24 + (w - icon - 34) / 2;
+  lines.forEach((ln, i) => ctx.fillText(ln, tx, y + 31 + i * 26));
+  ctx.restore();
+  bannerBottom = y + h;
 }
 
 function drawCoin(x, y, r) {
@@ -2165,12 +2215,20 @@ function drawBar() {
     ctx.shadowBlur = 0;
   } else {
     // Matthew 7:25, lit up as it happens
+    const vt = (k) => Bible.verse(VERSES[k]).text;
+    // Comma before a clause that starts afresh ("and the floods came"); none where
+    // the verse runs straight on (NLT: "and the winds beat against that house")
+    const sep = (next) => /^(and|the)\b/i.test(vt(next)) ? ', ' : ' ';
     const parts = [
-      ['And the rain descended, ', 0], ['and the floods came, ', 2.3],
-      ['and the winds blew, ', 5], ['and beat upon that house', 7.8],
+      [vt('rain') + sep('floods'), 0], [vt('floods') + sep('winds'), 2.3],
+      [vt('winds') + sep('beat'), 5], [vt('beat'), 7.8],
     ];
     const lines = [[parts[0], parts[1]], [parts[2], parts[3]]];
     ctx.font = 'italic 600 16px Fredoka, sans-serif';
+    // Shrink the text if a longer translation would reach the panel's edges
+    const widest = Math.max(...lines.map((ln) => ln.reduce((s, p) => s + ctx.measureText(p[0]).width, 0)));
+    const room = W - 48;
+    if (widest > room) ctx.font = `italic 600 ${Math.floor(16 * room / widest * 10) / 10}px Fredoka, sans-serif`;
     ctx.textAlign = 'left';
     const live = state === 'play' ? stormT : 99;
     lines.forEach((ln, i) => {
@@ -2185,24 +2243,26 @@ function drawBar() {
     ctx.textAlign = 'center';
     ctx.font = '600 12px Fredoka, sans-serif';
     ctx.fillStyle = 'rgba(255,246,220,0.6)';
-    ctx.fillText('Matthew 7:25', W / 2, H - 28);
+    ctx.fillText(Bible.verse(VERSES.rain).cite, W / 2, H - 28);
   }
 }
 
 function drawMessage() {
   if (message.t <= 0) return;
   const a = clamp(message.t / 0.5, 0, 1);
-  const y = Math.max(160, GROUND_Y - GROWS * BS * cam.zoom - 24);
+  const y = Math.max(bannerBottom ? bannerBottom - offY + 38 : 160, GROUND_Y - GROWS * BS * cam.zoom - 24);
   ctx.save();
   ctx.globalAlpha = a;
   ctx.textAlign = 'center';
-  ctx.font = '700 24px Fredoka, sans-serif';
-  const tw = ctx.measureText(message.text).width;
-  if (tw > W - 24) ctx.font = `700 ${Math.floor(24 * (W - 24) / tw)}px Fredoka, sans-serif`;
+  ctx.font = '700 23px Fredoka, sans-serif';
+  // greedy word wrap, so long verses fit on a phone
+  const lines = wrapText(message.text, Math.min(W - 44, 760));
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
-  ctx.strokeText(message.text, W / 2, y);
   ctx.fillStyle = '#7a5200';
-  ctx.fillText(message.text, W / 2, y);
+  lines.forEach((ln, i) => {
+    ctx.strokeText(ln, W / 2, y + i * 29);
+    ctx.fillText(ln, W / 2, y + i * 29);
+  });
   ctx.restore();
 }
 
@@ -2246,7 +2306,6 @@ function render() {
     ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 50, 0, TAU); ctx.stroke();
   }
 
-  drawMessage();
   if (state !== 'title') drawBar();
 
   if (flashT > 0) {
@@ -2256,6 +2315,8 @@ function render() {
 
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   drawHUD();
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawMessage();
 }
 
 // ============================================================
@@ -2278,7 +2339,7 @@ function update(dt) {
     updateNeighbourBuild(dt);
     while (msgQueue.length && buildT >= msgQueue[0].at) showMessage(msgQueue.shift().text);
     const ready = reqs.every((q) => q.ok);
-    if (ready && !wasReady) { readyJoyT = 1.6; showMessage('House ready! Let the storm come!'); }
+    if (ready && !wasReady) { readyJoyT = 1.6; goalT = Math.min(goalT, 0.5); showMessage('House ready! Let the storm come!'); }
     wasReady = ready;
   } else if (state === 'play' && phase === 'storm') {
     updateStorm(dt);
@@ -2294,6 +2355,7 @@ function update(dt) {
   pShockT = Math.max(0, pShockT - dt);
   nbShockT = Math.max(0, nbShockT - dt);
   readyJoyT = Math.max(0, readyJoyT - dt);
+  if (state === 'play') goalT = Math.max(0, goalT - dt);
   flashT = Math.max(0, flashT - dt);
   shakeT = Math.max(0, shakeT - dt);
   message.t -= dt;

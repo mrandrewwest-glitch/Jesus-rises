@@ -47,7 +47,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 
 | Game | Story | What you do | File |
 |---|---|---|---|
-| **The Wise Builder** | Built on the rock · Matthew 7:24 | Find the rock in the sandy valley, build your house on it, and see it stand through the storm. | `wise-builders.html` |
+| **The Wise Builder** | Built on the rock · Matthew 7:24 | Build your house block by block from stone, wood and glass. Find the rock in the sandy valley, build on it, and see it stand through the storm. | `wise-builders.html` |
 | **The Sower** | Seed on good ground · Matthew 13:8 | Scatter seed on the good soil, shoo the birds, and grow a hundredfold harvest. | `the-sower.html` |
 | **The Mustard Seed** | The smallest seed · Matthew 13:31 | Grow the tiniest seed into a great tree where the birds come to nest. | `mustard-seed.html` |
 | **The Wheat and the Weeds** | Wait for the harvest · Matthew 13:30 | Protect the field all season, then sort the wheat from the weeds at harvest. | `wheat-weeds.html` |
