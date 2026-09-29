@@ -101,7 +101,7 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
 | **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
 | **The Sower** | Tap ahead to throw seed; tap birds to shoo them | ←/→ aim, `Space` throw | Get the seed onto good ground for a big harvest |
-| **Follow the Star** | Tap left / right of the caravan to steer | ←/→ | Stay in the star's light all the way to Bethlehem |
+| **Follow the Star** | Tap left / right of the camels to stay in the light; tap above / below to change path (or slide your finger) | ←/→ step, ↑/↓ path | Stay in the star's light all the way to Bethlehem |
 | **Washing Feet** | Press and drag to wash, tap the jug to refill, drag the towel to dry | Arrows + hold `Space` wash, `T` towel | Get every disciple's feet sparkling clean before supper |
 | **Where Is Jesus?** | Drag to look around, tap to check a person, hint button | Arrows pan, `Space`/`Enter` magnifier | Find the boy Jesus in each busy scene before the third day ends |
 
