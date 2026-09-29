@@ -278,6 +278,7 @@ const FAST_WINDOW = 0.9;
 const LIFT_T = 1.1;             // friends lifting the mat over the hole
 const ROCK_K = 36;              // rocking spring (about one rock a second)
 const ROCK_DAMP = 2.6;          // how quickly the rocking dies away
+const HASTE = 0.28;             // taps closer together than this make the rope slip
 const TIME_EXTRA = 15;          // seconds given back when the sun runs out (costs a heart)
 
 const LEVEL_NAMES = [
@@ -318,7 +319,7 @@ function makeConfig(n) {
     stone:      n >= 3,                                         // a stone hops about on the roof
     stoneT:     pick([0, 0, 1.5, 1.35, 1.2, 1.1, 1, 0.9]),
     hearts:     pick([3, 3, 3, 3, 3, 2, 2, 2]),
-    limit:      pick([75, 68, 64, 62, 60, 58, 56, 54]),        // seconds before the sun sets
+    limit:      pick([60, 55, 52, 50, 48, 48, 46, 46]),        // seconds before the sun sets
     busy: n,
   };
 }
@@ -351,7 +352,7 @@ let winT = 0, cardShown = false;
 let particles = [];
 let message = { text: '', t: 0 };
 let bubble = null;
-let shockT = 0, shakeT = 0, bumpCd = 0, hitCd = 0, headCd = 0, gaspCd = 0;
+let shockT = 0, shakeT = 0, bumpCd = 0, hitCd = 0, headCd = 0, gaspCd = 0, slipCd = 0;
 const ropeFx = { L: 0, R: 0 };
 let endTimer = 0;
 let lastScore = null;
@@ -1081,8 +1082,15 @@ function notch(side) {
   const k = 't' + side;
   ropeFx[side] = 0.25;
   if (rope[k] >= MAX_D) return;   // that end is already on the floor
-  // Rope never pays out quite evenly on the busier houses
-  rope[k] = Math.min(MAX_D, rope[k] + cfg.notch * (1 + rand(-cfg.jitter, cfg.jitter)));
+  // Rope never pays out quite evenly on the busier houses, and tapping in a
+  // hurry makes it slip through the friends' hands
+  let give = cfg.notch * (1 + rand(-cfg.jitter, cfg.jitter));
+  const hasty = notchTimes.length && t - notchTimes[notchTimes.length - 1] < HASTE;
+  if (hasty) {
+    give += cfg.notch * rand(0.25, 0.45 + cfg.jitter * 1.5);
+    if (slipCd <= 0) { showMessage('Too quick! The rope slipped!'); slipCd = 2.5; }
+  }
+  rope[k] = Math.min(MAX_D, rope[k] + give);
   swayV += (Math.random() < 0.5 ? -1 : 1) * cfg.sway * rand(0.5, 1);
   // Letting out a rope makes the mat rock on toward that side: tapping again
   // too soon adds to the rock, so wait for it to settle
@@ -1447,7 +1455,7 @@ function resetLevelState() {
   man.slide = 0; man.oops = 0; man.stood = false;
   winT = 0; cardShown = false;
   particles = []; ripples.length = 0; bubble = null;
-  shockT = shakeT = bumpCd = hitCd = headCd = gaspCd = 0;
+  shockT = shakeT = bumpCd = hitCd = headCd = gaspCd = slipCd = 0;
   curTilt = 0; steerTilt = 0;
   buildScene();
 }
@@ -2561,6 +2569,7 @@ function update(dt) {
   hitCd = Math.max(0, hitCd - dt);
   headCd = Math.max(0, headCd - dt);
   gaspCd = Math.max(0, gaspCd - dt);
+  slipCd = Math.max(0, slipCd - dt);
   man.oops = Math.max(0, man.oops - dt);
   message.t -= dt;
   if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
