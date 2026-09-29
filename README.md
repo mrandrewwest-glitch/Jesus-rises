@@ -92,6 +92,6 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **Cleansing the Temple** | Tap stalls, cages and animals | Arrows move the ring, `Space` acts | Clear the market before it fills, without disturbing the worshippers |
 | **Let the Children Come** | Tap ahead to hop, beside to step; the Call button once a level | Arrows, `C` call | Help each child through the crowd to be blessed by Jesus |
 | **The Wise Builder** | Pick a block, tap the grid; "Let the storm come!" | `1`–`7` blocks, arrows + `Space`, `Enter` storm | Build a house that meets the goal card and still stands after the storm |
-| **He Is Risen** | Tap in time with the notes (hold the blue ones); then tap to jump | `Space`/↑ | Roll away the stone in rhythm, then run to tell the disciples |
+| **He Is Risen** | Tap in time with the notes (hold the blue ones) | `Space`/↑ | Roll away the stone in rhythm before sunrise, then meet the risen Jesus |
 | **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
 
