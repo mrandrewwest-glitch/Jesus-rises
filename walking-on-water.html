@@ -150,8 +150,12 @@
 </div>
 
 <script src="bible.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
+
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'harp', accent: 'pipe', ambience: 'none', percussion: false };
 
 // Scripture shown in this game. KJV is filled in; other versions are added later.
 // Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
@@ -822,7 +826,7 @@ function drawBoat() {
 // ============================================================
 function win() {
   const p = peter;
-  state = 'win';
+  state = 'win'; syncAmbience();
   p.face = 'joy';
   jesusReach = true;
   const par = cfg.dist / 55;
@@ -843,7 +847,7 @@ function win() {
 }
 
 function fail() {
-  state = 'fail';
+  state = 'fail'; syncAmbience();
   jesusReach = false;
   showMessage(`"${Bible.verse(VERSES.saveMe).text}"`);
   sfx.fail();
@@ -887,7 +891,7 @@ function resetScene() {
 }
 
 function titleScreen() {
-  state = 'title';
+  state = 'title'; syncAmbience();
   level = 1;
   resetScene();
   const touch = matchMedia('(pointer: coarse)').matches;
@@ -906,8 +910,9 @@ function titleScreen() {
 
 function startLevel() {
   resetScene();
-  state = 'play';
+  state = 'play'; syncAmbience();
   hideOverlay();
+  sfx.levelStart();
   showMessage(`Level ${level}: ${cfg.name}`);
   if (level === 1) {
     tutFear = false;
@@ -938,10 +943,10 @@ function endScreens(dt) {
 
 function togglePause() {
   if (state === 'play') {
-    state = 'pause';
+    state = 'pause'; syncAmbience();
     showOverlay('Paused', `Level ${level} — ${cfg.name}`, '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> or tap below to carry on.</p>', 'Resume', togglePause);
   } else if (state === 'pause') {
-    state = 'play';
+    state = 'play'; syncAmbience();
     hideOverlay();
   }
 }
@@ -1007,6 +1012,11 @@ function hudButtons() {
 // ============================================================
 //  Sound (tiny WebAudio synth)
 // ============================================================
+// The theme's ambient bed plays only during active play: never behind a card, while muted or once the page is hidden
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+addEventListener('pagehide', () => Music.ambience(false));
+
 const sfx = {
   ctx: null, master: null, windGain: null, noise: null, muted: false,
   init() {
@@ -1017,6 +1027,7 @@ const sfx = {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 0.5;
       this.master.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -1035,6 +1046,7 @@ const sfx = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
   },
   wind(level) {
     if (!this.windGain) return;
@@ -1066,14 +1078,9 @@ const sfx = {
   splash(v) { this.burst(1400, 0.5 * v, 0.35); },
   chime() { this.tone(1046.5, 0.35, 'triangle', 0.18); this.tone(1568, 0.4, 'sine', 0.1, 0.06); },
   thunder() { this.burst(300, 0.9, 1.3, 'lowpass'); },
-  win() {
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, i * 0.13));
-    [523.25, 659.25, 783.99].forEach((f) => { this.tone(f, 1.8, 'sine', 0.12, 0.55); this.tone(f * 1.005, 1.8, 'sine', 0.08, 0.55); });
-  },
-  fail() {
-    [392, 349.2, 293.7].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.2, i * 0.18));
-    [392, 493.9, 587.3].forEach((f) => this.tone(f, 1.4, 'sine', 0.1, 1.6));
-  },
+  win() { Music.win(); },
+  levelStart() { Music.start(); },
+  fail() { Music.fail(); },
 };
 
 // ============================================================
