@@ -2372,11 +2372,12 @@ function titleScreen() {
     `${portraitHTML('title')}
      ${verseHTML('foundTemple')}
      <ul>
-       <li>Mary and Joseph have lost 12-year-old Jesus in the Passover crowds! Help them <b>find Him</b>.</li>
-       <li>Look for the boy in a <b>white robe</b> with a <b>red sash</b> and a soft <b>golden glow</b>. Watch out for look-alikes!</li>
+       <li>Mary and Joseph have lost 12-year-old Jesus in the Passover crowds! Follow the clues through <b>12 places</b> in Jerusalem, all the way to the temple.</li>
+       <li>Look for the boy in a <b>white robe</b> with a <b>red sash tied in a knot</b>, <b>brown hair</b> and a <b>little scroll</b>. At first He has a soft golden glow, but it fades as you go!</li>
+       <li>Watch out for look-alikes, people walking past, and crowds that hide Him for a moment.</li>
        <li><b>Touch / mouse:</b> drag to look around, <b>tap</b> someone to check them. Pinch or scroll to zoom.</li>
        <li><b>Keyboard:</b> arrows to look, <kbd>Space</kbd>/<kbd>Enter</kbd> for a magnifier (again to check), <kbd>H</kbd> for a hint.</li>
-       <li>Wrong guesses cost time, and you only have <b>three days</b>! Spot the hidden <b>lamb</b>, <b>scroll</b> and <b>dove</b> for bonus points.</li>
+       <li>You only have <b>three days</b>. Wrong guesses cost time, and tapping wildly makes you wait. Bonus: find the <b>lamb</b>, <b>scroll</b> and <b>dove</b>, and make no wrong taps!</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
@@ -2395,13 +2396,6 @@ function storyScreen() {
     'Help them look!', () => { level = 1; totalScore = 0; startLevel(); });
 }
 
-const LEVEL_GOALS = [
-  'Is He with the relatives? Find the boy in white with a red sash!',
-  'Search the busy market!',
-  'Look through the Passover crowds!',
-  null,   // the temple level shows Luke 2:46 as a caption instead
-];
-
 function startLevel() {
   cfg = makeConfig(level);
   buildScene();
@@ -2416,9 +2410,14 @@ function startLevel() {
   state = 'play';
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
-  if (LEVEL_GOALS[cfg.loc]) queueMessage(LEVEL_GOALS[cfg.loc]);
+  if (cfg.L.goal) queueMessage(cfg.L.goal);
   else caption = { key: 'hearing', t: 5.5, where: 'top' };
   if (cfg.cycle > 0) queueMessage('More people, more look-alikes!');
+  // tell the player about each new trick the first time it appears (and on every level after the glow is gone)
+  if (cfg.d === 3) queueMessage('Careful: some look-alikes wear a red sash too!');
+  if (cfg.d === 5) queueMessage('Crowds pass by now and then. Keep watching!');
+  if (cfg.halo === 0 && !cfg.cousin) queueMessage('No glow now! Look for brown hair, a knotted red sash and a scroll.');
+  lockT = 0; tapTimes = [];
   if (level === 1) queueMessage(touchy() ? 'Drag to look around. Tap to check!' : 'Drag or use arrows to look. Click to check!');
   sfx.levelStart();
   syncAmbience();
@@ -2434,7 +2433,7 @@ function endScreens(dt) {
   if (endTimer <= 0) return;
   endTimer -= dt;
   if (endTimer > 0) return;
-  const next = LOCS[level % 4].name;
+  const next = LOCS[level % LOCS.length].name;
   if (state === 'win') {
     const s = lastScore;
     if (endKind === 'final') {
@@ -2453,14 +2452,14 @@ function endScreens(dt) {
          ${creditHTML()}`,
         `Next: ${next}`, () => { level++; startLevel(); });
     } else {
-      const clue = cfg.loc === 1
-        ? 'You spotted Him! But a flock of sheep trotted past, and He was gone. A merchant saw Him head toward the city gate.'
-        : 'There He was, just for a moment! A kind stranger says He went up to the temple to hear the teachers.';
-      showOverlay(cfg.loc === 1 ? 'A clue!' : 'Up to the temple!', `Level ${level} complete — ${cfg.name}`,
+      const passed = { sheep: 'a flock of sheep trotted past', donkey: 'a string of donkeys clip-clopped past', people: 'a crowd of pilgrims pushed past' }[cfg.L.pass];
+      const clue = `You spotted Him! But ${passed}, and He was gone. ${cfg.L.who} says He went ${cfg.L.where}.`;
+      const withVerse = cfg.loc === 1 || cfg.loc === 6;
+      showOverlay(cfg.L.card, `Level ${level} complete — ${cfg.name}`,
         `<p style="text-align:center">${clue}</p>
-         ${cfg.loc === 1 ? verseHTML('kinsfolk') : ''}
+         ${withVerse ? verseHTML('kinsfolk') : ''}
          ${scoreHTML(s)}
-         ${cfg.loc === 1 ? creditHTML() : ''}`,
+         ${withVerse ? creditHTML() : ''}`,
         `Next: ${next}`, () => { level++; startLevel(); });
     }
   } else if (state === 'fail') {
