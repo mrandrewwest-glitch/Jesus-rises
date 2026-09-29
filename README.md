@@ -1,113 +1,84 @@
 # Stories of Jesus ✨
 
-Small cartoon games based on stories of Jesus from the Gospels. Open `index.html` for the game menu, then pick a game. Every game has a 🏠 button and an **All games** link that take you back to the menu.
+48 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
-| Game | Story | File |
-|---|---|---|
-| **Jesus Rises** ☁️ | The Ascension (Acts 1:9–11) | `jesus-rises.html` |
-| **Walking on Water** 🌊 | Peter walks to Jesus (Matthew 14:22–33) | `walking-on-water.html` |
-| **Feeding the 5,000** 🍞 | Loaves and fishes (John 6:1–14) | `feeding-5000.html` |
-| **Calming the Storm** ⛵ | Peace, be still (Mark 4:35–41) | `calming-the-storm.html` |
-| **Zacchaeus Climbs** 🌳 | Up the sycomore tree (Luke 19:1–10) | `zacchaeus.html` |
-| **The Lost Sheep** 🐑 | One in a hundred (Luke 15:3–7) | `lost-sheep.html` |
-| **Water into Wine** 🍷 | The wedding at Cana (John 2:1–11) | `water-into-wine.html` |
-| **Fishers of Men** 🎣 | The great catch (Luke 5:1–11) | `fishers-of-men.html` |
-| **Palm Sunday** 🌿 | Hosanna! (Matthew 21:1–11) | `palm-sunday.html` |
-| **Cleansing the Temple** 🕊️ | My Father's house (John 2:13–17) | `cleansing-temple.html` |
-| **Let the Children Come** 🧒 | Jesus blesses the children (Mark 10:13–16) | `blesses-children.html` |
-| **The Wise Builder** 🧱 | Built on the rock (Matthew 7:24–27) | `wise-builders.html` |
-| **He Is Risen** 🌅 | The empty tomb (Matthew 28:1–10) | `empty-tomb.html` |
-| **Legion** 🐖 | Into the swine (Mark 5:1–20) | `legion.html` |
-| **Through the Roof** 🏠 | Four faithful friends (Mark 2:1–12) | `through-the-roof.html` |
-| **The Sower** 🌾 | Seed on good ground (Matthew 13:3–23) | `the-sower.html` |
-| **Follow the Star** ⭐ | The wise men (Matthew 2:1–12) | `follow-the-star.html` |
-| **Washing Feet** 🦶 | Love one another (John 13:1–17) | `washing-feet.html` |
-| **Where Is Jesus?** 🔍 | The boy Jesus in the temple (Luke 2:41–52) | `boy-jesus-temple.html` |
-| **The Good Samaritan** 🫏 | Who is my neighbour? (Luke 10:25–37) | `good-samaritan.html` |
-| **The Prodigal Son** 🏃 | The father runs (Luke 15:11–32) | `prodigal-son.html` |
-| **The Lost Coin** 🪙 | Sweep the house (Luke 15:8–10) | `lost-coin.html` |
-| **The Mustard Seed** 🌱 | The smallest seed (Matthew 13:31–32) | `mustard-seed.html` |
-| **Keep Your Lamp Burning** 🪔 | The ten bridesmaids (Matthew 25:1–13) | `ten-bridesmaids.html` |
-| **The Talents** 💰 | Good and faithful servant (Matthew 25:14–30) | `talents.html` |
+Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files, libraries or build step.
 
-Every game has the same pause menu (Resume / ↻ Restart Level / All games), keyboard shortcuts (`P`/`Esc` pause, `R` restart while paused, `M` mute), choir-and-organ music, and saves your best score in your browser.
+## Play and share
 
-## Play
+- **Play locally:** open `index.html` in any modern browser.
+- **Share online:** turn on **GitHub Pages** (Settings → Pages → Deploy from a branch → `main`, `/ (root)`). The menu is then at `https://mrandrewwest-glitch.github.io/Jesus-rises/`.
 
-Open `index.html` in any modern browser. It works on desktop and mobile, with no build step and nothing to install.
-To share it, turn on **GitHub Pages** for this repo (Settings → Pages → deploy from branch). The menu is then hosted at `https://<user>.github.io/<repo>/`.
+## Features in every game
 
----
+- **Controls:** tap-first touch controls, plus keyboard shortcuts on computers. `P` / `Esc` pauses, `R` restarts the level while paused, `M` mutes, and `Enter` / `Space` presses the card button.
+- **Pause menu:** Resume, ↻ Restart Level and All games.
+- **iPhone-friendly:** no double-tap zoom, pinch zoom or long-press menu getting in the way.
+- **Best scores:** saved on the device and shown on the menu.
+- **Bible version:** pick **KJV, NKJV, NIV or NLT** on the menu. Every verse in every game is quoted word for word in the chosen version and credited to its publisher. The shared code is in `bible.js`, and each game keeps its own `VERSES` table.
+- **Sound:** the shared engine in `music.js` uses a harp and a shepherd's pipe. Each game has its own public-domain hymn tune (Amazing Grace, Jesus Loves Me, Joy to the World, O Come All Ye Faithful, Ode to Joy, the Doxology or the Hallelujah) and a soft background sound (sea, birdsong, crowd, wind, night, campfire or market). The background sound only plays during play.
 
-## Jesus Rises ☁️
+## The Life of Jesus (31 games, in story order)
 
-A cartoon take on the classic *Lunar Lander*, played in reverse. Instead of landing on the moon, you guide Jesus up on His cloud at the Ascension (Acts 1:9–11). Your goal is to settle Him gently onto the golden seat **at the right hand of the Father** at the top of the screen.
-
-### Controls
-
-| | Keyboard | Touch / mouse |
-|---|---|---|
-| Rise | Hold `↑`, `W` or `Space` | **Tap** above Jesus: each tap is one push |
-| Steer | Hold `←` `→` or `A` `D` | **Tap** to His left / right |
-| Pause | `P` / `Esc` | ⏸ button |
-| Restart level | `R` while paused | ↻ Restart Level in the pause menu |
-| Mute | `M` | 🔊 button |
-
-### Rules
-
-- On touch screens, holding your finger down does nothing. Every tap is a single push toward where you tapped, so hovering and landing gently takes rhythm.
-
-- Rising and steering use up **Glory**. If it runs out, He drifts back down to earth.
-- Land on the seat **gently**: the ↑↓ and ↔ speed readouts turn green when you're slow enough. Come in too fast and you bounce off.
-- **Wind** blows Him sideways. Check the wind arrow, and watch the streaks and the olive trees. It gets gustier each level, and it starts shearing in different directions from level 3.
-- **Storm clouds** (from level 2) zap you and push you down.
-- The **disciples** watch from the Mount of Olives. They follow Him with their eyes and react: wonder, worry, shock and joy. Keep an eye on Thomas.
-- Score = gentle landing + how centred you are on the seat + Glory left + level bonus. Your best score is saved in your browser.
-
----
-
-## Walking on Water 🌊
-
-It's the fourth watch of the night and the sea is rough. Jesus says "Come", and Peter steps out of the boat. Help him walk across the waves to Jesus **without taking his eyes off Him** (Matthew 14:22–33).
-
-### Controls
-
-| | Keyboard | Touch / mouse |
-|---|---|---|
-| Jump a wave | `↑`, `W` or `Space` | **Tap** anywhere |
-| Chase away a fear | `F`, `↓` or `Enter` | **Tap** the fear |
-| Pause | `P` / `Esc` | ⏸ button |
-| Mute | `M` | 🔊 button |
-
-### Rules
-
-- Peter walks toward Jesus by himself. A golden line shows him keeping his eyes on Jesus.
-- **Fears** (Fear, Doubt, Worry, Panic…) drift in and try to block his view. While one is in the way, his **Faith** drains, he slows down and he starts to sink. Chase them away before they arrive!
-- **Waves** roll in from the right. Jump them or get knocked back and lose Faith. From level 3 some waves come in pairs, and lightning can bring extra fears.
-- If Faith runs out, Peter cries "Lord, save me!" and Jesus reaches out His hand. Then try again.
-- Reach Jesus and the wind ceases. Score = Faith left + speed bonus + fears chased away + level bonus. Your best score is saved in your browser and shown on the menu.
-
----
-
-## The other games at a glance
-
-| Game | Touch | Keyboard | Goal |
+| Game | Story | What you do | File |
 |---|---|---|---|
-| **Feeding the 5,000** | Pick bread or fish, tap a hungry group; then tap to move the basket | ←/→ aim, `Space` toss, `F` switch food; ←/→ basket | Feed every group before evening, then gather twelve baskets of fragments |
-| **Calming the Storm** | Tap puddles to bail, tap the high side to lean, tap Jesus when the meter is full | `Space` bail, ←/→ lean, `W`/`Enter` wake | Keep the boat afloat until Jesus wakes and calms the sea |
-| **Zacchaeus Climbs** | Tap left / right half to hop to that branch | ←/→ (↑ for same side) | Reach the top of the sycomore before Jesus passes by |
-| **The Lost Sheep** | Tap where to walk; tap the sheep to free it, tap a wolf to shoo it | Arrows/WASD, `Space` free / shoo | Follow the bleats, find the sheep and carry it home before nightfall |
-| **Water into Wine** | Press and hold, release to pour | Hold `Space`/↓ | Let go when the jar glows ruby for the best wine, before it turns to vinegar |
-| **Fishers of Men** | Tap a side of the boat to cast, tap HAUL to call the other boat | `Space` cast, ←/→ side, `B` haul | Land the catch before the net breaks and the sun climbs high |
-| **Palm Sunday** | Slide your finger up / down to change lanes, flick up to hop | ↑/↓ lanes, `Space` hop | Ride the donkey to Jerusalem's gate, dodging obstacles and collecting palms and cloaks |
-| **Cleansing the Temple** | Tap stalls, cages and animals | Arrows move the ring, `Space` acts | Clear the market before it fills, without disturbing the worshippers |
-| **Let the Children Come** | Tap ahead to hop, beside to step; the Call button once a level | Arrows, `C` call | Help each child through the crowd to be blessed by Jesus |
-| **The Wise Builder** | Tap a spot of rock for the foundation, tap the glowing squares, then "Let the storm come!" | ←/→ + `Enter` foundation, arrows + `Space` build, `Enter` storm | Find the rock, build your house on it, and see it stand through the storm |
-| **He Is Risen** | Tap in time with the notes (hold the blue ones) | `Space`/↑ | Roll away the stone in rhythm before sunrise, then meet the risen Jesus |
-| **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
-| **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
-| **The Sower** | Tap ahead to throw seed; tap birds to shoo them | ←/→ aim, `Space` throw | Get the seed onto good ground for a big harvest |
-| **Follow the Star** | Tap left / right of the camels to stay in the light; tap above / below to change path (or slide your finger) | ←/→ step, ↑/↓ path | Stay in the star's light all the way to Bethlehem |
-| **Washing Feet** | Press and drag to wash, tap the jug to refill, drag the towel to dry | Arrows + hold `Space` wash, `T` towel | Get every disciple's feet sparkling clean before supper |
-| **Where Is Jesus?** | Drag to look around, tap to check a person, hint button | Arrows pan, `Space`/`Enter` magnifier | Find the boy Jesus in each busy scene before the third day ends |
+| **The Shepherds and the Angels** | Good tidings of great joy · Luke 2:10 | Gather the sheep, hear the angel choir, and hurry to Bethlehem to find the baby. | `shepherds-angels.html` |
+| **Follow the Star** | The wise men · Matthew 2:9 | Guide the wise men's camels across the desert by starlight to find young Jesus. | `follow-the-star.html` |
+| **Where Is Jesus?** | The boy Jesus in the temple · Luke 2:46 | Help Mary and Joseph search the busy crowds of Jerusalem for twelve-year-old Jesus. | `boy-jesus-temple.html` |
+| **Jesus Is Baptised** | My beloved Son · Matthew 3:17 | Help the crowd to John at the Jordan, then guide the dove down from heaven. | `baptism.html` |
+| **Jesus in the Wilderness** | It is written · Matthew 4:4 | Answer each temptation with the words Jesus spoke from Scripture. | `wilderness.html` |
+| **Water into Wine** | The wedding at Cana · John 2:9 | Hold to turn the water into the best wine, but let go in time or it turns to vinegar! | `water-into-wine.html` |
+| **The Woman at the Well** | Living water · John 4:14 | Draw water from the deep well, then run to invite the whole town to meet Jesus. | `woman-at-well.html` |
+| **Fishers of Men** | The great catch · Luke 5:6 | Cast the net at just the right moment and call for help before it breaks. | `fishers-of-men.html` |
+| **Through the Roof** | Four faithful friends · Mark 2:4 | Dig through the roof and lower your friend down to Jesus, gently and level! | `through-the-roof.html` |
+| **Calming the Storm** | Peace, be still · Mark 4:39 | Keep the boat afloat through the storm until Jesus wakes and calms the sea. | `calming-the-storm.html` |
+| **Legion** | Into the swine · Mark 5:13 | Flick the cheeky shadow imps out of the man and into the herd of pigs, slingshot style! | `legion.html` |
+| **Jairus's Daughter** | Only believe · Mark 5:36 | Lead Jesus through the crowd to Jairus's house, and find who touched His cloak. | `jairus-daughter.html` |
+| **Feeding the 5,000** | Loaves and fish · John 6:11 | Share five loaves and two fish with a hungry hillside, then gather twelve baskets. | `feeding-5000.html` |
+| **Walking on Water** | Peter steps out · Matthew 14:29 | Help Peter cross the stormy sea. Jump the waves and chase away fears to keep his eyes on Jesus. | `walking-on-water.html` |
+| **On the Mountain** | The Transfiguration · Matthew 17:2 | Climb the high mountain with Peter, James and John and see Jesus shine like the sun. | `transfiguration.html` |
+| **The Coin in the Fish** | Peter goes fishing · Matthew 17:27 | Cast your hook and find the one fish with a coin in its mouth. | `coin-in-fish.html` |
+| **Mary and Martha** | The good part · Luke 10:42 | Rush round Martha's kitchen, then learn what matters most: sitting with Jesus. | `mary-martha.html` |
+| **The Man Born Blind** | Now I see · John 9:25 | Guide the man through the streets to wash in the Pool of Siloam, and see! | `man-born-blind.html` |
+| **The Ten Lepers** | Where are the nine? · Luke 17:17 | Ten are healed, but can you spot the one who comes back to say thank you? | `ten-lepers.html` |
+| **Lazarus, Come Forth!** | The resurrection and the life · John 11:43 | Roll away the stone, then swipe fast to unwrap Lazarus! | `raising-lazarus.html` |
+| **Let the Children Come** | Jesus blesses the children · Mark 10:14 | Help the children weave through the crowd to reach Jesus. Great for little ones! | `blesses-children.html` |
+| **Blind Bartimaeus** | Have mercy on me! · Mark 10:47 | Shout louder than the crowd so Jesus hears you, and receive your sight. | `bartimaeus.html` |
+| **Zacchaeus Climbs** | Up the sycamore · Luke 19:4 | Help Zacchaeus climb the tree to see Jesus over the crowd. | `zacchaeus.html` |
+| **Palm Sunday** | Hosanna! · Matthew 21:9 | Ride into Jerusalem on the donkey. Slide between lanes, hop the rocks and collect palm branches. | `palm-sunday.html` |
+| **Cleansing the Temple** | My Father's house · John 2:16 | Clear the market stalls from the temple courts, but don't disturb the people praying. | `cleansing-temple.html` |
+| **Washing Feet** | Love one another · John 13:5 | Scrub off the mud, pop out the pebbles and clean under every toenail. So satisfying! | `washing-feet.html` |
+| **He Is Risen** | The empty tomb · Matthew 28:6 | Tap in time with the music to roll away the stone on Easter morning. | `empty-tomb.html` |
+| **The Road to Emmaus** | Our hearts burned · Luke 24:32 | Walk with the stranger at sunset, and know Him when He breaks the bread. | `road-to-emmaus.html` |
+| **Thomas Believes** | My Lord and my God · John 20:28 | Gather the clues and testimonies until Thomas meets the risen Jesus. | `doubting-thomas.html` |
+| **Breakfast on the Beach** | 153 fish · John 21:11 | Catch exactly 153 fish, then cook breakfast with Jesus by the fire. | `breakfast-beach.html` |
+| **Jesus Rises** | The Ascension · Acts 1:9 | Guide Jesus on His cloud up to the right hand of the Father. Mind the wind and land gently! | `jesus-rises.html` |
 
+## Parables Jesus Told (17 games)
+
+| Game | Story | What you do | File |
+|---|---|---|---|
+| **The Wise Builder** | Built on the rock · Matthew 7:24 | Find the rock in the sandy valley, build your house on it, and see it stand through the storm. | `wise-builders.html` |
+| **The Sower** | Seed on good ground · Matthew 13:8 | Scatter seed on the good soil, shoo the birds, and grow a hundredfold harvest. | `the-sower.html` |
+| **The Mustard Seed** | The smallest seed · Matthew 13:31 | Grow the tiniest seed into a great tree where the birds come to nest. | `mustard-seed.html` |
+| **The Wheat and the Weeds** | Wait for the harvest · Matthew 13:30 | Protect the field all season, then sort the wheat from the weeds at harvest. | `wheat-weeds.html` |
+| **The Hidden Treasure** | The pearl of great price · Matthew 13:44 | Dig for the treasure in the field and find the one perfect pearl. | `hidden-treasure.html` |
+| **The Good Samaritan** | Who is my neighbour? · Luke 10:33 | Tend the hurt traveller and carry him gently down the Jericho road to the inn. | `good-samaritan.html` |
+| **The Rich Fool** | Bigger barns · Luke 12:18 | Stack the harvest in bigger barns, or share it and be rich toward God. | `rich-fool.html` |
+| **The Lost Sheep** | One in a hundred · Luke 15:4 | Search the hills for the one lost sheep and carry it safely home. | `lost-sheep.html` |
+| **The Lost Coin** | Sweep the house · Luke 15:8 | Light the lamp and sweep every corner to find the one lost silver coin. | `lost-coin.html` |
+| **The Prodigal Son** | The father runs · Luke 15:20 | Walk the long road home, then run as the father to welcome his son with a party! | `prodigal-son.html` |
+| **The Great Banquet** | Come, for all is ready · Luke 14:21 | The guests make silly excuses, so invite everyone from the streets to fill the feast! | `great-banquet.html` |
+| **The Unforgiving Servant** | Seventy times seven · Matthew 18:22 | You've been forgiven a mountain of debt. Will you forgive others too? | `unforgiving-servant.html` |
+| **The Workers in the Vineyard** | The last shall be first · Matthew 20:16 | Pick grapes all day and hire workers every hour, with a generous surprise at the end. | `workers-vineyard.html` |
+| **The Persistent Widow** | Always pray · Luke 18:1 | Keep knocking on the grumpy judge's door until he finally listens! | `persistent-widow.html` |
+| **Two Men Who Prayed** | A humble heart · Luke 18:13 | Pop the proud thoughts and lift up the humble prayer. | `pharisee-tax-collector.html` |
+| **Keep Your Lamp Burning** | The ten bridesmaids · Matthew 25:4 | Keep all five lamps lit through the night until the bridegroom comes. | `ten-bridesmaids.html` |
+| **The Talents** | Good and faithful servant · Matthew 25:21 | Trade at the market to double your master's silver before he returns. | `talents.html` |
+
+## Scripture credits
+
+- **KJV:** Scripture quotations are from the King James Version (public domain).
+- **NKJV:** Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. Used by permission. All rights reserved.
+- **NIV:** Scripture quotations taken from The Holy Bible, New International Version® NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ Used by permission. All rights reserved worldwide.
+- **NLT:** Scripture quotations are taken from the Holy Bible, New Living Translation, copyright © 1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Carol Stream, Illinois 60188. All rights reserved.
