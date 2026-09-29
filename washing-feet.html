@@ -265,7 +265,7 @@ function mixHex(a, b, f) {
 const THRESHOLD = 0.9;     // each foot must be this clean
 const BRUSH_R = 26;        // size of the water stream's scrub
 const TOWEL_R = 38;        // size of the towel
-const POWER = 70;          // how much grime one stamp of water lifts
+const POWER = 80;          // how much grime one stamp of water lifts
 const REFILL_TIME = 1.2;   // seconds to refill the pitcher
 const MASK_SCALE = 0.8;    // mask pixels per logical pixel (144 x 216 per foot)
 const SEAT_Y = 440;        // the disciple's waist in the close-up
@@ -325,11 +325,11 @@ function makeConfig(n) {
   return {
     name: LEVEL_NAMES[n - 1] || `Supper ${n}`,
     names,
-    grime: Math.min(1 + (n - 1) * 0.22, 2.2),     // how much grime is on each foot
-    tough: Math.min(1 + (n - 1) * 0.12, 1.9),     // how many passes it takes
+    grime: Math.min(1 + (n - 1) * 0.15, 1.8),     // how much grime is on each foot
+    tough: Math.min(1 + (n - 1) * 0.07, 1.4),     // how many passes it takes
     pebbles: [1, 2, 2, 3, 3][n - 1] || 4,
     nails: Math.min(5, n),
-    perDisc: Math.max(24, 50 - (n - 1) * 5),      // candle seconds per disciple
+    perDisc: Math.max(34, 52 - (n - 1) * 3),      // candle seconds per disciple
     nailTime: 0.9 + Math.min(n - 1, 6) * 0.15,
     waterUse: Math.min(13, 8 + (n - 1) * 1.1),     // pitcher drains this much per second
   };
@@ -642,12 +642,12 @@ function scrubTarget(f, lx, ly, R, power) {
       const fall = 1 - d2;
       if (!f.everWet[i]) { f.everWet[i] = 1; f.everWetCount++; }
       const w = f.wet[i];
-      if (w < 255) { const nw = Math.min(255, w + 255 * fall * 1.5 + 30); f.wetSum += nw - w; f.wet[i] = nw; }
+      if (w < 255) { const nw = Math.min(255, Math.floor(w + 255 * fall * 1.5 + 30)); f.wetSum += nw - w; f.wet[i] = nw; }
       let p = power * fall;
       for (let k = layers.length - 1; k >= 0 && p > 0; k--) {
         const L = layers[k], v = L.amt[i];
         if (!v) continue;
-        let nv = v - p / L.tough;
+        let nv = Math.floor(v - p / L.tough);   // whole numbers keep the running total exact
         if (nv < 16) { nv = 0; cleared++; }
         p -= (v - nv) * L.tough;
         removed += v - nv;
@@ -673,7 +673,7 @@ function dryTarget(f, lx, ly, R, power) {
       if (d2 >= 1) continue;
       const i = y * f.mw + x, w = f.wet[i];
       if (!w) continue;
-      let nw = w - power * (1 - d2 * 0.6);
+      let nw = Math.floor(w - power * (1 - d2 * 0.6));
       if (nw < 20) nw = 0;
       dried += w - nw;
       f.wet[i] = nw;
@@ -741,7 +741,7 @@ function makeDisciple(name) {
   const d = DISCIPLES.find((x) => x.name === name);
   const st = STYLES[name];
   const layers = st.layers.slice();
-  if (level >= 3 && !layers.includes('mud') && !layers.includes('muck')) layers.unshift('mud');
+  if (level >= 4 && !layers.includes('mud') && !layers.includes('muck')) layers.unshift('mud');
   const opts = { grime: cfg.grime, tough: cfg.tough };
   const feet = [-1, 1].map((side) => makeTarget('foot', side, FEET_Y, layers, opts));
   feet.forEach((f, k) => { addItems(f, st, k); addNails(f); });
@@ -1016,11 +1016,6 @@ function doTools(dt) {
   const dx = pointer.x - pointer.lx, dy = pointer.y - pointer.ly;
   const dist = Math.hypot(dx, dy);
   pointer.speed = lerp(pointer.speed, dist / Math.max(dt, 1e-4), 0.35);
-  if (refillT > 0) {
-    refillT -= dt;
-    water = Math.min(100, water + (dt * 100) / REFILL_TIME);
-    if (refillT <= 0) { water = 100; emptyWarned = false; }
-  }
   pouring = false; pourHit = false;
   if (pressing && tool === 'pitcher' && refillT <= 0) {
     if (water > 0) {
@@ -2071,6 +2066,8 @@ function drawHandArms(c) {
 // ============================================================
 function drawTarget(f, skin) {
   ctx.save();
+  // pulled-up feet disappear under the robe
+  if (f.kind === 'foot' && f.oy < 0) { ctx.beginPath(); ctx.rect(-offX, FEET_Y, viewW, H); ctx.clip(); }
   ctx.translate(f.x0 + f.ox, f.y0 + f.oy);
   if (f.mirror) { ctx.translate(f.bw, 0); ctx.scale(-1, 1); }
   const outline = shade(skin, -55);
@@ -2294,8 +2291,8 @@ function drawSleeve(hx, hy) {
   ctx.beginPath(); ctx.arc(hx - 3, hy - 2, 8, 0.6 * Math.PI, 1.4 * Math.PI); ctx.stroke();
 }
 
-function drawTowel(x, y, a) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+function drawTowel(x, y, a, s = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.scale(s, s);
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
   roundRect(-46, -26, 96, 60, 12); ctx.fill();
   ctx.fillStyle = '#f5eeda'; ctx.strokeStyle = '#c9bb95'; ctx.lineWidth = 2;
@@ -2347,10 +2344,10 @@ function drawJesusTools() {
 
 function updatePitcher(dt) {
   const active = inWashPhase() && (pointer.down || pointer.mouse || kb.active);
-  let tx = pitcher.x, ty = pitcher.y;
-  if (active || state === 'title') { tx = pointer.x + 62; ty = pointer.y - 150; }
-  if (state === 'title') { tx = W * 0.8; ty = 640; }
-  if (refillT > 0) { ty += 30; }
+  if (active || state === 'title') { pitcher.tx = pointer.x + 62; pitcher.ty = pointer.y - 150; }
+  if (state === 'title') { pitcher.tx = W * 0.8; pitcher.ty = 640; }
+  if (pitcher.tx === undefined) { pitcher.tx = pitcher.x; pitcher.ty = pitcher.y; }
+  const tx = pitcher.tx, ty = pitcher.ty + (refillT > 0 ? 30 : 0);   // dips while refilling
   const k = Math.min(1, dt * 18);
   pitcher.x += (tx - pitcher.x) * k;
   pitcher.y += (ty - pitcher.y) * k;
@@ -2797,7 +2794,7 @@ function drawHUD() {
       ctx.fillStyle = '#4a3208'; ctx.textAlign = 'center'; ctx.font = '700 11px Fredoka, sans-serif';
       ctx.fillText(refillT > 0 ? 'glug…' : empty ? 'REFILL' : 'WATER', b.x, b.y - b.r - 12);
     } else {
-      drawTowel(b.x, b.y + 2, -0.15);
+      drawTowel(b.x, b.y + 2, -0.15, 0.5);
       ctx.fillStyle = '#4a3208'; ctx.textAlign = 'center'; ctx.font = '700 11px Fredoka, sans-serif';
       ctx.fillText('TOWEL', b.x, b.y - b.r - 8);
     }
@@ -2840,6 +2837,11 @@ function update(dt) {
       if (sceneT > 4.5) beginWashing();
     } else {
       moveKeyboardSponge(dt);
+      if (refillT > 0) {
+        refillT -= dt;
+        water = Math.min(100, water + (dt * 100) / REFILL_TIME);
+        if (refillT <= 0) { water = 100; emptyWarned = false; }
+      }
       updateWash(dt);
     }
   } else if (state === 'win') {
