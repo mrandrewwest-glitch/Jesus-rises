@@ -267,7 +267,7 @@ const isTouch = () => matchMedia('(pointer: coarse)').matches;
 // ============================================================
 //  Tuning
 // ============================================================
-const CH = 1.35;          // drawing scale for people on the road
+const CH = 1.55;          // drawing scale for people on the road
 const WALK_V = 150;       // the son's walking speed during a stride (px/s)
 const STRIDE = 0.75;      // one good tap keeps him walking this long (s)
 const STUMBLE_T = 0.9;    // time spent picking himself up after a stumble
@@ -416,9 +416,9 @@ function makeDistractions() {
     const x = n === 1 ? (a + b) / 2 : lerp(a, b, i / (n - 1));
     const kind = i % 2 === 0 ? 'tent' : 'dice';
     const folk = kind === 'tent'
-      ? [person({ robe: '#e0527a', hair: '#2a1a0e', beard: false, skin: '#dca678', scarf: '#ffd84a' }, { i: 3, pose: 'beckon', mood: 'joy', facing: -1, dx: -60, s: 1.2 })]
-      : [person({ robe: '#6b8e3a', hair: '#1c120b', beard: true, skin: '#c58a55' }, { i: 4, pose: 'beckon', mood: 'joy', facing: -1, dx: -52, s: 1.2 }),
-         person({ robe: '#b08a2e', hair: '#4a2f1a', beard: true, skin: '#d7a070' }, { i: 5, pose: 'sit', mood: 'watch', facing: -1, dx: 46, s: 1.2 })];
+      ? [person({ robe: '#e0527a', hair: '#2a1a0e', beard: false, skin: '#dca678', scarf: '#ffd84a' }, { i: 3, pose: 'beckon', mood: 'joy', facing: -1, dx: -64, s: CH * 0.9 })]
+      : [person({ robe: '#6b8e3a', hair: '#1c120b', beard: true, skin: '#c58a55' }, { i: 4, pose: 'beckon', mood: 'joy', facing: -1, dx: -58, s: CH * 0.9 }),
+         person({ robe: '#b08a2e', hair: '#4a2f1a', beard: true, skin: '#d7a070' }, { i: 5, pose: 'sit', mood: 'watch', facing: -1, dx: 50, s: CH * 0.9 })];
     list.push({ x, kind, done: false, left: cfg.shakes, phase: rand(0, TAU), folk, line: (kind === 'tent' ? TENT_LINES : DICE_LINES)[Math.floor(i / 2) % 3] });
   }
   return list;
@@ -541,6 +541,7 @@ function setScene(name) {
     sfx.levelStart();
   } else if (name === 'feast') {
     son.fine = son.ring = son.shoes = false;
+    son.mood = 'worried'; son.lx = son.ly = undefined;
     son.sitting = false; son.stumble = 0;
     say('father', verseText('bestRobe'), 6);
     showHint(isTouch() ? 'Drag the robe, ring and shoes onto your son' : 'Drag the robe, ring and shoes onto him (or press Space)', 6);
@@ -804,18 +805,18 @@ function updateHug(dt) {
 function feastLayout() {
   const narrow = W < 700;
   const gy = H - 150;
-  const ps = narrow ? 1.5 : 1.75;
+  const ps = narrow ? 1.6 : 2.0;
   const sonX = W * 0.5 + (narrow ? 14 : 0);
   return {
     gy, ps, narrow, sonX,
     fatherX0: sonX - (narrow ? 84 : 118),
     panelX: narrow ? 58 : Math.max(96, W * 0.15),
-    itemY: [gy - 330, gy - 240, gy - 150],
-    lamps: [0.22, 0.5, 0.78].map((f) => W * f), lampY: 300,
-    brotherX: W - (narrow ? 46 : 110),
+    itemY: narrow ? [gy - 432, gy - 352, gy - 272] : [gy - 400, gy - 300, gy - 200],
+    lamps: (narrow ? [0.3, 0.52, 0.74] : [0.22, 0.5, 0.78]).map((f) => W * f), lampY: 300,
+    brotherX: W - (narrow ? 62 : 120),
     tableY: gy + 58,
     guestX: [0.32, 0.42, 0.6, 0.7, narrow ? 0.12 : 0.16].map((f) => W * f),
-    gs: narrow ? 1.12 : 1.35,
+    gs: narrow ? 1.15 : 1.55,
   };
 }
 
@@ -916,7 +917,7 @@ function updateFeast(dt) {
 
   // People
   son.x = L.sonX; son.y = L.gy; son.s = L.ps; son.facing = -1;
-  const fx0 = L.fatherX0, fx1 = L.brotherX - 62;
+  const fx0 = L.fatherX0, fx1 = L.brotherX - 36 * L.ps;
   father.x = lerp(fx0, fx1, ease(feast.fwalk)); father.y = L.gy; father.s = L.ps; father.lift = 0;
   guests.forEach((g, i) => { g.x = L.guestX[i]; g.y = L.gy - 70; g.s = L.gs; g.facing = g.x < L.sonX ? 1 : -1; });
   const dancing = feast.music;
@@ -953,7 +954,7 @@ function updateFeast(dt) {
     father.facing = 1; father.mood = 'joy';
     if (st === 'smile' && feast.stepT > 1.6 && state === 'play') win();
   }
-  if (feast.fwalk >= 1 && (st === 'hug' || st === 'smile')) father.x = lerp(fx1, L.brotherX - 34, feast.hugFx > 0 || st === 'smile' ? 1 : 0);
+  if (feast.fwalk >= 1 && (st === 'hug' || st === 'smile')) father.x = lerp(fx1, L.brotherX - 26 * L.ps, feast.hugFx > 0 || st === 'smile' ? 1 : 0);
 
   // The older brother, sulking outside with folded arms
   brother.x = lerp(W + 60, L.brotherX, ease(feast.bro)); brother.y = L.gy; brother.s = L.ps;
@@ -1631,7 +1632,6 @@ function drawPerson(p) {
   ctx.translate(p.x, p.y - (bob + (p.lift || 0)) * s);
   ctx.scale(s, s);
   if (lean) ctx.rotate(lean);
-  if (p.dim) ctx.filter = 'brightness(0.94)';
 
   const sit = pose === 'sit';
   const legsOut = pose === 'run' || pose === 'hop';
@@ -2274,7 +2274,7 @@ function drawWorldScene() {
 
   // Resist meter while a distraction tempts him
   if (lure) {
-    const n = cfg.shakes, bx = sp.x - (n - 1) * 9, byy = sp.y - 100 * CH;
+    const n = cfg.shakes, bx = sp.x - (n - 1) * 9, byy = sp.y + 26;
     for (let k = 0; k < n; k++) {
       ctx.fillStyle = k < n - lure.left ? '#2b8a3e' : 'rgba(255,255,255,0.85)';
       ctx.strokeStyle = '#2b8a3e'; ctx.lineWidth = 2;
@@ -2294,7 +2294,7 @@ function drawWorldScene() {
 
 function frameLayout() {
   const narrow = W < 700;
-  const s = narrow ? 1.12 : 1.4;
+  const s = narrow ? 1.2 : 1.6;
   const gy = H - 150;
   const jx = clamp(W * 0.2, 78, 260);
   const a = jx + (narrow ? 72 : 110), b = W - (narrow ? 36 : 70);
@@ -2412,8 +2412,8 @@ function drawFeastScene() {
   // guests at the back, then the father and son in front
   guests.forEach(drawPerson);
   drawPerson(son);
-  if (brotherVisible()) drawPerson(brother);
   drawPerson(father);
+  if (brotherVisible()) drawPerson(brother);   // in front, so his face can be seen softening
 
   // the darkness lifts as the lamps are lit
   const dark = 0.32 * (1 - feast.lamps / 3);
@@ -2600,14 +2600,14 @@ function drawHUD() {
   ctx.fillText(joy ? 'JOY' : 'HOPE', 12, 48);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(90,66,16,0.25)';
-  roundRect(52, 38, 136, 13, 6.5); ctx.fill();
+  roundRect(64, 38, 124, 13, 6.5); ctx.fill();
   const gl = joy ? clamp(stats.items / 6, 0, 1) : clamp(hope / 100, 0, 1);
-  const gg = ctx.createLinearGradient(52, 0, 188, 0);
+  const gg = ctx.createLinearGradient(64, 0, 188, 0);
   if (joy) { gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8'); }
   else { gg.addColorStop(0, '#ff6b8a'); gg.addColorStop(1, '#ffc2d1'); }
   ctx.fillStyle = !joy && gl < 0.25 && Math.sin(t * 10) > 0 ? '#c92a2a' : gg;
-  if (gl > 0) { roundRect(52, 38, 136 * gl, 13, 6.5); ctx.fill(); }
-  if (!joy) { ctx.fillStyle = '#e63950'; heartPath(46, 44, 5); ctx.fill(); }
+  if (gl > 0) { roundRect(64, 38, 124 * gl, 13, 6.5); ctx.fill(); }
+  if (!joy) { ctx.fillStyle = '#e63950'; heartPath(56, 45, 5); ctx.fill(); }
 
   // Home / pause / mute buttons
   for (const b of hudButtons()) {
@@ -2630,7 +2630,7 @@ function drawHUD() {
   }
 
   // Right: the road from the far country to home, and the score
-  const mx1 = viewW - 26, mx0 = mx1 - 140, my = 26;
+  const mx1 = viewW - 36, mx0 = mx1 - 130, my = 26;
   ctx.strokeStyle = 'rgba(90,66,16,0.35)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(mx0, my); ctx.lineTo(mx1, my); ctx.stroke();
   ctx.fillStyle = '#f6a9b8'; ctx.beginPath(); ctx.arc(mx0 - 8, my, 6, 0, TAU); ctx.fill();          // the pigs
