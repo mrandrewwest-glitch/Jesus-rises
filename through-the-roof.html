@@ -276,6 +276,9 @@ const ROPE_SPEED = 70;          // how fast a notch of rope pays out
 const FAST_TAPS = 3;            // this many notches within FAST_WINDOW at touchdown = bump
 const FAST_WINDOW = 0.9;
 const LIFT_T = 1.1;             // friends lifting the mat over the hole
+const ROCK_K = 36;              // rocking spring (about one rock a second)
+const ROCK_DAMP = 2.6;          // how quickly the rocking dies away
+const TIME_EXTRA = 15;          // seconds given back when the sun runs out (costs a heart)
 
 const LEVEL_NAMES = [
   'A House in Capernaum',
@@ -283,23 +286,39 @@ const LEVEL_NAMES = [
   'The Swinging Lamp',
   'A Very Curious Cat',
   'Dust in the Rafters',
+  'Wind off the Lake',
   'Not So Much as the Door',
+  'The Whole Town Came',
 ];
+const LAST_LEVEL = LEVEL_NAMES.length;
 
+// One entry per level (1..8); bonus houses after that stay at level-8 difficulty
 function makeConfig(n) {
+  const i = clamp(n, 1, LAST_LEVEL) - 1;
+  const pick = (arr) => arr[i];
   return {
-    name: LEVEL_NAMES[n - 1] || `The Whole Town Came ${n - LEVEL_NAMES.length + 1}`,
-    notch: n === 1 ? 22 : n === 2 ? 20 : 19,
-    slide: Math.max(33 - (n - 1) * 2, 24),          // degrees of tilt before he slides
-    holeMargin: Math.max(58 - (n - 1) * 9, 18),     // hole width beyond the mat's length
-    zoneMargin: Math.max(96 - (n - 1) * 12, 40),    // open floor beyond the mat's length
-    sway: Math.min(10 + (n - 1) * 6, 40),           // pendulum kick per notch
-    lampA: n === 1 ? 0 : Math.min(0.28 + (n - 2) * 0.08, 0.62),   // lamp swing (radians)
-    catReach: n === 1 ? 0 : Math.min(36 + (n - 2) * 6, 58),       // level 1: the cat sleeps
-    catCd: Math.max(4.2 - (n - 2) * 0.5, 2.2),
-    sneeze: n >= 4,
-    tileHp: 2,
-    par: 60 + n * 4,
+    name: LEVEL_NAMES[n - 1] || `Bonus House ${n - LAST_LEVEL}`,
+    notch:      pick([22, 21, 20, 20, 19, 19, 18, 18]),        // rope let out per tap
+    jitter:     pick([0, 0.12, 0.18, 0.22, 0.26, 0.3, 0.32, 0.35]),   // taps are this uneven (fraction)
+    slide:      pick([29, 27, 25, 24, 23, 22, 21, 20]),        // degrees of tilt before he slides
+    rock:       pick([12, 16, 20, 23, 25, 27, 29, 31]),        // rocking kick per tap (deg/s)
+    holeMargin: pick([58, 50, 42, 36, 30, 26, 22, 18]),        // hole width beyond the mat's length
+    zoneMargin: pick([96, 84, 74, 66, 58, 52, 48, 44]),        // open floor beyond the mat's length
+    sway:       pick([10, 16, 22, 26, 30, 34, 38, 40]),        // pendulum kick per notch
+    lampA:      pick([0, 0.3, 0.5, 0.55, 0.6, 0.65, 0.7, 0.72]),   // lamp swing (radians)
+    lampOff:    pick([30, 28, 20, 18, 16, 14, 12, 12]),        // lamp hook beyond the hole's edge
+    catReach:   pick([0, 40, 46, 62, 64, 66, 70, 74]),         // level 1: the cat sleeps
+    catCd:      pick([4.2, 4.2, 4, 3.4, 3.2, 3, 2.8, 2.5]),
+    sneeze:     n >= 5,
+    sneezeGap:  n >= 7 ? [4.5, 7] : [6, 9],
+    wind:       n >= 6,
+    windGap:    pick([0, 0, 0, 0, 0, [5, 8], [4.5, 7], [3.5, 6]]),
+    windRock:   pick([0, 0, 0, 0, 0, 55, 62, 70]),             // how hard a gust tips him
+    tileHp:     pick([2, 2, 3, 3, 3, 4, 4, 4]),
+    stone:      n >= 3,                                         // a stone hops about on the roof
+    stoneT:     pick([0, 0, 1.5, 1.35, 1.2, 1.1, 1, 0.9]),
+    hearts:     pick([3, 3, 3, 3, 3, 2, 2, 2]),
+    limit:      pick([75, 68, 64, 62, 60, 58, 56, 54]),        // seconds before the sun sets
     busy: n,
   };
 }
@@ -323,6 +342,10 @@ let hearts = 3, bumps = 0, notchTimes = [], touch = null, hauled = false;
 const lamp = { kick: 0, kickV: 0 };
 const cat = { mode: 'sleep', t: 0, cd: 2, rx: 0 };
 const sneeze = { t: 7, warned: false };
+let rock = 0, rockV = 0;                          // the mat rocking end-to-end (degrees)
+const wind = { t: 6, mode: 'calm', dir: 1, k: 0 }; // calm | warn | gust
+const stone = { at: -1, from: -1, hop: 0, t: 1.5, stun: 0 };   // at: tile index, -1 = resting beside the hole
+let timeLeft = 60, failReason = 'tip';
 const man = { face: 'watch', slide: 0, slideDir: 1, oops: 0, blink: 0, blinkT: 2, hair: '#3a2716', i: 1, stood: false, standX: 0 };
 let winT = 0, cardShown = false;
 let particles = [];
@@ -350,7 +373,7 @@ function layout() {
     tileW: (holeHalf * 2) / TILE_N,
     zoneL: hcx - zoneHalf, zoneR: hcx + zoneHalf,
     jx: hcx + zoneHalf + 26,
-    lampAX: hcx + holeHalf + 30,
+    lampAX: hcx + holeHalf + cfg.lampOff,
     catX: hcx - holeHalf - 34,
     matRestX: hcx - holeHalf - 64,
   };
@@ -363,8 +386,10 @@ function matGeom(L) {
   const hx = Math.sqrt(MAT_HALF * MAT_HALF - dy * dy / 4);
   const mx = L.hcx + matOff + swayX;
   const my = (yL + yR) / 2;
-  const ang = Math.atan2(dy, 2 * hx);
-  return { mx, my, x1: mx - hx, y1: my - dy / 2, x2: mx + hx, y2: my + dy / 2, ang, tilt: -ang * 180 / Math.PI };
+  // The ropes set the slope; the mat also rocks about its middle on top of that
+  const ang = Math.atan2(dy, 2 * hx) - rock * Math.PI / 180;
+  const c = Math.cos(ang) * MAT_HALF, s = Math.sin(ang) * MAT_HALF;
+  return { mx, my, x1: mx - c, y1: my - s, x2: mx + c, y2: my + s, ang, tilt: -ang * 180 / Math.PI };
 }
 
 function lampPos(L) {
@@ -980,6 +1005,16 @@ function dig(i) {
   if (idx < 0) return;
   const L = layout();
   const tl = tiles[idx];
+  if (stone.stun > 0) return;   // still shaking the sting out of their hands
+  if (cfg.stone && stone.at === idx) {
+    // A big stone sits on that spot: the spade bounces off
+    stone.stun = 0.45;
+    tl.shake = 0.3; digFx = 0.25; digSide = idx < TILE_N / 2 ? 'L' : 'R';
+    showMessage('Clonk! Dig round the stone!');
+    sfx.clonk();
+    cursor = idx;
+    return;
+  }
   tl.hp--;
   tl.shake = 0.2;
   digFx = 0.25; digSide = idx < TILE_N / 2 ? 'L' : 'R';
@@ -1005,11 +1040,31 @@ function dig(i) {
   }
 }
 
+// The stone hops from spot to spot (sometimes off to the side of the hole)
+function updateStone(dt) {
+  stone.stun = Math.max(0, stone.stun - dt);
+  stone.hop = Math.max(0, stone.hop - dt);
+  if (!cfg.stone) { stone.at = -1; return; }
+  stone.t -= dt;
+  if (stone.t > 0 && (stone.at < 0 || tiles[stone.at].hp > 0)) return;
+  const spots = stone.at === -1 ? [] : [-1];
+  tiles.forEach((tl, k) => { if (tl.hp > 0 && k !== stone.at) spots.push(k); });
+  if (spots.length) {
+    stone.from = stone.at;
+    stone.at = spots[Math.floor(rand(0, spots.length))];
+    stone.hop = 0.25;
+  }
+  stone.t = cfg.stoneT * rand(0.8, 1.25);
+}
+
+function stoneX(L, at) { return at < 0 ? L.holeL - 30 : L.holeL + (at + 0.5) * L.tileW; }
+
 function beginLower() {
   phase = 'lower'; phaseT = 0;
   rope.L = rope.R = rope.tL = rope.tR = 0;
-  matOff = 0; swayX = 0; swayV = 0;
+  matOff = 0; swayX = 0; swayV = 0; rock = 0; rockV = 0;
   touch = null; notchTimes = []; steerTilt = 0;
+  wind.mode = 'calm'; wind.t = cfg.wind ? rand(cfg.windGap[0], cfg.windGap[1]) * 0.7 : 99;
   showMessage('Gently now, and keep him level!');
   if (level === 1) setTimeout(() => {
     if (state === 'play' && phase === 'lower' && rope.tL + rope.tR < 60) {
@@ -1026,8 +1081,12 @@ function notch(side) {
   const k = 't' + side;
   ropeFx[side] = 0.25;
   if (rope[k] >= MAX_D) return;   // that end is already on the floor
-  rope[k] = Math.min(MAX_D, rope[k] + cfg.notch);
+  // Rope never pays out quite evenly on the busier houses
+  rope[k] = Math.min(MAX_D, rope[k] + cfg.notch * (1 + rand(-cfg.jitter, cfg.jitter)));
   swayV += (Math.random() < 0.5 ? -1 : 1) * cfg.sway * rand(0.5, 1);
+  // Letting out a rope makes the mat rock on toward that side: tapping again
+  // too soon adds to the rock, so wait for it to settle
+  rockV += (side === 'L' ? 1 : -1) * cfg.rock * rand(0.8, 1.2);
   notchTimes.push(t);
   if (notchTimes.length > 8) notchTimes.shift();
   sfx.tap(1 - ((rope.tL + rope.tR) / 2) / MAX_D);
@@ -1074,6 +1133,12 @@ function updateLower(dt, L) {
     swayV += (-(900 / len) * swayX - 0.5 * swayV) * dt;
     swayX = clamp(swayX + swayV * dt, -60, 60);
   }
+  // Rocking: a springy end-to-end swing on top of the slope the ropes give
+  if (onFloor) { rock *= Math.pow(0.001, dt); rockV = 0; }
+  else {
+    rockV += (-ROCK_K * rock - ROCK_DAMP * rockV) * dt;
+    rock = clamp(rock + rockV * dt, -25, 25);
+  }
 
   let g = matGeom(L);
   curTilt = g.tilt;
@@ -1088,7 +1153,7 @@ function updateLower(dt, L) {
     }
     if (phaseT > 1.4) {
       man.slide = 0;
-      if (hearts <= 0) { fail(); return; }
+      if (hearts <= 0) { failReason = 'tip'; fail(); return; }
       phase = 'lower'; phaseT = 0;
     }
     return;
@@ -1138,6 +1203,7 @@ function updateLower(dt, L) {
       lamp.kickV += dir * 1.4;
       matOff -= dir * 10;
       swayV -= dir * 25;
+      rockV += (lp.y < g.my ? dir : -dir) * cfg.rock * 1.3;   // a knock on one end tips him
       bump('lamp');
     }
   }
@@ -1155,10 +1221,14 @@ function updateLower(dt, L) {
       swayV += (Math.random() < 0.5 ? -1 : 1) * 45;
       const side = Math.random() < 0.5 ? 'tL' : 'tR';
       rope[side] = Math.min(MAX_D, rope[side] + 8);
+      rockV += (side === 'tL' ? 1 : -1) * cfg.rock * 1.6;
       for (let i = 0; i < 8; i++) spawn(g.x1 + rand(0, 16), g.y1 - 14, rand(-40, 40), rand(-40, 10), 0.6, '#e9dcc0', rand(2, 3.5));
-      sneeze.t = rand(6, 9); sneeze.warned = false;
+      sneeze.t = rand(cfg.sneezeGap[0], cfg.sneezeGap[1]); sneeze.warned = false;
     }
   }
+
+  // Gusts of wind off the lake blow in through the hole (later levels)
+  updateWind(dt, L, g, onFloor);
 
   // Dust drifting down from the hole
   if (Math.random() < dt * 6) spawn(rand(L.holeL, L.holeR), CEIL_Y + 2, rand(-8, 8), rand(20, 40), 2.5, 'rgba(200,170,120,0.8)', rand(1.2, 2.2), 10);
@@ -1201,6 +1271,25 @@ function updateLower(dt, L) {
   if (touchL && touchR) land(L, g);
 }
 
+function updateWind(dt, L, g, onFloor) {
+  if (!cfg.wind) { wind.mode = 'calm'; return; }
+  if (onFloor || rope.tL + rope.tR < 60) { if (wind.mode === 'gust') wind.mode = 'calm'; return; }
+  wind.t -= dt;
+  if (wind.mode === 'calm' && wind.t <= 1.3) {
+    wind.mode = 'warn'; wind.dir = Math.random() < 0.5 ? -1 : 1;
+    showMessage(wind.dir > 0 ? 'Whoosh! Wind from the left!' : 'Whoosh! Wind from the right!');
+    sfx.wind();
+  } else if (wind.mode === 'warn' && wind.t <= 0) {
+    wind.mode = 'gust'; wind.t = 0.9;
+  } else if (wind.mode === 'gust') {
+    swayV += wind.dir * 80 * dt;
+    matOff += wind.dir * 20 * dt;
+    rockV += wind.dir * cfg.windRock * dt;
+    if (Math.random() < dt * 30) spawn(wind.dir > 0 ? L.holeL - 40 : L.holeR + 40, rand(CEIL_Y + 10, FLOOR_Y - 120), wind.dir * rand(260, 380), rand(-10, 10), 0.7, 'rgba(255,255,255,0.8)', rand(1.5, 2.5));
+    if (wind.t <= 0) { wind.mode = 'calm'; wind.t = rand(cfg.windGap[0], cfg.windGap[1]); }
+  }
+}
+
 function updateCat(dt, L, g, onFloor) {
   if (cfg.catReach <= 0) { cat.mode = 'sleep'; return; }
   if (cat.mode === 'sleep') cat.mode = 'idle';
@@ -1217,6 +1306,7 @@ function updateCat(dt, L, g, onFloor) {
       if (inReach) {
         rope.tL = Math.min(MAX_D, rope.tL + cfg.notch * 0.7);
         swayV += 22;
+        rockV += cfg.rock * 1.6;
         showMessage('Swat! Naughty cat!');
         sfx.meow();
       }
@@ -1236,7 +1326,7 @@ function land(L, g) {
   winT = 0; cardShown = false;
   man.stood = false; man.standX = g.mx - 20;
   curTilt = 0;
-  const time = Math.max(0, Math.round((cfg.par - elapsed) * 10));
+  const time = Math.max(0, Math.round(timeLeft * 10));
   const levelB = Math.round((1 - clamp(touch.tilt / cfg.slide, 0, 1)) * 300);
   const soft = touch.fast <= 1 ? 300 : touch.fast === 2 ? 150 : 0;
   const heartsB = hearts * 200;
@@ -1294,6 +1384,15 @@ function skipPayoff() {
   winCard();
 }
 
+function timeUp() {
+  hearts--;
+  shakeT = 0.2;
+  sfx.bounce();
+  if (hearts <= 0) { timeLeft = 0; failReason = 'time'; fail(); return; }
+  timeLeft = TIME_EXTRA;
+  showMessage(`The sun is sinking — hurry! +${TIME_EXTRA}s`);
+}
+
 function fail() {
   state = 'fail';
   syncAmbience();
@@ -1337,11 +1436,14 @@ function resetLevelState() {
   cursor = 2; digFx = 0;
   phase = 'dig'; phaseT = 0; elapsed = 0;
   rope.L = rope.R = rope.tL = rope.tR = 0;
-  matOff = swayX = swayV = 0;
-  hearts = 3; bumps = 0; notchTimes = []; touch = null;
+  matOff = swayX = swayV = 0; rock = rockV = 0;
+  hearts = cfg.hearts; bumps = 0; notchTimes = []; touch = null;
+  timeLeft = cfg.limit; failReason = 'tip';
+  wind.mode = 'calm'; wind.t = 99;
+  stone.at = -1; stone.from = -1; stone.hop = 0; stone.stun = 0; stone.t = cfg.stoneT * 0.6;
   lamp.kick = lamp.kickV = 0;
   cat.mode = cfg.catReach > 0 ? 'idle' : 'sleep'; cat.cd = 2.5;
-  sneeze.t = rand(5, 8); sneeze.warned = false;
+  sneeze.t = rand(cfg.sneezeGap[0] - 1, cfg.sneezeGap[1] - 1); sneeze.warned = false;
   man.slide = 0; man.oops = 0; man.stood = false;
   winT = 0; cardShown = false;
   particles = []; ripples.length = 0; bubble = null;
@@ -1360,10 +1462,11 @@ function titleScreen() {
     `${verseHTML('uncovered')}
      <ul>
        <li>The house is packed and nobody can get to the door! Help four friends bring their friend to <b>Jesus</b>.</li>
-       <li><b>First</b> dig a hole in the roof. <b>Touch:</b> tap the roof. <b>Keyboard:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> choose a spot, <kbd>Space</kbd> digs.</li>
+       <li><b>First</b> dig a hole in the roof. <b>Touch:</b> tap the roof. <b>Keyboard:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> choose a spot, <kbd>Space</kbd> digs. Don't dig on the grey <b>stone</b> &mdash; it hops about!</li>
        <li><b>Then</b> lower his mat <b>gently and level</b>. <b>Touch:</b> tap the <b>left</b> or <b>right</b> half of the screen to let out those ropes a notch. <b>Keyboard:</b> <kbd>A</kbd>/<kbd>&larr;</kbd> left ropes, <kbd>D</kbd>/<kbd>&rarr;</kbd> right ropes.</li>
-       <li>Watch the <b>tilt meter</b>: tip too far and he slides (3 hearts). A little tilt lets you drift sideways past the <b>lamp</b> and the <b>cat</b>.</li>
-       <li>Land softly on the open floor in front of Jesus&hellip;</li>
+       <li>Each tap makes the mat <b>rock</b>, and the ropes don't always slip the same amount. Watch the <b>tilt meter</b> and wait for the wobble to settle. Tip too far and he slides &mdash; that costs a <b>heart</b>.</li>
+       <li>Look out for the swinging <b>lamp</b>, the swatting <b>cat</b>, a big <b>sneeze</b> and gusts of <b>wind</b>! A little tilt lets you drift sideways.</li>
+       <li>Be quick: when the <b>sun</b> timer runs out you lose a heart. Land softly in front of Jesus &mdash; 8 houses to go!</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
@@ -1393,7 +1496,11 @@ function winCard() {
      <p class="score">Time bonus: <b>${s.time}</b><br>Level landing: <b>${s.levelB}</b><br>Soft landing: <b>${s.soft}</b><br>Hearts left: <b>${s.heartsB}</b><br>Few bumps: <b>${s.bumpB}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
      <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
      ${creditHTML()}`,
-    'Next House', () => { level++; startLevel(); });
+    level === LAST_LEVEL ? 'Play Again' : 'Next House',
+    () => { if (level === LAST_LEVEL) { level = 1; totalScore = 0; } else level++; startLevel(); },
+    level === LAST_LEVEL ? 'Bonus House' : null,
+    level === LAST_LEVEL ? () => { level++; startLevel(); } : null);
+  if (level === LAST_LEVEL) ovSub.textContent = `All ${LAST_LEVEL} houses done! Well done, faithful friend!`;
 }
 
 function endScreens(dt) {
@@ -1402,7 +1509,9 @@ function endScreens(dt) {
   if (endTimer > 0) return;
   if (state === 'fail') {
     showOverlay('Oh… no!', `Level ${level} — ${cfg.name}`,
-      `<p style="text-align:center">He tipped once too often, so his friends hauled him safely back up onto the roof. They didn't give up &mdash; neither should you! Little notches, left and right.</p>
+      `<p style="text-align:center">${failReason === 'time'
+          ? "The sun went down before he reached Jesus! The friends will be back tomorrow &mdash; neither should you give up! Keep tapping steadily."
+          : "He tipped once too often, so his friends hauled him safely back up onto the roof. They didn't give up &mdash; neither should you! Little notches, left and right, and let the rocking settle."}</p>
        ${verseHTML('press')}
        <p class="score">Score so far: <b>${totalScore}</b></p>`,
       'Try Again', () => startLevel());
@@ -1607,6 +1716,21 @@ Object.assign(sfx, {
   sneeze() {
     this.puff(0.6);
     this.tone(600, 0.2, 'sine', 0.12, 0, 300);
+  },
+  clonk() {
+    this.tone(180, 0.12, 'square', 0.12, 0, 120);
+    this.tone(520, 0.18, 'triangle', 0.12, 0.02);
+  },
+  wind() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(300, t0); bp.frequency.exponentialRampToValueAtTime(1400, t0 + 1.2); bp.frequency.exponentialRampToValueAtTime(400, t0 + 2.2);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t0); g.gain.exponentialRampToValueAtTime(0.35, t0 + 1.2); g.gain.exponentialRampToValueAtTime(0.001, t0 + 2.3);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 2.4);
   },
 });
 
@@ -1915,6 +2039,43 @@ function drawLamp(L) {
   ctx.restore();
 }
 
+function drawStone(L) {
+  if (!cfg.stone || !(state === 'play' || state === 'pause') || phase !== 'dig') return;
+  const f = 1 - stone.hop / 0.25;
+  const x = lerp(stoneX(L, stone.from), stoneX(L, stone.at), ease(f));
+  const y = ROOF_Y - 9 - Math.sin(f * Math.PI) * (stone.hop > 0 ? 26 : 0);
+  const r = Math.min(15, L.tileW * 0.42);
+  ctx.save();
+  ctx.translate(x + (stone.stun > 0 ? rand(-1.5, 1.5) : 0), y);
+  ctx.fillStyle = 'rgba(60,40,20,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 8, r, 3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8f8a82'; ctx.strokeStyle = '#5e5a54'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.7, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#b3aea5';
+  ctx.beginPath(); ctx.ellipse(-r * 0.3, -r * 0.25, r * 0.35, r * 0.2, -0.3, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// Streaks and a big arrow warn that a gust is on its way
+function drawWind(L) {
+  if (!(state === 'play' && phase === 'lower') || wind.mode === 'calm') return;
+  const warn = wind.mode === 'warn';
+  const a = warn ? 0.5 + 0.5 * Math.sin(t * 14) : 0.9;
+  const cx = wind.dir > 0 ? L.holeL - 70 : L.holeR + 70, cy = CEIL_Y + 60;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(cx, cy);
+  ctx.scale(wind.dir, 1);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let k = 0; k < 3; k++) {
+    const y = (k - 1) * 14, off = warn ? 0 : ((t * 200 + k * 30) % 40);
+    ctx.beginPath(); ctx.moveTo(-30 + off, y); ctx.quadraticCurveTo(0 + off, y - 6, 22 + off, y); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#5a7fa0'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(30, -14); ctx.lineTo(48, 0); ctx.lineTo(30, 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
 function drawCat(L) {
   const x = L.catX, y = SHELF_Y;
   // shelf
@@ -1988,7 +2149,7 @@ function ropeHands(L) {
   };
 }
 
-function hanging() { return (state === 'play' && (phase === 'lower' || phase === 'haul')) || state === 'fail'; }
+function hanging() { return (state === 'play' || state === 'fail' || state === 'pause') && (phase === 'lower' || phase === 'haul'); }
 
 // The mat and the lower part of the ropes (inside the house)
 function drawHangingMat(L) {
@@ -2234,9 +2395,18 @@ function drawHUD() {
   ctx.fillText(state === 'title' ? 'Through the Roof' : `Level ${level} · ${cfg.name}`, 12, 26);
   ctx.shadowBlur = 0;
   if (state !== 'title') {
-    for (let k = 0; k < 3; k++) drawHeart(20 + k * 22, 46, 8, k < hearts);
-    ctx.fillStyle = '#23405a'; ctx.font = '600 13px Fredoka, sans-serif';
-    ctx.fillText(`Time ${Math.floor(elapsed)}s`, 86, 51);
+    for (let k = 0; k < cfg.hearts; k++) drawHeart(20 + k * 22, 46, 8, k < hearts);
+    // The sun timer: a little sun and the seconds left before it sets
+    const tx = 20 + cfg.hearts * 22 + 10, low = timeLeft < 10;
+    const flash = low && state === 'play' && Math.sin(t * 10) > 0;
+    ctx.fillStyle = flash ? '#e8594a' : '#f5b82e';
+    ctx.beginPath(); ctx.arc(tx, 46, 6.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < 8; k++) { const a = k * TAU / 8; ctx.moveTo(tx + Math.cos(a) * 9, 46 + Math.sin(a) * 9); ctx.lineTo(tx + Math.cos(a) * 11.5, 46 + Math.sin(a) * 11.5); }
+    ctx.stroke();
+    ctx.fillStyle = low ? '#c0392b' : '#23405a'; ctx.font = `${low ? 700 : 600} 14px Fredoka, sans-serif`;
+    ctx.fillText(`${Math.max(0, Math.ceil(timeLeft))}s`, tx + 16, 51);
   }
 
   // Home / pause / mute buttons
@@ -2335,9 +2505,11 @@ function render() {
   drawSideWalls(L);
   for (const p of people) if (p.row === 2) drawPerson(p, L.hx1 - 20, FLOOR_Y - 90);
   drawRoof(L);
+  drawStone(L);
   drawRoofMat(L);
   drawFriends(L);
   drawParticles();
+  drawWind(L);
 
   // Tap ripples
   for (const r of ripples) {
@@ -2369,7 +2541,13 @@ function update(dt) {
   lamp.kick += lamp.kickV * dt;
   if (state === 'play') {
     elapsed += dt; phaseT += dt;
-    if (phase === 'lift') { if (phaseT >= LIFT_T) beginLower(); }
+    if (phase !== 'haul') {
+      timeLeft -= dt;
+      if (timeLeft <= 0) timeUp();
+    }
+    if (state !== 'play') { /* the sun set on the last heart */ }
+    else if (phase === 'dig') updateStone(dt);
+    else if (phase === 'lift') { if (phaseT >= LIFT_T) beginLower(); }
     else if (phase === 'lower' || phase === 'haul') updateLower(dt, L);
   } else if (state === 'win') {
     updateWin(dt, L);

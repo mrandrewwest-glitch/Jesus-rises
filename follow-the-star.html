@@ -287,10 +287,10 @@ function makeConfig(n) {
     leg1: 5600 + (n - 1) * 1300,                       // distance to Jerusalem
     leg2: n === 1 ? 6000 : 7600 + (n - 1) * 1500,       // Jerusalem to Bethlehem
     amp: Math.min(0.6 + (n - 1) * 0.12, 1),              // how far the star wanders
-    starSpeed: Math.min(0.28 + (n - 1) * 0.07, 0.7),
-    hwF: Math.max(0.62 - (n - 1) * 0.07, 0.32),         // width of the beam
-    fill: 22,
-    drain: Math.min(7 + (n - 1) * 3, 21),
+    starSpeed: Math.min(0.28 + (n - 1) * 0.09, 0.8),
+    hwF: n === 1 ? 0.62 : Math.max(0.5 - (n - 2) * 0.06, 0.3),   // width of the beam
+    fill: n === 1 ? 22 : 20,
+    drain: n === 1 ? 7 : Math.min(10 + (n - 2) * 4, 24),          // level 1 is very forgiving
     gap: Math.max(600 - (n - 1) * 60, 320),
     waterEvery: n === 1 ? 3 : 4,                        // obstacle groups between water jugs
     critters: n >= 2,                                   // snakes and rolling tumbleweeds
@@ -385,6 +385,7 @@ function crowdMood() {
     if (scene.type === 'dream') return 'sleep';
     if (scene.type === 'herod') return scene.beat === 0 ? 'watch' : 'wow';
     if (scene.type === 'arrive') return scene.t > 1.2 ? 'joy' : 'wow';
+    if (scene.type === 'oasis') return 'joy';
   }
   if (shockT > 0) return 'shock';
   if (joyT > 0) return 'joy';
@@ -683,7 +684,7 @@ function drawCamel(x, y, s, m, walk, moving) {
   ctx.fillStyle = 'rgba(20,14,40,0.3)';
   ctx.beginPath(); ctx.ellipse(6, 2, 52, 7, 0, 0, TAU); ctx.fill();
 
-  const fur = '#caa06a', furDark = '#a37646';
+  const fur = m.calf ? '#dfbd8e' : '#caa06a', furDark = m.calf ? '#b8905e' : '#a37646';
   const bob = Math.sin(walk * 2) * 1.6 * moving;
   const leg = (hx, off, col) => {
     const sw = Math.sin(walk + off) * 11 * moving;
@@ -738,9 +739,12 @@ function drawCamel(x, y, s, m, walk, moving) {
   ctx.beginPath(); ctx.arc(64, -106, 4, 0.1 * Math.PI, 0.8 * Math.PI); ctx.stroke();   // a contented smile
   ctx.beginPath(); ctx.arc(70, -111, 1.3, 0, TAU); ctx.stroke();                       // nostril
   // bridle
-  ctx.strokeStyle = m.blanket; ctx.lineWidth = 2.2;
-  ctx.beginPath(); ctx.moveTo(52, -118); ctx.lineTo(60, -104); ctx.moveTo(51, -108); ctx.lineTo(68, -110); ctx.stroke();
+  if (!m.calf) {
+    ctx.strokeStyle = m.blanket; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(52, -118); ctx.lineTo(60, -104); ctx.moveTo(51, -108); ctx.lineTo(68, -110); ctx.stroke();
+  }
   ctx.restore();
+  if (m.calf) { ctx.restore(); return; }   // a camel calf carries nothing
 
   // saddle blanket with tassels
   ctx.fillStyle = m.blanket;
@@ -822,7 +826,7 @@ const SEG_GROUND = {
   dunes: ['#6f5d78', '#98806f', '#b8986e'],
   wadi: ['#684c5c', '#8c6560', '#a87a60'],
   oasis: ['#5e6274', '#87826c', '#a9976e'],
-  salt: ['#8a87a8', '#b8b3cb', '#d8d2de'],
+  salt: ['#7d7a9c', '#a6a0bc', '#c4bccb'],
   hills: ['#605f74', '#88816e', '#a59370'],
   jerusalem: ['#6d5e78', '#978070', '#b5976e'],
   bethlehem: ['#586176', '#7c886c', '#9da070'],
@@ -832,8 +836,8 @@ function buildRoute() {
   const L1 = herodAt, L2 = endAt - herodAt;
   const seg = (a, b, kind) => ({ a, b, kind });
   segments = [
-    seg(-1e5, 0.27 * L1, 'dunes'), seg(0.27 * L1, 0.5 * L1, 'wadi'), seg(0.5 * L1, 0.64 * L1, 'oasis'),
-    seg(0.64 * L1, 0.84 * L1, 'salt'), seg(0.84 * L1, L1 + 300, 'jerusalem'),
+    seg(-1e5, 0.27 * L1, 'dunes'), seg(0.27 * L1, 0.5 * L1, 'wadi'), seg(0.5 * L1, 0.68 * L1, 'oasis'),
+    seg(0.68 * L1, 0.86 * L1, 'salt'), seg(0.86 * L1, L1 + 300, 'jerusalem'),
     seg(L1 + 300, L1 + 0.24 * L2, 'hills'), seg(L1 + 0.24 * L2, L1 + 0.38 * L2, 'oasis'),
     seg(L1 + 0.38 * L2, L1 + 0.66 * L2, 'dunes'), seg(L1 + 0.66 * L2, L1 + 0.8 * L2, 'hills'),
     seg(L1 + 0.8 * L2, endAt + 1e5, 'bethlehem'),
@@ -867,7 +871,7 @@ function mixHex(w, idx) {
     const n = parseInt(SEG_GROUND[k][idx].slice(1), 16);
     r += (n >> 16) * w[k]; g += ((n >> 8) & 255) * w[k]; b += (n & 255) * w[k]; sum += w[k];
   }
-  sum = sum || 1;
+  if (!sum) return SEG_GROUND.dunes[idx];
   return `rgb(${Math.round(r / sum)},${Math.round(g / sum)},${Math.round(b / sum)})`;
 }
 function nextStopAt() {
@@ -1024,6 +1028,45 @@ function drawObstacle(o) {
       break;
     }
     case 'snake': drawSnake(o); break;
+    case 'bush': {
+      // a round camel-thorn bush with tiny pink flowers
+      ctx.fillStyle = '#5d7a45'; ctx.strokeStyle = '#3f5a30'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const [dx, dy, r] of [[-12, -14, 13], [10, -15, 13], [0, -26, 14], [-2, -10, 12]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#d9d2a0'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let k = 0; k < 9; k++) { const a = -Math.PI + k * Math.PI / 8; ctx.moveTo(Math.cos(a) * 20, -16 + Math.sin(a) * 16); ctx.lineTo(Math.cos(a) * 26, -16 + Math.sin(a) * 21); }
+      ctx.stroke();
+      ctx.fillStyle = '#ff9ac2';
+      for (const [dx, dy] of [[-10, -22], [8, -28], [12, -12], [-4, -34]]) { ctx.beginPath(); ctx.arc(dx, dy, 2.4, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'ruin': {
+      // a fallen pillar from long ago
+      ctx.fillStyle = '#b3a38e'; ctx.strokeStyle = '#7d6e5c'; ctx.lineWidth = 2;
+      roundRect(-30, -22, 44, 20, 4); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(14, -12, 7, 10, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      roundRect(-4, -52, 20, 32, 3); ctx.fill(); ctx.stroke();
+      roundRect(-8, -56, 28, 7, 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(90,75,60,0.5)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(2, -48); ctx.lineTo(2, -22); ctx.moveTo(9, -48); ctx.lineTo(9, -22);
+      ctx.moveTo(-26, -12); ctx.lineTo(8, -12); ctx.stroke();
+      break;
+    }
+    case 'tumble': {
+      // a tumbleweed rolling along
+      const rot = -o.x / 22;
+      ctx.translate(0, -22 - Math.abs(Math.sin(o.x / 30)) * 6);
+      ctx.rotate(rot);
+      ctx.strokeStyle = '#a4834f'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 20, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = '#8a6a3c'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let k = 0; k < 7; k++) { const a = k * 0.9; ctx.moveTo(Math.cos(a) * 20, Math.sin(a) * 20); ctx.quadraticCurveTo(0, 0, Math.cos(a + 2.2) * 20, Math.sin(a + 2.2) * 20); }
+      ctx.stroke();
+      break;
+    }
   }
   ctx.restore();
 }
@@ -1121,6 +1164,32 @@ function drawItemArt(type, ph) {
       ctx.fillStyle = '#2f6aa3'; roundRect(-6, -33, 12, 5, 2); ctx.fill();
       break;
     }
+    case 'dates': {
+      // a bunch of sweet dates
+      ctx.strokeStyle = '#4f7a3a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -32); ctx.quadraticCurveTo(-3, -26, 0, -22); ctx.stroke();
+      ctx.fillStyle = '#8a4b22'; ctx.strokeStyle = '#5c2e12'; ctx.lineWidth = 1.2;
+      for (const [dx, dy] of [[-7, -18], [0, -20], [7, -18], [-4, -10], [4, -10], [0, -3]]) {
+        ctx.beginPath(); ctx.ellipse(dx, dy, 4.2, 6, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.arc(-1.5, -22, 1.4, 0, TAU); ctx.fill();
+      break;
+    }
+    case 'spark': {
+      // a little twinkle of starlight
+      const tw = 1 + 0.18 * Math.sin(t * 6 + ph);
+      ctx.fillStyle = '#fff6c8';
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const a = -Math.PI / 2 + k * Math.PI / 4, r = (k % 2 ? 3.5 : 12) * tw;
+        ctx.lineTo(Math.cos(a) * r, -14 + Math.sin(a) * r);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0, -14, 3, 0, TAU); ctx.fill();
+      break;
+    }
     case 'gold': {
       // a little treasure chest full of gold
       ctx.fillStyle = '#8a5a30'; ctx.strokeStyle = '#5c3a1c'; ctx.lineWidth = 1.8;
@@ -1145,7 +1214,7 @@ function drawItem(it) {
   ctx.scale(s, s);
   ctx.fillStyle = 'rgba(20,14,40,0.25)';
   ctx.beginPath(); ctx.ellipse(0, 0, 12, 4, 0, 0, TAU); ctx.fill();
-  const bob = -14 + Math.sin(t * 3 + it.phase) * 4;
+  const bob = -14 - (it.lift || 0) + Math.sin(t * 3 + it.phase) * 4;
   ctx.translate(0, bob);
   const g = ctx.createRadialGradient(0, -14, 2, 0, -14, 26);
   g.addColorStop(0, 'rgba(255,240,170,0.55)'); g.addColorStop(1, 'rgba(255,240,170,0)');
@@ -1402,8 +1471,44 @@ function drawPalmSilhouette(x, y, s, col) {
 }
 
 function drawDunes() {
+  const w = biomeW(dist + Math.min(W * 0.5, 350));
   duneLayer(592, 34, 0.08, '#262c5c', 'rgba(170,170,230,0.25)', 0);
-  duneLayer(622, 26, 0.2, '#3a3768', 'rgba(190,180,230,0.25)', 400);
+  // distant hills of Judaea
+  const hillA = clamp((w.hills || 0) + (w.bethlehem || 0) + (w.jerusalem || 0) * 0.6, 0, 1);
+  if (hillA > 0.01) {
+    ctx.save(); ctx.globalAlpha = hillA;
+    const hy = (x) => 575 - 55 * (0.6 * Math.sin((x + dist * 0.1) / 260) + 0.4 * Math.sin((x + dist * 0.1) / 130 + 2)) ** 2;
+    ctx.fillStyle = '#2a3658';
+    ctx.beginPath(); ctx.moveTo(-offX - 10, 700);
+    for (let x = -offX - 10; x <= W + offX + 12; x += 12) ctx.lineTo(x, hy(x));
+    ctx.lineTo(W + offX + 12, 700); ctx.closePath(); ctx.fill();
+    // little olive trees and, near Bethlehem, lamplit windows on the hillsides
+    for (let k = Math.floor((dist * 0.1 - offX) / 90); k <= Math.floor((dist * 0.1 + W + offX) / 90); k++) {
+      const x = k * 90 + hash(k) * 50 - dist * 0.1;
+      if (hash(k + 4) < 0.5) {
+        ctx.fillStyle = '#34465e'; ctx.beginPath(); ctx.arc(x, hy(x) - 4, 6, 0, TAU); ctx.fill();
+      } else if ((w.bethlehem || 0) > 0.05) {
+        ctx.globalAlpha = hillA * (w.bethlehem || 0) * (0.7 + 0.3 * Math.sin(t * 2 + k));
+        ctx.fillStyle = '#ffd27a'; ctx.fillRect(x, hy(x) + 10, 4, 4);
+        ctx.globalAlpha = hillA;
+      }
+    }
+    ctx.restore();
+  }
+  // Jerusalem's walls and towers on the skyline
+  if ((w.jerusalem || 0) > 0.01) {
+    ctx.save(); ctx.globalAlpha = w.jerusalem;
+    for (let k = Math.floor((dist * 0.12 - offX) / 70); k <= Math.floor((dist * 0.12 + W + offX) / 70); k++) {
+      const x = k * 70 - dist * 0.12;
+      const hgt = 26 + hash(k) * 30 + (hash(k + 2) > 0.8 ? 30 : 0);
+      ctx.fillStyle = '#3b3560';
+      ctx.fillRect(x, 610 - hgt, 72, hgt + 40);
+      for (let c = 0; c < 4; c++) ctx.fillRect(x + c * 18, 604 - hgt, 10, 8);
+      if (hash(k + 7) > 0.5) { ctx.fillStyle = '#ffd27a'; ctx.fillRect(x + 20 + hash(k + 8) * 30, 620 - hgt, 5, 7); }
+    }
+    ctx.restore();
+  }
+  duneLayer(622, 26 * (1 - 0.6 * (w.salt || 0)), 0.2, '#3a3768', 'rgba(190,180,230,0.25)', 400);
   // palms on the middle dunes
   const f = 0.2;
   for (let k = Math.floor((dist * f - offX - 200) / 520); k <= Math.floor((dist * f + W + offX + 200) / 520); k++) {
@@ -1411,15 +1516,155 @@ function drawDunes() {
     const x = k * 520 + hash(k + 9) * 200 - dist * f;
     drawPalmSilhouette(x, duneY(x, 622, 26, 0.2, 400) + 4, 0.7 + hash(k + 3) * 0.3, '#2c2a55');
   }
-  duneLayer(652, 18, 0.45, '#56496f', 'rgba(230,200,190,0.3)', 900);
+  // rocky cliffs of the wadi
+  for (const d of decor) {
+    if (d.k !== 'cliff') continue;
+    const x = d.x - dist * d.f;
+    if (x < -offX - d.w || x > W + offX + d.w) continue;
+    ctx.fillStyle = '#4a3452';
+    ctx.beginPath();
+    ctx.moveTo(x - d.w / 2, 660);
+    ctx.lineTo(x - d.w / 2 + 14, 640 - d.h);
+    ctx.lineTo(x - d.w / 6, 634 - d.h - hash(d.seed) * 14);
+    ctx.lineTo(x + d.w / 5, 638 - d.h);
+    ctx.lineTo(x + d.w / 2 - 10, 646 - d.h + hash(d.seed + 1) * 20);
+    ctx.lineTo(x + d.w / 2, 660);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(210,160,170,0.35)'; ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(30,20,40,0.35)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let k = 1; k <= 3; k++) { const yy = 660 - d.h * k / 4; ctx.moveTo(x - d.w / 2 + 8, yy); ctx.lineTo(x + d.w / 2 - 8, yy + 4); }
+    ctx.stroke();
+  }
+  // palm silhouettes by the oasis
+  for (const d of decor) {
+    if (d.k !== 'palmS') continue;
+    const x = d.x - dist * d.f;
+    if (x < -offX - 80 || x > W + offX + 80) continue;
+    drawPalmSilhouette(x, duneY(x, 652, 18, 0.45, 900) + 6, d.s, '#3a3160');
+  }
+  duneLayer(652, 18 * (1 - 0.7 * (w.salt || 0)), 0.45, '#56496f', 'rgba(230,200,190,0.3)', 900);
+}
+
+// A leafy date palm standing on the far sand
+function drawPalm(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#7a5433'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, -50, 4, -110); ctx.stroke();
+  ctx.strokeStyle = '#5c3e24'; ctx.lineWidth = 2;
+  for (let k = 1; k < 9; k++) { const yy = -k * 12; ctx.beginPath(); ctx.moveTo(-3 + k * 0.6, yy); ctx.lineTo(6 + k * 0.4, yy - 2); ctx.stroke(); }
+  const sway = Math.sin(t * 1.2 + x * 0.01) * 0.05;
+  for (const [a, len, col] of [[-2.8, 58, '#2f6a3e'], [-2.2, 62, '#3f8a4e'], [-1.5, 50, '#3f8a4e'], [-0.9, 62, '#3f8a4e'], [-0.3, 58, '#2f6a3e'], [-1.2, 44, '#4f9a5a']]) {
+    ctx.save(); ctx.translate(4, -110); ctx.rotate(a + Math.PI / 2 + sway);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(12, len * 0.45, 2, len); ctx.quadraticCurveTo(-6, len * 0.5, 0, 0); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#8a4b22';
+  ctx.beginPath(); ctx.arc(0, -104, 4, 0, TAU); ctx.arc(8, -103, 4, 0, TAU); ctx.arc(4, -98, 4, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawOliveTree(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#5c4630'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-6, -22, 2, -40); ctx.stroke();
+  ctx.fillStyle = '#58705a';
+  ctx.beginPath();
+  for (const [dx, dy, r] of [[-16, -44, 15], [0, -56, 17], [16, -44, 14], [-4, -38, 13], [8, -36, 12]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = 'rgba(200,220,190,0.2)';
+  ctx.beginPath(); ctx.arc(-4, -60, 8, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// Props on the flat sand: tents, sheep and shepherds' fires, palms, olives and the oasis pools
+function drawDecorGround() {
+  const w = biomeW(dist + Math.min(W * 0.5, 350));
+  // the salt flat glitters like a second sky
+  if ((w.salt || 0) > 0.01) {
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    for (let k = Math.floor((dist - offX) / 23); k <= Math.floor((dist + W + offX) / 23); k++) {
+      const x = k * 23 + hash(k) * 20 - dist, y = lerp(HORIZON + 8, H - 4, hash(k + 31));
+      ctx.globalAlpha = (w.salt || 0) * Math.max(0, Math.sin(t * 2.5 + k * 1.7)) * 0.8;
+      ctx.beginPath(); ctx.arc(x, y, 1.3 + hash(k + 3), 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  for (const d of decor) {
+    if (d.f !== 0.6) continue;
+    const x = d.x - dist * d.f;
+    if (x < -offX - 120 || x > W + offX + 120) continue;
+    const y = HORIZON + 8;
+    if (d.k === 'tent') {
+      ctx.fillStyle = d.c;
+      ctx.beginPath(); ctx.moveTo(x - 34, y); ctx.lineTo(x, y - 30); ctx.lineTo(x + 34, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2b1d3a';
+      ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x, y - 16); ctx.lineTo(x + 6, y); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#f4e9c8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - 20, y - 12); ctx.lineTo(x + 20, y - 12); ctx.stroke();
+    } else if (d.k === 'sheep') {
+      for (let i = 0; i < d.n; i++) {
+        const sx = x + i * 16 + hash(d.seed + i) * 8, sy = y - 2 + hash(d.seed + i + 5) * 6;
+        ctx.fillStyle = '#e8e2d6';
+        ctx.beginPath(); ctx.ellipse(sx, sy - 5, 7, 4.5, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#3b3040';
+        ctx.beginPath(); ctx.arc(sx + 6, sy - 6, 2.5, 0, TAU); ctx.fill();
+      }
+    } else if (d.k === 'fire') {
+      const g = ctx.createRadialGradient(x, y - 6, 2, x, y - 6, 40);
+      g.addColorStop(0, 'rgba(255,180,90,0.6)'); g.addColorStop(1, 'rgba(255,180,90,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 6, 40, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffb347';
+      ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.quadraticCurveTo(x, y - 16 - Math.sin(t * 9) * 3, x + 5, y); ctx.fill();
+      // a shepherd with his crook
+      ctx.fillStyle = '#4a3a50';
+      ctx.beginPath(); ctx.moveTo(x + 14, y); ctx.lineTo(x + 17, y - 18); ctx.lineTo(x + 22, y); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 17, y - 21, 3.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#4a3a50'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x + 25, y); ctx.lineTo(x + 25, y - 26); ctx.arc(x + 22, y - 26, 3, 0, Math.PI, true); ctx.stroke();
+    }
+  }
+  // oasis pools with palms around them
+  for (const o of oases) {
+    const px = poolScreenX(o);
+    if (px < -offX - 420 || px > W + offX + 420) continue;
+    for (const [dx, sc] of [[-210, 1.05], [190, 1.15], [250, 0.85], [-140, 0.8]]) drawPalm(px + dx, HORIZON + 30, sc);
+    // the pool lies on the far sand, behind the paths
+    const py = 681;
+    const g = ctx.createLinearGradient(0, py - 12, 0, py + 12);
+    g.addColorStop(0, '#1e3a78'); g.addColorStop(1, '#3a68a8');
+    ctx.fillStyle = '#6d8a58';
+    ctx.beginPath(); ctx.ellipse(px, py, 168, 17, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(px, py, 154, 12, 0, 0, TAU); ctx.fill();
+    // the star shines back from the water
+    ctx.fillStyle = `rgba(255,250,220,${0.5 + 0.3 * Math.sin(t * 3)})`;
+    ctx.beginPath(); ctx.ellipse(clamp(star.x - star.lean, px - 120, px + 120), py, 14, 2.5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
+    for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(px - 60 + k * 50, py + k * 2 - 3, 20 + Math.sin(t * 2 + k) * 4, 1.6, 0, 0, TAU); ctx.stroke(); }
+    // reeds
+    ctx.strokeStyle = '#5d8a4a'; ctx.lineWidth = 2;
+    for (let k = 0; k < 8; k++) { const rx = px - 160 + k * 7 + (k > 3 ? 280 : 0); ctx.beginPath(); ctx.moveTo(rx, py + 6); ctx.lineTo(rx + Math.sin(t + k) * 2, py - 12 - (k % 3) * 5); ctx.stroke(); }
+  }
+  for (const d of decor) {
+    if (d.f !== 1) continue;
+    const x = d.x - dist;
+    if (x < -offX - 90 || x > W + offX + 90) continue;
+    if (d.k === 'palm') drawPalm(x, HORIZON + 26, d.s);
+    else if (d.k === 'olive') drawOliveTree(x, HORIZON + 26, d.s);
+  }
 }
 
 function drawGround() {
   const x0 = -offX - 10, x1 = W + offX + 10;
+  const w = biomeW(dist + Math.min(W * 0.5, 350));
   const g = ctx.createLinearGradient(0, HORIZON, 0, H);
-  g.addColorStop(0, '#6f5d78');
-  g.addColorStop(0.45, '#98806f');
-  g.addColorStop(1, '#b8986e');
+  g.addColorStop(0, mixHex(w, 0));
+  g.addColorStop(0.45, mixHex(w, 1));
+  g.addColorStop(1, mixHex(w, 2));
   ctx.fillStyle = g;
   ctx.fillRect(x0, HORIZON, x1 - x0, H - HORIZON + offY + 20);
   // gentle caravan tracks along each path
@@ -1743,7 +1988,7 @@ function win() {
   const score = gifts + light + noBump + way + levelBonus;
   totalScore += score;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('followStarBest', best); } catch (e) {} }
-  lastScore = { gifts, pct, light, noBump, way, levelBonus, score };
+  lastScore = { gifts, pct, light, noBump, way, levelBonus, score, trailsDone: trails.filter((tr) => tr.got === tr.n).length, trailsAll: trails.length };
   banner = { key: 'joyShort', y: 230, age: 0 };
   for (let i = 0; i < 60; i++) {
     const a = rand(0, TAU), sp = rand(40, 180);
@@ -1774,7 +2019,7 @@ function startFade(dur, fn) { fade = { t: 0, dur, fn, done: false }; }
 // ============================================================
 //  Story scenes
 // ============================================================
-const SCENE_BEATS = { dream: [6.5], herod: [6.5, 4.2], arrive: [3.6] };
+const SCENE_BEATS = { dream: [6.5], herod: [6.5, 4.2], arrive: [3.6], oasis: [3.8] };
 
 function startScene(type) {
   state = 'scene';
@@ -1789,6 +2034,11 @@ function startScene(type) {
   } else if (type === 'arrive') {
     banner = { key: 'stoodOver', y: 150, age: 0 };
     sfx.chime();
+  } else if (type === 'oasis') {
+    showMessage('Rest at the oasis');
+    say(1, 'Ahh, cool fresh water!', 2.6);
+    got.water++; giftPts += 30;
+    sfx.collect('water');
   }
 }
 
@@ -1813,6 +2063,9 @@ function endScene() {
     herodDone = true;
     showMessage('On to Bethlehem!');
     say(1, 'Follow the star!', 2.2);
+  } else if (type === 'oasis') {
+    guidance = 100;
+    showMessage('Refreshed! On we go');
   } else if (type === 'dream') {
     showMessage(`Level ${level}: ${cfg.name}`);
     showMessage('Take the other way at the fork!', true);
@@ -1832,6 +2085,12 @@ function updateScene(dt) {
   const r = range();
   if (sc.type === 'herod') caravan.tx = clamp(W * 0.3, r.lo, r.hi);
   if (sc.type === 'arrive') caravan.tx = clamp(houseScreenX() - 150 - SP, r.lo, r.hi);
+  if (sc.type === 'oasis') {
+    const o = oases.find((q) => Math.abs(q.at - dist) < 1);
+    if (o) caravan.tx = clamp(poolScreenX(o) - 160 - SP, r.lo, r.hi);
+    guidance = Math.min(100, guidance + 35 * dt);   // refilled by the cool water
+    if (Math.random() < dt * 5) floaters.push({ x: caravan.mx + rand(-SP, SP), y: laneY(caravan.lane) - 120, text: '+', t: 0.8, color: '#bfe3ff' });
+  }
   if (sc.type === 'arrive' && sc.t > 1.5 && Math.random() < dt * 6) {
     spawn(houseScreenX() + rand(-80, 80), rand(560, 690), 0, -20, 1.2, '#fff6d0', 2.5);
   }
@@ -1896,8 +2155,87 @@ function collect(it, p) {
     const a = rand(0, TAU);
     spawn(sx, y, Math.cos(a) * 70, Math.sin(a) * 70 - 20, 0.6, it.type === 'water' ? '#9fd3ff' : '#ffe27a', rand(2, 3.5));
   }
-  sfx.collect(it.type);
+  if (it.trail != null) {
+    const tr = trails[it.trail];
+    tr.got++;
+    if (tr.got === tr.n) {
+      giftPts += 100;
+      floaters.push({ x: sx, y: y - 40, text: 'Starlight trail! +100', t: 1.4, color: '#fff6c8' });
+      sfx.chime();
+    }
+  }
+  sfx.collect(it.type === 'spark' ? 'coin' : it.type === 'dates' ? 'myrrh' : it.type);
 }
+
+// Friendly creatures who trot alongside for a while (they never get in the way)
+function updateFriends(dt) {
+  for (const f of friends) {
+    if (f.st === 0) {
+      if (dist >= f.at) {
+        f.st = 1; f.t = 0; f.x = -offX - 60;
+        say(f.type === 'fox' ? 1 : 2, f.type === 'fox' ? 'Look, a little fox!' : 'Hello, little one!', 2.2);
+      }
+      continue;
+    }
+    if (f.st === 3) continue;
+    f.t += dt;
+    const rear = camelPos(2);
+    if (f.st === 1) {
+      const want = f.type === 'fox' ? caravan.mx + Math.sin(f.t * 0.7) * 60 : rear.x - 70;
+      f.x += (want - f.x) * Math.min(1, dt * 1.5);
+      if (f.t > (f.type === 'fox' ? 8 : 10)) {
+        f.st = 2;
+        say(f.type === 'fox' ? 0 : 2, f.type === 'fox' ? 'Goodbye, fox!' : 'Run back to your mother!', 2);
+      }
+    } else if (f.st === 2) {
+      f.x += (f.type === 'fox' ? 320 : -200) * dt;
+      if (f.x > W + offX + 80 || f.x < -offX - 120) f.st = 3;
+    }
+  }
+}
+
+function drawFox(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const run = t * 14;
+  ctx.fillStyle = 'rgba(20,14,40,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 1, 24, 4, 0, 0, TAU); ctx.fill();
+  const fur = '#e08a3c', dark = '#b8652a';
+  // legs
+  ctx.strokeStyle = dark; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  for (const [hx, off] of [[-12, 0], [-8, Math.PI], [10, Math.PI], [14, 0]]) {
+    ctx.beginPath(); ctx.moveTo(hx, -12); ctx.lineTo(hx + Math.sin(run + off) * 6, -1); ctx.stroke();
+  }
+  // bushy tail with a white tip
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(-26, -20 + Math.sin(run) * 2, 14, 6, -0.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff6ea';
+  ctx.beginPath(); ctx.ellipse(-37, -25 + Math.sin(run) * 2, 5, 4, -0.4, 0, TAU); ctx.fill();
+  // body and head
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(0, -17, 17, 8, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(19, -24, 7.5, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(24, -24); ctx.lineTo(33, -21); ctx.lineTo(24, -18); ctx.fill();
+  // big ears (a desert fox)
+  ctx.beginPath(); ctx.moveTo(14, -28); ctx.lineTo(12, -44); ctx.lineTo(20, -30); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(19, -30); ctx.lineTo(22, -45); ctx.lineTo(25, -28); ctx.fill();
+  ctx.fillStyle = '#fff6ea';
+  ctx.beginPath(); ctx.ellipse(2, -13, 10, 3.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12';
+  ctx.beginPath(); ctx.arc(22, -26, 1.6, 0, TAU); ctx.arc(33, -21, 1.6, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawFriends() {
+  for (const f of friends) {
+    if (f.st !== 1 && f.st !== 2) continue;
+    if (f.type === 'fox') drawFox(f.x, H - 20, 1);
+    else {
+      const rear = caravan.camels[2].laneF;
+      drawCamel(f.x, laneY(rear) + 6, CS * laneS(rear) * 0.55, CALF, caravan.walk * 1.4 + 1, 1);
+    }
+  }
+}
+const CALF = { calf: true, mood: 'watch', i: 0 };
 
 function checkFork() {
   if (!fork || fork.done || fork.pending) return;
@@ -1950,13 +2288,18 @@ function updateStorms(dt) {
 function updatePlay(dt) {
   playT += dt;
   let target = cfg.speed;
-  if (!herodDone) target *= clamp((herodAt - dist) / 400, 0.15, 1);
-  else target *= clamp((endAt - dist) / 400, 0.15, 1);
+  target *= clamp((nextStopAt() - dist) / 400, 0.15, 1);   // ease to a stop at each story beat
   if (fade) target *= 0.3;
   speed += (target - speed) * Math.min(1, dt * 2.5);
   dist += speed * dt;
   updateStorms(dt);
   updateCaravan(dt);
+  updateFriends(dt);
+  // tumbleweeds roll toward the caravan
+  for (const o of obstacles) if (o.type === 'tumble' && !o.hit && o.x - dist < W + offX + 60 && o.x - dist > -200) o.x -= 70 * dt;
+  // announce each new stretch of the route
+  const sk = segAt(dist + W * 0.5).kind;
+  if (sk !== segKind) { if (segKind) showMessage(SEG_NAMES[sk], true); segKind = sk; }
 
   // Guidance: fills in the star's light, drains outside it
   const sp = spot();
@@ -1987,6 +2330,7 @@ function updatePlay(dt) {
 
   if (!herodDone && dist >= herodAt) { dist = herodAt; speed = 0; startScene('herod'); return; }
   if (herodDone && dist >= endAt) { dist = endAt; speed = 0; startScene('arrive'); return; }
+  for (const o of oases) if (!o.done && dist >= o.at) { o.done = true; dist = o.at; speed = 0; startScene('oasis'); return; }
 
   // Little moments of chatter
   if (introT > 0) {
@@ -2038,6 +2382,7 @@ function titleScreen() {
   syncAmbience();
   cfg = makeConfig(1);
   herodAt = 1e9; endAt = 2e9;
+  buildRoute(); decor = []; obstacles = []; items = []; trails = []; fork = null;
   caravan = newCaravan();
   interior = false;
   showOverlay('Follow the Star', 'The wise men’s journey',
@@ -2047,6 +2392,7 @@ function titleScreen() {
        <li><b>Touch:</b> <b>tap</b> left or right of the camels to step that way. Tap the sand on the row <b>above or below</b> them to change path. (You can also keep your finger down and slide.)</li>
        <li><b>Keyboard:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> to change path.</li>
        <li>Go around dunes, cacti, rocks and sleepy snakes. Gather <b>gold</b>, <b>frankincense</b>, <b>myrrh</b> and <b>water</b>.</li>
+       <li>It&rsquo;s a long journey! Rest at the <b>oases</b>, follow the <b>star-sparkle trails</b>, and watch the map from the East to Bethlehem.</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
@@ -2057,7 +2403,7 @@ function startLevel() {
   cfg = makeConfig(level);
   herodAt = cfg.leg1; endAt = cfg.leg1 + cfg.leg2;
   dist = 0; speed = 0; playT = 0; inBeamT = 0; guidance = 80; inBeam = false;
-  bumps = 0; giftPts = 0; got = { coin: 0, frank: 0, myrrh: 0, water: 0 };
+  bumps = 0; giftPts = 0; got = { coin: 0, frank: 0, myrrh: 0, water: 0, dates: 0, spark: 0 };
   herodDone = false; forkChosen = false; interior = false;
   caravan = newCaravan();
   starT = rand(0, 10); starPh = rand(0, TAU);
@@ -2092,7 +2438,7 @@ function endScreens(dt) {
     showOverlay('They found Him!', `Level ${level} complete — ${cfg.name}`,
       `${verseHTML('joy')}
        ${verseHTML('gifts')}
-       <p class="score">Gifts gathered: <b>${s.gifts}</b><br>In the star&rsquo;s light: <b>${s.pct}%</b> &rarr; <b>${s.light}</b><br>No-bump bonus: <b>${s.noBump}</b>${cfg.fork ? `<br>Another way: <b>${s.way}</b>` : ''}<br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score">Gifts gathered: <b>${s.gifts}</b><br>In the star&rsquo;s light: <b>${s.pct}%</b> &rarr; <b>${s.light}</b><br>Star trails: <b>${s.trailsDone} of ${s.trailsAll}</b><br>No-bump bonus: <b>${s.noBump}</b>${cfg.fork ? `<br>Another way: <b>${s.way}</b>` : ''}<br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
       'Next Journey', () => { level++; startLevel(); });
@@ -2355,6 +2701,7 @@ function drawWorld() {
   drawStarOfBethlehem();
   drawDunes();
   drawGround();
+  drawDecorGround();
   drawPalace(palaceScreenX());
   drawHouse(houseScreenX());
   drawForkGround();
@@ -2369,6 +2716,7 @@ function drawWorld() {
     if (L === 1) drawForkMiddle();
     drawCaravanLane(L);
   }
+  drawFriends();
   drawBeam();
 
   // which way is the light? (a gentle hint above the caravan)
@@ -2701,25 +3049,58 @@ function drawHUD() {
     const cw = ctx.measureText(`${giftPts}`).width;
     ctx.fillStyle = '#f5c542'; ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(rx - cw - 12, 34, 7, 0, TAU); ctx.fill(); ctx.stroke();
-    // journey line: start, Jerusalem, Bethlehem
-    const x0 = rx - 150, x1 = rx, y = 60;
-    ctx.strokeStyle = 'rgba(255,241,196,0.4)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
-    const f = clamp(dist / endAt, 0, 1);
-    ctx.strokeStyle = '#f7c948';
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(lerp(x0, x1, f), y); ctx.stroke();
-    const jx = lerp(x0, x1, herodAt / endAt);
-    drawCrown(jx, y - 5, 10, 8);
-    ctx.fillStyle = '#fffbe0';
-    ctx.beginPath();
-    for (let k = 0; k < 10; k++) {
-      const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 3 : 7;
-      ctx.lineTo(x1 + Math.cos(a) * r, y + Math.sin(a) * r);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#caa06a'; ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(lerp(x0, x1, f), y, 5, 0, TAU); ctx.fill(); ctx.stroke();
   }
+  if (state !== 'title') drawJourneyMap();
+  ctx.restore();
+}
+
+// The journey map: from the East, past the oases and Herod's Jerusalem, to Bethlehem
+function drawJourneyMap() {
+  const x1 = viewW - 22, x0 = Math.max(136, x1 - 440), y = 82;
+  const at = (d) => lerp(x0, x1, clamp(d / endAt, 0, 1));
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,14,50,0.45)';
+  roundRect(x0 - 12, y - 16, x1 - x0 + 26, 44, 12); ctx.fill();
+  // the sandy road, dashed ahead and golden behind
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255,241,196,0.45)'; ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+  ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+  ctx.setLineDash([]);
+  const cx = at(dist);
+  ctx.strokeStyle = '#f7c948'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(cx, y); ctx.stroke();
+  // oases
+  for (const o of oases) {
+    const ox = at(o.at);
+    ctx.fillStyle = o.done ? 'rgba(120,180,255,0.5)' : '#7cc4f2';
+    ctx.beginPath(); ctx.moveTo(ox, y - 9); ctx.quadraticCurveTo(ox + 6, y - 1, ox, y + 1); ctx.quadraticCurveTo(ox - 6, y - 1, ox, y - 9); ctx.fill();
+  }
+  // the fork (later levels)
+  if (fork) {
+    const fx = at(fork.x - range().c);
+    ctx.strokeStyle = fork.done ? '#f7c948' : '#c9a0e8'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(fx - 5, y); ctx.lineTo(fx, y); ctx.lineTo(fx + 5, y - 5); ctx.moveTo(fx, y); ctx.lineTo(fx + 5, y + 5); ctx.stroke();
+  }
+  // Herod's Jerusalem and Bethlehem
+  const jx = at(herodAt);
+  drawCrown(jx, y - 3, 12, 10);
+  ctx.fillStyle = '#fffbe0';
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 3.2 : 8;
+    ctx.lineTo(x1 + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  ctx.closePath(); ctx.fill();
+  // labels
+  ctx.font = '600 10px Fredoka, sans-serif'; ctx.fillStyle = '#fff1c4';
+  ctx.textAlign = 'left'; ctx.fillText('East', x0 - 4, y + 20);
+  ctx.textAlign = 'center'; ctx.fillText('Herod', jx, y + 20);
+  ctx.textAlign = 'right'; ctx.fillText('Bethlehem', x1 + 8, y + 20);
+  // the caravan: a little camel
+  ctx.fillStyle = '#caa06a'; ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(cx, y - 3, 7, 4.5, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx - 1, y - 7, 3.5, Math.PI, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx + 5, y - 5); ctx.lineTo(cx + 9, y - 12); ctx.lineTo(cx + 12, y - 11); ctx.stroke();
   ctx.restore();
 }
 

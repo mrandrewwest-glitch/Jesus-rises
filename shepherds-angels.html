@@ -1396,7 +1396,7 @@ function endScreens(dt) {
     const s = lastScore;
     showOverlay('Tidings of great joy!', `Level ${level} complete — ${cfg.name}`,
       `${verseHTML('glory')}
-       <p class="score">Sheep kept safe: <b>${s.safe}/${s.total}</b><br>Strays called home: <b>${s.called}</b> &middot; Lambs freed: <b>${s.lambs}</b><br>${level >= 3 ? 'Wolves &amp; foxes' : 'Wolves'} shooed: <b>${s.wolves}</b></p>
+       <p class="score" style="font-size:1rem">Sheep kept safe: <b>${s.safe}/${s.total}</b><br>Strays called home: <b>${s.called}</b><br>Lambs freed: <b>${s.lambs}</b><br>${level >= 3 ? 'Wolves &amp; foxes' : 'Wolves'} shooed: <b>${s.wolves}</b></p>
        <p class="score">Night watch: <b>${s.watch}</b><br>Angel choir: <b>${s.choir}</b> <small>(${s.perfect} perfect)</small><br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
@@ -1722,9 +1722,13 @@ function drawNightSky() {
   ctx.fillRect(-offX, -offY, viewW, HORIZON + 80 + offY);
 }
 
+// How far the night has passed (0 at dusk, 1 when the watch is done)
+function nightF() { return phase === 'watch' ? (state === 'title' ? 0.1 : clamp(watchT / cfg.watchTime, 0, 1)) : 1; }
+
 function drawStars(alpha, top, bottom) {
+  const drift = nightF() * 0.12;     // the stars wheel slowly across the sky
   for (const s of STARS) {
-    const x = -offX + s.f * viewW, y = top + s.g * (bottom - top);
+    const x = -offX + ((s.f + drift) % 1) * viewW, y = top + s.g * (bottom - top);
     const a = alpha * (0.55 + 0.45 * Math.sin(t * 2 + s.tw));
     ctx.globalAlpha = clamp(a, 0, 1);
     ctx.fillStyle = '#fffbe8';
@@ -1738,7 +1742,8 @@ function drawStars(alpha, top, bottom) {
 }
 
 function drawMoon(alpha) {
-  const mx = W - Math.min(110, W * 0.18), my = 190;
+  const f = nightF();                // the moon crosses the sky as the night passes
+  const mx = lerp(W * 0.14, W * 0.86, f), my = 250 - Math.sin(f * Math.PI) * 120;
   ctx.save();
   ctx.globalAlpha = alpha;
   const g = ctx.createRadialGradient(mx, my, 10, mx, my, 70);
@@ -1844,7 +1849,7 @@ function drawDarkness(cx, cy, rx, ry, alpha) {
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.translate(cx, cy); ctx.scale(1, ry / rx);
-  const g = ctx.createRadialGradient(0, 0, rx * 0.55, 0, 0, rx * 1.05);
+  const g = ctx.createRadialGradient(0, 0, rx * 0.7, 0, 0, rx * 1.12);
   g.addColorStop(0, 'rgba(6,10,34,0)'); g.addColorStop(1, `rgba(6,10,34,${alpha})`);
   ctx.fillStyle = g;
   ctx.fillRect(-6000, -6000, 12000, 12000);
@@ -1855,22 +1860,24 @@ function drawDarkness(cx, cy, rx, ry, alpha) {
 function drawWolfBody(w) {
   ctx.save();
   ctx.translate(w.x, w.y);
-  ctx.scale(w.side, 1);   // side 1 = facing left
+  const fox = w.kind === 'fox';
+  ctx.scale(w.side * (fox ? 0.8 : 1), fox ? 0.8 : 1);   // side 1 = facing left
   const trot = w.stage === 'flee' ? Math.sin(t * 30) * 3 : Math.sin(t * 10) * 1.5;
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   ctx.beginPath(); ctx.ellipse(0, 2, 30, 6, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#5d6275';
+  ctx.fillStyle = fox ? '#d9772e' : '#5d6275';
   for (const lx of [-18, -8, 10, 20]) { roundRect(lx - 3, -16 + (lx % 20 === 0 ? trot : -trot), 6, 16, 3); ctx.fill(); }
   ctx.beginPath(); ctx.ellipse(0, -24, 28, 13, 0, 0, TAU); ctx.fill();
   // tail
   ctx.beginPath(); ctx.moveTo(24, -28); ctx.quadraticCurveTo(46, -34, 44, -18 + trot); ctx.quadraticCurveTo(34, -22, 24, -20); ctx.fill();
+  if (fox) { ctx.fillStyle = '#fff4e6'; ctx.beginPath(); ctx.arc(44, -19 + trot, 4.5, 0, TAU); ctx.fill(); ctx.fillStyle = '#d9772e'; }
   // head
   ctx.beginPath(); ctx.arc(-26, -32, 13, 0, TAU); ctx.fill();
   ctx.beginPath(); ctx.moveTo(-34, -30); ctx.lineTo(-48, -26); ctx.lineTo(-34, -22); ctx.fill();
   ctx.beginPath(); ctx.moveTo(-32, -42); ctx.lineTo(-30, -54); ctx.lineTo(-24, -43); ctx.fill();
   ctx.beginPath(); ctx.moveTo(-24, -43); ctx.lineTo(-18, -53); ctx.lineTo(-16, -40); ctx.fill();
   ctx.fillStyle = '#2b2d38'; ctx.beginPath(); ctx.arc(-48, -26, 2.5, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#9aa0b4'; ctx.beginPath(); ctx.ellipse(-30, -24, 7, 4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = fox ? '#fff4e6' : '#9aa0b4'; ctx.beginPath(); ctx.ellipse(-30, -24, 7, 4, 0, 0, TAU); ctx.fill();
   ctx.restore();
 }
 
@@ -1997,29 +2004,44 @@ function drawNightField() {
   drawNightSky();
   drawFarHills();
   drawField();
+  for (const side of [-1, 1]) { const tr = owlTree(side); drawLoneTree(tr.x, tr.y, side); }
   const bs = bushes();
   for (const b of bs) drawBush(b.x, b.y, wolves.some((w) => w.stage === 'eyes' && Math.hypot(w.x - b.x, w.y - 10 - b.y) < 20));
 
-  // People, sheep, fire and wolves, back to front
+  // People, sheep, fire, thorns and wolves, back to front
   const items = [{ y: FY, draw: () => drawCampfire(W / 2, FY, fireLevel) }];
   for (const sl of shepherdSlots()) items.push({ y: sl.y, draw: () => drawShepherd(sl) });
+  THORNS.forEach((th, k) => {
+    const [x, y] = sheepXY(th);
+    const stuck = sheep.find((o) => o.state === 'stuck' && o.thorn === k);
+    items.push({ y: y + 6, draw: () => drawThornBush(x, y + 6, stuck ? stuck.wobT : 0) });
+  });
   for (const s of sheep) {
-    const sc = 0.55 + clamp((s.y - HORIZON) / 500, 0, 1) * 0.3;
-    const moving = s.state !== 'home';
-    const graze = s.state === 'home' && Math.sin(t * 0.7 + s.phase) > 0.6 ? 6 : 0;
-    items.push({ y: s.y, draw: () => drawSheep(s.x, s.y, sc, s, s.mood, { walk: moving ? s.walk : 0, flip: s.flip, graze, lx: -s.flip * 0.6, ly: 0.2, jump: s.mood === 'joy' && phase !== 'watch' ? Math.abs(Math.sin(t * 6 + s.phase)) * 8 : 0 }) });
+    if (s.state === 'lost' && s.lostT > 1.6) continue;
+    const sc = (0.66 + clamp((s.y - HORIZON) / 500, 0, 1) * 0.3) * (s.kind === 'lamb' ? 0.72 : 1);
+    const moving = s.state === 'wander' || s.state === 'return';
+    const graze = s.state === 'home' && !s.doze && Math.sin(t * 0.7 + s.phase) > 0.6 ? 6 : 0;
+    // a rescued lamb snuggles up to its mother
+    const mom = s.nuzzleT > 0 && s.mom >= 0 ? sheep[s.mom] : null;
+    const nx = mom ? clamp(mom.x - s.x, -1, 1) * 8 * Math.sin(Math.min(1, s.nuzzleT) * Math.PI) : 0;
+    const jump = s.hop || (s.mood === 'joy' && phase !== 'watch' ? Math.abs(Math.sin(t * 6 + s.phase)) * 8 : 0) || (s.state === 'stuck' ? Math.abs(Math.sin(t * 10)) * 3 : 0);
+    items.push({ y: s.y, draw: () => {
+      if (s.state === 'lost') { ctx.save(); ctx.globalAlpha = clamp(1 - s.lostT / 1.6, 0, 1); }
+      drawSheep(s.x + nx, s.y, sc, s, s.mood, { walk: moving ? s.walk : 0, flip: mom ? (mom.x > s.x ? -1 : 1) : s.flip, graze, lx: mom ? Math.sign(mom.x - s.x) : -s.flip * 0.6, ly: 0.2, jump });
+      if (s.state === 'lost') ctx.restore();
+    } });
   }
   for (const w of wolves) if (w.stage !== 'eyes') items.push({ y: w.y, draw: () => drawWolfBody(w) });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
 
   // The night closes in beyond the firelight (and melts away in the glory)
-  const lr = RX() * cfg.light * fireLevel * 1.08;
-  drawDarkness(W / 2, FY - 30, lr, RY_UP * cfg.light * fireLevel * 1.08, cfg.dark * (1 - gloryF));
+  drawDarkness(W / 2, FY - 30, RX() * edge(), RY_UP * edge(), cfg.dark * (1 - gloryF));
   drawStars(1 - gloryF * 0.7, -offY + 8, HORIZON - 110);
   drawMoon(1 - gloryF * 0.6);
   drawFireGlow(W / 2, FY, fireLevel);
   for (const w of wolves) drawWolfEyes(w);
+  if (owl) drawOwl(owl);
 
   // A soft hint ring on sleepy Benjamin
   if (sleepy.asleep && state === 'play') {
@@ -2027,13 +2049,26 @@ function drawNightField() {
     ctx.strokeStyle = `rgba(255,240,160,${0.4 + 0.3 * Math.sin(t * 6)})`; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(b.x, b.y - 48, 48 + Math.sin(t * 6) * 3, 0, TAU); ctx.stroke();
   }
-  // Rings on sheep far out in the dark, so they can still be found
+  // Warnings over strays near the dark and lambs in the thorns, so they can always be found
   if (state === 'play' && phase === 'watch') {
+    const E = edge();
     for (const s of sheep) {
-      if (s.state !== 'wander' || s.r < 0.6) continue;
-      const a = clamp((s.r - 0.6) / 0.3, 0, 1);
-      ctx.strokeStyle = `rgba(255,255,255,${0.25 + a * 0.35 * (0.6 + 0.4 * Math.sin(t * 7))})`; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(s.x, s.y - 20, 30, 0, TAU); ctx.stroke();
+      if (s.state === 'wander' && s.thorn < 0 && s.r >= E * 0.85) {
+        drawWarning(s.x, s.y - 20, s.darkT > 0 ? 1 - s.darkT / cfg.grace : 1, s.darkT > 0);
+      } else if (s.state === 'stuck') {
+        drawWarning(s.x, s.y - 16, 1 - s.stuckT / cfg.stuckLimit, s.stuckT > cfg.stuckLimit * 0.6);
+        // one dot for each tap still needed
+        for (let k = 0; k < cfg.thornTaps; k++) {
+          const dx = (k - (cfg.thornTaps - 1) / 2) * 13;
+          ctx.fillStyle = k < s.taps ? '#ffe27a' : 'rgba(255,255,255,0.45)';
+          ctx.beginPath(); ctx.arc(s.x + dx, s.y + 16, 4.5, 0, TAU); ctx.fill();
+        }
+      }
+    }
+    // the fire wants a stick
+    if (fireLevel < 0.8) {
+      ctx.strokeStyle = `rgba(255,200,120,${0.35 + 0.3 * Math.sin(t * 6)})`; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(W / 2, FY - 18, 44 + Math.sin(t * 6) * 3, 0, TAU); ctx.stroke();
     }
   }
 
@@ -2094,166 +2129,92 @@ function drawAngelBubble() {
   ctx.restore();
 }
 
-// ============================================================
-//  Rendering: the road to Bethlehem
-// ============================================================
 function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
 
-function drawRock(x, y, seed) {
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.beginPath(); ctx.ellipse(x, y + 8, 34, 9, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#8b8792'; ctx.strokeStyle = '#5c5963'; ctx.lineWidth = 2;
+// A bramble of thorns with little red berries
+function drawThornBush(x, y, wob) {
+  const w = Math.sin(t * 40) * wob * 8;
+  ctx.save();
+  ctx.translate(x + w, y);
+  ctx.fillStyle = '#23482f';
   ctx.beginPath();
-  ctx.moveTo(x - 32, y + 8);
-  ctx.quadraticCurveTo(x - 34, y - 18, x - 10, y - 24 - seed);
-  ctx.quadraticCurveTo(x + 18, y - 30, x + 30, y - 6);
-  ctx.quadraticCurveTo(x + 36, y + 8, x + 20, y + 10);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#b2aeb8';
-  ctx.beginPath(); ctx.ellipse(x - 8, y - 14, 10, 5, -0.3, 0, TAU); ctx.fill();
+  for (const [dx, dy, r] of [[-22, -12, 16], [0, -22, 20], [22, -12, 16], [-10, -2, 14], [12, -2, 14]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+  ctx.fill();
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const [x0, y0, x1, y1] of [[-30, -4, 4, -34], [30, -6, -6, -36], [-20, -30, 26, -18], [-28, -20, 18, 0]]) {
+    ctx.moveTo(x0, y0); ctx.quadraticCurveTo((x0 + x1) / 2, Math.min(y0, y1) - 10, x1, y1);
+  }
+  ctx.stroke();
+  ctx.beginPath();     // little thorns
+  for (let i = 0; i < 12; i++) {
+    const a = i * 2.4, px = Math.cos(a) * (10 + (i % 3) * 7), py = -16 + Math.sin(a) * 12;
+    ctx.moveTo(px, py); ctx.lineTo(px + 4, py - 4);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#d6334a';
+  for (const [bx, by] of [[-14, -20], [8, -30], [18, -8], [-4, -6]]) { ctx.beginPath(); ctx.arc(bx, by, 2.6, 0, TAU); ctx.fill(); }
+  ctx.restore();
 }
 
-function drawDitch(x, y, w) {
-  ctx.fillStyle = '#5e4a2e';
-  ctx.beginPath(); ctx.ellipse(x, y, w / 2 + 6, 22, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#1e2616';
-  ctx.beginPath(); ctx.ellipse(x, y + 3, w / 2 - 4, 15, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#3f6b44'; ctx.lineWidth = 2;
+// A bare lone tree on the hill
+function drawLoneTree(x, y, side) {
+  ctx.strokeStyle = '#2a2233'; ctx.lineCap = 'round';
+  ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - side * 6, y - 50, x, y - 100); ctx.stroke();
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  for (const dx of [-w / 2, -w / 4, w / 4, w / 2 - 6]) { ctx.moveTo(x + dx, y - 16); ctx.lineTo(x + dx - 3, y - 25); ctx.moveTo(x + dx + 4, y - 16); ctx.lineTo(x + dx + 6, y - 24); }
+  ctx.moveTo(x, y - 70); ctx.quadraticCurveTo(x - side * 25, y - 85, x - side * 42, y - 104);
+  ctx.moveTo(x, y - 88); ctx.quadraticCurveTo(x + side * 20, y - 96, x + side * 38, y - 90);
+  ctx.moveTo(x, y - 100); ctx.lineTo(x + side * 6, y - 122);
   ctx.stroke();
 }
 
-function drawStarItem(x, y, seed) {
-  const r = 14 + Math.sin(t * 5 + seed) * 2;
+// The owl on its branch, fading in and out
+function drawOwl(o) {
+  const tr = owlTree(o.side);
+  const a = clamp(Math.min(o.t / 0.4, (3.6 - o.t) / 0.5), 0, 1);
+  const x = tr.x + o.side * 34, y = tr.y - 92;
   ctx.save();
-  ctx.translate(x, y - 20);
-  const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 40);
-  g.addColorStop(0, 'rgba(255,240,150,0.8)'); g.addColorStop(1, 'rgba(255,240,150,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 40, 0, TAU); ctx.fill();
-  ctx.rotate(t * 1.5 + seed);
-  ctx.fillStyle = '#ffe27a'; ctx.strokeStyle = '#f5b82e'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const rr = i % 2 ? r * 0.45 : r, a = (i / 10) * TAU - Math.PI / 2;
-    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  ctx.globalAlpha = a;
+  ctx.translate(x, y + Math.sin(o.t * 3) * 1);
+  ctx.fillStyle = '#8a6a4a';
+  ctx.beginPath(); ctx.ellipse(0, -14, 12, 16, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-10, -26); ctx.lineTo(-8, -36); ctx.lineTo(-3, -28); ctx.moveTo(10, -26); ctx.lineTo(8, -36); ctx.lineTo(3, -28); ctx.fill();
+  ctx.fillStyle = '#d9c3a0';
+  ctx.beginPath(); ctx.ellipse(0, -8, 7, 9, 0, 0, TAU); ctx.fill();
+  const hooting = o.t > 0.3 && o.t < 1.3;
+  ctx.fillStyle = '#fff4a8'; ctx.shadowColor = '#fff27a'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(-5, -20, 4.5, 0, TAU); ctx.arc(5, -20, 4.5, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath(); ctx.arc(-5, -20, 2, 0, TAU); ctx.arc(5, -20, 2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8a33a';
+  ctx.beginPath(); ctx.moveTo(-2.5, -15); ctx.lineTo(2.5, -15); ctx.lineTo(0, hooting ? -9 : -11); ctx.fill();
+  if (hooting) {
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,20,60,0.8)'; ctx.lineJoin = 'round';
+    ctx.strokeText('Hoo-hoo!', -o.side * 6, -46);
+    ctx.fillStyle = '#e8ecff'; ctx.fillText('Hoo-hoo!', -o.side * 6, -46);
   }
-  ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
 }
 
-function drawLantern(x, y) {
-  ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x, y - 20); ctx.stroke();
-  ctx.fillStyle = '#6b4a2b'; roundRect(x - 7, y - 14, 14, 3, 1); ctx.fill();
-  ctx.fillStyle = '#ffd766'; roundRect(x - 6, y - 11, 12, 13, 3); ctx.fill();
-  ctx.fillStyle = '#6b4a2b'; roundRect(x - 7, y + 2, 14, 3, 1); ctx.fill();
-}
-
-// The stable in Bethlehem, seen from the road
-function drawStableFront(x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-  const g = ctx.createRadialGradient(0, -80, 10, 0, -80, 260);
-  g.addColorStop(0, 'rgba(255,220,140,0.45)'); g.addColorStop(1, 'rgba(255,220,140,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -80, 260, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#7a5433'; ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 3;
-  roundRect(-130, -150, 260, 150, 6); ctx.fill(); ctx.stroke();
-  // roof
-  ctx.fillStyle = '#5a3b24';
-  ctx.beginPath(); ctx.moveTo(-160, -140); ctx.lineTo(0, -220); ctx.lineTo(160, -140); ctx.closePath(); ctx.fill(); ctx.stroke();
-  // warm doorway
-  ctx.fillStyle = '#ffd98a';
-  roundRect(-50, -110, 100, 110, [40, 40, 0, 0]); ctx.fill();
-  ctx.fillStyle = 'rgba(255,245,200,0.8)';
-  roundRect(-32, -86, 64, 86, [30, 30, 0, 0]); ctx.fill();
-  // planks
-  ctx.strokeStyle = 'rgba(60,40,20,0.4)'; ctx.lineWidth = 2;
-  for (const px of [-110, -80, 70, 100]) { ctx.beginPath(); ctx.moveTo(px, -145); ctx.lineTo(px, -2); ctx.stroke(); }
-  ctx.restore();
-}
-
-function drawTraveller(d, x, y, s, lantern) {
-  const bob = Math.abs(Math.sin(walkT + d.i)) * 3;
-  const slot = { d, x, y: y - bob, s };
-  if (lantern) {
-    drawDisciple(slot);
-    drawLantern(x + 20 * s, y - bob - 20 * s);
-  } else drawShepherd(slot);
-}
-
-function drawJourney() {
-  const lw = laneW();
-  const pw = lw * 3 + 60;
-  // the hillside
-  ctx.fillStyle = '#1f3f2c';
-  ctx.fillRect(-offX, -offY, viewW, viewH);
-  // grass tufts and stones beside the road, scrolling past
-  const rowH = 70;
-  const r0 = Math.floor((jd - GROUP_Y - offY) / rowH) - 1, r1 = Math.floor((jd + H - GROUP_Y) / rowH) + 1;
-  for (let r = r0; r <= r1; r++) {
-    const y = GROUP_Y + r * rowH - jd;
-    for (let k = 0; k < 3; k++) {
-      const side = k % 2 ? 1 : -1;
-      const x = W / 2 + side * (pw / 2 + 20 + hash(r * 3 + k) * Math.max(40, (viewW - pw) / 2 - 20));
-      if (hash(r * 7 + k) < 0.5) {
-        ctx.strokeStyle = '#3d7050'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 6, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 4, y); ctx.lineTo(x + 6, y - 8); ctx.stroke();
-      } else {
-        ctx.fillStyle = '#4a5c4c';
-        ctx.beginPath(); ctx.ellipse(x, y, 8 + hash(r + k) * 6, 5, 0, 0, TAU); ctx.fill();
-      }
-    }
+// A "!" bubble and a shrinking ring over a sheep in trouble
+function drawWarning(x, y, frac, urgent) {
+  const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+  ctx.strokeStyle = `rgba(255,235,150,${0.35 + 0.35 * pulse})`; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(x, y, 30 + pulse * 3, 0, TAU); ctx.stroke();
+  if (frac < 1) {
+    ctx.strokeStyle = urgent ? '#ff8a3a' : '#ffd24a'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, 36, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
   }
-  // the winding road
-  ctx.fillStyle = '#806a45';
-  ctx.beginPath();
-  const edge = (y) => Math.sin((jd + y) / 170) * 10;
-  for (let y = -offY - 20; y <= H + 20; y += 20) ctx.lineTo(W / 2 - pw / 2 + edge(y), y);
-  for (let y = H + 20; y >= -offY - 20; y -= 20) ctx.lineTo(W / 2 + pw / 2 + edge(y + 60), y);
-  ctx.closePath(); ctx.fill();
-  // lane marks
-  ctx.fillStyle = 'rgba(80,60,30,0.25)';
-  for (let r = r0; r <= r1; r++) {
-    const y = GROUP_Y + r * rowH - jd;
-    for (const lx of [W / 2 - lw / 2, W / 2 + lw / 2]) { ctx.beginPath(); ctx.ellipse(lx, y, 3, 6, 0, 0, TAU); ctx.fill(); }
-  }
-  // Bethlehem's stable comes into view at the end
-  if (cfg.pathLen - jd < 900) drawStableFront(W / 2, GROUP_Y + cfg.pathLen + 330 - jd);
-
-  const sy = (o) => GROUP_Y + (o.d - jd);
-  const visible = obstacles.filter((o) => { const y = sy(o); return y > -offY - 60 && y < H + 80; });
-  for (const o of visible) if (o.type === 'ditch') drawDitch(laneX(o.lane), sy(o), lw * 0.78);
-  for (const o of visible) if (o.type === 'rock' && sy(o) < GROUP_Y + 10) drawRock(laneX(o.lane), sy(o), (o.seed % 1) * 6);
-  // the travellers: two shepherds and two sheep
-  const blink = hitCd > 0 && Math.sin(t * 30) > 0;
-  if (!blink) {
-    drawTraveller(SHEPHERDS[0], gx - 28, GROUP_Y - 8, 0.92, false);
-    drawTraveller(SHEPHERDS[2], gx + 28, GROUP_Y - 4, 0.92, true);
-    for (const [k, dx] of [[0, -30], [1, 30]]) {
-      const s = sheep[k];
-      if (s) drawSheep(gx + dx, GROUP_Y + 36 + Math.abs(Math.sin(walkT * 1.3 + k)) * -2, 0.56, s, SHEPHERDS[0].mood === 'shock' ? 'shock' : SHEPHERDS[0].mood, { walk: walkT * 2 + k, flip: 1, ly: 1 });
-    }
-  }
-  for (const o of visible) if (o.type === 'rock' && sy(o) >= GROUP_Y + 10) drawRock(laneX(o.lane), sy(o), (o.seed % 1) * 6);
-
-  // Only starlight and a lantern: darker nights show less of the road ahead
-  ctx.fillStyle = 'rgba(8,12,40,0.22)';
-  ctx.fillRect(-offX, -offY, viewW, viewH);
-  drawDarkness(gx, GROUP_Y + 190, cfg.view * 0.85, cfg.view * 0.95, Math.min(cfg.dark + 0.12, 0.9));
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const lg = ctx.createRadialGradient(gx + 20, GROUP_Y - 20, 5, gx + 20, GROUP_Y - 20, 160);
-  lg.addColorStop(0, 'rgba(255,200,110,0.25)'); lg.addColorStop(1, 'rgba(255,200,110,0)');
-  ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(gx + 20, GROUP_Y - 20, 160, 0, TAU); ctx.fill();
-  ctx.restore();
-  for (const o of visible) if (o.type === 'star' && !o.hit) drawStarItem(laneX(o.lane), sy(o), o.seed);
-  // twinkles of starlight drifting over the hillside
-  for (let i = 0; i < 24; i++) {
-    const x = -offX + hash(i + 1) * viewW, y = ((hash(i + 50) * (H + offY) - jd * 0.3) % (H + offY) + H + offY) % (H + offY) - offY;
-    ctx.fillStyle = `rgba(255,250,220,${0.35 + 0.3 * Math.sin(t * 3 + i)})`;
-    ctx.beginPath(); ctx.arc(x, y, 1.6, 0, TAU); ctx.fill();
-  }
+  const by = y - 48 - pulse * 3;
+  ctx.fillStyle = urgent ? '#ff8a3a' : '#ffd24a';
+  ctx.beginPath(); ctx.arc(x, by, 12, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 5, by + 9); ctx.lineTo(x, by + 17); ctx.lineTo(x + 5, by + 9); ctx.fill();
+  ctx.fillStyle = '#3a2410'; ctx.font = '700 17px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('!', x, by + 6);
 }
 
 // ============================================================
@@ -2371,14 +2332,15 @@ function drawStableInterior() {
   ctx.save();
   ctx.translate(W / 2, 790);
   ctx.scale(k, k);
-  if (sheep[1]) drawSheep(-255, 20, 0.62, sheep[1], 'joy', { flip: -1, lx: 1 });
+  const fs = sheep.filter((o) => o.state !== 'lost');
+  if (fs[1]) drawSheep(-255, 20, 0.62, fs[1], 'joy', { flip: -1, lx: 1 });
   drawKneeling(SHEPHERDS[0], -190, 10, 1.35, 1);
   drawKneeling(SHEPHERDS[2], -100, 30, 1.35, 1);
   drawManger(0, 20, 1.45);
   drawMary(104, 20, 1.45);
   drawShepherd({ d: JOSEPH, x: 184, y: 20, s: 1.35 });
   drawKneeling(SHEPHERDS[1], 262, 34, 1.2, -1);
-  if (sheep[0]) drawSheep(-40, 80, 0.62, sheep[0], 'joy', { flip: -1, lx: 0.5 });
+  if (fs[0]) drawSheep(-40, 80, 0.62, fs[0], 'joy', { flip: -1, lx: 0.5 });
   ctx.restore();
 }
 
@@ -2420,8 +2382,9 @@ function drawVillage() {
   drawShepherd({ d: SHEPHERDS[0], x: W / 2 - 50, y: 790, s: 1.25 });
   drawShepherd({ d: SHEPHERDS[1], x: W / 2 + 52, y: 796, s: 1.25 });
   drawDisciple({ d: SHEPHERDS[2], x: W / 2, y: 820, s: 1.2 });
-  if (sheep[0]) drawSheep(W / 2 - 110, 870, 0.6, sheep[0], 'joy', { flip: -1, lx: 0.4 });
-  if (sheep[1]) drawSheep(W / 2 + 110, 872, 0.6, sheep[1], 'joy', { flip: 1, lx: -0.4 });
+  const fs = sheep.filter((o) => o.state !== 'lost');
+  if (fs[0]) drawSheep(W / 2 - 110, 870, 0.6, fs[0], 'joy', { flip: -1, lx: 0.4 });
+  if (fs[1]) drawSheep(W / 2 + 110, 872, 0.6, fs[1], 'joy', { flip: 1, lx: -0.4 });
   // a joyful word (not scripture)
   const said = stage === 1 ? 'Come and hear what we saw tonight!' : 'It was all just as the angel told us!';
   drawSpeech(said, W / 2, 790 - 1.25 * 95);
@@ -2467,23 +2430,6 @@ function drawBanner() {
   ctx.restore();
 }
 
-function drawLampIcon(x, y, lit) {
-  if (lit) {
-    const g = ctx.createRadialGradient(x, y, 2, x, y, 16);
-    g.addColorStop(0, 'rgba(255,220,120,0.7)'); g.addColorStop(1, 'rgba(255,220,120,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 16, 0, TAU); ctx.fill();
-  }
-  // a little clay oil lamp with a flame
-  ctx.fillStyle = lit ? '#c8864a' : '#6a6070';
-  ctx.beginPath(); ctx.ellipse(x, y + 5, 10, 5, 0, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(x + 6, y + 3); ctx.lineTo(x + 14, y + 1); ctx.lineTo(x + 8, y + 7); ctx.fill();
-  if (lit) {
-    const fl = Math.sin(t * 12 + x) * 1;
-    ctx.fillStyle = '#ffb13a';
-    ctx.beginPath(); ctx.moveTo(x + 10, y + 1); ctx.quadraticCurveTo(x + 8 + fl, y - 6, x + 13 + fl, y - 11); ctx.quadraticCurveTo(x + 16, y - 4, x + 14, y + 1); ctx.fill();
-  }
-}
-
 function drawHUD() {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
@@ -2495,12 +2441,12 @@ function drawHUD() {
   ctx.font = '700 17px Fredoka, sans-serif';
   ctx.fillText(state === 'title' ? 'The Shepherds and the Angels' : `Level ${level} · ${cfg.name}`, 12, 26);
   if (state !== 'title') {
-    const labels = { watch: 'WATCH', angel: 'GLORY', choir: 'CHOIR', journey: 'ROAD', finale: 'ROAD' };
+    const labels = { watch: 'NIGHT', angel: 'GLORY', choir: 'CHOIR', go: 'TOWN', finale: 'TOWN' };
     const prog = {
       watch: clamp(watchT / cfg.watchTime, 0, 1),
       angel: 1,
       choir: melody.length ? clamp((noteSpawned - notes.filter((n) => n.state === 'live').length) / melody.length, 0, 1) : 0,
-      journey: clamp(jd / cfg.pathLen, 0, 1),
+      go: 1,
       finale: 1,
     }[phase];
     ctx.font = '600 12px Fredoka, sans-serif';
@@ -2535,7 +2481,7 @@ function drawHUD() {
     }
   }
 
-  // Right: score + lamps
+  // Right: score + the sheep count
   if (state !== 'title') {
     const rx = viewW - 12;
     ctx.textAlign = 'right';
@@ -2544,11 +2490,14 @@ function drawHUD() {
     ctx.font = '600 12px Fredoka, sans-serif';
     ctx.fillText('SCORE', rx, 18);
     ctx.font = '700 17px Fredoka, sans-serif';
-    ctx.fillText(`${totalScore + (state === 'win' ? 0 : pts.watch + pts.choir + pts.path)}`, rx, 38);
-    ctx.shadowBlur = 0;
-    if (phase === 'watch' || phase === 'journey') {
-      for (let i = 0; i < LAMPS; i++) drawLampIcon(rx - 12 - i * 28, 56, i < lamps);
+    ctx.fillText(`${totalScore + (state === 'win' ? 0 : pts.watch + pts.choir)}`, rx, 38);
+    if (phase === 'watch') {
+      // turns orange when one more lost sheep would end the night
+      ctx.fillStyle = lostCount >= cfg.lostAllowed ? '#ffae5a' : '#fff3cf';
+      ctx.font = '700 16px Fredoka, sans-serif';
+      ctx.fillText(`Sheep ${safeCount()}/${sheep.length}`, rx, 62);
     }
+    ctx.shadowBlur = 0;
   }
   ctx.restore();
 }
@@ -2561,7 +2510,7 @@ function drawMessage() {
   ctx.textAlign = 'center';
   ctx.font = '700 24px Fredoka, sans-serif';
   const lines = wrapLines(message.text, W - 30);
-  const y0 = phase === 'journey' ? H * 0.5 : H * 0.44;
+  const y0 = phase === 'watch' ? 232 : H * 0.44;   // over the sky during the watch, clear of the flock
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(20,20,60,0.85)'; ctx.lineJoin = 'round';
   lines.forEach((l, i) => { ctx.strokeText(l, W / 2, y0 + i * 28); });
   ctx.fillStyle = '#fff3a0';
@@ -2576,9 +2525,16 @@ function render() {
   if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
   ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
 
-  if (phase === 'journey') drawJourney();
-  else if (phase === 'finale') { if (stage === 0) drawStableInterior(); else drawVillage(); }
-  else drawNightField();
+  if (phase === 'finale') { if (stage === 0) drawStableInterior(); else drawVillage(); }
+  else if (phase === 'go') {
+    // drift in toward the lights of Bethlehem on the far hill
+    const f = clamp(phaseT / GO_DUR, 0, 1), z = (f * f * (3 - 2 * f)) * 0.35;
+    const bx = W * 0.2, by = HORIZON - 55;
+    ctx.save();
+    ctx.translate(bx, by); ctx.scale(1 + z, 1 + z); ctx.translate(-bx, -by);
+    drawNightField();
+    ctx.restore();
+  } else drawNightField();
 
   drawParticles();
 
@@ -2596,8 +2552,9 @@ function render() {
     ctx.fillStyle = `rgba(255,252,225,${Math.min(1, flashT * 1.2)})`;
     ctx.fillRect(-offX, -offY, viewW, viewH);
   }
-  if (fadeT > 0) {
-    ctx.fillStyle = `rgba(10,12,40,${Math.min(1, fadeT * 1.25)})`;
+  const fade = phase === 'go' ? clamp(phaseT - (GO_DUR - 1), 0, 1) : Math.min(1, fadeT * 1.25);
+  if (fade > 0) {
+    ctx.fillStyle = `rgba(10,12,40,${fade})`;
     ctx.fillRect(-offX, -offY, viewW, viewH);
   }
 
@@ -2619,13 +2576,14 @@ function update(dt) {
   if (phase === 'watch') {
     const far = sheep.filter((s) => s.state === 'wander').sort((a, b) => b.r - a.r)[0];
     const w = wolves.find((o) => o.stage !== 'flee');
-    lookTarget = w ? { x: w.x, y: w.y - 20 } : far ? { x: far.x, y: far.y - 20 } : { x: W / 2, y: FY - 20 };
+    const stuck = sheep.find((s) => s.state === 'stuck');
+    lookTarget = w ? { x: w.x, y: w.y - 20 } : stuck ? { x: stuck.x, y: stuck.y - 20 } : far ? { x: far.x, y: far.y - 20 } : { x: W / 2, y: FY - 20 };
   } else if (phase === 'angel' || phase === 'choir') lookTarget = { x: W / 2, y: 260 };
-  else if (phase === 'journey') lookTarget = null;
+  else if (phase === 'go') lookTarget = { x: W * 0.2, y: HORIZON - 60 };
   updatePeople(SHEPHERDS, shepherdMood, dt);
   updatePeople([JOSEPH], () => 'joy', dt);
   updatePeople(TOWNSFOLK, townMood, dt);
-  if (phase === 'watch' || phase === 'angel' || phase === 'choir') updateSheep(dt);
+  if (phase !== 'finale') updateSheep(dt);
   else for (const s of sheep) { s.mood = state === 'fail' ? 'dismay' : SHEPHERDS[0].mood === 'shock' ? 'shock' : 'joy'; s.blinkT -= dt; if (s.blinkT <= 0) { s.blink = 0.13; s.blinkT = rand(1.5, 5); } if (s.blink > 0) s.blink -= dt; }
 
   if (state === 'play') {
@@ -2637,7 +2595,10 @@ function update(dt) {
       if (phaseT > 1.2 && lineT > angelLineDur()) nextAngelLine();
       if (phaseT < 1.2) lineT = 0;
     } else if (phase === 'choir') { updateWolves(dt); updateChoir(dt); }
-    else if (phase === 'journey') updateJourney(dt);
+    else if (phase === 'go') {
+      gloryF = Math.max(0, 1 - phaseT / 2.5);
+      if (phaseT > GO_DUR) startFinale();
+    }
     else if (phase === 'finale') {
       stageT += dt;
       if (stageT > STAGE_DUR + (stage === 0 ? 0.6 : 0)) nextStage();
