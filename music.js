@@ -201,7 +201,7 @@
   const asList = (f) => (Array.isArray(f) ? f : [f]).map(noteFreq);
 
   // Loudness trims so each instrument sits at about the choir's level at the same vol
-  const TRIM = { choir: 1, organ: 0.62, harp: 0.9, pipe: 0.6, bells: 0.53, strings: 0.72, timbrel: 1 };
+  const TRIM = { choir: 1, organ: 0.62, harp: 0.9, pipe: 0.75, bells: 0.53, strings: 0.72, timbrel: 1 };
 
   function choir(ac, out, t0, freq, dur, vol, opts = {}) {
     const fs = asList(freq), v = vol * TRIM.choir / Math.sqrt(fs.length);
@@ -475,8 +475,8 @@
   // ------------------------------------------------------------
   //  Rendering helpers
   // ------------------------------------------------------------
-  const MEL = 0.2;    // melody level (same as the house choir soprano)
-  const ACC = 0.11;   // harmony level
+  const MEL = 0.25;   // melody level (a little above the house choir soprano, which has 3 other parts)
+  const ACC = 0.14;   // harmony level
   const PERC = 0.07;  // timbrel level
 
   const sumBeats = (list) => list.reduce((s, n) => s + (n.beats != null ? n.beats : n[1]), 0);
@@ -753,7 +753,7 @@
   function chirp(ac, dest, t) {
     const kind = pick(['chirp', 'chirp', 'trill', 'whistle']);
     const f0 = pick([2600, 3200, 3900, 4600]) * rand(0.95, 1.05);
-    const vol = rand(0.006, 0.014);
+    const vol = rand(0.009, 0.02);
     if (kind === 'chirp') {
       const k = 1 + Math.floor(Math.random() * 3);
       blip(ac, dest, t, k * 0.11 + 0.1, (o, g) => {
@@ -828,10 +828,10 @@
   const BEDS = {
     sea: {
       base(ac, bus, t0, st) {
-        const surf = noiseLayer(ac, bus, t0, st, 'lowpass', 550, 0.7, 0.32);
+        const surf = noiseLayer(ac, bus, t0, st, 'lowpass', 550, 0.7, 0.24);
         const foam = noiseLayer(ac, bus, t0, st, 'bandpass', 2400, 0.5, 0.05);
-        noiseLayer(ac, bus, t0, st, 'lowpass', 160, 0.7, 0.35);           // deep rumble
-        lfoTo(ac, t0, st, surf.g.gain, 0.085, 0.28);                     // waves swelling
+        noiseLayer(ac, bus, t0, st, 'lowpass', 160, 0.7, 0.25);           // deep rumble
+        lfoTo(ac, t0, st, surf.g.gain, 0.085, 0.21);                     // waves swelling
         lfoTo(ac, t0, st, surf.f.frequency, 0.085, 320);
         lfoTo(ac, t0, st, foam.g.gain, 0.11, 0.045);
       },
@@ -840,10 +840,10 @@
     wind: {
       base(ac, bus, t0, st) {
         st.gust = ac.createGain(); st.gust.gain.value = 1; st.gust.connect(bus); st.nodes.push(st.gust);
-        const w = noiseLayer(ac, st.gust, t0, st, 'bandpass', 520, 0.9, 0.55);
-        const wh = noiseLayer(ac, st.gust, t0, st, 'bandpass', 900, 12, 0.35);   // whistle
+        const w = noiseLayer(ac, st.gust, t0, st, 'bandpass', 520, 0.9, 0.4);
+        const wh = noiseLayer(ac, st.gust, t0, st, 'bandpass', 900, 12, 0.25);   // whistle
         lfoTo(ac, t0, st, w.f.frequency, 0.07, 260);
-        lfoTo(ac, t0, st, w.g.gain, 0.13, 0.3);
+        lfoTo(ac, t0, st, w.g.gain, 0.13, 0.22);
         lfoTo(ac, t0, st, wh.f.frequency, 0.05, 380);
       },
       events(ac, bus, from, to, st) {
@@ -864,30 +864,30 @@
       base(ac, bus, t0, st) {
         st.vbus = ac.createBiquadFilter(); st.vbus.type = 'lowpass'; st.vbus.frequency.value = 1900;
         st.vbus.connect(bus); st.nodes.push(st.vbus);
-        const m = noiseLayer(ac, bus, t0, st, 'bandpass', 480, 0.9, 0.12);
-        lfoTo(ac, t0, st, m.g.gain, 0.2, 0.04);
+        const m = noiseLayer(ac, bus, t0, st, 'bandpass', 480, 0.9, 0.18);
+        lfoTo(ac, t0, st, m.g.gain, 0.2, 0.06);
       },
-      events(ac, bus, from, to, st) { every(st, 'v', from, to, () => rand(0.15, 0.45), (t) => voice(ac, st.vbus, t, rand(0.006, 0.013))); },
+      events(ac, bus, from, to, st) { every(st, 'v', from, to, () => rand(0.15, 0.45), (t) => voice(ac, st.vbus, t, rand(0.016, 0.032))); },
     },
     market: {
       base(ac, bus, t0, st) {
         st.vbus = ac.createBiquadFilter(); st.vbus.type = 'lowpass'; st.vbus.frequency.value = 2200;
         st.vbus.connect(bus); st.nodes.push(st.vbus);
-        const m = noiseLayer(ac, bus, t0, st, 'bandpass', 520, 0.8, 0.16);
-        lfoTo(ac, t0, st, m.g.gain, 0.25, 0.05);
+        const m = noiseLayer(ac, bus, t0, st, 'bandpass', 520, 0.8, 0.22);
+        lfoTo(ac, t0, st, m.g.gain, 0.25, 0.07);
       },
       events(ac, bus, from, to, st) {
-        every(st, 'v', from, to, () => rand(0.08, 0.25), (t) => voice(ac, st.vbus, t, rand(0.007, 0.015)));
+        every(st, 'v', from, to, () => rand(0.08, 0.25), (t) => voice(ac, st.vbus, t, rand(0.016, 0.03)));
         every(st, 'k', from, to, () => rand(1.2, 4), (t) => {
           const n = Math.random() < 0.35 ? 3 : 1;             // sometimes a jingle of coins
-          for (let i = 0; i < n; i++) clink(ac, bus, t + i * rand(0.05, 0.09), rand(0.012, 0.02));
+          for (let i = 0; i < n; i++) clink(ac, bus, t + i * rand(0.05, 0.09), rand(0.02, 0.035));
         });
       },
     },
     night: {
       base(ac, bus, t0, st) {
-        const b = noiseLayer(ac, bus, t0, st, 'lowpass', 380, 0.7, 0.12);
-        lfoTo(ac, t0, st, b.g.gain, 0.06, 0.05);
+        const b = noiseLayer(ac, bus, t0, st, 'lowpass', 380, 0.7, 0.2);
+        lfoTo(ac, t0, st, b.g.gain, 0.06, 0.08);
         st.crickets = [rand(4200, 4500), rand(4700, 5000)];
       },
       events(ac, bus, from, to, st) {
@@ -896,7 +896,7 @@
           for (let p = 0; p < 3; p++) {
             const tp = t + p * 0.032;
             g.gain.setValueAtTime(0, tp);
-            g.gain.linearRampToValueAtTime(0.006, tp + 0.004);
+            g.gain.linearRampToValueAtTime(0.013, tp + 0.004);
             g.gain.linearRampToValueAtTime(0, tp + 0.016);
           }
         })));
