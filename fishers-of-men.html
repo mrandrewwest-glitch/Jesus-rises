@@ -229,7 +229,7 @@ const NET_TOP = SEA_Y + 14;     // top of the net's sweep zone
 const NET_BOTTOM = SEA_Y + 365; // how deep the net reaches
 const CS = 1.1;                 // character scale
 const DROP_T = 0.16;            // net plunging down
-const LIFT_T = 0.35;            // net drawn back up into a bag
+const LIFT_T = 0.6;             // net drawn back up and gathered before the next cast
 const MEND_T = 1.4;             // mending a broken net
 const HAUL_T = 0.9;             // emptying the net into the boats
 const PERFECT = 0.8;            // net at least this full (and untorn) = perfect haul
@@ -249,19 +249,20 @@ function makeConfig(n) {
   return {
     name: LEVEL_NAMES[n - 1] || `Morning ${n}`,
     time: 60,                                   // seconds until the sun is high
-    goal: 20 + (n - 1) * 8,                     // fish to land in the boats
+    goal: [20, 32, 42, 52, 60][n - 1] || 68,   // fish to land in the boats
     cap: 14 + Math.min(n - 1, 4),               // net capacity before it strains
-    window: Math.max(0.75 - (n - 1) * 0.08, 0.36), // how long the net sweeps
-    zoneHalf: Math.max(80 - (n - 1) * 7, 52),   // half width of the net
-    speed: 85 + (n - 1) * 18,                   // shoal swimming speed
-    bigGap: Math.max(4.6 - (n - 1) * 0.35, 2.8),
-    bigMin: 6, bigMax: 10 + Math.min(n, 5),
-    smallGap: 3.6,
-    junkGap: n === 1 ? 11 : Math.max(8 - (n - 1) * 1.2, 2.6),
+    window: [0.75, 0.62, 0.52, 0.45, 0.4][n - 1] || 0.36, // how long the net sweeps
+    zoneHalf: Math.max(80 - (n - 1) * 8, 42),   // half width of the net
+    speed: 85 + (n - 1) * 22,                   // shoal swimming speed
+    bigGap: Math.max(6.5 - (n - 1) * 0.4, 4.5),
+    bigMin: 6, bigMax: 10 + Math.min(n, 3),
+    turnBack: Math.max(0.5 - (n - 1) * 0.1, 0.2), // chance a shoal turns back through the net
+    smallGap: 5,
+    junkGap: n === 1 ? 11 : Math.max(7 - (n - 1) * 1.1, 2.4),
     crabs: n >= 2,
     goldChance: 0.28,
     flip: n >= 3 ? Math.max(16 - (n - 3) * 2, 9) : 0,  // Jesus points to the other side
-    tearRate: 1 + (n - 1) * 0.15,
+    tearRate: 1 + (n - 1) * 0.25,
   };
 }
 
@@ -316,9 +317,9 @@ function boatX() { return W / 2 + boatShift; }
 function zoneOff() { return Math.min(180, W * 0.29); }
 function zoneX(s) { return boatX() + s * zoneOff(); }
 function surf(x) { return SEA_Y + 3 * Math.sin(x * 0.028 + t * 1.5) + 2 * Math.sin(x * 0.065 - t * 2.2); }
-function sinkAmt() { return clamp(stats.landed / cfg.goal, 0, 1) * 10 + winSink * 16; }
+function sinkAmt() { return clamp(stats.landed / cfg.goal, 0, 1) * 10 + winSink * 8; }
 function boatY() { return SEA_Y + 2 + Math.sin(t * 1.4) * 2.5 + sinkAmt(); }
-function partnerY() { return SEA_Y - 6 + Math.sin(t * 1.6 + 1) * 2.5 + sinkAmt() * 0.8; }
+function partnerY() { return SEA_Y - 12 + Math.sin(t * 1.6 + 1) * 2.5 + sinkAmt() * 0.8; }
 // How deep the bag of caught fish hangs
 function bagDepth() { return 34 + Math.min(net.weight, 30) * 3.1; }
 function bagWidth() { return 48 + Math.min(net.fish, 30) * 1.5 + net.junk.length * 6; }
@@ -659,13 +660,14 @@ function spawnBig() {
   const size = rand(1.0, 1.2);
   const color = FISH_COLORS[randInt(0, FISH_COLORS.length - 1)];
   const turnX = boatX() + s * rand(-10, 30);
-  const dive = rand(-50, 60);
+  const back = Math.random() < cfg.turnBack;      // otherwise it dives deep, out of the net's reach
+  const dive = back ? rand(-50, 60) : 999;
   for (let i = 0; i < n; i++) {
     addSwimmer({ kind: 'fish', x: x0 + s * rand(0, 130), y: clamp(y + rand(-38, 38), 440, 745), vx: -s * sp * rand(0.95, 1.05),
-      size: size * rand(0.9, 1.1), color, turnX, dive });
+      size: size * rand(0.9, 1.1), color, turnX, dive, back });
   }
   if (Math.random() < cfg.goldChance) {
-    addSwimmer({ kind: 'gold', x: x0 + s * rand(20, 110), y: clamp(y + rand(-20, 20), 440, 745), vx: -s * sp, size: 1.05, turnX, dive });
+    addSwimmer({ kind: 'gold', x: x0 + s * rand(20, 110), y: clamp(y + rand(-20, 20), 440, 745), vx: -s * sp, size: 1.05, turnX, dive, back });
   }
 }
 
@@ -699,10 +701,12 @@ function updateSwimmers(dt) {
     const f = swimmers[i];
     // U-turn under the boat
     if (f.turnX !== null && !f.turned && ((f.vx < 0 && f.x < f.turnX) || (f.vx > 0 && f.x > f.turnX))) {
-      f.turned = true; f.tvx = -f.vx; f.ty = clamp(f.y + f.dive, 440, 748);
+      f.turned = true;
+      if (f.back) { f.tvx = -f.vx; f.ty = clamp(f.y + f.dive, 440, 748); }
+      else f.ty = rand(800, 825);
     }
     f.vx += (f.tvx - f.vx) * Math.min(1, dt * 3);
-    f.y += (f.ty - f.y) * Math.min(1, dt * 1.2);
+    f.y += (f.ty - f.y) * Math.min(1, dt * (f.turned && !f.back ? 3.5 : 1.2));
     if (f.free) f.y += f.vy * dt;
     f.x += f.vx * dt;
     if (f.kind === 'weed' || f.kind === 'sandal') f.y += Math.sin(t * 1.5 + f.phase) * 8 * dt;
@@ -779,9 +783,10 @@ function catchIt(f) {
   } else {
     net.junk.push(f.kind);
     net.weight += WEIGHT[f.kind];
-    showMessage({ sandal: 'An old sandal! It clogs the net', weed: 'Seaweed! It clogs the net', crab: 'Snip! A grumpy crab!' }[f.kind]);
+    showMessage({ sandal: 'An old sandal! It clogs the net', weed: 'Seaweed! It clogs the net', crab: 'Snip! A grumpy crab cut the net!' }[f.kind]);
     sfx.junk(f.kind === 'crab');
-    if (f.kind === 'crab') shockT = Math.max(shockT, 0.6);
+    // the crab snips a hole in the net
+    if (f.kind === 'crab') { shockT = Math.max(shockT, 0.6); net.tear = Math.min(0.9, net.tear + 0.3); }
   }
 }
 
@@ -851,13 +856,16 @@ function breakNet() {
 // ============================================================
 //  James & John's boat (Luke 5:7)
 // ============================================================
+// Where James & John's boat stops: just outboard of the net, kept on screen
+function partnerSpot(s) { return clamp(zoneX(s) + s * 50, 70, W - 70); }
+
 function callPartner() {
   if (state !== 'play') return;
   if (partner.phase === 'coming' || partner.phase === 'haul') return;
   if (net.fish === 0 && net.junk.length === 0) { showMessage('The net is empty — cast first!'); return; }
   if (partner.phase === 'away') partner.x = net.side > 0 ? W + 170 : -170;
   partner.side = net.side;
-  partner.target = zoneX(net.side);
+  partner.target = partnerSpot(net.side);
   partner.phase = 'coming'; partner.t = 0;
   partner.dir = Math.sign(partner.target - partner.x) || 1;
   partner.speed = Math.max(Math.abs(partner.target - partner.x) / 0.9, 260);
@@ -869,7 +877,7 @@ function updatePartner(dt) {
   const p = partner;
   p.t += dt;
   if (p.phase === 'coming') {
-    p.target = zoneX(p.side);
+    p.target = partnerSpot(p.side);
     const d = p.target - p.x;
     const step = p.speed * dt;
     if (Math.abs(d) <= step) {
@@ -1507,7 +1515,7 @@ function drawShore() {
   g.addColorStop(1, mix('#7fb2d2', '#5aa6d6', p));
   ctx.fillStyle = g;
   ctx.fillRect(x0, SEA_Y - 22, x1 - x0, 30);
-  ctx.strokeStyle = 'rgba(255,250,220,0.8)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,250,220,0.45)'; ctx.lineWidth = 1.5;
   const sx = W * 0.8;
   for (let i = 0; i < 6; i++) {
     const y = SEA_Y - 18 + i * 3.4, w = 34 - i * 3 + Math.sin(t * 3 + i) * 6;
@@ -1517,10 +1525,10 @@ function drawShore() {
 
 // Fish lying in a boat, peeking over the rail
 function drawPile(x0, x1, load, y) {
-  const n = Math.round(clamp(load, 0, 1.2) * 16);
+  const n = Math.round(clamp(load, 0, 1.2) * 12);
   for (let i = 0; i < n; i++) {
     const x = lerp(x0, x1, hsh(i, 9));
-    const row = Math.floor(i / 6);
+    const row = Math.floor(i / 7);
     ctx.save();
     ctx.translate(x, y - 3 - row * 6);
     ctx.rotate((hsh(i, 3) - 0.5) * 0.8);
@@ -1557,18 +1565,17 @@ function drawPeterBoat() {
   const win = state === 'win';
   const zx = zoneX(net.side) - bx, zy = NET_TOP + 90 - by;
   const kneelF = win ? clamp(winT / 0.8, 0, 1) : 0;
-  const peterX = lerp(8, -40, kneelF), peterY = -6 + kneelF * 22;
+  const peterX = lerp(8, -40, kneelF), peterY = -6 + kneelF * 12;
   let pose = 'point';
   if (win) pose = winT > 0.8 ? 'bless' : 'open';
   else if (state === 'fail') pose = 'open';
+  drawPile(-100, 110, stats.landed / cfg.goal + winSink * 0.3, -36);
   drawJesus(-80, -6, CS, pose, blessed, win ? 'joy' : 'calm');
 
   const [alx, aly] = lookAt(zx, zy, 64, -64);
   drawDisciple({ d: DISCIPLES[1], x: 64, y: -6, s: CS, lx: alx, ly: aly });
   const [plx, ply] = win ? [-0.9, -0.4] : lookAt(zx, zy, peterX, peterY - 58);
   drawDisciple({ d: DISCIPLES[0], x: peterX, y: peterY, s: CS, lx: plx, ly: ply, kneel: kneelF > 0.5 });
-
-  drawPile(-100, 110, stats.landed / cfg.goal + winSink * 0.3, -36);
 
   // Hull
   ctx.fillStyle = '#8b5a2b';
@@ -1608,7 +1615,7 @@ function drawPartnerBoat() {
   const p = partner;
   if (p.phase === 'away') return;
   const px = p.x, py = partnerY();
-  const S = 0.86;
+  const S = 0.78;
   const moving = p.phase === 'coming' || p.phase === 'leaving';
   if (moving && Math.random() < 0.5) spawn(px - p.dir * 90, SEA_Y + 2, -p.dir * rand(20, 60), rand(-40, -10), 0.5, 'rgba(255,255,255,0.9)', rand(2, 4), 200);
   ctx.save();
@@ -1630,12 +1637,11 @@ function drawPartnerBoat() {
   ctx.beginPath(); ctx.moveTo(0, -195); ctx.lineTo(18 * -p.dir, -190); ctx.lineTo(0, -185); ctx.fill();
 
   const zx = (zoneX(p.side) - px) / S, zy = (NET_TOP + 60 - py) / S;
+  drawPile(-90, 95, stats.landed / cfg.goal + winSink * 0.3, -34);
   const [jlx, jly] = state === 'win' ? [0, -1] : lookAt(zx, zy, -44, -64);
   drawDisciple({ d: DISCIPLES[2], x: -44, y: -6, s: CS, lx: jlx, ly: jly });
   const [olx, oly] = state === 'win' ? [0, -1] : lookAt(zx, zy, 40, -64);
   drawDisciple({ d: DISCIPLES[3], x: 40, y: -6, s: CS, lx: olx, ly: oly });
-
-  drawPile(-90, 95, stats.landed / cfg.goal + winSink * 0.3, -34);
 
   ctx.fillStyle = '#7d5230';
   ctx.beginPath();
@@ -1882,15 +1888,19 @@ function drawNet() {
     // The net spread wide in the water
     const sway = Math.sin(t * 4) * 6;
     const L = zx - half, R = zx + half, mid = (top + depth) / 2;
-    ctx.beginPath();
-    ctx.moveTo(L, top); ctx.lineTo(R, top);
-    ctx.quadraticCurveTo(R + 6, mid, R - 8 + sway, depth);
-    ctx.quadraticCurveTo(zx + sway, depth + 20, L + 8 + sway, depth);
-    ctx.quadraticCurveTo(L - 6, mid, L, top);
-    ctx.closePath();
+    const shape = () => {
+      ctx.beginPath();
+      ctx.moveTo(L, top); ctx.lineTo(R, top);
+      ctx.quadraticCurveTo(R + 6, mid, R - 8 + sway, depth);
+      ctx.quadraticCurveTo(zx + sway, depth + 20, L + 8 + sway, depth);
+      ctx.quadraticCurveTo(L - 6, mid, L, top);
+      ctx.closePath();
+    };
+    shape();
     ctx.fillStyle = n.phase === 'sweep' ? 'rgba(255,240,190,0.16)' : 'rgba(230,215,170,0.12)';
     ctx.fill();
     ctx.save(); ctx.clip(); meshIn(L - 10, R + 10, top, depth + 20); ctx.restore();
+    shape();
     ctx.strokeStyle = '#e2d3a4'; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.fillStyle = '#6d7680';
     for (let i = 0; i <= 6; i++) {
@@ -1923,11 +1933,14 @@ function drawBag(zx, top, tieX, tieY) {
   const bw = bagWidth(), bd = bagDepth(), s = strain();
   const wob = s >= PERFECT ? Math.sin(t * 18) * 2.5 * s : 0;
   const L = zx - bw / 2, R = zx + bw / 2;
-  ctx.beginPath();
-  ctx.moveTo(L, top); ctx.lineTo(R, top);
-  ctx.bezierCurveTo(R + bw * 0.25 + wob, top + bd * 0.5, zx + bw * 0.4, top + bd, zx, top + bd);
-  ctx.bezierCurveTo(zx - bw * 0.4, top + bd, L - bw * 0.25 - wob, top + bd * 0.5, L, top);
-  ctx.closePath();
+  const shape = () => {
+    ctx.beginPath();
+    ctx.moveTo(L, top); ctx.lineTo(R, top);
+    ctx.bezierCurveTo(R + bw * 0.25 + wob, top + bd * 0.5, zx + bw * 0.4, top + bd, zx, top + bd);
+    ctx.bezierCurveTo(zx - bw * 0.4, top + bd, L - bw * 0.25 - wob, top + bd * 0.5, L, top);
+    ctx.closePath();
+  };
+  shape();
   ctx.fillStyle = 'rgba(230,215,170,0.2)';
   ctx.fill();
   ctx.save(); ctx.clip();
@@ -1939,6 +1952,7 @@ function drawBag(zx, top, tieX, tieY) {
   n.junk.forEach((j, i) => drawJunk(j, zx + (hsh(i, 11) - 0.5) * bw * 0.6, top + bd * (0.45 + hsh(i, 12) * 0.35), 0.6, i));
   meshIn(L - 30, R + 30, top, top + bd + 10, 12);
   ctx.restore();
+  shape();
   ctx.strokeStyle = s > 1 ? (Math.sin(t * 14) > 0 ? '#ff6b6b' : '#ffd0d0') : s >= PERFECT ? '#f5c542' : '#e2d3a4';
   ctx.lineWidth = s >= PERFECT ? 4 : 3;
   if (s >= PERFECT && s <= 1) { ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 14; }
@@ -2012,7 +2026,7 @@ function drawBubbles() {
     if (b.who === 'jesus') drawSpeech(boatX() - 80, by - 6 - 76 * CS, b.text, 'jesus');
     else {
       const kneel = state === 'win' ? clamp(winT / 0.8, 0, 1) : 0;
-      drawSpeech(boatX() + lerp(8, -40, kneel), by - 6 - 76 * CS + kneel * 22, b.text, 'peter');
+      drawSpeech(boatX() + lerp(8, -40, kneel), by - 6 - 76 * CS + kneel * 12, b.text, 'peter');
     }
   }
 }
