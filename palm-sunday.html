@@ -205,28 +205,46 @@ function roundRect(x, y, w, h, r) {
 // ============================================================
 //  Tuning
 // ============================================================
-const ROAD_TOP = 650;     // far edge of the road
-const ROAD_Y = 748;       // where the donkey's hooves touch the road
-const ROAD_BOT = 812;     // near edge of the road
+// Road geometry: layoutRoad() raises the land on tall phones so the
+// road, lanes and crowd fill the screen instead of empty sky.
+let ROAD_TOP = 610;       // far edge of the road
+let ROAD_BOT = 830;       // near edge of the road
+let LIFT = 0;             // how far everything behind the road is raised
+let PZ = 0;               // 0 on wide screens .. 1 on tall portrait phones
+const LANE_Y = [650, 722, 794];   // hoof line of the far, middle and near lanes
+function layoutRoad() {
+  PZ = clamp(offY / 300, 0, 1);
+  ROAD_TOP = Math.max(610 - offY * 1.6, 380);
+  LIFT = 610 - ROAD_TOP;
+  ROAD_BOT = 830;
+  for (let i = 0; i < 3; i++) LANE_Y[i] = lerp(ROAD_TOP + 40, ROAD_BOT - 36, i / 2);
+}
+window.addEventListener('resize', layoutRoad);
+layoutRoad();
+const laneY = (f) => lerp(LANE_Y[0], LANE_Y[2], clamp(f, 0, 2) / 2);
+const laneS = (f) => lerp(0.84, 1, clamp(f, 0, 2) / 2) * (1 + 0.18 * PZ);   // nearer lanes look a little bigger
+
 const GRAV = 2300;        // gravity on a hop (px/s^2)
 const JUMP_V = 860;       // hop speed
 const HOP_V = 640;        // the small second hop in mid-air
-const DROP_V = 900;       // ↓ in mid-air drops quickly back to the road
-const DUCK_TIME = 0.75;   // one tap = this long ducking
-const STAND_TOP = 146;    // top of the halo above the hooves, standing
-const DUCK_TOP = 110;     // ...and ducking
-const BRANCH_BOT = 122;   // underside of a low branch above the road
+const LANE_STEP_PX = 55;  // CSS px of vertical drag per lane change
+const FLICK_V = 0.9;      // CSS px per ms: an upward flick this fast is a hop
+const FLICK_MIN = 38;     // ...covering at least this many CSS px
+const STAND_TOP = 146;    // top of the halo above the hooves
 const HIT_L = -44, HIT_R = 52;   // donkey's body, relative to its hooves
 const MAX_HEARTS = 3;
 
+// lanes: how many lanes it covers; h: how high you must hop to clear it (999 = steer round it)
 const OBS = {
-  rock:    { w: 48,  h: 36, kind: 'ground' },
-  goat:    { w: 60,  h: 56, kind: 'ground' },
-  cart:    { w: 96,  h: 62, kind: 'ground' },
-  pothole: { w: 66,  h: 0,  kind: 'hole' },
-  puddle:  { w: 84,  h: 0,  kind: 'hole' },
-  branch:  { w: 96,  h: BRANCH_BOT, kind: 'high' },
+  rock:    { w: 48,  h: 36,  lanes: 1, kind: 'ground' },
+  puddle:  { w: 84,  h: 0,   lanes: 1, kind: 'hole' },
+  pothole: { w: 66,  h: 0,   lanes: 1, kind: 'hole' },
+  goat:    { w: 60,  h: 999, lanes: 1, kind: 'ground' },
+  branch:  { w: 100, h: 999, lanes: 1, kind: 'ground' },   // a pile of cut branches (Matthew 21:8)
+  cart:    { w: 110, h: 999, lanes: 2, kind: 'ground' },
 };
+const HOPPABLE = ['rock', 'puddle', 'pothole'];
+const BLOCKERS = ['goat', 'branch'];
 
 const LEVEL_NAMES = [
   'From Bethphage',
@@ -243,18 +261,18 @@ function makeConfig(n) {
     len: Math.min(8000 + (n - 1) * 2200, 20000),
     v0: Math.min(260 + (n - 1) * 32, 480),
     v1: Math.min(360 + (n - 1) * 40, 640),
-    gapMin: Math.max(1.8 - (n - 1) * 0.18, 0.95),
-    gapMax: Math.max(2.7 - (n - 1) * 0.25, 1.4),
-    combo: n === 1 ? 0 : Math.min(0.2 + (n - 2) * 0.1, 0.55),
-    types: n === 1 ? ['rock', 'pothole', 'puddle', 'branch', 'goat']
-                   : ['rock', 'pothole', 'puddle', 'branch', 'goat', 'cart'],
+    gapMin: Math.max(1.6 - (n - 1) * 0.15, 0.95),
+    gapMax: Math.max(2.4 - (n - 1) * 0.2, 1.4),
+    multi: n === 1 ? 0 : Math.min(0.3 + (n - 2) * 0.12, 0.75),   // chance of a multi-lane pattern
+    wander: n >= 3,                                                 // goats wander between lanes
+    types: ['rock', 'pothole', 'puddle', 'branch', 'goat'],
   };
 }
 
 const SHOUTS = ['Hosanna!', 'Blessed is he!', 'Hosanna to the\nSon of David!', 'Hosanna in\nthe highest!', 'Hosanna!', 'The King!', 'Hosanna!'];
 const BUMP_MSG = {
   rock: 'Bump! A rock!', pothole: 'Oops, a pothole!', puddle: 'Splash! Slippery puddle!',
-  goat: 'Baa! A stubborn goat!', cart: 'Bonk! A fruit cart!', branch: 'Duck! Low branch!',
+  goat: 'Baa! A stubborn goat!', cart: 'Bonk! A fruit cart!', branch: 'Oops! A pile of branches!',
 };
 const CLOAK_COLORS = ['#c0392b', '#2f6db5', '#7a4fa0', '#d9a13a', '#3c8f86', '#c46b8c'];
 
@@ -289,7 +307,8 @@ const toScreen = (wx) => wx - dist + DX();
 function newDonkey() {
   return {
     y: 0, vy: 0, air: false, hops: 0,
-    duckT: 0, ducking: false, duckF: 0,
+    lane: 1, laneF: 1,          // 0 far, 1 middle, 2 near
+    duckF: 0,                   // (kept for the art: 1 = bowed low)
     gait: 0, hitCd: 0, dizzy: 0,
     earT: 2, flick: 0, blinkT: 3, blink: 0,
     heeHaw: 0, wave: 0, land: 0,
@@ -306,51 +325,56 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 function buildCourse() {
   obstacles = []; items = [];
   let cloakN = 0;
-  const obs = (type, x) => obstacles.push({ type, x, hit: false, phase: rand(0, TAU), baa: false });
-  const arc = (cx, hi = 0) => {
-    for (const [dx, h] of [[-70, 172], [0, 205], [70, 172]]) items.push({ x: cx + dx, y: h + hi, type: 'palm', got: false });
+  const obs = (type, lane, x, extra = {}) =>
+    obstacles.push({ type, lane, laneF: lane, x, hit: false, phase: rand(0, TAU), baa: false, wt: rand(0.4, 1.2), ...extra });
+  const arc = (cx, lane) => {
+    for (const [dx, h] of [[-70, 172], [0, 205], [70, 172]]) items.push({ x: cx + dx, y: h, lane, type: 'palm', got: false });
   };
-  const row = (x0, n, type, gap = 68) => {
-    for (let i = 0; i < n; i++) items.push({ x: x0 + i * gap, y: 16, type, got: false, c: CLOAK_COLORS[cloakN++ % CLOAK_COLORS.length], rot: rand(-0.3, 0.3) });
+  const row = (x0, lane, n, type, gap = 68) => {
+    for (let i = 0; i < n; i++) items.push({ x: x0 + i * gap, y: 16, lane, type, got: false, c: CLOAK_COLORS[cloakN++ % CLOAK_COLORS.length], rot: rand(-0.3, 0.3) });
   };
+  const others = (l) => [0, 1, 2].filter((k) => k !== l);
+  const anyLane = () => Math.floor(Math.random() * 3);
+  const gift = () => (Math.random() < 0.5 ? 'palm' : 'cloak');
 
+  // Every pattern leaves at least one lane clear, or one that can be hopped
   let x = 950;
   while (x < cfg.len - 750) {
     const v = speedAt(x);
-    if (cfg.combo && Math.random() < cfg.combo) {
+    if (Math.random() < cfg.multi) {
       const pat = Math.floor(Math.random() * 4);
-      if (pat === 0) {          // hop a rock, then duck a branch
-        obs('rock', x); arc(x);
-        x += v * 0.95;
-        obs('branch', x); row(x - 58, 3, 'cloak');
-      } else if (pat === 1) {   // two hops in a row
-        obs(pick(['pothole', 'puddle', 'rock']), x); arc(x);
-        x += v * 1.0;
-        obs(pick(['rock', 'pothole', 'puddle']), x);
-        row(x - v * 0.5 - 29, 2, 'cloak');
-      } else if (pat === 2) {   // duck a branch, then hop a goat or rock
-        obs('branch', x); row(x - 58, 3, 'cloak');
-        x += v * 0.85;
-        obs(pick(['rock', 'goat']), x); arc(x);
-      } else {                  // a fruit cart with a high palm: try the double hop!
-        obs('cart', x); arc(x, 25);
-        items.push({ x, y: 290, type: 'palm', got: false });
+      if (pat === 0) {          // two lanes blocked: find the free one
+        const free = anyLane(), [a, b] = others(free);
+        obs(pick(BLOCKERS), a, x); obs(pick([...BLOCKERS, ...HOPPABLE]), b, x);
+        row(x - 68, free, 3, 'cloak');
+      } else if (pat === 1) {   // a wide fruit cart across two lanes
+        const l = Math.random() < 0.5 ? 0 : 1;
+        obs('cart', l, x);
+        row(x - 100, l === 0 ? 2 : 0, 4, 'palm');
+      } else if (pat === 2) {   // all three lanes: one of them can be hopped
+        const hopL = anyLane();
+        for (const k of [0, 1, 2]) obs(k === hopL ? pick(HOPPABLE) : pick(BLOCKERS), k, x);
+        arc(x, hopL);
+      } else {                  // weave: one lane, then another
+        const a = anyLane(), b = pick(others(a));
+        obs(pick(BLOCKERS), a, x); row(x - 68, b, 2, gift());
+        x += v * 0.8;
+        obs(pick(BLOCKERS), b, x); row(x - 34, pick(others(b)), 2, gift());
       }
     } else {
-      const type = pick(cfg.types);
-      obs(type, x);
-      if (type === 'branch') row(x - 58, 3, 'cloak');
-      else if (Math.random() < 0.65) arc(x, type === 'cart' ? 25 : 0);
-      else row(x + 120, 2, 'cloak');
+      const type = pick(cfg.types), lane = anyLane();
+      obs(type, lane, x, { wander: cfg.wander && type === 'goat' });
+      if (HOPPABLE.includes(type) && Math.random() < 0.6) arc(x, lane);
+      else row(x - 68, pick(others(lane)), 3, gift());
     }
     const gap = rand(cfg.gapMin, cfg.gapMax) * v;
     // cloaks and palms spread on the road between the obstacles (Matthew 21:8)
-    if (gap > 480 && Math.random() < 0.7) row(x + gap * 0.5 - 58, 3, Math.random() < 0.5 ? 'palm' : 'cloak');
+    if (gap > 480 && Math.random() < 0.7) row(x + gap * 0.5 - 68, anyLane(), 3, gift());
     x += gap;
   }
   obstacles.sort((a, b) => a.x - b.x);
   // a final welcoming carpet of cloaks before the gate
-  row(cfg.len - 640, 6, 'cloak');
+  row(cfg.len - 640, 1, 6, 'cloak');
 }
 
 // ============================================================
@@ -396,8 +420,7 @@ function crowdSlots(R) {
   const out = [];
   for (let k = Math.floor((left - R.off) / R.gap); k <= Math.ceil((right - R.off) / R.gap); k++) {
     const p = crowdPerson(R, k);
-    if (R.row === 0 && obstacles.some((o) => o.type === 'branch' && Math.abs(o.x + 36 - p.wx) < 46)) continue; // the tree stands here
-    out.push({ d: p, x: toScreen(p.wx), y: R.y, s: R.s * (p.child ? 0.74 : 1), row: R.row });
+    out.push({ d: p, x: toScreen(p.wx), y: R.row === 0 ? ROAD_TOP + 2 : H - 6, s: R.s * (1 + 0.2 * PZ) * (p.child ? 0.74 : 1), row: R.row });
   }
   return out;
 }
@@ -747,7 +770,7 @@ function leafConfetti(n) {
 // Same art as drawJesus in "Jesus Rises"; origin is where He sits.
 function drawRider(pose, df) {
   ctx.save();
-  ctx.rotate(df * 0.6);      // bows forward to duck under branches
+  ctx.rotate(df * 0.6);      // bows forward when df > 0
   ctx.translate(0, 2);       // the robe's hem sits on the donkey's back
 
   const up = pose === 'joy';
@@ -877,7 +900,7 @@ function riderPose() {
   return 'ride';
 }
 
-function drawDonkey(x, gy) {
+function drawDonkey(x, gy, s) {
   const k = donk;
   const moving = state === 'play' || state === 'title' || (state === 'win' && speed > 15);
   const df = k.duckF;
@@ -886,10 +909,11 @@ function drawDonkey(x, gy) {
 
   // shadow on the road
   ctx.fillStyle = `rgba(80,55,20,${0.28 - Math.min(k.y, 200) / 1000})`;
-  ctx.beginPath(); ctx.ellipse(x + 4, gy + 3, 54 - Math.min(k.y, 200) / 10, 8, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 4 * s, gy + 3, (54 - Math.min(k.y, 200) / 10) * s, 8 * s, 0, 0, TAU); ctx.fill();
 
   ctx.save();
-  ctx.translate(x, gy - k.y);
+  ctx.translate(x, gy - k.y * s);
+  ctx.scale(s, s);
   if (k.hitCd > 0 && state === 'play' && Math.sin(t * 40) > 0.3) ctx.globalAlpha = 0.55;
   ctx.rotate(k.air ? clamp(-k.vy / 3200, -0.16, 0.16) : sitting ? -0.12 : 0);
 
@@ -1061,16 +1085,15 @@ function drawStar(x, y, r, col) {
 
 function updateDonkey(dt) {
   const k = donk;
-  const holdDuck = keys.has('ArrowDown') || keys.has('KeyS');
-  k.duckT = Math.max(0, k.duckT - dt);
-  k.ducking = !k.air && state === 'play' && (holdDuck || k.duckT > 0);
-  k.duckF += ((k.ducking ? 1 : 0) - k.duckF) * Math.min(1, dt * 18);
+  // glide smoothly toward the chosen lane
+  k.laneF += (k.lane - k.laneF) * Math.min(1, dt * 14);
+  if (Math.abs(k.lane - k.laneF) < 0.01) k.laneF = k.lane;
   if (k.air) {
     k.vy -= GRAV * dt;
     k.y += k.vy * dt;
     if (k.y <= 0) {
       k.y = 0; k.vy = 0; k.air = false; k.hops = 0; k.land = 0.12;
-      for (let i = 0; i < 8; i++) spawn(DX() + rand(-40, 40), ROAD_Y, rand(-60, 60), rand(-60, -15), 0.5, '#e9d6a8', rand(3, 6), 60);
+      for (let i = 0; i < 8; i++) spawn(DX() + rand(-40, 40), laneY(k.laneF), rand(-60, 60), rand(-60, -15), 0.5, '#e9d6a8', rand(3, 6), 60);
     }
   }
   k.land = Math.max(0, k.land - dt);
@@ -1087,28 +1110,31 @@ function updateDonkey(dt) {
   if (k.blinkT <= 0) { k.blink = 0.12; k.blinkT = rand(2, 5); }
   if (k.blink > 0) k.blink -= dt;
   // trotting dust
-  if (!k.air && speed > 50 && Math.random() < dt * 10) spawn(DX() - 40, ROAD_Y - 2, rand(-80, -30), rand(-30, -5), 0.6, 'rgba(230,210,160,0.9)', rand(3, 6));
+  if (!k.air && speed > 50 && Math.random() < dt * 10) spawn(DX() - 40, laneY(k.laneF) - 2, rand(-80, -30), rand(-30, -5), 0.6, 'rgba(230,210,160,0.9)', rand(3, 6));
 }
 
 function doJump() {
   const k = donk;
   if (state !== 'play') return;
   if (!k.air) {
-    k.vy = JUMP_V; k.air = true; k.hops = 1; k.duckT = 0; k.flick = 0.3;
+    k.vy = JUMP_V; k.air = true; k.hops = 1; k.flick = 0.3;
     sfx.hop(1);
   } else if (k.hops < 2) {
     k.vy = Math.max(k.vy, 0) * 0.25 + HOP_V; k.hops = 2;
-    for (let i = 0; i < 8; i++) spawn(DX() + rand(-30, 30), ROAD_Y - k.y, rand(-40, 40), rand(40, 110), 0.5, Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', rand(2, 4));
+    for (let i = 0; i < 8; i++) spawn(DX() + rand(-30, 30), laneY(k.laneF) - k.y, rand(-40, 40), rand(40, 110), 0.5, Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', rand(2, 4));
     sfx.hop(1.35);
   }
 }
 
-function doDuck() {
+// Move one lane farther (-1, up the screen) or nearer (+1)
+function changeLane(d) {
   const k = donk;
-  if (state !== 'play') return;
-  if (k.air) { k.vy = Math.min(k.vy, -DROP_V); return; }
-  if (!k.ducking) sfx.duck();
-  k.duckT = DUCK_TIME;
+  if (state !== 'play') return false;
+  const n = clamp(k.lane + d, 0, 2);
+  if (n === k.lane) return false;
+  k.lane = n; k.flick = 0.3;
+  sfx.lane(d);
+  return true;
 }
 
 // ============================================================
@@ -1116,12 +1142,12 @@ function doDuck() {
 // ============================================================
 function obstacleHits(o) {
   const d = OBS[o.type];
+  const lo = o.laneF, hi = o.laneF + d.lanes - 1;
+  if (donk.laneF <= lo - 0.45 || donk.laneF >= hi + 0.45) return false;   // not in its lane(s)
   const sx = toScreen(o.x), x = DX();
   const l = sx - d.w / 2, r = sx + d.w / 2;
-  const top = donk.y + (donk.ducking ? DUCK_TOP : STAND_TOP);
-  if (d.kind === 'ground') return r - 8 > x + HIT_L && l + 8 < x + HIT_R && donk.y < d.h - 6;
   if (d.kind === 'hole') return donk.y < 4 && r - 14 > x - 26 && l + 14 < x + 30;
-  return r - 20 > x - 30 && l + 20 < x + 45 && top > BRANCH_BOT;
+  return r - 8 > x + HIT_L && l + 8 < x + HIT_R && donk.y < d.h - 6;
 }
 
 function drawRock(sx, gy, o) {
@@ -1246,49 +1272,46 @@ function drawCart(sx, gy, o) {
 }
 
 // Low branch: an olive tree beyond the road, its bough stretched across it
-function drawBranchTree(sx, gy) {
-  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 13; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(sx + 38, ROAD_TOP + 2); ctx.quadraticCurveTo(sx + 26, gy - 180, sx + 44, gy - 250); ctx.stroke();
-  ctx.fillStyle = '#6f8a55';
+// A pile of branches cut from the trees and strawed in the way (Matthew 21:8)
+function drawBranchPile(sx, gy, o) {
+  ctx.fillStyle = 'rgba(80,55,20,0.22)';
+  ctx.beginPath(); ctx.ellipse(sx, gy + 3, 56, 8, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineCap = 'round';
+  ctx.lineWidth = 8;
   ctx.beginPath();
-  for (const [dx, dy, r] of [[20, -262, 32], [58, -270, 30], [40, -292, 30], [76, -248, 24], [8, -240, 22]]) {
-    ctx.moveTo(sx + dx + r, gy + dy); ctx.arc(sx + dx, gy + dy, r, 0, TAU);
-  }
-  ctx.fill();
-}
-
-function drawBranchBough(sx, gy) {
-  const by = gy - BRANCH_BOT;
-  const sway = Math.sin(t * 2 + sx * 0.01) * 2;
-  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 8; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(sx + 36, gy - 215); ctx.quadraticCurveTo(sx + 10, by - 40, sx - 56, by - 16 + sway); ctx.stroke();
-  ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(sx + 4, by - 30); ctx.lineTo(sx - 10, by - 6 + sway); ctx.stroke();
-  const leaves = [[-58, -14], [-44, -6], [-30, -12], [-14, -4], [2, -14], [-50, -24], [-20, -26], [14, -30], [-4, -2], [26, -44]];
+  ctx.moveTo(sx - 50, gy - 4); ctx.quadraticCurveTo(sx, gy - 14, sx + 50, gy - 8);
+  ctx.moveTo(sx - 40, gy - 10); ctx.lineTo(sx + 30, gy - 60);
+  ctx.moveTo(sx + 44, gy - 12); ctx.lineTo(sx - 20, gy - 70);
+  ctx.stroke();
+  const sway = Math.sin(t * 2 + o.phase) * 1.5;
+  const leaves = [[-44, -20], [-30, -36], [-12, -52], [6, -70], [24, -56], [38, -30], [14, -34], [-8, -22], [30, -80], [-26, -64], [0, -90], [44, -52], [-46, -44]];
   for (const [dx, dy] of leaves) {
     ctx.fillStyle = '#5f7f45';
-    ctx.beginPath(); ctx.ellipse(sx + dx, by + dy + sway, 12, 6, 0.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + dx + sway, gy + dy, 14, 7, 0.5 + dx * 0.01, 0, TAU); ctx.fill();
     ctx.fillStyle = '#8fae6b';
-    ctx.beginPath(); ctx.ellipse(sx + dx + 3, by + dy - 3 + sway, 7, 3, 0.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + dx + 3 + sway, gy + dy - 3, 8, 3.5, 0.5, 0, TAU); ctx.fill();
   }
-  // olives
   ctx.fillStyle = '#4a5a2a';
-  for (const [dx, dy] of [[-36, -2], [-8, 4], [-48, 2]]) { ctx.beginPath(); ctx.arc(sx + dx, by + dy + sway, 3, 0, TAU); ctx.fill(); }
+  for (const [dx, dy] of [[-20, -40], [10, -58], [30, -40], [-4, -76]]) { ctx.beginPath(); ctx.arc(sx + dx, gy + dy, 3, 0, TAU); ctx.fill(); }
 }
 
-function drawObstacle(o, layer) {
-  const sx = toScreen(o.x), gy = ROAD_Y;
+
+
+function drawObstacle(o) {
+  const sx = toScreen(o.x);
   if (sx < -offX - 150 || sx > W + offX + 150) return;
-  if (o.type === 'branch') {
-    if (layer === 'back') drawBranchTree(sx, gy); else drawBranchBough(sx, gy);
-    return;
-  }
-  if (layer !== 'mid') return;
-  if (o.type === 'rock') drawRock(sx, gy, o);
-  else if (o.type === 'pothole') drawPothole(sx, gy, o);
-  else if (o.type === 'puddle') drawPuddle(sx, gy, o);
-  else if (o.type === 'goat') drawGoat(sx, gy, o);
-  else if (o.type === 'cart') drawCart(sx, gy, o);
+  const d = OBS[o.type];
+  const lf = o.laneF + (d.lanes - 1) / 2;     // a cart stands between its two lanes
+  const s = laneS(lf) * (o.type === 'cart' ? 1.2 : 1);
+  ctx.save();
+  ctx.translate(sx, laneY(lf)); ctx.scale(s, s);
+  if (o.type === 'rock') drawRock(0, 0, o);
+  else if (o.type === 'pothole') drawPothole(0, 0, o);
+  else if (o.type === 'puddle') drawPuddle(0, 0, o);
+  else if (o.type === 'goat') drawGoat(0, 0, o);
+  else if (o.type === 'cart') drawCart(0, 0, o);
+  else if (o.type === 'branch') drawBranchPile(0, 0, o);
+  ctx.restore();
 }
 
 function drawCloakOnRoad(x, y, c, rot) {
@@ -1320,29 +1343,30 @@ function drawCloakOnRoad(x, y, c, rot) {
 function drawItem(it) {
   const sx = toScreen(it.x);
   if (it.got || sx < -offX - 60 || sx > W + offX + 60) return;
+  const s = laneS(it.lane);
+  ctx.save();
+  ctx.translate(sx, laneY(it.lane)); ctx.scale(s, s);
   if (it.y < 40) {
     // laid on the road
-    if (it.type === 'cloak') drawCloakOnRoad(sx, ROAD_Y + 2, it.c, it.rot);
-    else {
-      ctx.save(); ctx.translate(sx, ROAD_Y + 2); ctx.scale(1, 0.45);
-      drawPalm(-26, 0, 54, Math.PI / 2 + it.rot, 3);
-      ctx.restore();
-    }
-    return;
+    if (it.type === 'cloak') drawCloakOnRoad(0, 2, it.c, it.rot);
+    else { ctx.translate(0, 2); ctx.scale(1, 0.45); drawPalm(-26, 0, 54, Math.PI / 2 + it.rot, 3); }
+  } else {
+    // a palm branch waved high: hop to catch it!
+    const y = -it.y + Math.sin(t * 3 + it.x) * 4;
+    const g = ctx.createRadialGradient(0, y, 2, 0, y, 26);
+    g.addColorStop(0, 'rgba(255,245,180,0.8)'); g.addColorStop(1, 'rgba(255,245,180,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, y, 26, 0, TAU); ctx.fill();
+    drawPalm(-4, y + 18, 40, 0.3 + Math.sin(t * 4 + it.x) * 0.15, 5);
   }
-  // a palm branch waved high: hop to catch it!
-  const y = ROAD_Y - it.y + Math.sin(t * 3 + it.x) * 4;
-  const g = ctx.createRadialGradient(sx, y, 2, sx, y, 26);
-  g.addColorStop(0, 'rgba(255,245,180,0.8)'); g.addColorStop(1, 'rgba(255,245,180,0)');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(sx, y, 26, 0, TAU); ctx.fill();
-  drawPalm(sx - 4, y + 18, 40, 0.3 + Math.sin(t * 4 + it.x) * 0.15, 5);
+  ctx.restore();
 }
 
 function itemHit(it) {
+  if (Math.abs(donk.laneF - it.lane) > 0.45) return false;
   const sx = toScreen(it.x), x = DX();
   if (sx < x + HIT_L - 14 || sx > x + HIT_R + 22) return false;
-  const top = donk.y + (donk.ducking ? DUCK_TOP : STAND_TOP);
+  const top = donk.y + STAND_TOP;
   return it.y - 16 < top && it.y + 16 > donk.y - 6;
 }
 
@@ -1404,7 +1428,7 @@ function collect(it) {
   const mult = Math.min(1 + Math.floor(combo / 5), 4);
   const pts = (it.type === 'cloak' ? 20 : 10) * mult;
   levelPoints += pts;
-  const y = ROAD_Y - Math.max(it.y, 30);
+  const y = laneY(it.lane) - Math.max(it.y, 30) * laneS(it.lane);
   popups.push({ wx: it.x, y: y - 20, text: `+${pts}`, t: 0.9, color: mult > 1 ? '#c2410c' : '#2b8a3e' });
   for (let i = 0; i < 8; i++) {
     spawn(toScreen(it.x), y, rand(-80, 80), rand(-120, -20), 0.6, i % 2 ? '#6fd04f' : '#ffe27a', rand(2, 4), 120);
@@ -1418,7 +1442,7 @@ function collect(it) {
     sfx.hosanna();
     if (combo % 10 === 0) {
       donk.heeHaw = 0.9;
-      addBubble(dist + 60, ROAD_Y - 190, 'Hee-haw!', 1.1, '#fff4e0');
+      addBubble(dist + 60, laneY(donk.laneF) - 190, 'Hee-haw!', 1.1, '#fff4e0');
       sfx.heeHaw();
       showMessage(`Hosanna combo ×${combo}!`);
     }
@@ -1436,14 +1460,14 @@ function bump(o) {
   shockT = 0.9; worriedT = 2.2; cheerT = 0; shakeT = 0.35;
   bubbles.length = 0;       // the cheer scatters
   for (const p of crowdCache.values()) p.joyT = 0;
-  if (!donk.air && o.type !== 'branch') { donk.vy = 320; donk.air = true; donk.hops = 2; }   // stumble
-  const x = DX() + 40, y = ROAD_Y - 40;
+  if (!donk.air) { donk.vy = 320; donk.air = true; donk.hops = 2; }   // stumble
+  const gy = laneY(donk.laneF), x = DX() + 40, y = gy - 40;
   if (o.type === 'puddle') {
-    for (let i = 0; i < 18; i++) spawn(x, ROAD_Y, rand(-120, 120), rand(-260, -80), 0.8, '#7cc4f2', rand(3, 6), 600);
+    for (let i = 0; i < 18; i++) spawn(x, gy, rand(-120, 120), rand(-260, -80), 0.8, '#7cc4f2', rand(3, 6), 600);
   } else if (o.type === 'cart') {
-    for (let i = 0; i < 10; i++) spawn(x + 20, ROAD_Y - 60, rand(-100, 160), rand(-260, -80), 1.2, i % 3 ? '#f28c28' : '#7b4fa0', rand(5, 8), 700);
+    for (let i = 0; i < 10; i++) spawn(x + 20, gy - 60, rand(-100, 160), rand(-260, -80), 1.2, i % 3 ? '#f28c28' : '#7b4fa0', rand(5, 8), 700);
   } else if (o.type === 'branch') {
-    for (let i = 0; i < 12; i++) spawn(x, ROAD_Y - BRANCH_BOT, rand(-80, 80), rand(-40, 80), 1, '#6f8a55', rand(3, 5), 120);
+    for (let i = 0; i < 12; i++) spawn(x, gy - 50, rand(-100, 100), rand(-160, -20), 1, '#6f8a55', rand(3, 5), 120);
   } else {
     for (let i = 0; i < 12; i++) spawn(x, y, rand(-100, 100), rand(-160, -20), 0.7, '#e9d6a8', rand(3, 6), 300);
   }
@@ -1465,7 +1489,7 @@ function win() {
   totalScore += score;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('palmSundayBest', best); } catch (e) {} }
   lastScore = { collected, points, maxCombo, comboBonus, noBump, heartBonus, levelBonus, score };
-  donk.heeHaw = 1.2; donk.y = Math.max(0, donk.y);
+  donk.heeHaw = 1.2; donk.y = Math.max(0, donk.y); donk.lane = 1;   // into the gateway
   leafConfetti(60);
   showMessage('Hosanna in the highest!');
   sfx.win();
@@ -1474,7 +1498,6 @@ function win() {
 
 function fail() {
   state = 'fail';
-  donk.duckT = 0;
   bubbles.length = 0;
   showMessage('Oh… no');
   sfx.fail();
@@ -1520,10 +1543,10 @@ function titleScreen() {
     `<p class="verse">"Hosanna to the Son of David: Blessed is he that cometh in the name of the Lord; Hosanna in the highest." &mdash; Matthew 21:9</p>
      <ul>
        <li>Jesus rides a little donkey down from the Mount of Olives to <b>the gate of Jerusalem</b>.</li>
-       <li><b>Touch:</b> tap the <b>top</b> of the screen to <b>hop</b> (tap again in mid-air for a little double hop). Tap the <b>bottom</b> to <b>duck</b> under low branches.</li>
-       <li><b>Keyboard:</b> <kbd>&uarr;</kbd> / <kbd>Space</kbd> to hop, <kbd>&darr;</kbd> to duck.</li>
+       <li><b>Touch:</b> keep your finger on the screen and <b>slide it up or down</b> to move the donkey between the <b>3 lanes</b>. <b>Flick up</b> quickly to <b>hop</b>.</li>
+       <li><b>Keyboard:</b> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> to change lanes, <kbd>Space</kbd> to hop. (With a mouse, hold the button and drag.)</li>
        <li>Collect <b>palm branches</b> and <b>cloaks</b> to make the crowd cry "Hosanna!" Keep the combo going!</li>
-       <li>Hop over rocks, potholes, puddles, stubborn goats and fruit carts. Three bumps and the donkey gets too dizzy!</li>
+       <li>Hop over rocks, puddles and potholes. Steer round stubborn goats, piles of branches and wide fruit carts. Three bumps and the donkey gets too dizzy!</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
     'Ride into Jerusalem', () => { level = 1; totalScore = 0; startLevel(); });
@@ -1537,15 +1560,16 @@ function startLevel() {
   particles = []; bubbles = []; popups = [];
   crowdCache.clear();
   ripples.length = 0;
+  drag.id = null;
   hearts = MAX_HEARTS; bumps = 0; combo = 0; maxCombo = 0; levelPoints = 0; collected = 0;
   shockT = worriedT = cheerT = flashT = shakeT = 0;
-  hintT = level === 1 ? 6.5 : 0;
+  hintT = level === 1 ? 7 : 0;
   state = 'play';
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
   sfx.levelStart();
   if (level === 1 && !matchMedia('(pointer: coarse)').matches) {
-    setTimeout(() => { if (state === 'play' && dist < 2000) showMessage('↑ / Space to hop, ↓ to duck'); }, 2300);
+    setTimeout(() => { if (state === 'play' && dist < 2000) showMessage('↑ / ↓ change lanes · Space to hop'); }, 2300);
   }
 }
 
@@ -1595,8 +1619,9 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { sfx.toggleMute(); return; }
   if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
   if (state === 'play' && !e.repeat) {
-    if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') doJump();
-    if (e.code === 'ArrowDown' || e.code === 'KeyS') doDuck();
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') changeLane(-1);
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') changeLane(1);
+    if (e.code === 'Space') doJump();
   }
   keys.add(e.code);
 });
@@ -1607,8 +1632,18 @@ function toPlayfield(e) {
   return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
 }
 
-// Where the screen splits into the "hop" zone (above) and the "duck" zone (below)
-const splitY = () => offY + ROAD_TOP - 30;
+// Steering: keep a finger (or the mouse button) down and slide it up or down.
+// Every LANE_STEP_PX of drag changes one lane, re-anchoring after each change.
+// A quick upward flick is a hop. (Press-and-drag is this game's one exception
+// to the collection's tap-only controls, at the user's request.)
+const drag = { id: null, anchorY: 0, startY: 0, startT: 0, startLane: 1, hist: [], lastHop: -1e9, hopped: false };
+
+function flickHop(lane, now) {
+  if (now - drag.lastHop < 220) return;
+  donk.lane = lane;          // undo any lane change the flick itself made
+  doJump();
+  drag.lastHop = now; drag.hopped = true;
+}
 
 canvas.addEventListener('pointerdown', (e) => {
   sfx.init();
@@ -1617,13 +1652,47 @@ canvas.addEventListener('pointerdown', (e) => {
   for (const b of hudButtons()) {
     if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
   }
-  if (state !== 'play') return;
-  const duck = p.vy >= splitY();
-  if (duck) doDuck(); else doJump();
-  ripples.push({ x: p.x, y: p.y, t: 0, duck });
+  if (state !== 'play' || drag.id !== null) return;   // one finger steers
+  drag.id = e.pointerId;
+  drag.anchorY = drag.startY = e.clientY;
+  drag.startT = e.timeStamp; drag.startLane = donk.lane; drag.hopped = false;
+  drag.hist = [{ t: e.timeStamp, y: e.clientY, lane: donk.lane }];
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  ripples.push({ x: p.x, y: p.y, t: 0 });
 });
-// iOS only unlocks audio on some gestures, so try again when the finger lifts
-canvas.addEventListener('pointerup', () => sfx.init());
+
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== drag.id || state !== 'play') return;
+  const now = e.timeStamp, y = e.clientY;
+  drag.hist.push({ t: now, y, lane: donk.lane });
+  while (drag.hist.length > 2 && now - drag.hist[0].t > 150) drag.hist.shift();
+  // a quick upward flick = hop
+  const h0 = drag.hist[0];
+  const up = h0.y - y;
+  if (up > FLICK_MIN && up / Math.max(1, now - h0.t) > FLICK_V) {
+    flickHop(h0.lane, now);
+    drag.anchorY = y;
+    drag.hist = [{ t: now, y, lane: donk.lane }];
+    return;
+  }
+  // slide = change lanes
+  while (Math.abs(y - drag.anchorY) >= LANE_STEP_PX) {
+    const dir = y < drag.anchorY ? -1 : 1;
+    changeLane(dir);
+    drag.anchorY += dir * LANE_STEP_PX;
+  }
+});
+
+function endDrag(e) {
+  sfx.init();   // iOS only unlocks audio on some gestures, so try again when the finger lifts
+  if (e.pointerId !== drag.id) return;
+  // a short, quick upward swipe that ended before a move event caught its speed
+  const dur = e.timeStamp - drag.startT, up = drag.startY - e.clientY;
+  if (state === 'play' && !drag.hopped && dur < 300 && up > 35 && up / Math.max(1, dur) > 0.3) flickHop(drag.startLane, e.timeStamp);
+  drag.id = null;
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
 
 // iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
 // the long-press menu from hijacking rapid taps. The viewport tag is untouched.
@@ -1864,7 +1933,7 @@ Object.assign(sfx, {
     playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, ((n - 1) % 5) / 4);
   },
   hop(p) { this.puff(0.16); this.tone(300 * p, 0.14, 'sine', 0.16, 0, 560 * p); },
-  duck() { this.tone(420, 0.12, 'sine', 0.12, 0, 240); },
+  lane(d) { this.puff(0.08); this.tone(d < 0 ? 380 : 330, 0.1, 'sine', 0.1, 0, d < 0 ? 540 : 230); },
   bump() { this.bounce(); this.puff(0.4); },
   heeHaw() {
     // a happy "hee-haw, hee-haw!"
@@ -1998,6 +2067,8 @@ function drawOliveTree(x, y, s) {
 }
 
 function drawLand(p) {
+  ctx.save();
+  ctx.translate(0, ROAD_TOP - 650);
   // distant Judean hills
   ctx.fillStyle = '#cfd9a3';
   hillLine(0.06, 570, 22, 170, 7, 61);
@@ -2011,6 +2082,7 @@ function drawLand(p) {
     const x = k * gap + hrand(k, 6) * 80 - dist * 0.3;
     drawOliveTree(x, 630 + hrand(k, 7) * 10, 0.55 + hrand(k, 8) * 0.25);
   }
+  ctx.restore();
   // grass beside the road
   ctx.fillStyle = '#93c46a';
   ctx.fillRect(-offX, ROAD_TOP - 18, viewW, 20);
@@ -2029,6 +2101,16 @@ function drawLand(p) {
     const x = toScreen(k * pg + hrand(k, 1) * 30), y = ROAD_TOP + 12 + hrand(k, 2) * (ROAD_BOT - ROAD_TOP - 24);
     ctx.beginPath(); ctx.ellipse(x, y, 1.5 + hrand(k, 3) * 2.5, 1 + hrand(k, 3) * 1.4, 0, 0, TAU); ctx.fill();
   }
+  // the three lanes: soft cart ruts between them
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(-offX, (LANE_Y[0] + LANE_Y[1]) / 2, viewW, LANE_Y[1] - LANE_Y[0]);
+  ctx.strokeStyle = 'rgba(160,125,70,0.35)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const by of [(LANE_Y[0] + LANE_Y[1]) / 2, (LANE_Y[1] + LANE_Y[2]) / 2]) {
+    const ph = ((dist % 90) + 90) % 90;
+    for (let x = -offX - ph; x < W + offX + 90; x += 90) { ctx.moveTo(x, by); ctx.lineTo(x + 50, by); }
+  }
+  ctx.stroke();
   // near verge
   ctx.fillStyle = '#86b95d';
   ctx.fillRect(-offX, ROAD_BOT, viewW, H - ROAD_BOT + 20);
@@ -2039,7 +2121,7 @@ function drawLand(p) {
 // The gate of Jerusalem: the finish line
 function drawGate(gx) {
   if (state === 'title' || gx > W + offX + 160) return;
-  const gy = ROAD_Y + 6, right = W + offX + 10;
+  const gy = LANE_Y[1] + 8, right = W + offX + 10;
   const stone = ctx.createLinearGradient(0, gy - 340, 0, gy);
   stone.addColorStop(0, '#f3e2b8'); stone.addColorStop(1, '#d2b57c');
   ctx.fillStyle = stone; ctx.strokeStyle = '#a88a55'; ctx.lineWidth = 2;
@@ -2179,24 +2261,31 @@ function drawHUD() {
     ctx.beginPath(); ctx.arc(mx, y - 2, 4, 0, TAU); ctx.stroke();
   }
 
-  // Level 1: show where to tap
+  // Level 1: teach the steering
   if (hintT > 0 && state === 'play') {
     const a = Math.min(1, hintT / 0.6);
-    const sy = splitY();
+    const touch = matchMedia('(pointer: coarse)').matches;
+    const lines = touch
+      ? ['Slide your finger up and down', 'to change lanes · flick up to hop']
+      : ['↑ / ↓ (or drag the mouse) to change lanes', 'Space (or flick the mouse up) to hop'];
     ctx.globalAlpha = a;
-    ctx.setLineDash([10, 8]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(viewW, sy); ctx.stroke();
-    ctx.setLineDash([]);
     ctx.textAlign = 'center';
     ctx.font = '700 19px Fredoka, sans-serif';
-    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineJoin = 'round';
-    ctx.fillStyle = '#2b6a1e';
-    ctx.strokeText('↑ Tap up here to HOP', viewW / 2, sy - 16);
-    ctx.fillText('↑ Tap up here to HOP', viewW / 2, sy - 16);
-    ctx.fillStyle = '#8a4a10';
-    ctx.strokeText('Tap down here to DUCK ↓', viewW / 2, sy + 30);
-    ctx.fillText('Tap down here to DUCK ↓', viewW / 2, sy + 30);
+    const bw = Math.min(viewW - 20, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 30);
+    const by = offY + ROAD_TOP - 205;
+    ctx.fillStyle = 'rgba(255,252,240,0.9)'; ctx.strokeStyle = 'rgba(224,165,38,0.8)'; ctx.lineWidth = 2.5;
+    roundRect(viewW / 2 - bw / 2, by - 26, bw, 62, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#6a4a10';
+    ctx.fillText(lines[0], viewW / 2, by);
+    ctx.fillText(lines[1], viewW / 2, by + 26);
+    // bouncing up / down arrows beside the donkey
+    const ax = offX + DX() + 92, ay = offY + laneY(donk.laneF) - 80, bob = Math.sin(t * 6) * 5;
+    ctx.fillStyle = '#e0a526'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    for (const dir of [-1, 1]) {
+      const y = ay + dir * (34 + bob);
+      ctx.beginPath(); ctx.moveTo(ax - 13, y - dir * 8); ctx.lineTo(ax, y + dir * 7); ctx.lineTo(ax + 13, y - dir * 8); ctx.closePath();
+      ctx.stroke(); ctx.fill();
+    }
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -2210,9 +2299,9 @@ function drawMessage() {
   ctx.textAlign = 'center';
   ctx.font = '700 24px Fredoka, sans-serif';
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
-  ctx.strokeText(message.text, W / 2, H * 0.4);
+  ctx.strokeText(message.text, W / 2, ROAD_TOP - 250);
   ctx.fillStyle = '#7a5200';
-  ctx.fillText(message.text, W / 2, H * 0.4);
+  ctx.fillText(message.text, W / 2, ROAD_TOP - 250);
   ctx.restore();
 }
 
@@ -2223,24 +2312,27 @@ function render() {
   if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
   ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
 
-  jesus.x = DX(); jesus.y = ROAD_Y - donk.y - 90;
+  jesus.x = DX(); jesus.y = laneY(donk.laneF) - donk.y - 90;
   drawSky();
   drawLand(state === 'title' ? 0.05 : clamp(dist / cfg.len, 0, 1));
 
   for (const s of crowdSlots(ROWS[0])) drawPerson(s);
-  for (const o of obstacles) drawObstacle(o, 'back');
   drawGate(toScreen(cfg.len));
-  for (const it of items) drawItem(it);
-  for (const o of obstacles) drawObstacle(o, 'mid');
-  drawDonkey(DX(), ROAD_Y);
-  for (const o of obstacles) drawObstacle(o, 'front');
+  // far lane first, so things in nearer lanes draw in front
+  const list = [];
+  const onScreen = (wx) => { const sx = toScreen(wx); return sx > -offX - 160 && sx < W + offX + 160; };
+  for (const it of items) if (!it.got && onScreen(it.x)) list.push([it.lane - (it.y < 40 ? 0.03 : 0.02), it, drawItem]);
+  for (const o of obstacles) if (onScreen(o.x)) list.push([o.laneF + (OBS[o.type].lanes - 1) / 2, o, drawObstacle]);
+  list.push([donk.laneF + 0.01, null, () => drawDonkey(DX(), laneY(donk.laneF), laneS(donk.laneF))]);
+  list.sort((a, b) => a[0] - b[0]);
+  for (const [, obj, fn] of list) fn(obj);
   drawParticles();
   for (const s of crowdSlots(ROWS[1])) drawPerson(s);
   drawBubbles();
 
   // Tap ripples
   for (const r of ripples) {
-    ctx.strokeStyle = r.duck ? `rgba(255,220,160,${0.8 * (1 - r.t / 0.4)})` : `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
   }
@@ -2266,14 +2358,20 @@ function updatePlay(dt) {
   updateDonkey(dt);
   hintT = Math.max(0, hintT - dt);
 
-  // stubborn goats wander toward the donkey and bleat
+  // stubborn goats plod toward the donkey, bleat, and (later levels) wander between lanes
   for (const o of obstacles) {
     if (o.type !== 'goat' || o.hit) continue;
     const sx = toScreen(o.x);
     if (sx < W + offX + 100 && sx > DX() + 90) {
       o.x -= 20 * dt;
-      if (!o.baa && sx < W - 40) { o.baa = true; addBubble(o.x - 20, ROAD_Y - 90, 'Baa!', 1.1, '#fff'); sfx.baa(); }
+      if (!o.baa && sx < W - 40) { o.baa = true; addBubble(o.x - 20, laneY(o.laneF) - 90, 'Baa!', 1.1, '#fff'); sfx.baa(); }
+      // it settles into a lane once it is close, so there is time to steer round it
+      if (o.wander && sx > DX() + 260) {
+        o.wt -= dt;
+        if (o.wt <= 0) { o.wt = rand(0.8, 1.6); o.lane = clamp(o.lane + pick([-1, 1]), 0, 2); }
+      }
     }
+    o.laneF += (o.lane - o.laneF) * Math.min(1, dt * 4);
   }
 
   if (donk.hitCd <= 0) {
@@ -2302,7 +2400,7 @@ function update(dt) {
     dist += (cfg.len - dist) * Math.min(1, dt * 2.2);
     speed = (dist - before) / dt;
     updateDonkey(dt);
-    if (winStep === 0 && winT > 0.5) { addBubble(dist + 150, ROAD_Y - 280, 'Who is this?', 2.6); winStep = 1; }
+    if (winStep === 0 && winT > 0.5) { addBubble(dist + 150, LANE_Y[1] - 280, 'Who is this?', 2.6); winStep = 1; }
     if (winStep === 1 && winT > 1.9) { addBubble(dist - 50, H - 92, 'This is Jesus the prophet\nof Nazareth of Galilee.', 3); winStep = 2; }
     if (Math.random() < dt * 5) leafConfetti(2);
   } else if (state === 'fail') {
