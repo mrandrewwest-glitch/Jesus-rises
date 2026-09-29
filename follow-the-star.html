@@ -283,18 +283,20 @@ const LEVEL_NAMES = [
 function makeConfig(n) {
   return {
     name: LEVEL_NAMES[n - 1] || `Journey ${n}`,
-    speed: Math.min(150 + (n - 1) * 15, 240),
-    leg1: 2800 + (n - 1) * 500,                        // distance to Jerusalem
-    leg2: n === 1 ? 3000 : 3600 + (n - 1) * 700,        // Jerusalem to Bethlehem
+    speed: Math.min(150 + (n - 1) * 14, 235),
+    leg1: 5600 + (n - 1) * 1300,                       // distance to Jerusalem
+    leg2: n === 1 ? 6000 : 7600 + (n - 1) * 1500,       // Jerusalem to Bethlehem
     amp: Math.min(0.6 + (n - 1) * 0.12, 1),              // how far the star wanders
     starSpeed: Math.min(0.28 + (n - 1) * 0.07, 0.7),
     hwF: Math.max(0.62 - (n - 1) * 0.07, 0.32),         // width of the beam
     fill: 22,
-    drain: Math.min(8 + (n - 1) * 3, 22),
-    gap: Math.max(620 - (n - 1) * 70, 320),
-    types: n === 1 ? ['rock', 'cactus', 'dune'] : ['rock', 'cactus', 'dune', 'snake'],
+    drain: Math.min(7 + (n - 1) * 3, 21),
+    gap: Math.max(600 - (n - 1) * 60, 320),
+    waterEvery: n === 1 ? 3 : 4,                        // obstacle groups between water jugs
+    critters: n >= 2,                                   // snakes and rolling tumbleweeds
+    trails: 2 + Math.min(n - 1, 2),                     // star-sparkle bonus trails
     multi: n === 1 ? 0 : Math.min(0.2 + (n - 2) * 0.12, 0.6),   // chance of a two-path block
-    storms: n >= 3 ? Math.min(n - 2, 3) : 0,
+    storms: n >= 3 ? Math.min(n - 1, 5) : 0,
     stormDur: Math.min(2.6 + (n - 3) * 0.3, 3.8),
     fork: n >= 2,
   };
@@ -314,7 +316,8 @@ let t = 0;
 let dist = 0, speed = 0;
 let herodAt = 0, endAt = 0, herodDone = false;
 let guidance = 80, inBeam = false, playT = 0, inBeamT = 0;
-let bumps = 0, giftPts = 0, got = { coin: 0, frank: 0, myrrh: 0, water: 0 };
+let bumps = 0, giftPts = 0, got = { coin: 0, frank: 0, myrrh: 0, water: 0, dates: 0, spark: 0 };
+let segments = [], oases = [], friends = [], decor = [], trails = [], segKind = '';
 let fork = null, forkChosen = false;
 let obstacles = [], items = [], storms = [], particles = [], floaters = [], sand = [];
 let stormA = 0;
@@ -784,62 +787,183 @@ const OBST = {
   cactus: { w: 42 },
   snake:  { w: 58 },
   dune:   { w: 130 },
+  bush:   { w: 46 },    // a prickly camel-thorn bush
+  ruin:   { w: 60 },    // a fallen stone pillar
+  tumble: { w: 44 },    // a tumbleweed that rolls toward you
 };
 const ITEMS = {
   coin:  { pts: 50, label: '+50' },
   frank: { pts: 75, label: '+75' },
   myrrh: { pts: 75, label: '+75' },
   water: { pts: 30, label: 'Water!' },
+  dates: { pts: 40, label: '+40' },
+  spark: { pts: 25, label: '+25' },
 };
 
+// ------------------------------------------------------------
+//  The route: stretches of scenery from the East to Bethlehem
+// ------------------------------------------------------------
+const SEG_NAMES = {
+  dunes: 'Rolling dunes', wadi: 'A rocky wadi', oasis: 'An oasis ahead!', salt: 'The starry salt flat',
+  hills: 'The hills of Judaea', jerusalem: 'Jerusalem is near!', bethlehem: 'Nearly at Bethlehem!',
+};
+// the obstacles you meet on each stretch
+const SEG_TYPES = {
+  dunes: ['dune', 'cactus', 'bush', 'rock', 'dune'],
+  wadi: ['rock', 'ruin', 'rock', 'snake', 'bush'],
+  oasis: ['bush', 'rock', 'cactus'],
+  salt: ['rock', 'ruin', 'tumble', 'tumble'],
+  hills: ['bush', 'rock', 'snake', 'tumble'],
+  jerusalem: ['ruin', 'rock', 'bush'],
+  bethlehem: ['bush', 'rock', 'cactus'],
+};
+// ground colours (top, middle, bottom) for each stretch
+const SEG_GROUND = {
+  dunes: ['#6f5d78', '#98806f', '#b8986e'],
+  wadi: ['#684c5c', '#8c6560', '#a87a60'],
+  oasis: ['#5e6274', '#87826c', '#a9976e'],
+  salt: ['#8a87a8', '#b8b3cb', '#d8d2de'],
+  hills: ['#605f74', '#88816e', '#a59370'],
+  jerusalem: ['#6d5e78', '#978070', '#b5976e'],
+  bethlehem: ['#586176', '#7c886c', '#9da070'],
+};
+
+function buildRoute() {
+  const L1 = herodAt, L2 = endAt - herodAt;
+  const seg = (a, b, kind) => ({ a, b, kind });
+  segments = [
+    seg(-1e5, 0.27 * L1, 'dunes'), seg(0.27 * L1, 0.5 * L1, 'wadi'), seg(0.5 * L1, 0.64 * L1, 'oasis'),
+    seg(0.64 * L1, 0.84 * L1, 'salt'), seg(0.84 * L1, L1 + 300, 'jerusalem'),
+    seg(L1 + 300, L1 + 0.24 * L2, 'hills'), seg(L1 + 0.24 * L2, L1 + 0.38 * L2, 'oasis'),
+    seg(L1 + 0.38 * L2, L1 + 0.66 * L2, 'dunes'), seg(L1 + 0.66 * L2, L1 + 0.8 * L2, 'hills'),
+    seg(L1 + 0.8 * L2, endAt + 1e5, 'bethlehem'),
+  ];
+  // two restful oasis stops, one on each half of the journey
+  oases = [{ at: 0.57 * L1, done: false }, { at: L1 + 0.31 * L2, done: false }];
+  // friendly desert creatures who trot alongside for a while
+  friends = [
+    { type: 'fox', at: 0.15 * L1, st: 0, t: 0, x: -80 },
+    { type: 'calf', at: L1 + 0.12 * L2, st: 0, t: 0, x: -80 },
+    { type: 'fox', at: L1 + 0.7 * L2, st: 0, t: 0, x: -80 },
+  ];
+  segKind = '';
+}
+function segAt(d) {
+  for (const sg of segments) if (d >= sg.a && d < sg.b) return sg;
+  return segments[segments.length - 1];
+}
+// How strongly each stretch's scenery shows at distance d (500px cross-fades)
+function biomeW(d) {
+  const w = {};
+  for (const sg of segments) {
+    const f = clamp((d - sg.a + 250) / 500, 0, 1) * clamp((sg.b - d + 250) / 500, 0, 1);
+    if (f > 0) w[sg.kind] = (w[sg.kind] || 0) + f;
+  }
+  return w;
+}
+function mixHex(w, idx) {
+  let r = 0, g = 0, b = 0, sum = 0;
+  for (const k in w) {
+    const n = parseInt(SEG_GROUND[k][idx].slice(1), 16);
+    r += (n >> 16) * w[k]; g += ((n >> 8) & 255) * w[k]; b += (n & 255) * w[k]; sum += w[k];
+  }
+  sum = sum || 1;
+  return `rgb(${Math.round(r / sum)},${Math.round(g / sum)},${Math.round(b / sum)})`;
+}
+function nextStopAt() {
+  let at = herodDone ? endAt : herodAt;
+  for (const o of oases) if (!o.done && o.at < at) at = o.at;
+  return at;
+}
+function poolScreenX(o) { return o.at + W * 0.66 - dist; }
+
+// Scenery props placed along the route (x is in the prop's own parallax layer)
+function buildDecor() {
+  decor = [];
+  for (const sg of segments) {
+    const a = Math.max(sg.a, -400), b = Math.min(sg.b, endAt + 400);
+    if (sg.kind === 'wadi') {
+      for (let d = a - 400; d < b; d += rand(240, 380)) decor.push({ k: 'cliff', f: 0.32, x: d * 0.32 + rand(0, 700), w: rand(150, 280), h: rand(70, 140), seed: rand(0, 99) });
+    }
+    if (sg.kind === 'oasis') {
+      for (let d = a; d < b; d += rand(200, 340)) decor.push({ k: 'palm', f: 1, x: d + rand(0, 900), s: rand(0.8, 1.15) });
+      for (let d = a - 300; d < b; d += rand(300, 500)) decor.push({ k: 'palmS', f: 0.45, x: d * 0.45 + rand(0, 700), s: rand(0.8, 1.1) });
+    }
+    if (sg.kind === 'hills' || sg.kind === 'bethlehem') {
+      for (let d = a + 600; d < Math.min(b, endAt - 200); d += rand(260, 480)) decor.push({ k: 'olive', f: 1, x: d + rand(0, 900), s: rand(0.8, 1.1) });
+    }
+    if (sg.kind === 'bethlehem' || (sg.kind === 'hills' && sg.a > herodAt + 0.5 * (endAt - herodAt))) {
+      for (let d = a; d < b; d += rand(500, 800)) decor.push({ k: Math.random() < 0.7 ? 'sheep' : 'fire', f: 0.6, x: d * 0.6 + rand(0, 700), n: 3 + Math.floor(rand(0, 3)), seed: rand(0, 99) });
+    }
+    if (sg.kind === 'dunes') {
+      for (let d = a + 400; d < b; d += rand(1200, 1800)) decor.push({ k: 'tent', f: 0.6, x: d * 0.6 + rand(0, 700), c: pick(['#c0392b', '#2f8f83', '#7b3fa0']) });
+    }
+  }
+}
+
 function buildLevel() {
-  obstacles = []; items = []; storms = [];
-  const legs = [[1000, herodAt - 150], [herodAt + 1400, endAt - 150]];
+  obstacles = []; items = []; storms = []; trails = [];
+  buildRoute();
+  buildDecor();
   const r = range();
   fork = null;
-  if (cfg.fork) {
-    const a = legs[1][0], b = legs[1][1];
-    fork = { x: a + (b - a) * 0.5, side: Math.random() < 0.5 ? 0 : 2, done: false, pending: false, tries: 0 };
+  if (cfg.fork) fork = { x: herodAt + 0.52 * (endAt - herodAt) + 700, side: Math.random() < 0.5 ? 0 : 2, done: false, pending: false, tries: 0 };
+  // stretches kept clear: the start, Jerusalem, the oases, the fork and Bethlehem
+  const zones = [[-1e9, 1000], [herodAt - 150, herodAt + 1400], [endAt - 150, 1e12]];
+  for (const o of oases) zones.push([o.at - 150, o.at + 1450]);
+  if (fork) zones.push([fork.x - 1000, fork.x + 750]);
+  // star-sparkle trails: optional arcs of twinkles in one path
+  for (let k = 0; k < cfg.trails; k++) {
+    let x = lerp(1600, endAt - 1200, (k + 0.5) / cfg.trails);
+    for (let tries = 0; tries < 20 && zones.some(([a, b]) => x > a - 100 && x < b + 400); tries++) x += 500;
+    const lane = pick([0, 1, 2]);
+    trails.push({ n: 7, got: 0 });
+    for (let i = 0; i < 7; i++) items.push({ type: 'spark', lane, x: x + i * 48, got: false, phase: i * 0.6, lift: Math.sin((i / 6) * Math.PI) * 34, trail: k });
+    zones.push([x - 150, x + 450]);
   }
-  const inFork = (x) => fork && x > fork.x - 1000 && x < fork.x + 750;
+  const blocked = (x) => zones.some(([a, b]) => x > a && x < b);
   const obs = (type, lane, x, lanes = 1) =>
     obstacles.push({ type, lane, lanes, x, w: OBST[type].w * (lanes === 2 ? 1.25 : 1), hit: false, phase: rand(0, TAU) });
   const item = (type, lane, x) => items.push({ type, lane, x, got: false, phase: rand(0, TAU) });
   const coins = (x0, lane, n) => { for (let i = 0; i < n; i++) item('coin', lane, x0 + i * 55); };
+  const typesAt = (x) => SEG_TYPES[segAt(x - 400).kind].map((ty) => (!cfg.critters && (ty === 'snake' || ty === 'tumble')) ? pick(['bush', 'rock']) : ty);
   let sinceWater = 0;
-  for (const [a, b] of legs) {
-    let x = a;
-    while (x < b - 150) {
-      if (inFork(x)) { x = fork.x + 800; continue; }
-      const lanes = [0, 1, 2];
-      if (Math.random() < cfg.multi) {
-        // two paths blocked: find the free one
-        const free = pick(lanes);
-        const blocked = lanes.filter((l) => l !== free);
-        if (blocked[1] - blocked[0] === 1 && Math.random() < 0.5) obs('dune', blocked[0], x, 2);
-        else for (const l of blocked) obs(pick(cfg.types), l, x + rand(-20, 20));
-        coins(x - 55, free, 3);
-      } else {
-        const lane = pick(lanes);
-        obs(pick(cfg.types), lane, x);
-        const other = pick(lanes.filter((l) => l !== lane));
-        const roll = Math.random();
-        if (roll < 0.5) coins(x - 55, other, 3);
-        else item(roll < 0.75 ? 'frank' : 'myrrh', other, x);
-      }
-      sinceWater += 1;
-      const g = cfg.gap * rand(0.85, 1.2);
-      if (sinceWater >= 3 && x + g / 2 < b) { item('water', pick([0, 1, 2]), x + g / 2); sinceWater = 0; }
-      else if (Math.random() < 0.35 && x + g / 2 < b) item(pick(['frank', 'myrrh', 'coin']), pick([0, 1, 2]), x + g / 2);
-      x += g;
+  let x = 1000;
+  while (x < endAt - 150) {
+    if (blocked(x)) { x += 100; continue; }
+    const lanes = [0, 1, 2];
+    const types = typesAt(x);
+    if (Math.random() < cfg.multi) {
+      // two paths blocked: find the free one
+      const free = pick(lanes);
+      const bl = lanes.filter((l) => l !== free);
+      if (bl[1] - bl[0] === 1 && Math.random() < 0.4) obs('dune', bl[0], x, 2);
+      else for (const l of bl) obs(pick(types), l, x + rand(-20, 20));
+      coins(x - 55, free, 3);
+    } else {
+      const lane = pick(lanes);
+      obs(pick(types), lane, x);
+      const other = pick(lanes.filter((l) => l !== lane));
+      const roll = Math.random();
+      if (roll < 0.45) coins(x - 55, other, 3);
+      else item(roll < 0.65 ? 'frank' : roll < 0.85 ? 'myrrh' : 'dates', other, x);
     }
+    sinceWater += 1;
+    const g = cfg.gap * rand(0.85, 1.2);
+    const mid = x + g / 2;
+    if (!blocked(mid)) {
+      if (sinceWater >= cfg.waterEvery) { item('water', pick(lanes), mid); sinceWater = 0; }
+      else if (Math.random() < 0.35) item(pick(['frank', 'myrrh', 'coin', 'dates']), pick(lanes), mid);
+    }
+    x += g;
   }
-  // Sandstorms, spread through the journey (by distance travelled)
+  // Sandstorms, spread through the journey (by distance travelled), away from the stops
   for (let k = 0; k < cfg.storms; k++) {
-    let at = lerp(600, endAt - 900, (k + 0.5) / cfg.storms);
-    if (Math.abs(at - herodAt) < 700) at = herodAt + 900;
-    if (fork && Math.abs(at + r.c - fork.x) < 1200) at = fork.x - r.c - 1300;
-    storms.push({ at, st: 0, t: 0 });
+    let at = lerp(900, endAt - 1200, (k + 0.5) / cfg.storms);
+    const near = (d) => Math.abs(d - herodAt) < 900 || oases.some((o) => Math.abs(d - o.at) < 900) ||
+      (fork && Math.abs(d + r.c - fork.x) < 1300) || d > endAt - 1000;
+    for (let tries = 0; tries < 12 && near(at); tries++) at += 350;
+    if (!near(at)) storms.push({ at, st: 0, t: 0 });
   }
 }
 

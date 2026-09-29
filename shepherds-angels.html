@@ -257,11 +257,10 @@ function wrapLines(text, maxW) {
 // ============================================================
 const FY = 660;           // the campfire's y
 const HORIZON = 400;      // where the field meets the far hills
-const RY_UP = 250;        // how far up the hill the firelight reaches
+const RY_UP = 230;        // how far up the hill the firelight reaches
 const RY_DOWN = 190;      // ... and down toward us
-const LAMPS = 3;          // lamps (lives) for each part of the night
-const GROUP_Y = 300;      // the travelling shepherds' feet on the road
 const STAGE_DUR = 4.6;    // seconds per finale scene
+const GO_DUR = 5;         // the gentle journey to Bethlehem between the choir and the stable
 
 const LEVEL_NAMES = [
   'A Quiet Night',
@@ -269,32 +268,38 @@ const LEVEL_NAMES = [
   'Starlit Fields',
   'The Darkest Watch',
   'Frost on the Hills',
-  'The Long Road Down',
+  'The Longest Night',
 ];
 
 function makeConfig(n) {
   const k = n - 1;
   return {
     name: LEVEL_NAMES[n - 1] || `Night Watch ${n}`,
-    sheep: Math.min(4 + n, 10),                  // flock size
-    watchTime: Math.min(30 + k * 9, 75),         // seconds of night watch
-    wanderRate: Math.min(0.05 + k * 0.012, 0.12),// how fast strays head for the dark
-    maxWander: Math.min(1 + Math.floor(n / 2), 4),
-    wanderGap: Math.max(4.5 - k * 0.6, 1.6),
-    wolves: n === 1 ? 1 : Math.min(n, 5),
+    sheep: Math.min(6 + k * 2, 12),              // grown sheep in the flock
+    lambs: Math.min(2 + k, 4),                   // little lambs (they wander faster)
+    lostAllowed: n === 1 ? 2 : 1,                // lose more than this and the night is over
+    watchTime: Math.min(75 + k * 12, 120),       // seconds of night watch
+    wanderRate: Math.min(0.04 + k * 0.008, 0.08),// how fast strays head for the dark
+    lambSpeed: 1.6,
+    maxWander: Math.min(2 + k, 5),
+    wanderGap: Math.max(4.5 - k * 0.7, 1.8),
+    grace: Math.max(6 - k * 1.2, 3),             // seconds a stray can stand in the dark before it's lost
+    wolves: Math.min(1 + Math.floor(k * 0.7), 4),
+    foxes: n >= 3 ? Math.min(n - 2, 3) : 0,
     wolfWarn: Math.max(3 - k * 0.3, 1.5),        // eyes in the bushes before it creeps
     wolfSpeed: 32 + k * 8,
-    naps: n === 1 ? 1 : Math.min(n, 4),
-    napLimit: Math.max(10 - k, 6),               // seconds asleep before the fire burns low
-    light: Math.max(1 - k * 0.1, 0.6),           // size of the firelight
-    dark: Math.min(0.5 + k * 0.08, 0.82),        // darkness beyond it
+    scatter: n === 1 ? 1 : 2,                    // sheep a wolf chases off if it reaches the flock
+    naps: Math.min(1 + k, 4),
+    thorns: Math.min(1 + k, 4),
+    thornTaps: Math.min(3 + k, 6),               // taps to free a lamb from the thorns
+    stuckLimit: Math.max(20 - k * 3, 10),
+    owls: Math.min(1 + k, 4),
+    burn: 0.008 + k * 0.003,                     // how fast the fire burns down
+    light: Math.max(1 - k * 0.05, 0.85),         // size of the firelight
+    dark: Math.min(0.55 + k * 0.08, 0.82),       // darkness beyond it
     notes: Math.min(8 + k * 3, 20),              // choir notes
     noteGap: Math.max(1.15 - k * 0.1, 0.62),
     ring: Math.max(1.6 - k * 0.15, 0.95),        // time for a ring to close
-    pathLen: 2600 + k * 1100,                    // road length to Bethlehem
-    speed: Math.min(170 + k * 22, 300),
-    gapMin: Math.max(330 - k * 25, 220),
-    view: Math.max(560 - k * 50, 330),           // how far ahead starlight shows the road
   };
 }
 
@@ -302,7 +307,7 @@ function makeConfig(n) {
 //  Game state
 // ============================================================
 let state = 'title';      // title | play | win | fail | pause
-let phase = 'watch';      // watch | angel | choir | journey | finale
+let phase = 'watch';      // watch | angel | choir | go | finale
 let phaseT = 0;
 let level = 1;
 let totalScore = 0;
@@ -311,8 +316,7 @@ try { best = +localStorage.getItem('shepherdsBest') || 0; } catch (e) {}
 
 let cfg = makeConfig(1);
 let t = 0;
-let lamps = LAMPS;
-let pts = { watch: 0, choir: 0, path: 0 };
+let pts = { watch: 0, choir: 0 };
 let particles = [];
 let message = { text: '', t: 0 };
 let banner = null;        // { key, t } a verse shown at the top
@@ -326,14 +330,15 @@ let lookTarget = null;    // where the people are looking
 let sheep = [];
 let wolves = [];
 let events = [];
-let watchT = 0, wanderT = 0, fireLevel = 1, wakeT = 0;
+let owl = null;           // an owl that hoots from a lone tree
+let watchT = 0, wanderT = 0, fireLevel = 1, wakeT = 0, lostCount = 0;
 let sleepy = { asleep: false, napT: 0 };
+let stats = { called: 0, lambs: 0, wolves: 0, woken: 0, safe: 0 };
+let hints = {};
 // Part 2: the angel and the heavenly host
 let lineIdx = 0, lineT = 0, gloryF = 0;
 let notes = [], noteSpawned = 0, noteSpawnT = 0, melody = [], choirDoneT = -1;
 let noteStats = { perfect: 0, good: 0, miss: 0 };
-// Part 3: the road to Bethlehem
-let jd = 0, lane = 1, gx = 0, obstacles = [], hitCd = 0, walkT = 0;
 // Finale
 let stage = 0, stageT = 0;
 
@@ -385,17 +390,11 @@ function shepherdMood(d) {
     if (d.name === 'Benjamin' && wakeT > 0) return 'shock';
     if (shockT > 0) return 'shock';
     if (joyT > 0) return 'joy';
-    if (wolves.some((w) => w.stage === 'creep') || sheep.some((s) => s.state === 'wander' && s.r > 0.75)) return 'worried';
+    if (wolves.some((w) => w.stage === 'creep') || sheep.some((s) => s.state === 'stuck' || (s.state === 'wander' && s.r >= edge() * 0.85))) return 'worried';
     return 'watch';
   }
   if (phase === 'angel') return phaseT < 2.2 ? 'shock' : 'wow';
   if (phase === 'choir') return joyT > 0 ? 'joy' : 'wow';
-  if (phase === 'journey') {
-    if (hitCd > 0.7) return 'shock';
-    if (hitCd > 0) return 'worried';
-    if (joyT > 0 || cfg.pathLen - jd < 500) return 'joy';
-    return 'watch';
-  }
   return 'joy';
 }
 
@@ -723,22 +722,43 @@ function drawSheep(x, y, s, d, mood, opts = {}) {
 // ============================================================
 //  Part 1: the night watch
 // ============================================================
-function RX() { return Math.min(W / 2 - 26, 560); }
+function RX() { return Math.min(W / 2 - 60, 560); }
+// Thorn bushes near the edge of the firelight, where lambs get tangled
+const THORNS = [{ a: -2.35, r: 0.84 }, { a: -0.8, r: 0.84 }];
+const LOST_R = 1.12;      // how far a stray walks into the dark before it stops and waits
 
-function makeSheep(n) {
+function safeCount() { return sheep.filter((s) => s.state !== 'lost').length; }
+
+// The firelight's reach (1 = full): it shrinks as the fire burns low
+function edge() { return clamp(fireLevel * cfg.light, 0.55, 1.05); }
+
+function newSheep(i, kind, a, r, mom) {
+  return {
+    i, kind, mom, ha: a, hr: r, a, r, wa: a, state: 'home', speed: 1, darkT: 0, warned: false, counted: false,
+    thorn: -1, taps: 0, stuckT: 0, wobT: 0, lostT: 0, nuzzleT: 0, scareT: 0, hop: 0,
+    x: 0, y: 0, flip: 1, walk: 0, mood: 'watch', hair: kind === 'lamb' ? '#b8a898' : '#9a8878',
+    blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU), bleatCd: 0, doze: 0, dozeT: rand(5, 15),
+  };
+}
+
+// Grown sheep in rows around the fire; each lamb stays beside its mother
+function makeFlock(nSheep, nLambs) {
   const homes = [];
-  const lower = n >= 7 ? 2 : 0;
-  const upper = n - lower;
+  const lower = nSheep >= 8 ? 2 : 0;
+  const upper = nSheep - lower;
   for (let i = 0; i < upper; i++) {
     const f = upper === 1 ? 0.5 : i / (upper - 1);
-    homes.push({ a: -Math.PI * 0.87 + f * Math.PI * 0.74, r: i % 2 ? 0.6 : 0.42 });
+    homes.push({ a: -Math.PI * 0.88 + f * Math.PI * 0.76, r: i % 2 ? 0.6 : 0.4 });
   }
-  if (lower) { homes.push({ a: 0.35, r: 0.72 }); homes.push({ a: Math.PI - 0.35, r: 0.72 }); }
-  return homes.map((h, i) => ({
-    i, ha: h.a, hr: h.r, a: h.a, r: h.r, wa: h.a, state: 'home', speed: 1,
-    x: 0, y: 0, flip: 1, walk: 0, mood: 'watch', hair: '#9a8878', blink: 0, blinkT: rand(1, 4),
-    phase: rand(0, TAU), bleatCd: 0,
-  }));
+  if (lower) { homes.push({ a: 0.38, r: 0.74 }); homes.push({ a: Math.PI - 0.38, r: 0.74 }); }
+  const list = homes.map((h, i) => newSheep(i, 'sheep', h.a, h.r, -1));
+  const moms = shuffle(list.slice(0, upper).map((m) => m.i)).slice(0, nLambs);
+  moms.forEach((m) => {
+    const mom = list[m];
+    const side = Math.cos(mom.ha) < 0 ? 1 : -1;       // tucked in on the side toward the middle
+    list.push(newSheep(list.length, 'lamb', mom.ha + side * 0.16, mom.hr - 0.06, m));
+  });
+  return list;
 }
 
 function sheepXY(s) {
@@ -754,6 +774,9 @@ function bushes() {
   ];
 }
 
+// The lone trees on the hill, where the owl perches
+function owlTree(side) { return { x: W / 2 + side * RX() * 0.92, y: HORIZON + 30 }; }
+
 function shepherdSlots() {
   return [
     { d: SHEPHERDS[0], x: W / 2 - 62, y: FY + 50, s: 1.05 },
@@ -763,141 +786,251 @@ function shepherdSlots() {
 }
 
 function setupField() {
-  sheep = makeSheep(cfg.sheep);
+  sheep = makeFlock(cfg.sheep, cfg.lambs);
   for (const s of sheep) [s.x, s.y] = sheepXY(s);
-  wolves = [];
-  watchT = 0; wanderT = 2.5; fireLevel = 1; wakeT = 0;
+  wolves = []; owl = null;
+  watchT = 0; wanderT = 3; fireLevel = 1; wakeT = 0; lostCount = 0;
   sleepy = { asleep: false, napT: 0 };
-  // Spread the wolves and naps through the night
+  stats = { called: 0, lambs: 0, wolves: 0, woken: 0, safe: 0 };
+  hints = {};
+  // Spread the night's troubles through the watch, a few seconds apart
   events = [];
-  for (let i = 0; i < cfg.wolves; i++) events.push({ t: cfg.watchTime * lerp(0.22, 0.8, cfg.wolves === 1 ? 0.5 : i / (cfg.wolves - 1)) + rand(-2, 2), type: 'wolf' });
-  for (let i = 0; i < cfg.naps; i++) events.push({ t: cfg.watchTime * lerp(0.12, 0.7, cfg.naps === 1 ? 0.5 : i / (cfg.naps - 1)) + rand(-1.5, 1.5) + 3, type: 'nap' });
+  const spread = (n, type, lo, hi) => {
+    for (let i = 0; i < n; i++) events.push({ t: cfg.watchTime * lerp(lo, hi, n === 1 ? 0.5 : i / (n - 1)) + rand(-3, 3), type });
+  };
+  spread(cfg.naps, 'nap', 0.15, 0.7);
+  spread(cfg.thorns, 'thorn', 0.22, 0.75);
+  spread(cfg.wolves, 'wolf', 0.3, 0.85);
+  spread(cfg.owls, 'owl', 0.38, 0.9);
+  spread(cfg.foxes, 'fox', 0.45, 0.8);
   events.sort((a, b) => a.t - b.t);
+  for (let i = 1; i < events.length; i++) events[i].t = Math.max(events[i].t, events[i - 1].t + 4);
 }
 
 function updateSheep(dt) {
   const playing = state === 'play' && phase === 'watch';
+  const E = edge();
   for (const s of sheep) {
+    if (s.state === 'lost') {          // fading away into the night
+      s.lostT += dt; s.r += dt * 0.12;
+      [s.x, s.y] = sheepXY(s);
+      continue;
+    }
     s.blinkT -= dt;
     if (s.blinkT <= 0) { s.blink = 0.13; s.blinkT = rand(1.5, 5); }
     if (s.blink > 0) s.blink -= dt;
     s.bleatCd = Math.max(0, s.bleatCd - dt);
+    s.scareT = Math.max(0, s.scareT - dt);
+    s.nuzzleT = Math.max(0, s.nuzzleT - dt);
+    s.wobT = Math.max(0, s.wobT - dt);
     const [ox] = sheepXY(s);
+    const lambF = s.kind === 'lamb' ? cfg.lambSpeed : 1;
+    s.hop = 0;
     if (s.state === 'home') {
       s.a += (s.ha - s.a) * Math.min(1, dt * 2);
       s.r += (s.hr - s.r) * Math.min(1, dt * 2);
+      // sleepy sheep doze off now and then
+      s.dozeT -= dt;
+      if (s.dozeT <= 0) {
+        s.doze = s.doze ? 0 : 1;
+        s.dozeT = s.doze ? rand(3, 7) : rand(6, 16);
+      }
     } else if (s.state === 'wander') {
-      s.r += cfg.wanderRate * s.speed * (sleepy.asleep ? 1.4 : 1) * dt;
-      s.a += (s.wa - s.a) * Math.min(1, dt * 0.4);
-      s.walk += dt * 7;
-      if (s.r >= 1 && playing) lostSheep(s);
+      const rate = cfg.wanderRate * s.speed * lambF * (sleepy.asleep ? 1.3 : 1);
+      if (s.thorn >= 0) {
+        // a lamb scampering off toward the thorns
+        const th = THORNS[s.thorn];
+        s.a += (th.a - s.a) * Math.min(1, dt * 1.6);
+        s.r = Math.min(th.r, s.r + rate * dt);
+        if (s.r >= th.r - 0.005 && Math.abs(s.a - th.a) < 0.08) {
+          s.state = 'stuck'; s.taps = 0; s.stuckT = 0;
+          sfx.bleat(1.5);
+          hint('thorn', 'A lamb is stuck in the thorns! Tap it a few times to free it.', true);
+        }
+      } else {
+        s.r = Math.min(LOST_R, s.r + rate * dt);
+        s.a += (s.wa - s.a) * Math.min(1, dt * 0.4);
+        if (playing) {
+          if (s.r >= E) {
+            // out of the firelight: a little while to be called home
+            s.darkT += dt;
+            if (!s.warned) { s.warned = true; sfx.bleat(1.25); hint('dark', 'Quick! Tap the sheep with the "!" before it is lost.'); }
+            if (s.darkT >= cfg.grace) loseSheep(s);
+          } else s.darkT = Math.max(0, s.darkT - dt * 2);
+        }
+      }
+      s.walk += dt * 7 * lambF;
+    } else if (s.state === 'stuck') {
+      if (playing) {
+        s.stuckT += dt;
+        if (s.bleatCd <= 0) { sfx.bleat(1.5); s.bleatCd = 2.5; }
+        if (s.stuckT >= cfg.stuckLimit) loseSheep(s);
+      }
     } else if (s.state === 'return') {
       const sp = s.speed * dt;
       s.r += clamp(s.hr - s.r, -sp, sp);
       s.a += (s.ha - s.a) * Math.min(1, dt * 3 * s.speed);
       s.walk += dt * 12;
-      if (Math.abs(s.r - s.hr) < 0.01 && Math.abs(s.a - s.ha) < 0.05) s.state = 'home';
+      if (s.kind === 'lamb') s.hop = Math.abs(Math.sin(t * 9 + s.phase)) * 9;   // happy hops home
+      if (Math.abs(s.r - s.hr) < 0.01 && Math.abs(s.a - s.ha) < 0.05) arriveHome(s);
     }
     [s.x, s.y] = sheepXY(s);
     if (Math.abs(s.x - ox) > 0.01) s.flip = s.x > ox ? -1 : 1;
     // Sheep faces
     if (state === 'fail') s.mood = 'dismay';
-    else if (state === 'win' || joyT > 0 && s.state === 'return') s.mood = 'joy';
+    else if (state === 'win' || phase === 'choir' || phase === 'go') s.mood = 'joy';
     else if (phase === 'angel') s.mood = phaseT < 2 ? 'shock' : 'wow';
-    else if (phase === 'choir') s.mood = 'joy';
+    else if (s.nuzzleT > 0) s.mood = 'joy';
     else if (s.scareT > 0) s.mood = 'shock';
-    else if (s.state === 'wander' && s.r > 0.8) s.mood = 'worried';
+    else if (s.state === 'stuck') s.mood = 'worried';
+    else if (s.state === 'wander' && s.r >= E * 0.85) s.mood = 'worried';
     else if (s.state === 'return') s.mood = 'joy';
+    else if (s.state === 'home' && s.doze) s.mood = 'sleep';
     else s.mood = 'watch';
-    s.scareT = Math.max(0, (s.scareT || 0) - dt);
   }
   if (!playing) return;
   // Send another sheep off to explore
-  wanderT -= dt * (sleepy.asleep ? 1.4 : 1);
-  const wandering = sheep.filter((s) => s.state === 'wander').length;
+  wanderT -= dt * (sleepy.asleep ? 1.3 : 1);
+  const wandering = sheep.filter((s) => s.state === 'wander' && s.thorn < 0).length;
   if (wanderT <= 0 && wandering < cfg.maxWander) {
     const idle = sheep.filter((s) => s.state === 'home');
-    if (idle.length) {
-      const s = idle[Math.floor(Math.random() * idle.length)];
-      s.state = 'wander'; s.speed = rand(0.85, 1.15);
-      if (Math.sin(s.ha) > 0) s.wa = Math.cos(s.ha) > 0 ? -0.2 : -Math.PI + 0.2;
-      else s.wa = clamp(s.ha + rand(-0.35, 0.35), -Math.PI + 0.12, -0.12);
-      if (s.bleatCd <= 0) { sfx.bleat(1.1); s.bleatCd = 2; }
-    }
+    if (idle.length) sendWandering(idle[Math.floor(Math.random() * idle.length)], rand(0.85, 1.15));
     wanderT = cfg.wanderGap * rand(0.7, 1.3);
   }
 }
 
-function lostSheep(s) {
-  s.state = 'return'; s.speed = 0.22;      // it wanders back on its own, slowly
-  loseLamp('watch', 'A sheep slipped away into the dark!');
+// Off a sheep goes, outward into the dark (fast if frightened)
+function sendWandering(s, speed, side = 0) {
+  s.state = 'wander'; s.speed = speed; s.thorn = -1; s.darkT = 0; s.warned = false; s.doze = 0;
+  if (side) s.wa = side > 0 ? -0.2 : -Math.PI + 0.2;
+  else if (Math.sin(s.ha) > 0) s.wa = Math.cos(s.ha) > 0 ? -0.2 : -Math.PI + 0.2;
+  else s.wa = clamp(s.ha + rand(-0.4, 0.4), -Math.PI + 0.12, -0.12);
+  if (s.bleatCd <= 0) { sfx.bleat(s.kind === 'lamb' ? 1.4 : 1.1); s.bleatCd = 2; }
 }
 
-function loseLamp(reason, text) {
+// Back safe by the fire: a counting "baa", and lambs nuzzle their mothers
+function arriveHome(s) {
+  s.state = 'home'; s.darkT = 0; s.warned = false; s.thorn = -1; s.dozeT = rand(6, 14);
+  if (!s.counted) return;
+  s.counted = false;
+  const n = safeCount();
+  floatText(s.x, s.y - 58, `${n}/${sheep.length}`);
+  sfx.bleat(0.9 + 0.4 * n / sheep.length);
+  const mom = s.mom >= 0 ? sheep[s.mom] : null;
+  if (mom && mom.state === 'home') {
+    s.nuzzleT = mom.nuzzleT = 1.8;
+    for (let i = 0; i < 4; i++) particles.push({ x: (s.x + mom.x) / 2 + rand(-8, 8), y: s.y - 40, vx: rand(-10, 10), vy: rand(-45, -25), life: 1.3, max: 1.3, color: 'heart', size: 7, grav: 0 });
+  }
+}
+
+function loseSheep(s) {
   if (state !== 'play') return;
-  lamps = Math.max(0, lamps - 1);
-  shakeT = 0.3; shockT = 1.1;
+  s.state = 'lost'; s.lostT = 0;
+  lostCount++;
+  sfx.sadBaa();
+  shockT = 1.2; shakeT = 0.2;
+  showMessage(s.kind === 'lamb' ? 'Oh no... a little lamb is lost in the dark.' : 'Oh no... a sheep is lost in the dark.');
+  if (lostCount > cfg.lostAllowed) fail('lost');
+}
+
+// Level 1 teaches as it goes; "always" hints show the first time on any night
+function hint(key, text, always = false) {
+  if (hints[key] || (level > 1 && !always)) return;
+  hints[key] = true;
   showMessage(text);
-  sfx.bump();
-  if (lamps <= 0) fail(reason);
+}
+
+function floatText(x, y, text) {
+  particles.push({ x, y, vx: 0, vy: -32, life: 1.5, max: 1.5, color: 'txt', text, size: 20, grav: 0 });
+}
+
+function startEvent(type) {
+  if (type === 'wolf' || type === 'fox') {
+    const b = bushes()[Math.floor(Math.random() * 4)];
+    const side = b.x < W / 2 ? -1 : 1;
+    wolves.push({ kind: type, x: b.x - side * 6, y: b.y + 10, side, stage: 'eyes', t: 0, target: null, blink: 0 });
+    if (type === 'fox') hint('fox', 'A sly fox is sneaking up on the lambs! Tap it to shoo it.', true);
+    else hint('wolf', 'Eyes in the bushes! Tap the wolf to shoo it away.');
+  } else if (type === 'nap') {
+    if (!sleepy.asleep) {
+      sleepy.asleep = true; sleepy.napT = 0;
+      showMessage(level === 1 ? 'Benjamin is nodding off... tap him to wake him!' : 'Benjamin is nodding off...');
+    }
+  } else if (type === 'thorn') {
+    const lambs = sheep.filter((s) => s.kind === 'lamb' && s.state === 'home');
+    if (!lambs.length) return;
+    const s = lambs[Math.floor(Math.random() * lambs.length)];
+    sendWandering(s, 1.4);
+    s.thorn = Math.abs(s.a - THORNS[0].a) < Math.abs(s.a - THORNS[1].a) ? 0 : 1;
+  } else if (type === 'owl') {
+    owl = { side: Math.random() < 0.5 ? -1 : 1, t: 0, bolted: false };
+    sfx.hoot();
+  }
 }
 
 function updateWatch(dt) {
   watchT += dt;
-  while (events.length && watchT >= events[0].t) {
-    const e = events.shift();
-    if (e.type === 'wolf') {
-      const b = bushes()[Math.floor(Math.random() * 4)];
-      const side = b.x < W / 2 ? -1 : 1;
-      wolves.push({ x: b.x - side * 6, y: b.y + 10, side, stage: 'eyes', t: 0, target: null, blink: 0 });
-    } else if (e.type === 'nap' && !sleepy.asleep) {
-      sleepy.asleep = true; sleepy.napT = 0;
-      showMessage('Benjamin is nodding off...');
-    }
-  }
+  while (events.length && watchT >= events[0].t) startEvent(events.shift().type);
   updateWolves(dt);
+  // The owl hoots, and one sheep takes fright and bolts
+  if (owl) {
+    owl.t += dt;
+    if (!owl.bolted && owl.t > 1) {
+      owl.bolted = true;
+      const idle = sheep.filter((s) => s.state === 'home');
+      if (idle.length) {
+        const tr = owlTree(owl.side);
+        const s = idle.reduce((a, b) => (Math.abs(b.x - tr.x) < Math.abs(a.x - tr.x) ? b : a));
+        sendWandering(s, 3.5, -owl.side);
+        s.scareT = 1.4;
+        showMessage('Hoo-hoo! A sheep got a fright and ran off!');
+      }
+    }
+    if (owl.t > 3.6) owl = null;
+  }
   // Sleepy Benjamin lets the fire burn low
   if (sleepy.asleep) {
     sleepy.napT += dt;
     if (Math.random() < dt * 1.2) spawnZ();
-    if (sleepy.napT > cfg.napLimit) {
-      sleepy.asleep = false; wakeT = 1;
-      loseLamp('watch', 'The fire burned low!');
-    }
   }
   wakeT = Math.max(0, wakeT - dt);
-  const target = sleepy.asleep ? 0.62 : 1;
-  fireLevel += clamp(target - fireLevel, -0.07 * dt, 1.2 * dt);
+  fireLevel = Math.max(0.62, fireLevel - (cfg.burn + (sleepy.asleep ? 0.045 : 0)) * dt);
+  if (fireLevel < 0.8) hint('fire', 'The fire is burning low. Tap it to add sticks!');
   if (watchT >= cfg.watchTime && state === 'play') startAngel();
 }
 
-// Wolves: glowing eyes first, then a slow creep toward the flock
+// Wolves (and foxes): glowing eyes first, then a slow creep toward the flock
 function updateWolves(dt) {
   for (let i = wolves.length - 1; i >= 0; i--) {
     const w = wolves[i];
     w.t += dt;
     w.blink = (w.t % 2.4) < 0.12 ? 1 : 0;
+    const fox = w.kind === 'fox';
     if (w.stage === 'eyes' && w.t > cfg.wolfWarn) {
       w.stage = 'creep';
-      if (!sheep.length) continue;
-      w.target = sheep.reduce((a, b) => (Math.hypot(b.x - w.x, b.y - w.y) < Math.hypot(a.x - w.x, a.y - w.y) ? b : a));
     } else if (w.stage === 'creep') {
+      if (!w.target || w.target.state === 'lost') {
+        const prey = sheep.filter((o) => o.state !== 'lost' && (!fox || o.kind === 'lamb'));
+        const pool = prey.length ? prey : sheep.filter((o) => o.state !== 'lost');
+        if (!pool.length) { w.stage = 'flee'; continue; }
+        w.target = pool.reduce((a, b) => (Math.hypot(b.x - w.x, b.y - w.y) < Math.hypot(a.x - w.x, a.y - w.y) ? b : a));
+      }
       const s = w.target;
       const dx = s.x - w.x, dy = s.y - w.y, len = Math.hypot(dx, dy) || 1;
-      w.x += (dx / len) * cfg.wolfSpeed * dt;
-      w.y += (dy / len) * cfg.wolfSpeed * dt;
+      const sp = cfg.wolfSpeed * (fox ? 1.4 : 1);
+      w.x += (dx / len) * sp * dt;
+      w.y += (dy / len) * sp * dt;
       w.side = dx < 0 ? 1 : -1;
       if (len < 46) {
-        // The flock scatters in a fright; the wolf lopes off
-        for (const o of sheep) {
-          if (Math.hypot(o.x - w.x, o.y - w.y) < 170) {
-            o.scareT = 1; o.state = 'wander'; o.r = Math.min(o.r + 0.12, 0.9); o.speed = 1.5;
-            o.wa = Math.cos(o.a) > 0 ? -0.15 : -Math.PI + 0.15;
-          }
-        }
+        // It reaches the flock: the nearest sheep bolt off into the dark
+        const near = sheep.filter((o) => o.state === 'home' || o.state === 'wander' || o.state === 'return')
+          .sort((a, b) => Math.hypot(a.x - w.x, a.y - w.y) - Math.hypot(b.x - w.x, b.y - w.y))
+          .slice(0, fox ? 1 : cfg.scatter);
+        for (const o of near) { sendWandering(o, 4, w.x < W / 2 ? 1 : -1); o.scareT = 1.4; o.counted = false; }
         sfx.bleat(1.3);
+        shockT = 1; shakeT = 0.25;
         w.stage = 'flee'; w.t = 0;
-        loseLamp('watch', 'The wolf scattered the sheep!');
+        showMessage(fox ? 'The fox chased a lamb into the dark! Tap it home!' : 'The wolf chased sheep into the dark! Tap them home!');
       }
     } else if (w.stage === 'flee') {
       const dir = w.x < W / 2 ? -1 : 1;
@@ -908,13 +1041,13 @@ function updateWolves(dt) {
   }
 }
 
-// Taps during the watch: the wolf first, then Benjamin, then strays
+// Taps during the watch: wolves and foxes first, then Benjamin, lambs in the thorns, strays, and the fire
 function tapWatch(p) {
   for (const w of wolves) {
     if (w.stage !== 'flee' && Math.hypot(p.x - w.x, p.y - (w.y - 22)) < 70) {
       w.stage = 'flee'; w.t = 0;
-      pts.watch += 100; joyT = 1;
-      showMessage('Shoo, wolf! Off you go!');
+      stats.wolves++; pts.watch += 100; joyT = 1;
+      showMessage(w.kind === 'fox' ? 'Shoo, little fox!' : 'Shoo, wolf! Off you go!');
       sfx.yelp();
       for (let i = 0; i < 12; i++) spawn(w.x, w.y - 10, rand(-80, 80), rand(-80, 10), 0.6, '#c9c2b0', rand(3, 6), 60);
       return;
@@ -923,28 +1056,50 @@ function tapWatch(p) {
   const b = shepherdSlots()[2];
   if (sleepy.asleep && Math.hypot(p.x - b.x, p.y - (b.y - 45)) < 60) {
     sleepy.asleep = false; wakeT = 1;
-    pts.watch += 50;
+    stats.woken++; pts.watch += 50;
     showMessage('Wake up, Benjamin!');
     sfx.wake();
     return;
   }
-  let pick = null, pd = 58;
   for (const s of sheep) {
-    const d = Math.hypot(p.x - s.x, p.y - (s.y - 22));
+    if (s.state !== 'stuck' || Math.hypot(p.x - s.x, p.y - (s.y - 16)) > 64) continue;
+    s.taps++; s.wobT = 0.25;
+    sfx.rustle();
+    for (let i = 0; i < 5; i++) spawn(s.x + rand(-20, 20), s.y - 20, rand(-60, 60), rand(-90, -30), 0.6, '#3f7a3a', rand(2, 3.5), 120);
+    if (s.taps >= cfg.thornTaps) {
+      s.state = 'return'; s.speed = 1.2; s.thorn = -1; s.counted = true;
+      stats.lambs++; pts.watch += 120; joyT = 1;
+      showMessage('Free! Hop home, little lamb!');
+    }
+    return;
+  }
+  let pick = null, pd = 62;
+  for (const s of sheep) {
+    const d = Math.hypot(p.x - s.x, p.y - (s.y - 20));
     if (d < pd && s.state === 'wander') { pick = s; pd = d; }
   }
   if (pick) {
-    pick.state = 'return'; pick.speed = 1.1;
-    pts.watch += Math.round(30 + pick.r * 40);
+    pts.watch += pick.darkT > 0 ? 60 : 30;
+    stats.called++;
+    pick.state = 'return'; pick.speed = 1.1; pick.thorn = -1; pick.counted = true; pick.scareT = 0;
     joyT = 0.8;
     sfx.whistle();
-    setTimeout(() => sfx.bleat(1), 250);
     for (let i = 0; i < 8; i++) spawn(pick.x, pick.y - 30, rand(-50, 50), rand(-80, -20), 0.6, '#fff6d0', rand(2, 3.5));
     return;
   }
-  // A tap on a sheep that's already home earns a friendly "baa"
+  if (Math.hypot(p.x - W / 2, p.y - (FY - 18)) < 60) {
+    // another stick on the fire
+    if (fireLevel < 0.95) pts.watch += 10;
+    fireLevel = Math.min(1.15, fireLevel + 0.22);
+    sfx.crackle();
+    for (let i = 0; i < 14; i++) spawn(W / 2 + rand(-16, 16), FY - 26, rand(-40, 40), rand(-160, -70), rand(0.5, 1), Math.random() < 0.5 ? '#ffb13a' : '#ffe27a', rand(1.5, 3));
+    return;
+  }
+  // A tap on a sheep at home earns a friendly "baa" (and wakes a dozing one)
   for (const s of sheep) {
-    if (Math.hypot(p.x - s.x, p.y - (s.y - 22)) < 40 && s.bleatCd <= 0) { sfx.bleat(1); s.bleatCd = 1.2; return; }
+    if (s.state === 'home' && Math.hypot(p.x - s.x, p.y - (s.y - 20)) < 40 && s.bleatCd <= 0) {
+      sfx.bleat(s.kind === 'lamb' ? 1.4 : 1); s.bleatCd = 1.2; s.doze = 0; s.dozeT = rand(6, 14); return;
+    }
   }
 }
 
@@ -956,7 +1111,7 @@ function spawnZ() {
 // ============================================================
 //  Part 2: the angel and the multitude of the heavenly host
 // ============================================================
-const ANGEL_LINES = ['fearNot', 'born'];
+const ANGEL_LINES = ['fearNot', 'born', 'sign'];
 // "Gloria" (after the traditional carol "Angels We Have Heard on High", public domain)
 const GLORIA = ['A5', 'B5', 'A5', 'G5', 'F#5', 'G5', 'A5', 'F#5', 'G5', 'A5', 'G5', 'F#5', 'E5', 'F#5', 'G5', 'E5',
   'F#5', 'G5', 'F#5', 'E5', 'D5', 'E5', 'F#5', 'D5', 'E5', 'A4', 'D5'];
@@ -964,9 +1119,10 @@ const GLORIA = ['A5', 'B5', 'A5', 'G5', 'F#5', 'G5', 'A5', 'F#5', 'G5', 'A5', 'G
 function startAngel() {
   phase = 'angel'; phaseT = 0; lineIdx = 0; lineT = 0;
   for (const w of wolves) if (w.stage !== 'flee') { w.stage = 'flee'; w.t = 0; }
-  sleepy.asleep = false;
-  for (const s of sheep) if (s.state !== 'home') { s.state = 'return'; s.speed = 1; }
-  pts.watch += lamps * 100;
+  sleepy.asleep = false; owl = null;
+  for (const s of sheep) if (s.state !== 'home' && s.state !== 'lost') { s.state = 'return'; s.speed = 1; s.thorn = -1; s.counted = false; }
+  stats.safe = safeCount();
+  pts.watch += stats.safe * 50;
   flashT = 0.9; shockT = 0; message.t = 0; banner = null;
   sfx.glory();
 }
@@ -1021,7 +1177,7 @@ function updateChoir(dt) {
       sfx.levelStart();
     }
     choirDoneT += dt;
-    if (choirDoneT > 3) startJourney();
+    if (choirDoneT > 3) startGo();
   }
 }
 
@@ -1058,62 +1214,12 @@ function keyChoir() {
 }
 
 // ============================================================
-//  Part 3: down the hillside to Bethlehem
+//  "Let us now go even unto Bethlehem": a gentle drift toward the town
 // ============================================================
-function laneW() { return Math.min(W * 0.27, 170); }
-function laneX(i) { return W / 2 + (i - 1) * laneW(); }
-
-function makePath() {
-  const list = [];
-  let d = 900;
-  while (d < cfg.pathLen - 350) {
-    const two = level >= 2 && Math.random() < Math.min(0.1 + level * 0.08, 0.45);
-    const order = shuffle([0, 1, 2]);
-    const blocked = order.slice(0, two ? 2 : 1);
-    for (const L of blocked) list.push({ d, lane: L, type: Math.random() < 0.5 ? 'rock' : 'ditch', hit: false, seed: rand(0, TAU) });
-    if (Math.random() < 0.6) list.push({ d, lane: order[2], type: 'star', hit: false, seed: rand(0, TAU) });
-    d += cfg.gapMin + rand(0, 180);
-  }
-  return list;
-}
-
-function startJourney() {
-  phase = 'journey'; phaseT = 0;
-  jd = 0; lane = 1; gx = laneX(1); hitCd = 0; walkT = 0;
-  lamps = LAMPS; pts.path = 0;
-  obstacles = makePath();
-  banner = { key: 'letUsGo', t: 4.5 };
-  gloryF = 0; message.t = 0;
-  notes = [];
-}
-
-function updateJourney(dt) {
-  const sp = cfg.speed * Math.min(1, phaseT / 1.2);
-  jd += sp * dt;
-  walkT += sp * dt / 18;
-  gx += (laneX(lane) - gx) * Math.min(1, dt * 14);
-  hitCd = Math.max(0, hitCd - dt);
-  // Which lane are they in? Halfway between two lanes counts as neither.
-  let inLane = -1;
-  for (let i = 0; i < 3; i++) if (Math.abs(gx - laneX(i)) < laneW() * 0.42) inLane = i;
-  for (const o of obstacles) {
-    if (o.hit || o.lane !== inLane) continue;
-    const dy = o.d - (jd + 16);
-    if (o.type === 'star' && Math.abs(dy) < 42) {
-      o.hit = true; pts.path += 30; joyT = 0.5;
-      sfx.tap(0.4 + 0.6 * Math.random());
-      for (let i = 0; i < 12; i++) spawn(gx, GROUP_Y - 30, rand(-90, 90), rand(-120, 20), 0.7, '#ffe27a', rand(2, 4));
-    } else if (o.type !== 'star' && Math.abs(dy) < 30 && hitCd <= 0) {
-      o.hit = true; hitCd = 1.4;
-      loseLamp('path', o.type === 'rock' ? 'Oof! Mind the rocks!' : 'Whoops! A ditch!');
-    }
-  }
-  if (state === 'play' && jd >= cfg.pathLen) startFinale();
-}
-
-function stepLane(dir) {
-  const nl = clamp(lane + dir, 0, 2);
-  if (nl !== lane) { lane = nl; sfx.step(); }
+function startGo() {
+  phase = 'go'; phaseT = 0;
+  banner = { key: 'letUsGo', t: 999 };
+  notes = []; message.t = 0;
 }
 
 // ============================================================
@@ -1121,7 +1227,7 @@ function stepLane(dir) {
 // ============================================================
 function startFinale() {
   phase = 'finale'; stage = 0; stageT = 0; fadeT = 0.8;
-  pts.path += lamps * 100;
+  gloryF = 0;
   banner = { key: 'found', t: 999 };
   message.t = 0;
   sfx.levelStart();
@@ -1162,6 +1268,21 @@ function drawParticles() {
       ctx.font = `700 ${Math.round(p.size + (1 - a) * 8)}px Fredoka, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText('z', p.x, p.y);
+    } else if (p.color === 'txt') {   // counting the sheep home
+      ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(20,20,60,0.8)';
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = '#fff3a0';
+      ctx.fillText(p.text, p.x, p.y);
+    } else if (p.color === 'heart') {
+      const r = p.size;
+      ctx.fillStyle = '#ff7a9a';
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y + r * 0.9);
+      ctx.bezierCurveTo(p.x - r * 1.6, p.y - r * 0.2, p.x - r * 0.6, p.y - r * 1.4, p.x, p.y - r * 0.4);
+      ctx.bezierCurveTo(p.x + r * 0.6, p.y - r * 1.4, p.x + r * 1.6, p.y - r * 0.2, p.x, p.y + r * 0.9);
+      ctx.fill();
     } else {
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
@@ -1177,10 +1298,10 @@ function win() {
   state = 'win';
   syncAmbience();
   const levelBonus = level * 500;
-  const score = pts.watch + pts.choir + pts.path + levelBonus;
+  const score = pts.watch + pts.choir + levelBonus;
   totalScore += score;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('shepherdsBest', best); } catch (e) {} }
-  lastScore = { watch: pts.watch, choir: pts.choir, path: pts.path, levelBonus, score, perfect: noteStats.perfect };
+  lastScore = { ...stats, total: sheep.length, watch: pts.watch, choir: pts.choir, levelBonus, score, perfect: noteStats.perfect };
   for (let i = 0; i < 70; i++) {
     const a = rand(0, TAU), sp = rand(40, 180);
     spawn(W / 2, 420, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
@@ -1236,10 +1357,11 @@ function titleScreen() {
   showOverlay('The Shepherds and the Angels', 'A night on the hills of Bethlehem',
     `${verseHTML('fearNot')}
      <ul>
-       <li><b>Keep watch:</b> tap sheep that wander into the dark to call them back to the fire. Tap the wolf's glowing eyes to shoo it, and nudge sleepy Benjamin awake.</li>
-       <li><b>Sing:</b> when the angels come, tap each glowing note as its ring closes (or press <kbd>Space</kbd>).</li>
-       <li><b>Go to Bethlehem:</b> tap left or right of the shepherds (or <kbd>&larr;</kbd> <kbd>&rarr;</kbd>) to step around rocks and ditches.</li>
-       <li>You have <b>3 lamps</b> for each part of the night. A mouse click works like a tap.</li>
+       <li><b>Keep watch all night:</b> when a sheep or lamb wanders off toward the dark, tap it to call it home. Hurry when you see a <b>!</b></li>
+       <li>Tap a lamb stuck in the <b>thorns</b> a few times to free it. Tap glowing <b>eyes</b> to shoo the wolf, wake sleepy <b>Benjamin</b>, and tap the <b>fire</b> to add sticks.</li>
+       <li>If more than 2 sheep get lost, the night is over (fewer on later nights).</li>
+       <li><b>Then sing:</b> when the angels come, tap each glowing note as its ring closes (or press <kbd>Space</kbd>).</li>
+       <li>A mouse click works like a tap.</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
@@ -1250,10 +1372,9 @@ function startLevel() {
   cfg = makeConfig(level);
   phase = 'watch'; phaseT = 0;
   setupField();
-  lamps = LAMPS;
-  pts = { watch: 0, choir: 0, path: 0 };
+  pts = { watch: 0, choir: 0 };
   noteStats = { perfect: 0, good: 0, miss: 0 };
-  particles = []; notes = []; obstacles = [];
+  particles = []; notes = [];
   tapQueue.length = 0;
   ripples.length = 0;
   shockT = joyT = flashT = shakeT = fadeT = 0; gloryF = 0;
@@ -1264,18 +1385,7 @@ function startLevel() {
   showMessage(`Level ${level}: ${cfg.name}`);
   banner = { key: 'watch', t: 5 };
   sfx.levelStart();
-  if (level === 1) setTimeout(() => { if (state === 'play' && phase === 'watch' && watchT < 10) showMessage('Tap a wandering sheep to call it home'); }, 3500);
-}
-
-// Try again from the start of the part that went wrong
-function retryPart() {
-  if (failReason === 'path') {
-    state = 'play';
-    syncAmbience();
-    hideOverlay();
-    startJourney();
-    sfx.levelStart();
-  } else startLevel();
+  if (level === 1) setTimeout(() => { if (state === 'play' && phase === 'watch' && watchT < 10) showMessage('Tap a sheep that wanders off to call it home'); }, 3500);
 }
 
 function endScreens(dt) {
@@ -1286,20 +1396,17 @@ function endScreens(dt) {
     const s = lastScore;
     showOverlay('Tidings of great joy!', `Level ${level} complete — ${cfg.name}`,
       `${verseHTML('glory')}
-       <p class="score">Night watch: <b>${s.watch}</b><br>Angel choir: <b>${s.choir}</b> <small>(${s.perfect} perfect)</small><br>Road to Bethlehem: <b>${s.path}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score">Sheep kept safe: <b>${s.safe}/${s.total}</b><br>Strays called home: <b>${s.called}</b> &middot; Lambs freed: <b>${s.lambs}</b><br>${level >= 3 ? 'Wolves &amp; foxes' : 'Wolves'} shooed: <b>${s.wolves}</b></p>
+       <p class="score">Night watch: <b>${s.watch}</b><br>Angel choir: <b>${s.choir}</b> <small>(${s.perfect} perfect)</small><br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
       'Next Night', () => { level++; startLevel(); });
   } else if (state === 'fail') {
-    const lines = failReason === 'path'
-      ? ['A bumpy road!', 'The shepherds stumbled once too often. Watch for rocks and ditches in the starlight, and step aside in good time.']
-      : ['The flock got away!', 'The lamps went out before morning. Watch the edges of the firelight, and keep Benjamin awake!'];
-    showOverlay(lines[0], `Level ${level} — ${cfg.name}`,
-      `<p style="text-align:center">${lines[1]}</p>
-       ${verseHTML('sign')}
+    showOverlay('Lost in the dark!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${lostCount} of the flock wandered off into the night. Watch for the <b>!</b> and tap strays home in time, free lambs from the thorns, and keep the fire bright.</p>
+       ${verseHTML('watch')}
        <p class="score">Score so far: <b>${totalScore}</b></p>`,
-      'Try Again', retryPart,
-      failReason === 'path' ? '↻ Restart Level' : null, failReason === 'path' ? startLevel : null);
+      'Try Again', startLevel);
   }
 }
 
@@ -1331,12 +1438,10 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { sfx.toggleMute(); return; }
   if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
   if (state !== 'play' || e.repeat) return;
-  if (phase === 'journey') {
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') stepLane(-1);
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') stepLane(1);
-  } else if (e.code === 'Space' || e.code === 'Enter') {
+  if (e.code === 'Space' || e.code === 'Enter') {
     if (phase === 'choir') keyChoir();
     else if (phase === 'angel' && lineT > 0.8) nextAngelLine();
+    else if (phase === 'go' && phaseT > 1.5) startFinale();
     else if (phase === 'finale' && stageT > 1.2) nextStage();
   }
 });
@@ -1377,7 +1482,7 @@ function handleTaps() {
     if (phase === 'watch') tapWatch(p);
     else if (phase === 'angel') { if (lineT > 0.8) nextAngelLine(); }
     else if (phase === 'choir') tapChoir(p);
-    else if (phase === 'journey') { if (p.x < gx - 16) stepLane(-1); else if (p.x > gx + 16) stepLane(1); }
+    else if (phase === 'go') { if (phaseT > 1.5) startFinale(); }
     else if (phase === 'finale') { if (stageT > 1.2) nextStage(); }
   }
 }
@@ -1533,7 +1638,6 @@ const sfx = {
     src.connect(bp); bp.connect(g); g.connect(this.master);
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
-  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
   fail() { if (this.ctx) Music.fail(); },
   thunder() {
     if (!this.ctx) return;
@@ -1546,28 +1650,42 @@ const sfx = {
     src.start(t0); src.stop(t0 + 1.3);
   },
   // --- extra little sounds for this game ---
-  bleat(pitch = 1) {   // "baa-aa"
+  bleat(pitch = 1, sad = false) {   // "baa-aa" (a sad one droops and lingers)
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
+    const len = sad ? 0.95 : 0.55;
     const o = this.ctx.createOscillator(), lfo = this.ctx.createOscillator(), depth = this.ctx.createGain();
     o.type = 'sawtooth';
     o.frequency.setValueAtTime(470 * pitch, t0);
-    o.frequency.linearRampToValueAtTime(400 * pitch, t0 + 0.5);
+    o.frequency.linearRampToValueAtTime((sad ? 300 : 400) * pitch, t0 + len - 0.05);
     lfo.frequency.value = 17; depth.gain.value = 26 * pitch;
     lfo.connect(depth); depth.connect(o.frequency);
     const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1050; bp.Q.value = 2.5;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+    g.gain.exponentialRampToValueAtTime(sad ? 0.28 : 0.35, t0 + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
     o.connect(bp); bp.connect(g); g.connect(this.master);
-    o.start(t0); lfo.start(t0); o.stop(t0 + 0.6); lfo.stop(t0 + 0.6);
+    o.start(t0); lfo.start(t0); o.stop(t0 + len + 0.05); lfo.stop(t0 + len + 0.05);
+  },
+  sadBaa() { this.bleat(0.8, true); },
+  hoot() { this.tone(430, 0.3, 'sine', 0.2, 0, 390); this.tone(410, 0.55, 'sine', 0.2, 0.42, 340); },
+  rustle() { this.puff(0.2); this.tone(1800, 0.05, 'triangle', 0.05); },
+  crackle() {         // a stick catching light
+    if (!this.ctx) return;
+    for (let i = 0; i < 6; i++) {
+      const t0 = this.ctx.currentTime + i * 0.06 + Math.random() * 0.03;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+      const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.25, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.05);
+      src.connect(hp); hp.connect(g); g.connect(this.master);
+      src.start(t0, Math.random()); src.stop(t0 + 0.06);
+    }
   },
   whistle() { this.tone(1300, 0.12, 'sine', 0.12, 0, 1900); this.tone(1900, 0.2, 'sine', 0.12, 0.13, 1400); },
   yelp() { this.tone(950, 0.22, 'triangle', 0.2, 0, 520); this.tone(800, 0.2, 'triangle', 0.15, 0.2, 450); },
   wake() { this.tone(520, 0.1, 'sine', 0.2); this.tone(780, 0.16, 'sine', 0.2, 0.1); },
-  bump() { this.bounce(); this.puff(0.25); },
-  step() { this.puff(0.12); },
   sing(note, vowel) {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime + 0.01;
