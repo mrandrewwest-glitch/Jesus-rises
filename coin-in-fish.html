@@ -1,0 +1,1907 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>The Coin in the Fish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Coin in the Fish</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+
+// Sound: the shared music engine (music.js) with this game's tune, instruments and ambience
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'pipe', ambience: 'sea', percussion: false };
+
+// Scripture shown in this game. Every version is quoted exactly;
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  cast:    { ref: 'Matthew 17:27', KJV: 'Go thou to the sea, and cast an hook, and take up the fish that first cometh up; and when thou hast opened his mouth, thou shalt find a piece of money', NKJV: 'Go to the sea, cast in a hook, and take the fish that comes up first. And when you have opened its mouth, you will find a piece of money', NIV: 'Go to the lake and throw out your line. Take the first fish you catch; open its mouth and you will find a four-drachma coin', NLT: 'Go down to the lake and throw in a line. Open the mouth of the first fish you catch, and you will find a large silver coin' },
+  pay:     { ref: 'Matthew 17:27', KJV: 'That take, and give unto them for me and thee.', NKJV: 'Take that and give it to them for Me and you.', NIV: 'Take it and give it to them for my tax and yours.', NLT: 'Take it and pay the tax for both of us.' },
+  tribute: { ref: 'Matthew 17:24', KJV: 'Doth not your master pay tribute?', NKJV: 'Does your Teacher not pay the temple tax?', NIV: 'Doesn’t your teacher pay the temple tax?', NLT: 'Doesn’t your teacher pay the Temple tax?' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const hsh = (i, k) => { const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return s - Math.floor(s); };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const SEA_Y = 360;          // calm water line
+const SINK_SPEED = 115;     // how fast the hook sinks (px/s)
+const CAST_TIME = 0.7;      // seconds the hook flies through the air
+const TAP_GAP = 0.11;       // fastest reel rate
+const REEL_TENSION = 0.1;   // tension added by one tap of the reel
+const LET_OUT = 0.6;        // tension lost per second while you let the line run
+const SLACK_TIME = 1.8;     // seconds of slack line before the fish slips off
+const DECOY_PTS = 50;       // an ordinary fish for the basket
+
+const LEVEL_NAMES = [
+  'Morning at Capernaum',
+  'A Gentle Swell',
+  'Choppy Galilee',
+  'Whitecaps',
+  'Squall on the Lake',
+  'Wind from the Hills',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Galilee ${n}`,
+    decoys: Math.min(4 + (n - 1) * 2, 16),
+    chop: Math.min(3 + (n - 1) * 4, 24),                  // wave height
+    current: n === 1 ? 0 : (Math.random() < 0.5 ? -1 : 1) * Math.min(8 + (n - 1) * 6, 40),
+    time: Math.max(90 - (n - 1) * 8, 50),                 // the collectors' patience (s)
+    glintGap: Math.min(1.1 + (n - 1) * 0.45, 3.4),        // seconds between glints
+    glintAlpha: Math.max(1 - (n - 1) * 0.13, 0.4),
+    meterPeriod: Math.max(2.6 - (n - 1) * 0.25, 1.3),     // cast meter swing time
+    coinR: Math.max(160 - (n - 1) * 10, 105),             // how far the coin fish notices the hook
+    decoyR: Math.min(62 + n * 12, 150),                   // how far ordinary fish notice it
+    decoyEager: Math.min(0.35 + n * 0.08, 0.85),
+    speed: 30 + n * 5,
+    coinStr: 0.7 + n * 0.04,                              // how hard the coin fish pulls
+    decoyStr: 0.65 + n * 0.03,
+    coinReel: Math.max(0.056 - n * 0.003, 0.04),
+    murk: Math.min((n - 1) * 0.045, 0.28),
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('coinFishBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let timeLeft = 90;
+let fishes = [];
+let particles = [];
+let bubbles = [];
+let message = { text: '', t: 0 };
+let speech = null;          // { who, text, t }
+let shakeT = 0, flashT = 0, snapT = 0;
+let endTimer = 0;
+let lastScore = null;
+let levelPts = 0, basket = 0;
+let respawns = [];
+let saidHalf = false, saidLow = false;
+let rod = newRod();
+
+function newRod() {
+  return {
+    phase: 'aim', power: 0, meterT: 0,
+    hook: { x: 0, y: 0 }, from: null, to: null, castT: 0,
+    fish: null, T: 0, p: 0, slackT: 0, struggle: 0, struggleT: 1,
+    biteX: 0, biteY: 0, landT: 0, landFrom: null, tapCd: 0, coinT: 0,
+  };
+}
+
+// ============================================================
+//  World geometry
+// ============================================================
+function shoreX() { return clamp(W * 0.36, 185, 380); }        // where the bank meets the water
+function shoreY() { return SEA_Y - 26; }                         // the top of the bank
+function peterX() { return shoreX() - 24; }
+function bedY(x) { return H - 52 + Math.sin(x / 70) * 6 + Math.sin(x / 23) * 3; }
+function surf(x) {
+  const c = cfg.chop;
+  return SEA_Y + Math.sin(x / 60 + t * 1.6) * c * 0.5 + Math.sin(x / 23 - t * 2.3) * c * 0.22;
+}
+function castMin() { return shoreX() + 60; }
+function castMax() { return W - 40; }
+function swimX0() { return shoreX() + 50; }
+function swimX1() { return W - 24; }
+function landSpot() { return { x: shoreX() + 22, y: SEA_Y + 10 }; }
+
+// The rod tip bends toward the fish when the line is tight
+function rodTip() {
+  const x = peterX() + 68, y = shoreY() - 118;
+  if (rod.phase !== 'fight') return { x, y };
+  const h = rod.hook, dx = h.x - x, dy = h.y - y, len = Math.hypot(dx, dy) || 1;
+  const bend = rod.T * 24;
+  return { x: x + dx / len * bend, y: y + dy / len * bend };
+}
+function rodGrip() { return { x: peterX() + 10, y: shoreY() - 26 }; }
+
+// ============================================================
+//  People on the shore
+// ============================================================
+const PEOPLE = {
+  peter:  { name: 'Peter',  robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066', i: 0 },
+  andrew: { name: 'Andrew', robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56', i: 1 },
+  john:   { name: 'John',   robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184', i: 3 },
+  col1:   { name: 'Collector', robe: '#7a5c8e', hair: '#2e1d10', beard: true, skin: '#c58a55', scarf: '#e0cf9a', i: 4 },
+  col2:   { name: 'Collector', robe: '#8e6a3c', hair: '#5a5a5a', beard: true, skin: '#d7a070', scarf: '#b9c7cf', i: 5 },
+};
+for (const d of Object.values(PEOPLE)) {
+  Object.assign(d, { mood: 'watch', switchT: 0, delay: d.i === 0 ? 0 : rand(0.05, 0.45), blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) });
+}
+
+function peopleSlots() {
+  const sx = shoreX(), sy = shoreY();
+  const slots = [];
+  if (sx >= 300) {
+    slots.push({ d: PEOPLE.andrew, x: sx * 0.45, y: sy - 10, s: 0.72, row: 0 });
+    slots.push({ d: PEOPLE.john, x: sx * 0.73, y: sy - 10, s: 0.72, row: 0 });
+  }
+  slots.push({ d: PEOPLE.col1, x: sx * 0.13, y: sy + 2, s: 0.86, row: 1, bag: true });
+  slots.push({ d: PEOPLE.col2, x: sx * 0.33, y: sy + 2, s: 0.86, row: 1 });
+  slots.push({ d: PEOPLE.peter, x: peterX(), y: sy + 2, s: 0.88, row: 1, pose: state === 'win' ? 'coin' : 'rod' });
+  return slots;
+}
+function jesusX() { return shoreX() * 0.57; }
+
+function fishMood() {
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (snapT > 0) return 'shock';
+  if (rod.phase === 'fight') return rod.T > 0.8 || rod.struggle ? 'worried' : 'wow';
+  if (rod.phase === 'land') return 'wow';
+  return 'watch';
+}
+function collectorMood() {
+  if (state === 'title') return 'watch';
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (snapT > 0) return 'shock';
+  if (rod.phase === 'fight' || rod.phase === 'land') return 'wow';
+  const f = timeLeft / cfg.time;
+  if (f < 0.25) return 'worried';
+  if (f < 0.6) return 'doubt';
+  return 'watch';
+}
+
+function updatePeople(dt) {
+  const fm = fishMood(), cm = collectorMood();
+  for (const d of Object.values(PEOPLE)) {
+    const want = d.name === 'Collector' ? cm : fm;
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+}
+
+// Where everyone looks: the hook, the fish, or the coin
+function lookTarget() {
+  if (state === 'win') return { x: peterX() + 4, y: shoreY() - 120 };
+  if (rod.phase === 'aim') return { x: lerp(castMin(), castMax(), rod.power), y: SEA_Y };
+  return { x: rod.hook.x, y: rod.hook.y };
+}
+
+function drawDisciple(slot) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(x, slot.y - jump * s);
+  ctx.scale(s, s);
+  // back row is dimmed by darker colours (no canvas filter)
+  const dim = slot.row === 0 ? -14 : 0;
+  const robe = dim ? shade(d.robe, dim) : d.robe;
+  const skin = dim ? shade(d.skin, dim) : d.skin;
+
+  const sleeve = shade(d.robe, -25 + dim);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  // Look toward the action
+  const lt = lookTarget();
+  const wx = x, wy = slot.y - 52 * s;
+  const dx = lt.x - wx, dy = lt.y - wy;
+  const len = Math.hypot(dx, dy) || 1;
+  const lx = dx / len, ly = dy / len;
+
+  if (slot.pose === 'coin') {
+    arm(11, -32, 16, -80);           // holding the coin high
+  } else if (mood === 'joy' && !slot.pose) {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 3 === 0 && !slot.pose) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(d.robe, -40 + dim);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Arms
+  if (slot.pose === 'rod') {
+    // both hands on the rod, which is drawn separately
+    arm(-11, -32, 6, -30); arm(11, -32, 13, -34);
+  } else if (slot.pose === 'coin') {
+    arm(-11, -32, -18, -40);
+  } else if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+    if (mood === 'doubt') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); } // folded arms
+    else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // A collector's money bag
+  if (slot.bag && mood !== 'joy' && mood !== 'shock') {
+    ctx.fillStyle = '#a9824a'; ctx.strokeStyle = '#6e5025'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(-19, -8, 7, 8, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-23, -15); ctx.lineTo(-15, -15); ctx.stroke();
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Beard
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (!slot.pose) {
+    if (mood === 'shock') {
+      arm(-11, -32, -15, hy + 4);
+      arm(11, -32, 15, hy + 4);
+    } else if (mood === 'dismay' && d.i % 2 === 0) {
+      arm(11, -32, 2, hy - 3);   // facepalm
+      ctx.fillStyle = skin;
+      roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+    } else if (mood === 'dismay') {
+      arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+// ============================================================
+//  Jesus (as in the reference, without His cloud)
+// ============================================================
+function drawJesus(x, y, s, face, up) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  if (up) {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 75);
+    g.addColorStop(0, 'rgba(255,235,150,0.55)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 75, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: raised in joy, otherwise one hand gesturing to the lake
+  const bob = Math.sin(t * 2.5) * 1.5;
+  const hands = up ? [[-21, -66], [21, -66]] : [[-20, -22], [27, -38 + bob]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-3, -53, 1.5, 0, TAU); ctx.arc(5, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  Fish
+// ============================================================
+const FISH_COLORS = ['#a9b8c4', '#9fb3a6', '#b8ab8c', '#a3a9bd', '#b3bcc0'];
+
+function newFish(coin, fromEdge) {
+  const x0 = swimX0(), x1 = swimX1();
+  const y = rand(SEA_Y + 70, H - 110);
+  return {
+    coin, x: fromEdge ? W + 30 : rand(x0, x1), y, ty: y,
+    dir: fromEdge ? -1 : (Math.random() < 0.5 ? -1 : 1),
+    speed: cfg.speed * rand(0.8, 1.2) * (coin ? 0.85 : 1),
+    size: coin ? 1.12 : rand(0.85, 1.1),
+    color: FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)],
+    phase: rand(0, TAU), mode: 'swim', fleeT: 0, cool: rand(0, 1), turnT: rand(3, 8),
+  };
+}
+
+function makeFishes() {
+  const list = [];
+  const coin = newFish(true);
+  if (level === 1) { coin.x = lerp(swimX0(), swimX1(), 0.55); coin.y = coin.ty = SEA_Y + 200; }
+  list.push(coin);
+  for (let i = 0; i < cfg.decoys; i++) list.push(newFish(false));
+  return list;
+}
+
+function hookInWater() { return rod.phase === 'sink' || rod.phase === 'wait'; }
+
+function updateFishes(dt) {
+  const x0 = swimX0(), x1 = swimX1();
+  const hk = rod.hook;
+  for (const f of fishes) {
+    if (f.mode === 'hooked' || f.mode === 'landed') continue;
+    f.cool = Math.max(0, f.cool - dt);
+    const d = Math.hypot(hk.x - f.x, hk.y - f.y);
+
+    if (f.mode === 'flee') {
+      f.fleeT -= dt;
+      f.x += f.dir * f.speed * 3 * dt;
+      if (f.fleeT <= 0) f.mode = 'swim';
+    } else if (f.mode === 'seek') {
+      if (!hookInWater() || state !== 'play') { f.mode = 'swim'; f.cool = 1; continue; }
+      const sp = f.speed * (f.coin ? 1.7 : 1.9);
+      const dx = hk.x - (f.x + f.dir * 14 * f.size), dy = hk.y - f.y;
+      const len = Math.hypot(dx, dy) || 1;
+      if (Math.abs(dx) > 4) f.dir = Math.sign(dx);
+      f.x += dx / len * sp * dt;
+      f.y += dy / len * sp * dt;
+      f.ty = f.y;
+      if (len < 10) { bite(f); return; }
+      if (d > (f.coin ? cfg.coinR : cfg.decoyR) * 1.6) f.mode = 'swim';
+    } else {
+      // Swim along, drifting between depths and turning at the edges
+      f.x += f.dir * f.speed * dt;
+      f.turnT -= dt;
+      if (f.turnT <= 0) { f.turnT = rand(3, 8); f.ty = rand(SEA_Y + 70, H - 110); if (Math.random() < 0.3) f.dir *= -1; }
+      f.y += (f.ty - f.y) * 0.4 * dt + Math.sin(t * 2 + f.phase) * 6 * dt;
+      // Notice the hook
+      if (state === 'play' && hookInWater() && f.cool <= 0) {
+        const r = f.coin ? cfg.coinR : cfg.decoyR;
+        if (d < r) {
+          if (f.coin || Math.random() < cfg.decoyEager) f.mode = 'seek';
+          else f.cool = 1.2;
+        }
+      }
+    }
+    if (f.x < x0) { f.x = x0; f.dir = 1; if (f.mode === 'flee') f.fleeT = 0; }
+    if (f.x > x1 + (f.mode === 'flee' ? 0 : 10)) { f.x = Math.min(f.x, x1 + 10); f.dir = -1; if (f.mode === 'flee') f.fleeT = 0; }
+    f.y = clamp(f.y, SEA_Y + 50, bedY(f.x) - 26);
+  }
+  // Replace ordinary fish that went into the basket
+  for (let i = respawns.length - 1; i >= 0; i--) {
+    respawns[i] -= dt;
+    if (respawns[i] <= 0) { respawns.splice(i, 1); fishes.push(newFish(false, true)); }
+  }
+}
+
+// Fish at the hook: scare the others away
+function bite(f) {
+  f.mode = 'hooked';
+  Object.assign(rod, {
+    phase: 'fight', fish: f, T: 0.35, p: 0, slackT: 0, struggle: 0, struggleT: rand(0.5, 1),
+    biteX: rod.hook.x, biteY: rod.hook.y,
+  });
+  for (const o of fishes) {
+    if (o === f || o.mode === 'landed') continue;
+    if (o.mode === 'seek' || Math.hypot(o.x - f.x, o.y - f.y) < 110) {
+      o.mode = 'flee'; o.fleeT = 0.8; o.dir = o.x < f.x ? -1 : 1; o.cool = 2;
+    }
+  }
+  for (let i = 0; i < 10; i++) bubbles.push({ x: f.x + rand(-8, 8), y: f.y + rand(-6, 6), r: rand(2, 4.5), vy: rand(-60, -30) });
+  showMessage('A bite! Tap to reel in!');
+  sfx.bite();
+}
+
+function drawFish(f) {
+  ctx.save();
+  let wig = 0;
+  if (f.mode === 'hooked' && rod.struggle) wig = Math.sin(t * 28) * 0.25;
+  ctx.translate(f.x, f.y);
+  ctx.rotate(wig + (f.mode === 'hooked' ? -f.dir * 0.25 : 0));
+  ctx.scale(f.dir * f.size, f.size);
+  const wag = Math.sin(t * (f.mode === 'swim' ? 9 : 16) + f.phase);
+  // deeper fish look darker and bluer (colours dimmed directly, no canvas filter)
+  const depth = clamp((f.y - SEA_Y) / (H - SEA_Y), 0, 1);
+  const base = f.color;
+  const dimAmt = -Math.round(depth * 45);
+  const col = shade(base, dimAmt);
+  ctx.fillStyle = shade(base, -25 + dimAmt);
+  ctx.beginPath();
+  ctx.moveTo(-12, 0); ctx.lineTo(-24, -9 + wag * 3); ctx.quadraticCurveTo(-20, 0, -24, 9 + wag * 3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-7, -6); ctx.quadraticCurveTo(0, -15, 7, -7); ctx.fill();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.ellipse(0, 0, 15, 8, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath(); ctx.ellipse(1, 3, 11, 3.8, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = shade(base, -45 + dimAmt); ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(3, 0, 6, -0.9, 0.9); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(8, -2, 2.8, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1d1a18'; ctx.beginPath(); ctx.arc(8.8, -2, 1.4, 0, TAU); ctx.fill();
+  // A hint of gold in the coin fish's mouth
+  if (f.coin) {
+    ctx.fillStyle = `rgba(255,214,90,${0.25 + cfg.glintAlpha * 0.45})`;
+    ctx.beginPath(); ctx.ellipse(14.5, 1.5, 2.6, 3.2, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// The glint is drawn above the murky water so it can still be spotted
+function drawGlint(f) {
+  if (!f.coin || f.mode === 'landed') return;
+  const g = ((t + f.phase) % cfg.glintGap) / 0.45;
+  const mx = f.x + f.dir * 15 * f.size, my = f.y + 1.5;
+  if (level === 1) {
+    const gl = ctx.createRadialGradient(mx, my, 1, mx, my, 26);
+    gl.addColorStop(0, `rgba(255,236,150,${0.28 + 0.12 * Math.sin(t * 4)})`);
+    gl.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(mx, my, 26, 0, TAU); ctx.fill();
+  }
+  if (g >= 1) return;
+  const a = Math.sin(g * Math.PI) * cfg.glintAlpha;
+  const r = 5 + 9 * Math.sin(g * Math.PI);
+  ctx.save();
+  ctx.translate(mx, my);
+  ctx.rotate(g * 0.8);
+  ctx.fillStyle = `rgba(255,248,200,${a})`;
+  ctx.beginPath();
+  for (let k = 0; k < 4; k++) {
+    const an = k * Math.PI / 2;
+    ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r);
+    ctx.lineTo(Math.cos(an + Math.PI / 4) * r * 0.22, Math.sin(an + Math.PI / 4) * r * 0.22);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawCoin(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  const sq = Math.cos(t * 3);              // slowly spinning
+  ctx.scale(Math.max(0.25, Math.abs(sq)), 1);
+  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 1, 0, 0, r);
+  g.addColorStop(0, '#fff6c8'); g.addColorStop(0.5, '#f7c948'); g.addColorStop(1, '#c98e1b');
+  ctx.fillStyle = g; ctx.strokeStyle = '#9a6a12'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(154,106,18,0.6)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, TAU); ctx.stroke();
+  // a simple stamped star
+  ctx.fillStyle = 'rgba(154,106,18,0.55)';
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const an = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.2 : r * 0.48;
+    ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles and bubbles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.y += b.vy * dt; b.x += Math.sin(t * 5 + i) * 10 * dt;
+    if (b.y < surf(b.x) + 2) bubbles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBubbles() {
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;
+  for (const b of bubbles) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.stroke(); }
+}
+
+function splash(x, y, n, big) {
+  for (let i = 0; i < n; i++) {
+    spawn(x + rand(-10, 10), y, rand(-70, 70) * (big ? 1.4 : 1), rand(-190, -80) * (big ? 1.2 : 1), rand(0.4, 0.8), Math.random() < 0.5 ? '#ffffff' : '#bfe6fa', rand(2, 4), 420);
+  }
+}
+
+// ============================================================
+//  Fishing: cast, sink, wait, fight, land
+// ============================================================
+// One tap (or Space) does whatever the moment needs
+function act() {
+  if (state !== 'play' || rod.tapCd > 0) return;
+  const ph = rod.phase;
+  if (ph === 'aim') {
+    const tip = rodTip();
+    rod.from = { x: tip.x, y: tip.y };
+    rod.to = { x: lerp(castMin(), castMax(), rod.power), y: SEA_Y };
+    rod.castT = 0;
+    rod.phase = 'cast';
+    rod.tapCd = 0.2;
+    sfx.whoosh();
+  } else if (ph === 'sink') {
+    rod.phase = 'wait';
+    rod.tapCd = 0.25;
+    sfx.click(900);
+  } else if (ph === 'wait') {
+    rod.phase = 'retrieve';
+    rod.tapCd = 0.2;
+    sfx.click(700);
+  } else if (ph === 'fight') {
+    const f = rod.fish;
+    const s = rod.struggle ? 1 : 0;
+    rod.T += REEL_TENSION * (s ? 1.9 : 1);
+    rod.p += (f.coin ? cfg.coinReel : 0.055) * (s ? 0.35 : 1);
+    rod.tapCd = TAP_GAP;
+    sfx.reel(rod.T);
+  }
+}
+
+function updateRod(dt) {
+  rod.tapCd = Math.max(0, rod.tapCd - dt);
+  const hk = rod.hook;
+  switch (rod.phase) {
+    case 'aim': {
+      rod.meterT += dt;
+      const f = (rod.meterT / cfg.meterPeriod) % 2;
+      rod.power = f < 1 ? f : 2 - f;
+      const tip = rodTip(); hk.x = tip.x; hk.y = tip.y;
+      break;
+    }
+    case 'cast': {
+      rod.castT += dt / CAST_TIME;
+      const f = Math.min(rod.castT, 1);
+      hk.x = lerp(rod.from.x, rod.to.x, f);
+      hk.y = lerp(rod.from.y, surf(rod.to.x), f) - Math.sin(f * Math.PI) * 120;
+      if (rod.castT >= 1) {
+        hk.y = surf(hk.x) + 4;
+        splash(hk.x, SEA_Y, 12);
+        sfx.splash(0.35);
+        rod.phase = 'sink';
+      }
+      break;
+    }
+    case 'sink':
+    case 'wait': {
+      if (rod.phase === 'sink') {
+        hk.y += SINK_SPEED * dt;
+        if (hk.y >= bedY(hk.x) - 16) { hk.y = bedY(hk.x) - 16; rod.phase = 'wait'; showMessage('The hook rests on the lake bed'); }
+      }
+      // choppy water drags the line along
+      hk.x = clamp(hk.x + cfg.current * dt * (rod.phase === 'wait' ? 1 : 0.5) + Math.sin(t * 1.7) * cfg.chop * 0.4 * dt, castMin() - 20, W - 20);
+      if (Math.random() < dt * 0.8) bubbles.push({ x: hk.x, y: hk.y - 6, r: rand(1.5, 2.5), vy: rand(-50, -30) });
+      break;
+    }
+    case 'fight': updateFight(dt); break;
+    case 'land': {
+      rod.landT += dt / 0.75;
+      const f = rod.fish, a = rod.landFrom, b = { x: peterX() + 26, y: shoreY() - 10 };
+      const k = Math.min(rod.landT, 1);
+      f.x = lerp(a.x, b.x, k); f.y = lerp(a.y, b.y, k) - Math.sin(k * Math.PI) * 90;
+      f.dir = -1;
+      hk.x = f.x - 12; hk.y = f.y;
+      if (rod.landT >= 1) landed(f);
+      break;
+    }
+    case 'retrieve': {
+      const tip = rodTip();
+      const dx = tip.x - hk.x, dy = tip.y - hk.y, len = Math.hypot(dx, dy);
+      const step = 600 * dt;
+      if (len <= step) { hk.x = tip.x; hk.y = tip.y; rod.phase = 'aim'; rod.meterT = 0; }
+      else { hk.x += dx / len * step; hk.y += dy / len * step; }
+      break;
+    }
+  }
+}
+
+function updateFight(dt) {
+  const f = rod.fish;
+  const str = f.coin ? cfg.coinStr : cfg.decoyStr;
+  rod.struggleT -= dt;
+  if (rod.struggleT <= 0) {
+    if (rod.struggle) { rod.struggle = 0; rod.struggleT = rand(0.9, 2.0); }
+    else {
+      rod.struggle = 1; rod.struggleT = rand(0.5, 1.0) * (f.coin ? 1.1 : 1);
+      splash(f.x, surf(f.x), 3);
+      sfx.splash(0.12);
+    }
+  }
+  rod.T -= LET_OUT * dt;
+  if (rod.struggle) { rod.T += str * dt; rod.p -= 0.1 * dt; }
+  else rod.p -= 0.02 * dt;
+  // choppy water tugs the line
+  rod.T += Math.sin(t * 6.3) * Math.sin(t * 2.9 + 1) * cfg.chop * 0.012 * dt;
+  rod.p = Math.max(0, rod.p);
+  rod.T = Math.max(0, rod.T);
+
+  // The fish is pulled from where it bit toward the bank
+  const L = landSpot();
+  const k = rod.p;
+  f.x = lerp(rod.biteX, L.x, k) + (rod.struggle ? Math.sin(t * 22) * 5 : 0);
+  f.y = lerp(rod.biteY, L.y, k * k) + (rod.struggle ? Math.cos(t * 17) * 3 : 0);
+  f.dir = -1;
+  rod.hook.x = f.x - 16 * f.size; rod.hook.y = f.y + 1;
+  if (rod.struggle && Math.random() < 0.3) bubbles.push({ x: f.x, y: f.y, r: rand(1.5, 3), vy: rand(-70, -40) });
+
+  if (rod.T >= 1) { loseFish('Snap! The line was too tight.', true); return; }
+  if (rod.T < 0.06) {
+    rod.slackT += dt;
+    if (rod.slackT > SLACK_TIME) { loseFish('Too slack! It slipped off the hook.', false); return; }
+  } else rod.slackT = 0;
+  if (rod.p >= 1) {
+    rod.phase = 'land'; rod.landT = 0; rod.landFrom = { x: f.x, y: f.y };
+    splash(f.x, SEA_Y, 14, true);
+    sfx.splash(0.4);
+  }
+}
+
+function loseFish(msg, snapped) {
+  const f = rod.fish;
+  f.mode = 'flee'; f.fleeT = 1.8; f.cool = 3.5; f.dir = 1;
+  rod.fish = null;
+  rod.phase = 'retrieve';
+  rod.T = 0;
+  snapT = 1.3;
+  if (snapped) shakeT = 0.25;
+  showMessage(msg);
+  sfx.snap();
+}
+
+const BASKET_LINES = [
+  'That fish is not paying anybody!',
+  'A lovely fish. Still no tax.',
+  'Just an ordinary fish, Peter.',
+  'We are waiting...',
+];
+
+function landed(f) {
+  if (f.coin) { win(f); return; }
+  f.mode = 'landed';
+  fishes.splice(fishes.indexOf(f), 1);
+  respawns.push(4);
+  basket++;
+  levelPts += DECOY_PTS;
+  rod.fish = null;
+  rod.phase = 'aim'; rod.meterT = 0;
+  showMessage(`An ordinary fish. +${DECOY_PTS}`);
+  say('col', BASKET_LINES[(basket - 1) % BASKET_LINES.length]);
+  sfx.plop();
+}
+
+function say(who, text, dur = 2.8) { speech = { who, text, t: dur }; }
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win(f) {
+  state = 'win';
+  syncAmbience();
+  f.mode = 'landed';
+  rod.phase = 'reveal'; rod.coinT = 0; rod.fish = f;
+  const coin = 500;
+  const patience = Math.round(timeLeft * 10);
+  const levelBonus = level * 300;
+  const score = coin + patience + levelPts + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('coinFishBest', best); } catch (e) {} }
+  lastScore = { coin, patience, fish: levelPts, levelBonus, score };
+  for (let i = 0; i < 60; i++) {
+    const a = rand(0, TAU), sp = rand(40, 180);
+    spawn(peterX(), shoreY() - 100, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 30);
+  }
+  showMessage('A piece of money in its mouth!');
+  say('peter', 'For me and thee!', 3);
+  sfx.win();
+  endTimer = 2.6;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  if (rod.fish && rod.phase === 'fight') { const f = rod.fish; f.mode = 'flee'; f.fleeT = 2; rod.fish = null; }
+  rod.phase = 'retrieve';
+  showMessage("The collectors' patience ran out");
+  say('col', 'We will come back tomorrow...', 3);
+  sfx.fail();
+  endTimer = 1.6;
+}
+
+function showMessage(text) { message = { text, t: 2.2 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(1);
+  fishes = makeFishes();
+  rod = newRod();
+  showOverlay('The Coin in the Fish', 'A Galilee Fishing Game',
+    `${verseHTML('cast')}
+     <ul>
+       <li>The tax collectors want the temple tax. Help <b>Peter</b> catch the one fish with a <b>coin in its mouth</b>.</li>
+       <li>Watch the water for a faint <b>golden glint</b> &mdash; most fish are just ordinary fish.</li>
+       <li><b>Tap</b> (or <kbd>Space</kbd>) to cast when the meter points at the right spot, tap again to <b>stop the hook</b> at the fish's depth.</li>
+       <li>When a fish bites, <b>tap to reel</b> and <b>pause to let the line out</b>. Too tight and it snaps; too slack and it slips away. Ease off when the fish thrashes!</li>
+       <li>Hurry &mdash; the collectors' <b>patience</b> won't last for ever.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Go Fishing', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = makeConfig(level);
+  timeLeft = cfg.time;
+  fishes = makeFishes();
+  rod = newRod();
+  const tip = rodTip(); rod.hook.x = tip.x; rod.hook.y = tip.y;
+  particles = []; bubbles = []; respawns = [];
+  levelPts = 0; basket = 0;
+  shakeT = flashT = snapT = 0;
+  saidHalf = saidLow = false;
+  endTimer = 0;
+  state = 'play';
+  syncAmbience();
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  say('col', Bible.verse(VERSES.tribute).text, 3.5);
+  sfx.levelStart();
+  if (level === 1) setTimeout(() => { if (state === 'play' && rod.phase === 'aim' && level === 1) showMessage('Find the glint, then tap to cast!'); }, 2400);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('For me and thee!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('pay')}
+       <p class="score">The coin: <b>${s.coin}</b><br>Patience left: <b>${s.patience}</b><br>Basket of fish: <b>${s.fish}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Out of time!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The tax collectors went off to find their lunch. Look for the glint, and ease off the reel when the fish thrashes.</p>
+       ${verseHTML('tribute')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const ripples = [];
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if ((e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') && !e.repeat) act();
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  act();
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// The theme's ambient bed plays only during active play, with sound on and the page in view
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);   // the shared music plays through the same mute
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, q, vol, dur, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { Music.win(); },
+  levelStart() { Music.start(); },
+  fail() { Music.fail(); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    Music.tap(height);
+  },
+  puff(vol = 0.35) { this.noiseBurst(1100, 0.7, vol, 0.16); },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  thunder() { this.noiseBurst(400, 0.7, 0.9, 1.2, 'lowpass'); },
+  // Fishing sounds
+  whoosh() { this.noiseBurst(1800, 1.2, 0.25, 0.3); this.tone(900, 0.25, 'sine', 0.08, 0, 300); },
+  splash(vol = 0.3) { this.noiseBurst(700, 0.6, vol, 0.35, 'lowpass'); this.noiseBurst(2400, 1, vol * 0.4, 0.2); },
+  click(f = 900) { this.tone(f, 0.05, 'square', 0.06); },
+  reel(tension) { this.tone(1000 + tension * 700, 0.04, 'square', 0.05); },
+  bite() { Music.tap(0.8); this.splash(0.2); },
+  snap() { this.tone(700, 0.25, 'triangle', 0.25, 0, 140); this.bounce(); },
+  plop() { this.tone(500, 0.12, 'sine', 0.3, 0, 180); Music.tap(0.3); },
+};
+
+// ============================================================
+//  Rendering
+// ============================================================
+const bgClouds = Array.from({ length: 6 }, () => ({ f: Math.random(), y: rand(-60, 200), w: rand(70, 150), speed: rand(4, 9) }));
+const gulls = Array.from({ length: 3 }, () => ({ f: Math.random(), y: rand(120, 230), phase: rand(0, TAU), speed: rand(15, 25) }));
+
+function updateScenery(dt) {
+  for (const c of bgClouds) { c.f += c.speed * dt / (viewW + 300); if (c.f > 1) c.f -= 1; }
+  for (const g of gulls) { g.f += g.speed * dt / (viewW + 200); if (g.f > 1) { g.f -= 1; g.y = rand(120, 230); } }
+}
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, SEA_Y);
+  g.addColorStop(0, '#6fb6ea');
+  g.addColorStop(0.6, '#a8d8f4');
+  g.addColorStop(1, '#fff1d0');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, SEA_Y + offY + 10);
+  // Sun
+  const sx = W * 0.82, sy = 150;
+  const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 130);
+  sg.addColorStop(0, 'rgba(255,244,190,0.8)');
+  sg.addColorStop(1, 'rgba(255,244,190,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(sx, sy, 130, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff3b0';
+  ctx.beginPath(); ctx.arc(sx, sy, 32, 0, TAU); ctx.fill();
+  for (const c of bgClouds) drawCloud(-offX - 150 + c.f * (viewW + 300), c.y, c.w, c.w * 0.3, 'rgba(255,255,255,0.9)', 'rgba(220,235,250,0.8)');
+  // Gulls
+  ctx.strokeStyle = 'rgba(70,60,60,0.6)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for (const gl of gulls) {
+    const x = -offX - 100 + gl.f * (viewW + 200), y = gl.y + Math.sin(t + gl.phase) * 6;
+    const flap = Math.sin(t * 6 + gl.phase) * 4;
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y - flap); ctx.quadraticCurveTo(x - 5, y - 6 - flap, x, y);
+    ctx.quadraticCurveTo(x + 5, y - 6 - flap, x + 10, y - flap);
+    ctx.stroke();
+  }
+  // Far shore hills with the little white houses of a village
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  ctx.fillStyle = '#a9c79a';
+  ctx.beginPath(); ctx.moveTo(x0, SEA_Y + 5);
+  for (let x = x0; x <= x1; x += 16) ctx.lineTo(x, SEA_Y - 38 - Math.sin(x / 110) * 18 - Math.sin(x / 41) * 6);
+  ctx.lineTo(x1, SEA_Y + 5); ctx.fill();
+  for (let i = 0; i < 7; i++) {
+    const hx = W * 0.55 + i * 22 + hsh(i, 3) * 8, hy = SEA_Y - 12 - hsh(i, 5) * 10;
+    ctx.fillStyle = '#f3ead6'; ctx.fillRect(hx, hy - 12, 16, 12);
+    ctx.fillStyle = '#c9b48c'; ctx.fillRect(hx - 1, hy - 14, 18, 3);
+  }
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function waterPath() {
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  ctx.beginPath();
+  ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x));
+  ctx.lineTo(x1, H + 10);
+  ctx.closePath();
+}
+
+function drawWater() {
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  waterPath();
+  const g = ctx.createLinearGradient(0, SEA_Y - 6, 0, H);
+  g.addColorStop(0, 'rgba(110,190,225,0.9)');
+  g.addColorStop(0.06, '#3a8abc');
+  g.addColorStop(0.5, '#1f6b9c');
+  g.addColorStop(1, '#0f3a60');
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.save();
+  waterPath(); ctx.clip();
+  // Light rays
+  ctx.fillStyle = 'rgba(255,255,220,0.06)';
+  for (let i = 0; i < 6; i++) {
+    const x = x0 + (x1 - x0) * (i + 0.5) / 6 + Math.sin(t * 0.3 + i * 1.7) * 30;
+    ctx.beginPath();
+    ctx.moveTo(x - 18, SEA_Y); ctx.lineTo(x + 26, SEA_Y); ctx.lineTo(x + 130, H); ctx.lineTo(x + 30, H);
+    ctx.closePath(); ctx.fill();
+  }
+  // Lake bed, pebbles and swaying weeds
+  const bg = ctx.createLinearGradient(0, H - 60, 0, H);
+  bg.addColorStop(0, '#b99d63'); bg.addColorStop(1, '#7d6440');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 10) ctx.lineTo(x, bedY(x));
+  ctx.lineTo(x1, H + 10); ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 24; i++) {
+    const x = x0 + hsh(i, 1) * (x1 - x0);
+    ctx.fillStyle = ['#9c8a6e', '#8a7a64', '#b0a080'][i % 3];
+    ctx.beginPath(); ctx.ellipse(x, bedY(x) + 10 + hsh(i, 2) * 20, 5 + hsh(i, 3) * 5, 3 + hsh(i, 4) * 3, 0, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = '#3f7f4a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = 0; i < 12; i++) {
+    const x = x0 + hsh(i, 7) * (x1 - x0), y = bedY(x) + 4, h = 30 + hsh(i, 8) * 40;
+    const sw = Math.sin(t * 1.4 + i) * (6 + cfg.chop * 0.4);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 8 + sw * 0.5, y - h * 0.5, x + sw, y - h); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Murkier water on stormier levels
+function drawMurk() {
+  if (cfg.murk <= 0) return;
+  ctx.save();
+  waterPath(); ctx.clip();
+  const g = ctx.createLinearGradient(0, SEA_Y, 0, H);
+  g.addColorStop(0, `rgba(40,80,90,${cfg.murk * 0.5})`);
+  g.addColorStop(1, `rgba(20,45,60,${cfg.murk * 1.4})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, SEA_Y - 30, viewW, H);
+  ctx.restore();
+}
+
+function drawSurfaceLine() {
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, surf(x));
+  ctx.stroke();
+  // Whitecaps on choppy water
+  if (cfg.chop >= 10) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    for (let x = x0; x <= x1; x += 8) {
+      const y = surf(x);
+      if (y < SEA_Y - cfg.chop * 0.55 && Math.floor(x / 8) % 2 === 0) { ctx.beginPath(); ctx.arc(x, y + 1, 3, 0, TAU); ctx.fill(); }
+    }
+  }
+}
+
+// The bank Peter stands on, sloping down under the water
+function drawShore() {
+  const sx = shoreX(), sy = shoreY(), x0 = -offX - 10;
+  // underwater slope
+  const ug = ctx.createLinearGradient(0, SEA_Y, 0, H);
+  ug.addColorStop(0, '#c2a46a'); ug.addColorStop(1, '#7e6644');
+  ctx.fillStyle = ug;
+  ctx.beginPath();
+  ctx.moveTo(x0, SEA_Y); ctx.lineTo(sx + 6, SEA_Y);
+  ctx.quadraticCurveTo(sx + 30, SEA_Y + 140, sx + 60, H + 10);
+  ctx.lineTo(x0, H + 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(60,130,170,0.28)';
+  ctx.fill();
+  // stones and weeds on the drowned bank
+  ctx.save(); ctx.clip();
+  for (let i = 0; i < 14; i++) {
+    const x = x0 + hsh(i, 11) * (sx + 40 - x0), y = SEA_Y + 40 + hsh(i, 12) * (H - SEA_Y - 40);
+    ctx.fillStyle = i % 2 ? 'rgba(110,90,60,0.5)' : 'rgba(220,200,160,0.4)';
+    ctx.beginPath(); ctx.ellipse(x, y, 8 + hsh(i, 13) * 10, 5 + hsh(i, 14) * 5, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(70,120,80,0.8)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const y = SEA_Y + 90 + i * 110, x = sx + 6 + (y - SEA_Y) / (H - SEA_Y) * 50 - 6, sw = Math.sin(t * 1.4 + i * 2) * 6;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 6 + sw * 0.5, y - 20, x + 3 + sw, y - 40); ctx.stroke();
+  }
+  // sandy bank
+  const g = ctx.createLinearGradient(0, sy, 0, SEA_Y + 10);
+  g.addColorStop(0, '#e8cf94'); g.addColorStop(1, '#c9a86a');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x0, SEA_Y + 12); ctx.lineTo(x0, sy);
+  ctx.lineTo(sx - 18, sy);
+  ctx.quadraticCurveTo(sx - 4, sy + 2, sx + 10, SEA_Y + 12);
+  ctx.closePath(); ctx.fill();
+  // grass tufts along the back
+  ctx.fillStyle = '#86b95d';
+  roundRect(x0, sy - 4, sx - 20 - x0, 8, 4); ctx.fill();
+  ctx.strokeStyle = '#6a9c45'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for (let x = 6; x < sx - 30; x += 17) {
+    ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x - 3, sy - 8); ctx.moveTo(x, sy); ctx.lineTo(x + 3, sy - 9); ctx.stroke();
+  }
+  // rocks at the water's edge
+  ctx.fillStyle = '#9a9184';
+  ctx.beginPath(); ctx.ellipse(sx - 2, SEA_Y + 2, 16, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#b3aa9b';
+  ctx.beginPath(); ctx.ellipse(sx - 6, SEA_Y - 1, 10, 6, 0, 0, TAU); ctx.fill();
+}
+
+function drawBasket() {
+  const x = peterX() + 24, y = shoreY() + 2;
+  // fish tails poking out
+  for (let i = 0; i < Math.min(basket, 5); i++) {
+    const fx = x - 8 + i * 4;
+    ctx.fillStyle = FISH_COLORS[i % FISH_COLORS.length];
+    ctx.beginPath(); ctx.moveTo(fx, y - 16); ctx.lineTo(fx - 5, y - 26); ctx.lineTo(fx + 5, y - 26); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#b8894a'; ctx.strokeStyle = '#7d5a2c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x - 13, y - 18); ctx.lineTo(x + 13, y - 18); ctx.lineTo(x + 10, y); ctx.lineTo(x - 10, y); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 12, y - 12); ctx.lineTo(x + 12, y - 12); ctx.moveTo(x - 11, y - 6); ctx.lineTo(x + 11, y - 6); ctx.stroke();
+}
+
+function drawRodAndLine() {
+  const gp = rodGrip(), tip = rodTip(), hk = rod.hook;
+  if (state === 'win') return;   // Peter has put the rod down to hold up the coin
+  // Rod
+  ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(gp.x - 8, gp.y + 8);
+  ctx.quadraticCurveTo(lerp(gp.x, tip.x, 0.6), lerp(gp.y, tip.y, 0.5), tip.x, tip.y);
+  ctx.stroke();
+  if (state === 'win' || state === 'title' || rod.phase === 'aim' && state !== 'play') return;
+  if (rod.phase === 'reveal') return;
+  // Line: taut when fighting, sagging otherwise
+  const sag = rod.phase === 'fight' ? (1 - rod.T) * 40 : rod.phase === 'cast' ? 10 : 30;
+  ctx.strokeStyle = rod.phase === 'fight' && rod.T > 0.85 ? 'rgba(255,120,110,0.95)' : 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(tip.x, tip.y);
+  ctx.quadraticCurveTo((tip.x + hk.x) / 2, Math.max(tip.y, hk.y) - 10 + sag, hk.x, hk.y);
+  ctx.stroke();
+  // Hook with a little bait
+  if (rod.phase !== 'land') {
+    ctx.strokeStyle = '#d9dde2'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hk.x, hk.y); ctx.lineTo(hk.x, hk.y + 8); ctx.arc(hk.x - 4, hk.y + 8, 4, 0, Math.PI); ctx.stroke();
+    if (rod.phase !== 'fight') { ctx.fillStyle = '#d9826b'; ctx.beginPath(); ctx.arc(hk.x - 4, hk.y + 12, 2.5, 0, TAU); ctx.fill(); }
+  }
+}
+
+// Where the cast will land
+function drawAimMarker() {
+  if (state !== 'play' || rod.phase !== 'aim') return;
+  const x = lerp(castMin(), castMax(), rod.power), y = surf(x);
+  ctx.strokeStyle = 'rgba(255,236,150,0.9)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(x, y + 2, 22, 6, 0, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#ffe27a';
+  ctx.beginPath(); ctx.moveTo(x - 9, y - 30); ctx.lineTo(x + 9, y - 30); ctx.lineTo(x, y - 14); ctx.closePath(); ctx.fill();
+  // faint drop line to show the path the hook will sink along
+  ctx.setLineDash([6, 8]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x, bedY(x) - 16); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function drawSpeech() {
+  if (!speech || speech.t <= 0) return;
+  const sx = shoreX();
+  const x = speech.who === 'peter' ? peterX() : sx * 0.23;
+  const y = shoreY() - 82;
+  ctx.save();
+  ctx.globalAlpha = clamp(speech.t / 0.3, 0, 1);
+  ctx.font = '600 15px Fredoka, sans-serif';
+  const lines = wrapText(speech.text, Math.min(230, W - 60));
+  const lh = 19;
+  const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 24;
+  const bh = lines.length * lh + 14;
+  const bx = clamp(x - bw / 2, 10, W - 10 - bw), by = y - bh - 16;
+  ctx.fillStyle = 'rgba(255,252,240,0.97)';
+  ctx.strokeStyle = speech.who === 'peter' ? 'rgba(63,111,181,0.7)' : 'rgba(122,92,142,0.75)';
+  ctx.lineWidth = 2.5;
+  roundRect(bx, by, bw, bh, 12); ctx.fill(); ctx.stroke();
+  const tx = clamp(x, bx + 18, bx + bw - 18);
+  ctx.beginPath(); ctx.moveTo(tx - 8, by + bh - 1); ctx.lineTo(x, y - 2); ctx.lineTo(tx + 8, by + bh - 1); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath(); ctx.moveTo(tx - 8, by + bh); ctx.lineTo(x, y - 2); ctx.lineTo(tx + 8, by + bh); ctx.stroke();
+  ctx.fillStyle = '#3b2f1e'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 12, by + 8 + i * lh));
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + patience
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Coin in the Fish' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('PATIENCE', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(78, 38, 120, 13, 6.5); ctx.fill();
+  const pf = state === 'title' ? 1 : clamp(timeLeft / cfg.time, 0, 1);
+  const pg = ctx.createLinearGradient(78, 0, 198, 0);
+  pg.addColorStop(0, '#f7c948'); pg.addColorStop(1, '#fff1a8');
+  ctx.fillStyle = pf < 0.2 && Math.sin(t * 10) > 0 ? '#ff6b6b' : pg;
+  if (pf > 0) { roundRect(78, 38, 120 * pf, 13, 6.5); ctx.fill(); }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score and basket
+  const rx = viewW - 12;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SCORE', rx, 20);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(`${totalScore + (state === 'win' ? 0 : levelPts)}`, rx, 40);
+  if (state !== 'title') {
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(`Basket: ${basket} fish`, rx, 60);
+  }
+  ctx.shadowBlur = 0;
+
+  drawMeter();
+  ctx.restore();
+}
+
+// Bottom panel: the cast meter, or the line tension while reeling
+function drawMeter() {
+  if (state !== 'play') return;
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const key = coarse ? 'Tap' : 'Tap / Space';
+  const bw = Math.min(360, viewW - 40), bx = (viewW - bw) / 2, by = viewH - 50;
+  let label = '';
+  ctx.textAlign = 'center';
+  if (rod.phase === 'aim' || rod.phase === 'fight') {
+    ctx.fillStyle = 'rgba(255,252,240,0.9)';
+    roundRect(bx - 10, by - 30, bw + 20, 64, 14); ctx.fill();
+    ctx.fillStyle = 'rgba(90,66,16,0.2)';
+    roundRect(bx, by, bw, 16, 8); ctx.fill();
+  }
+  if (rod.phase === 'aim') {
+    label = `${key} to cast!`;
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    g.addColorStop(0, '#9fd8f7'); g.addColorStop(1, '#2c7fb8');
+    ctx.fillStyle = g;
+    roundRect(bx, by, bw * rod.power, 16, 8); ctx.fill();
+    ctx.fillStyle = '#5a4210';
+    ctx.font = '600 11px Fredoka, sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('near', bx, by + 29);
+    ctx.textAlign = 'right'; ctx.fillText('far', bx + bw, by + 29);
+    ctx.textAlign = 'center';
+  } else if (rod.phase === 'fight') {
+    label = rod.struggle ? 'It’s thrashing! Ease off…' : rod.T < 0.12 ? `Slack! ${key} to reel` : `${key} to reel · pause to let out`;
+    // safe zone
+    ctx.fillStyle = 'rgba(80,180,90,0.35)';
+    ctx.fillRect(bx + bw * 0.15, by, bw * 0.65, 16);
+    ctx.fillStyle = 'rgba(230,80,70,0.35)';
+    ctx.fillRect(bx + bw * 0.85, by, bw * 0.15, 16);
+    const T = clamp(rod.T, 0, 1);
+    ctx.fillStyle = T > 0.85 ? '#e03131' : T < 0.12 ? '#e8a33a' : '#2b8a3e';
+    ctx.fillRect(bx + bw * T - 3, by - 4, 6, 24);
+    if (rod.struggle) {
+      ctx.strokeStyle = Math.sin(t * 20) > 0 ? '#e8590c' : '#ffa94d'; ctx.lineWidth = 3;
+      roundRect(bx - 10, by - 30, bw + 20, 64, 14); ctx.stroke();
+    }
+    // progress toward the bank
+    ctx.fillStyle = '#5a4210';
+    ctx.font = '600 11px Fredoka, sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('TENSION', bx, by + 29);
+    ctx.textAlign = 'right'; ctx.fillText(`${Math.round(rod.p * 100)}% reeled in`, bx + bw, by + 29);
+    ctx.textAlign = 'center';
+  } else if (rod.phase === 'sink') label = `Sinking… ${key} to stop the hook here`;
+  else if (rod.phase === 'wait') label = `Waiting for a bite… ${key} to reel in`;
+  if (!label) return;
+  ctx.font = '700 15px Fredoka, sans-serif';
+  if (rod.phase === 'aim' || rod.phase === 'fight') {
+    ctx.fillStyle = '#5a4210';
+    ctx.fillText(label, viewW / 2, by - 10);
+  } else {
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,50,80,0.8)'; ctx.lineJoin = 'round';
+    ctx.strokeText(label, viewW / 2, by + 10);
+    ctx.fillStyle = '#fff6d0'; ctx.fillText(label, viewW / 2, by + 10);
+  }
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  const x = clamp(lerp(shoreX(), W, 0.5), 150, W - 150);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const mx = W < 560 ? W / 2 : x;
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, mx, SEA_Y + 60);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, mx, SEA_Y + 60);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  drawSky();
+  drawWater();
+  for (const f of fishes) if (f.mode !== 'landed') drawFish(f);
+  drawMurk();
+  for (const f of fishes) drawGlint(f);
+  drawBubbles();
+  drawSurfaceLine();
+  drawShore();
+  drawAimMarker();
+
+  const slots = peopleSlots();
+  for (const s of slots) if (s.row === 0) drawDisciple(s);
+  drawJesus(jesusX(), shoreY() + 2, 0.95, state === 'win' ? 'joy' : 'calm', state === 'win');
+  for (const s of slots) if (s.row === 1) drawDisciple(s);
+  drawBasket();
+  drawRodAndLine();
+  // The landed fish and the coin
+  if (rod.fish && (rod.phase === 'land' || rod.phase === 'reveal')) drawFish(rod.fish);
+  if (rod.phase === 'reveal') {
+    const k = clamp(rod.coinT / 0.8, 0, 1);
+    const cx = lerp(peterX() + 30, peterX() + 14, k), cy = lerp(shoreY() - 12, shoreY() - 80, k);
+    const gl = ctx.createRadialGradient(cx, cy, 2, cx, cy, 50);
+    gl.addColorStop(0, 'rgba(255,240,170,0.8)'); gl.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, 50, 0, TAU); ctx.fill();
+    drawCoin(cx, cy, 12);
+  }
+  drawParticles();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawSpeech();
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateScenery(dt);
+  updateParticles(dt);
+  updatePeople(dt);
+  if (state === 'play') {
+    timeLeft -= dt;
+    const f = timeLeft / cfg.time;
+    if (!saidHalf && f < 0.5) { saidHalf = true; if (!speech || speech.t <= 0) say('col', 'We haven’t got all day, Peter…'); }
+    if (!saidLow && f < 0.2) { saidLow = true; say('col', 'Tick… tock…'); }
+    updateFishes(dt);
+    if (state === 'play') updateRod(dt);
+    if (state === 'play' && timeLeft <= 0) { timeLeft = 0; fail(); }
+  } else if (state === 'win' || state === 'fail' || state === 'title') {
+    updateFishes(dt);
+    if (state === 'fail') updateRod(dt);
+    if (state === 'win') {
+      rod.coinT += dt;
+      if (Math.random() < dt * 12) spawn(peterX() + 14 + rand(-30, 30), shoreY() - 80 - rand(-20, 40), 0, -20, 1, '#fff6d0', 3);
+    }
+  }
+  if (speech) speech.t -= dt;
+  shakeT = Math.max(0, shakeT - dt);
+  flashT = Math.max(0, flashT - dt);
+  snapT = Math.max(0, snapT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  syncAmbience();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

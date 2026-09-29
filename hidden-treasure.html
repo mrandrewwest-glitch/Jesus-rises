@@ -1,0 +1,2694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#bfe6ff">
+<title>The Hidden Treasure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #bfe6ff;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Hidden Treasure</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  // Title card
+  field: { ref: 'Matthew 13:44', KJV: 'Again, the kingdom of heaven is like unto treasure hid in a field; the which when a man hath found, he hideth, and for joy thereof goeth and selleth all that he hath, and buyeth that field.', NKJV: 'Again, the kingdom of heaven is like treasure hidden in a field, which a man found and hid; and for joy over it he goes and sells all that he has and buys that field.', NIV: 'The kingdom of heaven is like treasure hidden in a field. When a man found it, he hid it again, and then in his joy went and sold all he had and bought that field.', NLT: 'The Kingdom of Heaven is like a treasure that a man discovered hidden in a field. In his excitement, he hid it again and sold everything he owned to get enough money to buy the field.' },
+  // Jesus telling the first story (speech bubbles)
+  tell1: { ref: 'Matthew 13:44', KJV: 'The kingdom of heaven is like unto treasure hid in a field;', NKJV: 'The kingdom of heaven is like treasure hidden in a field,', NIV: 'The kingdom of heaven is like treasure hidden in a field.', NLT: 'The Kingdom of Heaven is like a treasure that a man discovered hidden in a field.' },
+  tell2: { ref: 'Matthew 13:44', KJV: '...when a man hath found, he hideth, and for joy thereof goeth and selleth all that he hath, and buyeth that field.', NKJV: '...which a man found and hid; and for joy over it he goes and sells all that he has and buys that field.', NIV: 'When a man found it, he hid it again, and then in his joy went and sold all he had and bought that field.', NLT: 'In his excitement, he hid it again and sold everything he owned to get enough money to buy the field.' },
+  // Banner while selling everything for the field (and on the win card)
+  sellField: { ref: 'Matthew 13:44', KJV: 'For joy thereof goeth and selleth all that he hath', NKJV: 'For joy over it he goes and sells all that he has', NIV: 'In his joy went and sold all he had', NLT: 'In his excitement, he hid it again and sold everything he owned' },
+  // Jesus telling the second story (speech bubbles); also the fail card
+  tell3: { ref: 'Matthew 13:45', KJV: 'The kingdom of heaven is like unto a merchant man, seeking goodly pearls:', NKJV: 'The kingdom of heaven is like a merchant seeking beautiful pearls,', NIV: 'The kingdom of heaven is like a merchant looking for fine pearls.', NLT: 'The Kingdom of Heaven is like a merchant on the lookout for choice pearls.' },
+  pearlFound: { ref: 'Matthew 13:46', KJV: '...when he had found one pearl of great price,', NKJV: '...when he had found one pearl of great price,', NIV: 'When he found one of great value,', NLT: 'When he discovered a pearl of great value,' },
+  // Banner while selling everything for the pearl
+  sellPearl: { ref: 'Matthew 13:46', KJV: 'Went and sold all that he had, and bought it.', NKJV: 'Went and sold all that he had and bought it.', NIV: 'He went away and sold everything he had and bought it.', NLT: 'He sold everything he owned and bought it!' },
+  // Win card: Jesus's point
+  pearlWin: { ref: 'Matthew 13:45–46', KJV: 'Again, the kingdom of heaven is like unto a merchant man, seeking goodly pearls: Who, when he had found one pearl of great price, went and sold all that he had, and bought it.', NKJV: 'Again, the kingdom of heaven is like a merchant seeking beautiful pearls, who, when he had found one pearl of great price, went and sold all that he had and bought it.', NIV: 'Again, the kingdom of heaven is like a merchant looking for fine pearls. When he found one of great value, he went away and sold everything he had and bought it.', NLT: 'Again, the Kingdom of Heaven is like a merchant on the lookout for choice pearls. When he discovered a pearl of great value, he sold everything he owned and bought it!' },
+};
+// A leading "..." becomes "…", and a trailing comma, semicolon or colon becomes "…" so a part-verse reads on
+function verseText(key) {
+  return Bible.verse(VERSES[key]).text.replace(/^\.\.\.\s*/, '…').replace(/[,;:]$/, '…');
+}
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${verseText(key)}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Blend two #rrggbb colours; returns #rrggbb so shade() still works on the result
+function mix(a, b, f) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (s) => Math.round(lerp((pa >> s) & 255, (pb >> s) & 255, clamp(f, 0, 1)));
+  return '#' + ((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1);
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+// Tiny repeatable noise so each tuft of grass keeps its place
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function isTouch() { return matchMedia('(pointer: coarse)').matches; }
+
+// ============================================================
+//  Tuning
+// ============================================================
+const LEVEL_NAMES = [
+  'The Field by the Road',
+  'The Olive Grove',
+  'The Stony Hillside',
+  'The Vineyard Slope',
+  'The Wide Valley',
+  'The Far Country',
+];
+
+// How warm the shimmer is, by distance (in squares) from the buried chest
+const BANDS = [
+  { max: 1.01, name: 'Very hot!', col: '#ff5a3c', n: 9 },
+  { max: 1.5,  name: 'Hot!',      col: '#ff922b', n: 7 },
+  { max: 2.3,  name: 'Warm',      col: '#ffd43b', n: 5 },
+  { max: 3.7,  name: 'Cool',      col: '#8ce99a', n: 3 },
+  { max: 5.5,  name: 'Chilly',    col: '#74c0fc', n: 2 },
+  { max: 99,   name: 'Cold',      col: '#91a7ff', n: 1 },
+];
+
+// Things for sale: what each is worth, and whether it wanders about
+const GOODS = {
+  goat:    { value: 12, moves: 1 },
+  chicken: { value: 4,  moves: 1.6 },
+  pot:     { value: 6 },
+  cart:    { value: 15 },
+  rug:     { value: 10 },
+  stool:   { value: 5 },
+  lamp:    { value: 5 },
+  basket:  { value: 6 },
+  silk:    { value: 14 },
+  spice:   { value: 10 },
+  scales:  { value: 9 },
+  casket:  { value: 20 },
+};
+const FARM_GOODS = ['goat', 'pot', 'cart', 'goat', 'chicken', 'rug', 'stool', 'lamp', 'basket'];
+const SHOP_GOODS = ['silk', 'spice', 'casket', 'rug', 'goat', 'scales', 'chicken', 'lamp', 'pot'];
+
+const FLAWS = ['shape', 'bump', 'dull', 'tint', 'spot', 'crack', 'small'];
+const FLAW_TEXT = {
+  shape: "It's a little egg-shaped.",
+  bump: "There's a lump on it.",
+  dull: "It's dull, not shining.",
+  tint: "Its colour isn't pure.",
+  spot: "There's a dark speck.",
+  crack: "There's a tiny crack!",
+  small: "It's smaller than the best.",
+};
+
+function makeConfig(n) {
+  const m = n - 1;
+  const pearlCount = [6, 8, 10, 12, 15][Math.min(m, 4)];
+  return {
+    name: LEVEL_NAMES[m] || `Field ${n}`,
+    cols: Math.min(6 + m, 9),
+    rows: Math.min(5 + m, 8),
+    digs: [16, 12, 10, 9, 8][Math.min(m, 4)],   // daylight: how many squares can be dug
+    rocks: n === 1 ? 0 : Math.min(2 + m * 2, 10),
+    deep: n >= 3 ? 2 : 1,                        // digs needed on the chest's square
+    drift: n <= 2,                               // shimmer sparkles drift toward the chest
+    sellItems: Math.min(5 + m, 9),
+    sellSpeed: n === 1 ? 0 : Math.min(25 + m * 15, 90),
+    stalls: n === 1 ? 1 : n <= 3 ? 2 : 3,
+    pearls: pearlCount,
+    flaw: clamp(1 - m * 0.16, 0.34, 1),          // how easy the flaws are to see
+    marketTime: Math.max(45, 80 - m * 8),
+    wrongCost: n === 1 ? 5 : 8,
+    glint: n === 1,                              // the perfect pearl twinkles on level 1
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let stage = 'intro1';     // intro1 | field | sell1 | intro2 | pearl | sell2
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('treasureBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let particles = [];
+let floaters = [];        // little words that float up ("Warm", "+100")
+let message = { text: '', t: 0 };
+let hint = null;          // a message that appears after a delay
+let bubble = null;
+let introStep = 0, introT = 0;
+let trans = null;         // fade between scenes
+let endTimer = 0;
+let failStage = 'field', failReason = '';
+let flashT = 0, shakeT = 0;
+let told = 0;             // the level whose story has been told
+let pts = { field: 0, sell1: 0, pearl: 0, sell2: 0 };
+let lastScore = null;
+
+// The field
+let grid = [], digsLeft = 0, pendingDig = null, lastDist = null, lastBand = 9;
+let found = null, coinsFound = 0;
+const cursor = { c: 0, r: 0, show: false };
+const farmer = { x: 0, y: 0, tx: 0, ty: 0, digT: 0 };
+
+// Selling everything
+let sell = null;
+
+// The pearl market
+let pearls = [], examining = null, exam = { t: 0, wrong: null, wrongT: 0 };
+let timeLeft = 0, mistakes = 0, pearlWon = null, pcursor = 0, pearlKb = false;
+
+// ============================================================
+//  People
+// ============================================================
+function makePerson(spec, i) {
+  return { ...spec, i, mood: 'watch', switchT: 0, delay: rand(0.05, 0.5), blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), flash: null };
+}
+// The listening crowd in the story scene
+const PEOPLE = [
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { robe: '#c46b8c', hair: '#3a2716', beard: false, skin: '#d7a070', scarf: '#e8dcc0' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184', kid: true },
+  { robe: '#7a4fa0', hair: '#3a2716', beard: false, skin: '#c58a55', scarf: '#f0c9a0' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: false, skin: '#b87a48', scarf: '#d8c7a0' },
+  { robe: '#5a6475', hair: '#2a1a0e', beard: true,  skin: '#c88e5a', scarf: '#c9b27a' },
+  { robe: '#e07a5f', hair: '#5c3a1c', beard: false, skin: '#dca678', kid: true },
+  { robe: '#b08a2e', hair: '#1c120b', beard: true,  skin: '#c78f5c' },
+  { robe: '#4b7f4b', hair: '#2d1b0f', beard: false, skin: '#bf8150', scarf: '#e8dcc0' },
+  { robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+].map(makePerson);
+
+// Neighbours peeping over the field wall
+const NEIGHBOURS = [
+  { robe: '#c46b8c', hair: '#3a2716', beard: false, skin: '#d7a070', scarf: '#f0e2c0' },
+  { robe: '#5a6475', hair: '#8a8a8a', beard: true,  skin: '#c88e5a' },
+  { robe: '#e07a5f', hair: '#5c3a1c', beard: false, skin: '#dca678', kid: true },
+].map(makePerson);
+
+// The stall-keepers at the pearl market
+const SELLERS = [
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070', scarf: '#f3e6c4' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: false, skin: '#b87a48', scarf: '#e9b949' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+].map(makePerson);
+
+// The man who found the treasure (with his spade), the pearl merchant, and the buyers
+const FARMER = makePerson({ robe: '#9a6b3e', hair: '#3a2716', beard: true, skin: '#c98d56', scarf: '#e8dcc0', spade: true }, 0);
+const MERCHANT = makePerson({ robe: '#6a3fa0', hair: '#2a1a0e', beard: true, skin: '#d39a66', scarf: '#f1c75b' }, 1);
+const BUYER = makePerson({ robe: '#3f6fb5', hair: '#5c3a1c', beard: true, skin: '#c78f5c' }, 3);
+
+function flashMood(d, mood, dur = 1.1) { d.flash = { mood, t: dur }; }
+
+function tickPerson(d, want, dt, delayed = true) {
+  if (d.flash) { d.flash.t -= dt; if (d.flash.t <= 0) d.flash = null; else want = d.flash.mood; }
+  if (!delayed) d.mood = want;
+  else if (want !== d.mood) {
+    d.switchT += dt;
+    if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+  } else d.switchT = 0;
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+function updatePeople(dt) {
+  // The crowd listening to Jesus
+  let crowd = 'watch';
+  if (state === 'play' && (stage === 'intro1' || stage === 'intro2')) crowd = introStep === 0 ? 'watch' : 'wow';
+  PEOPLE.forEach((d) => {
+    let want = crowd;
+    if (want === 'wow' && d.i % 4 === 2) want = 'joy';
+    tickPerson(d, want, dt);
+  });
+
+  // The field: the man and his neighbours
+  let man = 'watch', nb = 'watch';
+  const lowDay = digsLeft <= 3;
+  if (state === 'fail' && failStage === 'field') { man = 'dismay'; nb = 'dismay'; }
+  else if (found) { man = found.t < 2 ? 'joy' : 'watch'; nb = found.t < 2 ? 'joy' : 'wow'; }
+  else if (lastBand <= 1) { man = 'wow'; nb = 'wow'; }
+  else if (lowDay && lastDist !== null) { man = 'worried'; nb = 'worried'; }
+  if (stage === 'sell1') man = sell && sell.done ? 'joy' : 'watch';
+  tickPerson(FARMER, man, dt, false);
+  NEIGHBOURS.forEach((d, k) => tickPerson(d, nb === 'wow' && k === 1 ? 'shock' : nb, dt));
+
+  // The market: the merchant and the stall-keepers
+  let mer = 'watch', sel = 'watch';
+  if (state === 'fail' && failStage === 'pearl') { mer = 'dismay'; sel = 'dismay'; }
+  else if (pearlWon || stage === 'sell2' || state === 'win') { mer = 'joy'; sel = 'joy'; }
+  else if (examining) mer = 'wow';
+  else if (timeLeft < 10 && stage === 'pearl') mer = 'worried';
+  if (stage === 'sell2' && sell && !sell.done && state !== 'win') mer = 'watch';
+  tickPerson(MERCHANT, mer, dt, false);
+  SELLERS.forEach((d, k) => {
+    let want = sel;
+    if (sel === 'watch' && examining && examining.stall === k) want = 'wow';
+    tickPerson(d, want, dt);
+  });
+  tickPerson(BUYER, state === 'win' || (sell && sell.done) ? 'joy' : 'watch', dt, false);
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// A spade: handle from (x1,y1) down to the blade at (x2,y2)
+function drawSpade(x1, y1, x2, y2) {
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.save();
+  ctx.translate(x2, y2); ctx.rotate(a - Math.PI / 2);
+  ctx.fillStyle = '#9aa3ad'; ctx.strokeStyle = '#6c757d'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-7, -2); ctx.lineTo(7, -2); ctx.lineTo(6, 10); ctx.quadraticCurveTo(0, 16, -6, 10); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+// A pearl glowing in someone's hand
+function drawHeldPearl(x, y, r) {
+  const g = ctx.createRadialGradient(x, y, 1, x, y, r * 4);
+  g.addColorStop(0, 'rgba(255,250,225,0.9)'); g.addColorStop(1, 'rgba(255,250,225,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 4, 0, TAU); ctx.fill();
+  drawPearl(x, y, r, PERFECT);
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.kid) s *= 0.78;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  const calm = mood === 'watch' || mood === 'wow' || mood === 'worried';
+  const digging = d.spade && calm;
+
+  // A spade left standing in the earth while he celebrates or frets
+  if (d.spade && !calm) drawSpade(30, -52, 30, -2);
+
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 2 === 0 && !d.spade && !d.lens) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  if (digging) {
+    // Both hands on the spade; it rises and plunges while he digs
+    const k = d.digT > 0 ? Math.sin((1 - d.digT / 0.35) * Math.PI) : 0;
+    const lift = k * 16;
+    drawSpade(10, -46 - lift, 26, -4 - lift + k * 6);
+    arm(-11, -32, 11, -40 - lift);
+    arm(11, -32, 17, -26 - lift);
+  } else if (d.lens && calm) {
+    arm(-11, -32, -15, -12);
+    arm(11, -32, 22, -44);
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(22, -44); ctx.lineTo(28, -54); ctx.stroke();
+    ctx.fillStyle = 'rgba(220,240,255,0.6)'; ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(32, -62, 9, 0, TAU); ctx.fill(); ctx.stroke();
+  } else if (mood === 'watch' || (mood === 'wow' && d.i % 2 !== 0) || (mood === 'wow' && d.spade)) {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+  // The pearl of great price, held up high
+  if (d.pearl && mood === 'joy') drawHeldPearl(24 - Math.sin(t * 9 + d.phase) * 4, -76, 9);
+  ctx.restore();
+}
+
+// ============================================================
+//  Jesus (drawn as in Jesus Rises, standing on a rock to teach)
+// ============================================================
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(j.s, j.s);
+
+  const up = j.face === 'joy';
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: open and welcoming; one hand lifted as He tells the story
+  const hands = up ? [[-21, -66], [21, -66]] : [[-20, -22], [20, -22]];
+  if (!up && j.speaking) hands[1] = [23, -34 - Math.max(0, Math.sin(t * 3)) * 6];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4 + 1, -53, 1.5, 0, TAU); ctx.arc(4 + 1, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (j.speaking && Math.sin(t * 14) > 0) {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -46.5, 2, 1.8, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles and floating words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 450) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 190);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.7, 1.5), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function dirtPuff(x, y, n = 10) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(Math.PI * 1.05, Math.PI * 1.95), sp = rand(40, 130);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.4, 0.8), pick(['#8a5a2b', '#a0703a', '#6b4423']), rand(2.5, 5), 320);
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    floaters[i].t += dt;
+    if (floaters[i].t > floaters[i].dur) floaters.splice(i, 1);
+  }
+}
+function drawStar(x, y, r) {
+  ctx.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4, rr = k % 2 ? r * 0.35 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.8);
+    else if (p.kind === 'coin') {
+      ctx.fillStyle = '#f5c542'; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.size, p.size * Math.abs(Math.cos(p.life * 9)) + 1, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function floater(x, y, text, col = '#7a5200', dur = 1.4, size = 20) { floaters.push({ x, y, text, col, t: 0, dur, size }); }
+function drawFloaters() {
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (const f of floaters) {
+    const a = clamp((f.dur - f.t) / 0.4, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.font = `700 ${f.size}px Fredoka, sans-serif`;
+    const y = f.y - f.t * 26;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeText(f.text, f.x, y);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, y);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  The story scene: Jesus and the listening crowd
+// ============================================================
+function storyLayout() {
+  const k = clamp(W / 640, 1, 1.4);      // bigger figures on wide screens
+  const jx = Math.max(80, W * 0.2);
+  const gy = H - 150;
+  const slots = [];
+  const x0 = jx + 95 * k, x1 = W - 34 * k;
+  const nBack = clamp(Math.floor((x1 - x0) / (62 * k)), 3, 8), nFront = clamp(Math.floor((x1 - x0 + 40) / (70 * k)), 3, 8);
+  for (let i = 0; i < nBack; i++) slots.push({ d: PEOPLE[(i * 2 + 1) % PEOPLE.length], x: lerp(x0 + 20, x1, nBack === 1 ? 0.5 : i / (nBack - 1)), y: gy - 26, s: 1.05 * k, row: 0 });
+  for (let i = 0; i < nFront; i++) slots.push({ d: PEOPLE[(i * 2) % PEOPLE.length], x: lerp(x0 - 10, x1 - 16, nFront === 1 ? 0.5 : i / (nFront - 1)), y: gy + 40, s: 1.25 * k, row: 1 });
+  return { jx, gy, slots, k };
+}
+
+function inStory() {
+  return state === 'title' || (state === 'play' || state === 'pause') && (stage === 'intro1' || stage === 'intro2');
+}
+
+function drawStory() {
+  const L = storyLayout();
+  // warm afternoon sky
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, '#fff3cf'); g.addColorStop(0.35, '#ffe0a8'); g.addColorStop(0.62, '#bfe3f5'); g.addColorStop(1, '#9fd1ee');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // sun
+  const sg = ctx.createRadialGradient(W * 0.78, 190, 10, W * 0.78, 190, 140);
+  sg.addColorStop(0, 'rgba(255,250,220,0.95)'); sg.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.78, 190, 140, 0, TAU); ctx.fill();
+  for (const [cx, cy, w] of [[W * 0.25, 170, 140], [W * 0.6, 110, 110]]) drawCloud(cx, cy, w, w * 0.3);
+  // distant hills with little fields and a village
+  ctx.fillStyle = '#b9d49a';
+  ctx.beginPath(); ctx.moveTo(-offX, H);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, H - 330 + Math.sin(x / 110) * 26 + Math.sin(x / 41) * 8);
+  ctx.lineTo(W + offX, H); ctx.fill();
+  for (let k = 0; k < 5; k++) {
+    const fx = W * (0.08 + k * 0.2), fy = H - 300 + (k % 2) * 16;
+    ctx.fillStyle = ['#d9c07a', '#a9c77a', '#e3cf8f', '#9fbf6d', '#d4b870'][k];
+    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx + 90, fy - 6); ctx.lineTo(fx + 100, fy + 24); ctx.lineTo(fx + 6, fy + 30); ctx.closePath(); ctx.fill();
+  }
+  for (let k = 0; k < 6; k++) {
+    const hx = W * 0.42 + k * 44 - (k > 2 ? 20 : 0), hy = H - 350 + Math.sin(hx / 110) * 26 + (k % 2) * 12;
+    ctx.fillStyle = k % 2 ? '#e8d3aa' : '#dcc497';
+    ctx.fillRect(hx, hy, 36, 28);
+    ctx.fillStyle = '#b89a6a'; ctx.fillRect(hx - 2, hy - 4, 40, 5);
+    ctx.fillStyle = '#6b5238';
+    ctx.fillRect(hx + 13, hy + 12, 9, 16);
+  }
+  // near hill where the crowd sits
+  ctx.fillStyle = '#8fc06a';
+  ctx.beginPath(); ctx.moveTo(-offX, H + 10);
+  for (let x = -offX; x <= W + offX + 10; x += 10) ctx.lineTo(x, L.gy - 60 + Math.sin(x / 160) * 10);
+  ctx.lineTo(W + offX, H + 10); ctx.fill();
+  ctx.fillStyle = '#7aae55';
+  ctx.fillRect(-offX, H - 60, viewW, 70);
+  // flowers
+  for (let k = 0; k < 18; k++) {
+    const fx = hash(k, 1) * W, fy = L.gy - 30 + hash(k, 2) * 170;
+    ctx.fillStyle = ['#fff', '#ffd166', '#f28fb1'][k % 3];
+    ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
+  }
+  // the rock Jesus stands on
+  ctx.fillStyle = '#a89a86';
+  ctx.beginPath(); ctx.ellipse(L.jx, L.gy + 6, 50 * L.k, 20 * L.k, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c2b5a0';
+  ctx.beginPath(); ctx.ellipse(L.jx - 6, L.gy - 2, 40 * L.k, 12 * L.k, 0, 0, TAU); ctx.fill();
+
+  const speaking = state === 'play' && bubble && bubble.t > 0.3;
+  const js = 1.55 * L.k;
+  const jHead = { x: L.jx, y: L.gy - 4 - 55 * js };
+  for (const s of L.slots) if (s.row === 0) drawPerson(s.d, s.x, s.y, s.s, jHead.x, jHead.y);
+  drawJesus({ x: L.jx, y: L.gy - 4, s: js, face: 'calm', speaking });
+  for (const s of L.slots) if (s.row === 1) drawPerson(s.d, s.x, s.y, s.s, jHead.x, jHead.y);
+
+  if (state !== 'title') drawStoryBubble(L);
+  if (state === 'play' && introT > 0.8 && !trans) {
+    ctx.font = '600 15px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(90,66,16,${0.5 + 0.3 * Math.sin(t * 4)})`;
+    ctx.fillText(isTouch() ? 'Tap to continue' : 'Click or press Space to continue', W / 2, H - 24);
+  }
+}
+
+function drawStoryBubble(L) {
+  if (!bubble) return;
+  const text = '“' + verseText(bubble.key) + '”';
+  ctx.save();
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.font = '700 19px Fredoka, sans-serif';
+  const maxW = Math.min(W - 64, 520);
+  const lines = wrapText(text, maxW);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 30, h = lines.length * 24 + 20;
+  const ax = L.jx + 14, ay = L.gy - 104 * L.k;       // just above His head
+  const bx = clamp(L.jx - 40, 14, W - w - 14), by = L.gy - 110 - 60 * L.k - h;
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.stroke();
+  const tx = clamp(ax, bx + 20, bx + w - 40);
+  ctx.beginPath(); ctx.moveTo(tx, by + h - 1.5); ctx.lineTo(ax, ay - 8); ctx.lineTo(tx + 22, by + h - 1.5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(tx, by + h); ctx.lineTo(ax, ay - 8); ctx.lineTo(tx + 22, by + h); ctx.stroke();
+  ctx.fillStyle = '#8a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 15, by + 10 + 12 + i * 24));
+  ctx.restore();
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#e6eef6') {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  Part 1: the treasure hid in a field
+// ============================================================
+function fieldLayout() {
+  const top = 292, bottom = H - 58;
+  const cell = Math.min((W - 36) / cfg.cols, (bottom - top) / cfg.rows, 92);
+  const gw = cell * cfg.cols, gh = cell * cfg.rows;
+  return { cell, x0: (W - gw) / 2, y0: top + (bottom - top - gh) * 0.3, gw, gh };
+}
+function cellCentre(c, r) {
+  const L = fieldLayout();
+  return { x: L.x0 + (c + 0.5) * L.cell, y: L.y0 + (r + 0.5) * L.cell, cell: L.cell };
+}
+function cellAt(x, y) {
+  const L = fieldLayout();
+  const c = Math.floor((x - L.x0) / L.cell), r = Math.floor((y - L.y0) / L.cell);
+  if (c < 0 || r < 0 || c >= cfg.cols || r >= cfg.rows) return null;
+  return grid[r * cfg.cols + c];
+}
+function chestCell() { return grid.find((g) => g.item === 'chest'); }
+function bandFor(d) { return BANDS.findIndex((b) => d <= b.max); }
+
+function buildField() {
+  grid = [];
+  for (let r = 0; r < cfg.rows; r++) for (let c = 0; c < cfg.cols; c++) {
+    grid.push({ c, r, dug: 0, rock: false, item: null, band: -1, v: hash(c + level * 7, r) });
+  }
+  const free = () => grid.filter((g) => !g.rock && !g.item);
+  pick(free()).item = 'chest';
+  const ch = chestCell();
+  // Rocks: never on the chest, and never walling it in completely
+  for (let k = 0; k < cfg.rocks; k++) {
+    const opts = free().filter((g) => Math.hypot(g.c - ch.c, g.r - ch.r) > 1.5);
+    if (opts.length) pick(opts).rock = true;
+  }
+  // A few little surprises in the soil
+  const extras = ['coin', 'worm', 'shard', pick(['sandal', 'snail', 'coin'])];
+  for (const e of extras) { const f = free(); if (f.length) pick(f).item = e; }
+}
+
+function startField() {
+  stage = 'field';
+  buildField();
+  digsLeft = cfg.digs;
+  pendingDig = null; found = null; failSoon = 0;
+  lastDist = null; lastBand = 9; coinsFound = 0;
+  floaters = []; particles = [];
+  cursor.c = Math.floor(cfg.cols / 2); cursor.r = Math.floor(cfg.rows / 2);
+  const L = fieldLayout();
+  farmer.x = farmer.tx = W / 2; farmer.y = farmer.ty = L.y0 + L.gh + 36;
+  farmer.digT = 0;
+  if (level === 1) hint = { t: 2.4, text: isTouch() ? 'Tap a square to dig!' : 'Click a square to dig (or arrows + Space)' };
+}
+
+function farmerSpot(g) {
+  const p = cellCentre(g.c, g.r);
+  const side = g.c >= cfg.cols / 2 ? -1 : 1;
+  return { x: p.x + side * p.cell * 0.5, y: p.y + p.cell * 0.4 };
+}
+
+function digAt(g) {
+  if (!g || state !== 'play' || stage !== 'field' || trans || found || pendingDig) return;
+  cursor.c = g.c; cursor.r = g.r;
+  if (g.rock) {
+    const p = cellCentre(g.c, g.r);
+    floater(p.x, p.y - 10, 'Too stony!', '#6c757d', 1.1, 18);
+    sfx.clonk();
+    return;
+  }
+  const done = g.item === 'chest' ? g.dug >= cfg.deep : g.dug >= 1;
+  if (done) { const p = cellCentre(g.c, g.r); floater(p.x, p.y - 10, 'Dug already', '#8a6a2a', 1, 16); return; }
+  if (digsLeft <= 0) return;
+  const s = farmerSpot(g);
+  farmer.tx = s.x; farmer.ty = s.y;
+  pendingDig = { g, t: 0.32 };
+  FARMER.digT = 0.35;
+}
+
+// The spade goes in: see what's there and how warm the shimmer is
+function finishDig(g) {
+  const p = cellCentre(g.c, g.r);
+  g.dug++;
+  digsLeft--;
+  dirtPuff(p.x, p.y, 12);
+  sfx.dig();
+  const ch = chestCell();
+  if (g.item === 'chest') {
+    if (g.dug < cfg.deep) {
+      floater(p.x, p.y - 12, 'Clunk!', '#a8741a', 1.4, 22);
+      showMessage('Something hard down there… dig again!');
+      flashMood(FARMER, 'shock', 0.9);
+      lastBand = 0; lastDist = 0;
+      sfx.clunkWood();
+      sfx.shimmerPing(0);
+    } else { foundTreasure(g); return; }
+  } else {
+    const d = Math.hypot(g.c - ch.c, g.r - ch.r);
+    const b = bandFor(d);
+    g.band = b;
+    floater(p.x, p.y - 12, BANDS[b].name, shade(BANDS[b].col, -70), 1.5, 20);
+    if (lastDist !== null) {
+      if (d < lastDist - 0.01) showMessage(b <= 1 ? 'Warmer… very close now!' : 'Warmer!', 1.6);
+      else if (d > lastDist + 0.01) showMessage('Colder…', 1.6);
+      else showMessage('Just as warm as before…', 1.6);
+    }
+    lastDist = d; lastBand = b;
+    sfx.shimmerPing(b);
+    for (let i = 0; i < BANDS[b].n * 3; i++) spawn(p.x + rand(-14, 14), p.y + rand(-10, 10), rand(-20, 20), rand(-70, -30), rand(0.6, 1.2), BANDS[b].col, rand(2, 4), 0, 'star');
+    // Little surprises in the soil
+    if (g.item === 'coin') { coinsFound++; floater(p.x, p.y - 44, '+100', '#a8741a', 1.6, 18); later('An old coin! (Not the treasure though…)'); sfx.clink(); }
+    else if (g.item === 'worm') later('Hello, little worm!');
+    else if (g.item === 'shard') later('Just a bit of old pot.');
+    else if (g.item === 'sandal') later("Somebody's long-lost sandal!");
+    else if (g.item === 'snail') later('A sleepy snail. Sorry, snail!');
+  }
+  if (digsLeft <= 0) { endTimer = 0; failSoon = 1.1; }
+}
+let failSoon = 0;
+
+function foundTreasure(g) {
+  found = { g, t: 0 };
+  const p = cellCentre(g.c, g.r);
+  pts.field = digsLeft * 60 + coinsFound * 100;
+  // he steps aside to gaze at it
+  const side = g.c >= cfg.cols / 2 ? -1 : 1;
+  farmer.tx = p.x + side * p.cell;
+  sparkleBurst(p.x, p.y - 20, 60);
+  flashT = 0.3; shakeT = 0.25;
+  showMessage('Treasure! Hid in the field!', 2);
+  sfx.found();
+  hint = null;
+}
+
+function updateField(dt) {
+  farmer.x += (farmer.tx - farmer.x) * Math.min(1, dt * 14);
+  farmer.y += (farmer.ty - farmer.y) * Math.min(1, dt * 14);
+  FARMER.digT = Math.max(0, FARMER.digT - dt);
+  if (pendingDig) {
+    pendingDig.t -= dt;
+    if (pendingDig.t <= 0) { const g = pendingDig.g; pendingDig = null; finishDig(g); }
+  }
+  if (failSoon > 0 && !found) {
+    failSoon -= dt;
+    if (failSoon <= 0) fail('sunset');
+  }
+  // The shimmer sparkles above each dug hole; on early levels they drift toward the chest
+  const ch = chestCell();
+  for (const g of grid) {
+    if (g.band < 0 || Math.random() > dt * (0.6 + BANDS[g.band].n * 0.5)) continue;
+    const p = cellCentre(g.c, g.r);
+    let vx = rand(-8, 8), vy = rand(-40, -20);
+    if (cfg.drift && ch) {
+      const [dx, dy] = lookAt(g.c, g.r, ch.c, ch.r);
+      vx = dx * p.cell * 0.9; vy = dy * p.cell * 0.9 - 8;
+    }
+    spawn(p.x + rand(-8, 8), p.y + rand(-6, 6), vx, vy, rand(0.7, 1.1), BANDS[g.band].col, rand(1.8, 3.2), 0, 'star');
+  }
+  if (found) {
+    const was = found.t;
+    found.t += dt;
+    const p = cellCentre(found.g.c, found.g.r);
+    if (found.t < 1.9 && Math.random() < dt * 20) spawn(p.x + rand(-26, 26), p.y - rand(10, 50), 0, -30, 1, '#fff6d0', 3, 0, 'star');
+    if (was < 2.0 && found.t >= 2.0) { showMessage('Shh! He hid it again…', 2); sfx.puff(0.3); dirtPuff(p.x, p.y, 14); }
+    if (was < 3.6 && found.t >= 3.6) goStage(() => startSell('field'));
+  }
+}
+
+function drawFieldScene() {
+  const L = fieldLayout();
+  // The sky dims to sunset as the daylight runs out
+  const dusk = state === 'fail' && failStage === 'field' ? 1 : clamp(1 - digsLeft / cfg.digs, 0, 1) * 0.7;
+  const g = ctx.createLinearGradient(0, -offY, 0, 300);
+  g.addColorStop(0, mix('#8fd0f7', '#f08a5d', dusk));
+  g.addColorStop(1, mix('#e6f6ff', '#ffd59a', dusk));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // The sun crosses the sky with the daylight
+  const f = 1 - digsLeft / cfg.digs;
+  const sx = lerp(W * 0.12, W * 0.88, f), sy = 150 - Math.sin((0.15 + f * 0.7) * Math.PI) * 60 + (state === 'fail' ? 60 : 0);
+  const sg = ctx.createRadialGradient(sx, sy, 5, sx, sy, 80);
+  sg.addColorStop(0, mix('#fffbe0', '#ffb070', dusk)); sg.addColorStop(0.3, `rgba(255,236,170,${0.6 - dusk * 0.2})`); sg.addColorStop(1, 'rgba(255,236,170,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 80, 0, TAU); ctx.fill();
+  ctx.fillStyle = mix('#fff6c8', '#ff9a52', dusk); ctx.beginPath(); ctx.arc(sx, sy, 22, 0, TAU); ctx.fill();
+  drawCloud(W * 0.3 + Math.sin(t * 0.05) * 30, 120, 120, 34);
+  drawCloud(W * 0.75, 70, 90, 26);
+  // hills
+  ctx.fillStyle = mix('#b4d48c', '#c9a878', dusk * 0.6);
+  ctx.beginPath(); ctx.moveTo(-offX, 300);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, 215 + Math.sin(x / 120) * 16 + Math.sin(x / 47) * 6);
+  ctx.lineTo(W + offX, 300); ctx.fill();
+  // Neighbours peeping over the stone wall
+  const wallY = 256;
+  const nk = clamp(W / 560, 1.2, 1.45);
+  const spots = [0.13, 0.5, 0.87].map((fx) => W * fx);
+  NEIGHBOURS.forEach((d, k) => drawPerson(d, spots[k] + (k === 1 ? W * 0.08 : 0), wallY + 14 * nk, nk, farmer.x, farmer.y - 40));
+  // stone wall
+  ctx.fillStyle = mix('#c9b89a', '#a8927a', dusk * 0.5);
+  ctx.fillRect(-offX, wallY, viewW, 40);
+  for (let x = -offX, k = 0; x < W + offX; x += 34, k++) {
+    for (let row = 0; row < 2; row++) {
+      ctx.fillStyle = hash(k, row) > 0.5 ? '#b8a584' : '#d6c6a6';
+      roundRect(x + (row ? 17 : 0), wallY + 2 + row * 19, 31, 16, 5); ctx.fill();
+    }
+  }
+  // The field itself
+  ctx.fillStyle = mix('#8cc063', '#9aa15a', dusk * 0.5);
+  ctx.fillRect(-offX, wallY + 40, viewW, H - wallY);
+  ctx.fillStyle = '#6f4a28';
+  roundRect(L.x0 - 8, L.y0 - 8, L.gw + 16, L.gh + 16, 14); ctx.fill();
+  for (const c of grid) drawCell(c, L);
+  // keyboard cursor
+  if (cursor.show && state === 'play' && !found) {
+    const x = L.x0 + cursor.c * L.cell, y = L.y0 + cursor.r * L.cell;
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 + 0.3 * Math.sin(t * 6)})`; ctx.lineWidth = 3.5;
+    roundRect(x + 3, y + 3, L.cell - 6, L.cell - 6, 8); ctx.stroke();
+  }
+  // The chest pops up, shines, and is hidden again
+  if (found) drawFoundChest(L);
+  // The man with his spade
+  const fs = clamp(L.cell / 72, 0.7, 1.15);
+  drawPerson(FARMER, farmer.x, farmer.y, fs, farmer.x + 30, farmer.y + 10);
+  drawParticles();
+  drawFloaters();
+  // Legend for the shimmer colours
+  ctx.font = '600 13px Fredoka, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const items = [['Cold', BANDS[5].col], ['Cool', BANDS[3].col], ['Warm', BANDS[2].col], ['Hot!', BANDS[1].col]];
+  const iw = 66, lx0 = W / 2 - iw * items.length / 2, ly = H - 22;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; roundRect(lx0 - 8, ly - 12, iw * items.length + 10, 24, 12); ctx.fill();
+  items.forEach(([name, col], k) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(lx0 + k * iw + 8, ly, 6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#4a3a1a'; ctx.fillText(name, lx0 + k * iw + 18, ly + 1);
+  });
+  if (dusk > 0.3) {
+    ctx.fillStyle = `rgba(80,40,60,${(dusk - 0.3) * 0.35})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+}
+
+function drawCell(g, L) {
+  const x = L.x0 + g.c * L.cell, y = L.y0 + g.r * L.cell, s = L.cell;
+  const cx = x + s / 2, cy = y + s / 2;
+  ctx.fillStyle = (g.c + g.r) % 2 ? '#86bd5c' : '#92c768';
+  roundRect(x + 1.5, y + 1.5, s - 3, s - 3, 7); ctx.fill();
+  if (g.rock) {
+    ctx.fillStyle = '#9aa0a6';
+    ctx.beginPath(); ctx.ellipse(cx, cy + s * 0.05, s * 0.34, s * 0.26, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#b8bec4';
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.06, cy - s * 0.04, s * 0.22, s * 0.15, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#868d93';
+    ctx.beginPath(); ctx.ellipse(cx + s * 0.2, cy + s * 0.14, s * 0.12, s * 0.09, 0, 0, TAU); ctx.fill();
+    return;
+  }
+  if (!g.dug) {
+    // grass tufts and the odd flower
+    ctx.strokeStyle = '#6ea54a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < 3; k++) {
+      const tx = x + s * (0.2 + hash(g.c * 3 + k, g.r) * 0.6), ty = y + s * (0.3 + hash(g.r * 3 + k, g.c) * 0.5);
+      ctx.moveTo(tx - 4, ty); ctx.lineTo(tx - 6, ty - 7);
+      ctx.moveTo(tx, ty); ctx.lineTo(tx, ty - 9);
+      ctx.moveTo(tx + 4, ty); ctx.lineTo(tx + 6, ty - 7);
+    }
+    ctx.stroke();
+    if (g.v > 0.8) {
+      ctx.fillStyle = g.v > 0.9 ? '#fff' : '#ffd166';
+      ctx.beginPath(); ctx.arc(x + s * 0.72, y + s * 0.3, 3, 0, TAU); ctx.fill();
+    }
+    return;
+  }
+  // a dug hole with its heap of earth
+  ctx.fillStyle = '#a0703a';
+  ctx.beginPath(); ctx.ellipse(cx + s * 0.22, cy + s * 0.25, s * 0.2, s * 0.1, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8a5a2b';
+  ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.36, s * 0.28, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#5a3a1c';
+  ctx.beginPath(); ctx.ellipse(cx, cy + s * 0.03, s * 0.27, s * 0.2, 0, 0, TAU); ctx.fill();
+  // what's in it
+  const k = s / 70;
+  ctx.save(); ctx.translate(cx, cy + 3 * k); ctx.scale(k, k);
+  if (g.item === 'chest' && !found) {
+    // the corner of something wooden
+    ctx.fillStyle = '#8a4b1c'; roundRect(-10, -4, 22, 10, 2); ctx.fill();
+    ctx.fillStyle = '#e0a526'; ctx.fillRect(-3, -4, 4, 10);
+  } else if (g.item === 'coin') {
+    ctx.fillStyle = '#f5c542'; ctx.beginPath(); ctx.ellipse(0, 0, 7, 5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1.2; ctx.stroke();
+  } else if (g.item === 'worm') {
+    ctx.strokeStyle = '#f08a9a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= 8; i++) { const wx = -12 + i * 3, wy = Math.sin(i * 0.9 + t * 5) * 3; i ? ctx.lineTo(wx, wy) : ctx.moveTo(wx, wy); }
+    ctx.stroke();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(11, Math.sin(8 * 0.9 + t * 5) * 3 - 1, 1.2, 0, TAU); ctx.fill();
+  } else if (g.item === 'shard') {
+    ctx.fillStyle = '#c56a3a'; ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-2, -6); ctx.lineTo(8, -2); ctx.lineTo(5, 5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#f0d9a0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 1); ctx.stroke();
+  } else if (g.item === 'sandal') {
+    ctx.fillStyle = '#a0673a'; ctx.beginPath(); ctx.ellipse(0, 0, 11, 5, -0.2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-3, -4); ctx.lineTo(2, 4); ctx.moveTo(3, -4); ctx.lineTo(-2, 4); ctx.stroke();
+  } else if (g.item === 'snail') {
+    ctx.fillStyle = '#c9b07a'; ctx.beginPath(); ctx.ellipse(-1, 3, 12, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#d98c4a'; ctx.beginPath(); ctx.arc(-2, -2, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#8a4b1c'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(-2, -2, 3.5, 0, 5); ctx.stroke();
+  }
+  ctx.restore();
+  // the shimmer: a glowing ring in the hole's colour
+  if (g.band >= 0) {
+    const b = BANDS[g.band];
+    const pulse = 0.5 + 0.5 * Math.sin(t * (2 + (5 - g.band)) + g.v * 6);
+    ctx.strokeStyle = b.col; ctx.globalAlpha = 0.55 + pulse * 0.45; ctx.lineWidth = 3 + (5 - g.band) * 0.5;
+    ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.4, s * 0.31, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawChest(x, y, s, open) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  if (open > 0) {
+    const g = ctx.createRadialGradient(0, -24, 4, 0, -24, 70);
+    g.addColorStop(0, `rgba(255,236,150,${0.8 * open})`); g.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -24, 70, 0, TAU); ctx.fill();
+  }
+  // box
+  ctx.fillStyle = '#9a5a26'; ctx.strokeStyle = '#5e3413'; ctx.lineWidth = 2;
+  roundRect(-26, -26, 52, 28, 4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e0a526';
+  ctx.fillRect(-20, -26, 6, 28); ctx.fillRect(14, -26, 6, 28);
+  // treasure inside
+  if (open > 0) {
+    ctx.fillStyle = '#f5c542';
+    ctx.beginPath(); ctx.ellipse(0, -27, 24, 9 * open, 0, Math.PI, TAU); ctx.fill();
+    for (let k = 0; k < 7; k++) {
+      ctx.fillStyle = k % 3 === 0 ? '#e63946' : k % 3 === 1 ? '#4dabf7' : '#fff3b0';
+      ctx.beginPath(); ctx.arc(-16 + k * 5.3, -29 - Math.sin(k * 1.7) * 5 * open, 2.5, 0, TAU); ctx.fill();
+    }
+  }
+  // lid
+  ctx.save();
+  ctx.translate(0, -26);
+  ctx.rotate(-open * 1.9);
+  ctx.fillStyle = '#b06a2e'; ctx.strokeStyle = '#5e3413';
+  ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(-26, -8); ctx.quadraticCurveTo(0, -22, 26, -8); ctx.lineTo(26, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e0a526'; ctx.fillRect(-20, -14, 6, 14); ctx.fillRect(14, -14, 6, 14);
+  ctx.restore();
+  ctx.fillStyle = '#ffd766'; roundRect(-5, -22, 10, 10, 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawFoundChest(L) {
+  const p = cellCentre(found.g.c, found.g.r);
+  const ft = found.t;
+  // rise, open, close, and sink back into the earth
+  const rise = ft < 0.5 ? ease(ft / 0.5) : ft < 2.0 ? 1 : ft < 2.8 ? 1 - ease((ft - 2.0) / 0.8) : 0;
+  const open = ft < 0.5 ? 0 : ft < 0.9 ? ease((ft - 0.5) / 0.4) : ft < 1.8 ? 1 : ft < 2.1 ? 1 - ease((ft - 1.8) / 0.3) : 0;
+  if (rise <= 0) {
+    // freshly patted earth
+    ctx.fillStyle = '#8a5a2b';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, L.cell * 0.36, L.cell * 0.26, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a0703a';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y - 3, L.cell * 0.3, L.cell * 0.18, 0, 0, TAU); ctx.fill();
+    return;
+  }
+  const s = clamp(L.cell / 60, 0.8, 1.4);
+  drawChest(p.x, p.y + 10 - rise * 26 * s, s, open);
+}
+
+// ============================================================
+//  Selling all that he hath
+// ============================================================
+function sellLayout() {
+  const k = clamp(W / 640, 0.9, 1.25);
+  const groundY = 548;
+  return {
+    k, groundY,
+    seller: { x: Math.max(64, W * 0.13), y: groundY, s: 1.3 * k },
+    buyer: { x: W - Math.max(64, W * 0.13), y: groundY, s: 1.3 * k },
+    rx0: 40, rx1: W - 40, ry0: 628, ry1: H - 60,
+  };
+}
+
+function startSell(kind) {
+  stage = kind === 'field' ? 'sell1' : 'sell2';
+  const L = sellLayout();
+  const list = (kind === 'field' ? FARM_GOODS : SHOP_GOODS).slice(0, cfg.sellItems);
+  // spread the belongings over the yard in a loose grid
+  const n = list.length;
+  const w = L.rx1 - L.rx0, h = L.ry1 - L.ry0;
+  let cols = Math.min(n, Math.max(3, Math.floor(w / 120)));
+  const rows = Math.ceil(n / cols);
+  cols = Math.ceil(n / rows);
+  const order = list.map((kd, i) => ({ kd, i })).sort(() => Math.random() - 0.5);
+  const items = order.map(({ kd }, j) => {
+    const c = j % cols, r = Math.floor(j / cols);
+    const rowN = Math.min(cols, n - r * cols);
+    const x = L.rx0 + w * (c + 0.5 + (cols - rowN) / 2) / cols + rand(-12, 12);
+    const y = L.ry0 + h * (r + 0.72) / rows + rand(-8, 8);
+    const g = GOODS[kd];
+    const sp = g.moves ? cfg.sellSpeed * g.moves : 0;
+    const a = rand(0, TAU);
+    return { kind: kd, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.5, sp, turnT: rand(1, 3), value: g.value, sold: false, fly: null, phase: rand(0, TAU), face: Math.random() < 0.5 ? -1 : 1 };
+  });
+  sell = { kind, items, price: items.reduce((s, it) => s + it.value, 0), coins: 0, t: 0, done: false, doneT: 0, sold: 0 };
+  particles = []; floaters = [];
+  if (level === 1) hint = { t: 2.6, text: isTouch() ? 'Tap each thing to sell it!' : 'Click each thing to sell it (or press Space)' };
+}
+
+function itemScale() { return clamp(W / 480, 1.2, 1.5); }
+
+function sellAt(x, y) {
+  if (!sell || sell.done || state !== 'play' || trans) return;
+  const s = itemScale();
+  let bestIt = null, bd = 1e9;
+  for (const it of sell.items) {
+    if (it.sold) continue;
+    const d = Math.hypot(x - it.x, y - (it.y - 22 * s));
+    if (d < 50 * s && d < bd) { bd = d; bestIt = it; }
+  }
+  if (bestIt) sellItem(bestIt);
+}
+
+function sellItem(it) {
+  if (!sell || it.sold) return;
+  it.sold = true;
+  it.fly = { t: 0, x0: it.x, y0: it.y };
+  sell.sold++;
+  const who = sell.kind === 'field' ? FARMER : MERCHANT;
+  flashMood(who, 'joy', 0.7);
+  sfx.sellNote(sell.sold / sell.items.length);
+  if (it.kind === 'goat') sfx.baa();
+  else if (it.kind === 'chicken') sfx.cluck();
+  hint = null;
+}
+
+function updateSell(dt) {
+  if (!sell) return;
+  const L = sellLayout();
+  if (!sell.done) sell.t += dt;
+  for (const it of sell.items) {
+    if (!it.sold && it.sp > 0) {
+      // goats and chickens wander about the yard
+      it.turnT -= dt;
+      if (it.turnT <= 0) {
+        const a = rand(0, TAU);
+        it.vx = Math.cos(a) * it.sp; it.vy = Math.sin(a) * it.sp * 0.5;
+        it.turnT = rand(0.8, 2.6);
+        if (Math.random() < 0.25) { it.vx = 0; it.vy = 0; }
+      }
+      it.x += it.vx * dt; it.y += it.vy * dt;
+      if (it.x < L.rx0 + 20) { it.x = L.rx0 + 20; it.vx = Math.abs(it.vx); }
+      if (it.x > L.rx1 - 20) { it.x = L.rx1 - 20; it.vx = -Math.abs(it.vx); }
+      if (it.y < L.ry0 + 10) { it.y = L.ry0 + 10; it.vy = Math.abs(it.vy); }
+      if (it.y > L.ry1) { it.y = L.ry1; it.vy = -Math.abs(it.vy); }
+      if (Math.abs(it.vx) > 1) it.face = Math.sign(it.vx);
+    }
+    if (it.fly && it.fly.t < 1) {
+      it.fly.t += dt / 0.55;
+      if (it.fly.t >= 1) {
+        it.fly.t = 1;
+        // the buyer pays: coins fly across to the seller
+        sell.coins += it.value;
+        flashMood(BUYER, 'wow', 0.6);
+        sfx.clink();
+        for (let i = 0; i < 6; i++) spawn(L.buyer.x, L.buyer.y - 70 * L.buyer.s * 0.8, (L.seller.x - L.buyer.x) * rand(0.9, 1.3), rand(-220, -120), 1, '#f5c542', 5, 260, 'coin');
+        floater(L.buyer.x, L.buyer.y - 100 * L.k, `+${it.value}`, '#a8741a', 1.1, 20);
+      }
+    }
+  }
+  if (!sell.done && sell.items.every((it) => it.fly && it.fly.t >= 1)) {
+    sell.done = true;
+    sell.doneT = 0;
+    const bonus = Math.max(60, Math.round(500 - sell.t * 22));
+    if (sell.kind === 'field') { pts.sell1 = bonus; showMessage('He bought the field!', 2.2); }
+    else { pts.sell2 = bonus; }
+    sfx.found();
+    sparkleBurst(W / 2, 330, 40);
+    if (sell.kind === 'pearl') { win(); return; }
+  }
+  if (sell.done) {
+    const was = sell.doneT;
+    sell.doneT += dt;
+    if (sell.kind === 'field' && was < 2.4 && sell.doneT >= 2.4) goStage(() => startIntro(2));
+  }
+}
+
+// Sell with the keyboard: the nearest thing still for sale
+function sellNext() {
+  if (!sell || sell.done) return;
+  const it = sell.items.filter((i) => !i.sold).sort((a, b) => a.x - b.x)[0];
+  if (it) sellItem(it);
+}
+
+function drawSellScene() {
+  const L = sellLayout();
+  const market = sell && sell.kind === 'pearl';
+  // sky
+  const g = ctx.createLinearGradient(0, -offY, 0, 420);
+  g.addColorStop(0, '#8fd0f7'); g.addColorStop(1, '#eaf7ff');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  drawCloud(W * 0.2, 110, 110, 30);
+  drawCloud(W * 0.8, 80, 130, 34);
+  ctx.fillStyle = '#b4d48c';
+  ctx.beginPath(); ctx.moveTo(-offX, 440);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, 380 + Math.sin(x / 120) * 14);
+  ctx.lineTo(W + offX, 440); ctx.fill();
+  if (market) {
+    // a row of market stalls
+    const n = Math.max(3, Math.round(W / 190));
+    for (let k = 0; k < n; k++) drawStallBack(W * k / n + 6, W / n - 12, 330, 470, ['#e63946', '#4dabf7', '#f4a261', '#6a3fa0'][k % 4], false);
+  } else {
+    // his little house and the courtyard wall
+    const hx = -offX - 20, hw = Math.max(200, W * 0.32);
+    ctx.fillStyle = '#e8d3aa'; ctx.fillRect(hx, 300, hw + offX + 20, 180);
+    ctx.fillStyle = '#c9ae7e'; ctx.fillRect(hx - 6, 290, hw + offX + 32, 14);
+    ctx.fillStyle = '#6b5238'; roundRect(hx + offX + 20 + hw * 0.55, 380, 42, 100, [20, 20, 0, 0]); ctx.fill();
+    ctx.fillStyle = '#5a4630'; ctx.fillRect(hx + offX + 20 + hw * 0.2, 340, 26, 24);
+    ctx.fillStyle = '#dcc497'; ctx.fillRect(-offX + hw, 420, viewW, 60);
+    ctx.fillStyle = '#c9ae7e'; ctx.fillRect(-offX + hw, 414, viewW, 8);
+    // a fig tree peeking over
+    ctx.fillStyle = '#6b8e3a';
+    ctx.beginPath(); ctx.arc(W * 0.7, 380, 50, 0, TAU); ctx.arc(W * 0.7 + 50, 395, 38, 0, TAU); ctx.arc(W * 0.7 - 45, 398, 34, 0, TAU); ctx.fill();
+  }
+  // the yard
+  ctx.fillStyle = '#ecd9a8';
+  ctx.fillRect(-offX, 480, viewW, H - 480);
+  ctx.fillStyle = 'rgba(160,120,60,0.15)';
+  for (let k = 0; k < 26; k++) { ctx.beginPath(); ctx.ellipse(hash(k, 4) * W, 500 + hash(k, 5) * 380, 14, 4, 0, 0, TAU); ctx.fill(); }
+
+  // The seller, the buyer and his money-bag
+  const who = market ? MERCHANT : FARMER;
+  const was = who.pearl;
+  who.pearl = state === 'win';
+  const sp = who.spade;
+  who.spade = false;
+  drawPerson(who, L.seller.x, L.seller.y, L.seller.s, L.buyer.x, L.buyer.y - 60);
+  who.spade = sp; who.pearl = was;
+  drawPerson(BUYER, L.buyer.x, L.buyer.y, L.buyer.s, L.seller.x, L.seller.y - 60);
+  ctx.save(); ctx.translate(L.buyer.x + 30 * L.k, L.buyer.y); ctx.scale(L.k, L.k);
+  ctx.fillStyle = '#b08a2e'; ctx.beginPath(); ctx.ellipse(0, -12, 16, 13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8a6a1e'; ctx.fillRect(-6, -28, 12, 6);
+  ctx.fillStyle = '#f5c542'; ctx.beginPath(); ctx.arc(0, -13, 5, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  // the things for sale
+  const s = itemScale();
+  const list = sell ? [...sell.items].sort((a, b) => a.y - b.y) : [];
+  for (const it of list) {
+    if (it.fly && it.fly.t >= 1) continue;
+    let x = it.x, y = it.y, sc = s;
+    if (it.fly) {
+      const f = ease(it.fly.t);
+      x = lerp(it.fly.x0, L.buyer.x, f);
+      y = lerp(it.fly.y0, L.buyer.y - 20, f) - Math.sin(f * Math.PI) * 140;
+      sc = s * (1 - f * 0.5);
+    } else if (level === 1 && sell.t > 1.5 && Math.sin(t * 5 + it.phase) > 0.3) {
+      ctx.strokeStyle = 'rgba(255,215,90,0.8)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, y - 2, 42 * s, 14 * s, 0, 0, TAU); ctx.stroke();
+    }
+    drawGood(it, x, y, sc);
+  }
+  drawParticles();
+  drawFloaters();
+  drawBanner(market ? 'sellPearl' : 'sellField', 128);
+  // The deed to the field / the pearl, once everything is sold
+  if (sell && sell.done && sell.kind === 'field') {
+    const f = ease(clamp(sell.doneT / 0.6, 0, 1));
+    ctx.save(); ctx.translate(W / 2, 440); ctx.scale(f, f);
+    ctx.fillStyle = '#f7ecd0'; ctx.strokeStyle = '#b89a6a'; ctx.lineWidth = 2;
+    roundRect(-95, -46, 190, 92, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d4b870'; roundRect(-104, -52, 16, 104, 8); ctx.fill(); roundRect(88, -52, 16, 104, 8); ctx.fill();
+    ctx.fillStyle = '#6a4a1a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '700 20px Fredoka, sans-serif'; ctx.fillText('The field', 0, -18);
+    ctx.font = '600 15px Fredoka, sans-serif'; ctx.fillText('is his!', 0, 6);
+    ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(52, 26, 10, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// A scroll-like banner carrying a verse
+function drawBanner(key, y) {
+  const v = Bible.verse(VERSES[key]);
+  const text = '“' + verseText(key) + '”';
+  ctx.save();
+  ctx.font = '700 19px Fredoka, sans-serif';
+  const maxW = Math.min(W - 70, 620);
+  const lines = wrapText(text, maxW);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width), 160);
+  const w = tw + 36, h = lines.length * 24 + 38;
+  const x = W / 2 - w / 2;
+  ctx.fillStyle = 'rgba(255,248,225,0.95)'; ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2.5;
+  roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#7a5200'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + 20 + i * 24));
+  ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillStyle = '#9a7a40';
+  ctx.fillText('— ' + v.cite, W / 2, y + h - 13);
+  ctx.restore();
+}
+
+function drawStallBack(x, w, top, bottom, col, big) {
+  // posts
+  ctx.fillStyle = '#8a5a2b';
+  ctx.fillRect(x + 4, top, 6, bottom - top); ctx.fillRect(x + w - 10, top, 6, bottom - top);
+  // back cloth
+  ctx.fillStyle = shade(col, 60);
+  ctx.globalAlpha = 0.5; ctx.fillRect(x + 10, top + 30, w - 20, bottom - top - 30); ctx.globalAlpha = 1;
+  // striped awning with a scalloped edge
+  const ah = big ? 52 : 38;
+  const n = Math.max(3, Math.round(w / 34));
+  for (let k = 0; k < n; k++) {
+    ctx.fillStyle = k % 2 ? '#fffaf0' : col;
+    ctx.beginPath();
+    ctx.moveTo(x + w * k / n, top); ctx.lineTo(x + w * (k + 1) / n, top);
+    ctx.lineTo(x + w * (k + 1) / n, top + ah); ctx.lineTo(x + w * k / n, top + ah);
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w * (k + 0.5) / n, top + ah, w / n / 2, 0, Math.PI); ctx.fill();
+  }
+}
+
+// ---- The belongings, drawn with their feet at (0,0) ----
+function drawGood(it, x, y, s) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 30 * s, 7 * s, 0, 0, TAU); ctx.fill();
+  const bob = it.sp > 0 && Math.hypot(it.vx, it.vy) > 1 && !it.sold ? Math.abs(Math.sin(t * 10 + it.phase)) * 3 : 0;
+  ctx.scale(s, s);
+  ctx.translate(0, -bob);
+  if (it.kind === 'goat' || it.kind === 'chicken') ctx.scale(it.face, 1);
+  const k = it.kind;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (k === 'goat') {
+    const step = it.sold ? 0 : Math.sin(t * 10 + it.phase) * (bob ? 4 : 0);
+    ctx.strokeStyle = '#6b5b4b'; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (const [lx, d] of [[-14, 1], [-7, -1], [8, 1], [14, -1]]) { ctx.moveTo(lx, -18); ctx.lineTo(lx + step * d, 0); }
+    ctx.stroke();
+    ctx.fillStyle = '#f4efe6'; ctx.strokeStyle = '#b8ab98'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -26, 22, 13, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e0d6c6'; ctx.beginPath(); ctx.ellipse(-21, -32, 5, 3, -0.6, 0, TAU); ctx.fill();
+    // head
+    ctx.fillStyle = '#f4efe6';
+    ctx.beginPath(); ctx.ellipse(22, -40, 9, 8, 0.3, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#8a7a66'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(19, -47); ctx.quadraticCurveTo(14, -58, 8, -54); ctx.moveTo(24, -47); ctx.quadraticCurveTo(22, -59, 15, -58); ctx.stroke();
+    ctx.fillStyle = '#e0d6c6'; ctx.beginPath(); ctx.ellipse(13, -42, 6, 3, 0.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(24, -42, 1.8, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#d8ccba'; ctx.beginPath(); ctx.moveTo(26, -34); ctx.lineTo(30, -26); ctx.lineTo(24, -32); ctx.fill();
+    ctx.strokeStyle = '#8a5a4a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(28, -37, 2.5, 0.2, 1.6); ctx.stroke();
+  } else if (k === 'chicken') {
+    const step = bob ? Math.sin(t * 16 + it.phase) * 3 : 0;
+    ctx.strokeStyle = '#e8a33a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-3, -8); ctx.lineTo(-3 + step, 0); ctx.moveTo(3, -8); ctx.lineTo(3 - step, 0); ctx.stroke();
+    ctx.fillStyle = '#c8763a';
+    ctx.beginPath(); ctx.ellipse(0, -16, 13, 10, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a85a2a'; ctx.beginPath(); ctx.moveTo(-10, -18); ctx.lineTo(-18, -28); ctx.lineTo(-12, -14); ctx.fill();
+    ctx.fillStyle = '#b8652f'; ctx.beginPath(); ctx.ellipse(-1, -15, 7, 5, 0.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#c8763a'; ctx.beginPath(); ctx.arc(10, -27, 6.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.arc(9, -34, 2.5, 0, TAU); ctx.arc(12, -34, 2.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(14, -23, 1.8, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f2b544'; ctx.beginPath(); ctx.moveTo(16, -28); ctx.lineTo(21, -26); ctx.lineTo(16, -24); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(12, -28.5, 1.3, 0, TAU); ctx.fill();
+  } else if (k === 'pot' || k === 'spice') {
+    const cols = k === 'pot' ? ['#c56a3a'] : ['#b5503f', '#d98c4a', '#c9a227'];
+    const n = cols.length;
+    for (let i = 0; i < n; i++) {
+      const px = n === 1 ? 0 : (i - 1) * 20, sc = n === 1 ? 1 : 0.62;
+      ctx.save(); ctx.translate(px, 0); ctx.scale(sc, sc);
+      ctx.fillStyle = k === 'pot' ? cols[0] : '#c8a36a';
+      ctx.beginPath();
+      ctx.moveTo(-9, -48); ctx.lineTo(9, -48); ctx.lineTo(8, -40);
+      ctx.bezierCurveTo(26, -34, 26, -4, 10, 0); ctx.lineTo(-10, 0); ctx.bezierCurveTo(-26, -4, -26, -34, -8, -40);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = shade(k === 'pot' ? cols[0] : '#c8a36a', -30); ctx.fillRect(-11, -50, 22, 5);
+      ctx.strokeStyle = '#f0d9a0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-16, -24); ctx.quadraticCurveTo(0, -20, 16, -24); ctx.stroke();
+      if (k === 'spice') { ctx.fillStyle = cols[i]; ctx.beginPath(); ctx.ellipse(0, -50, 10, 6, 0, Math.PI, TAU); ctx.fill(); }
+      else { ctx.strokeStyle = cols[0]; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(-17, -32, 6, 1.6, 4.6); ctx.moveTo(17, -38); ctx.arc(17, -32, 6, -1.6, 1.6); ctx.stroke(); }
+      ctx.restore();
+    }
+  } else if (k === 'cart') {
+    ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(22, -26); ctx.lineTo(44, -18); ctx.moveTo(22, -20); ctx.lineTo(44, -12); ctx.stroke();
+    ctx.fillStyle = '#b07a42'; ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 2;
+    roundRect(-32, -44, 58, 24, 3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-32, -36); ctx.lineTo(26, -36); ctx.stroke();
+    for (const wx of [-18, 12]) {
+      ctx.fillStyle = '#8a5a2b'; ctx.beginPath(); ctx.arc(wx, -12, 12, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#5e3413'; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let a = 0; a < 3; a++) { const an = a * Math.PI / 3 + (it.fly ? t * 10 : 0); ctx.moveTo(wx + Math.cos(an) * 11, -12 + Math.sin(an) * 11); ctx.lineTo(wx - Math.cos(an) * 11, -12 - Math.sin(an) * 11); }
+      ctx.stroke();
+    }
+  } else if (k === 'rug') {
+    ctx.fillStyle = '#b5303f'; roundRect(-32, -24, 60, 22, 10); ctx.fill();
+    ctx.strokeStyle = '#f2c14e'; ctx.lineWidth = 3;
+    for (const sx of [-18, -4, 10]) { ctx.beginPath(); ctx.moveTo(sx, -24); ctx.lineTo(sx, -2); ctx.stroke(); }
+    ctx.fillStyle = '#8a1f2c'; ctx.beginPath(); ctx.ellipse(28, -13, 7, 11, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#f2c14e'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(28, -13, 4, 0, 5.5); ctx.stroke();
+    ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); for (let i = 0; i < 5; i++) { ctx.moveTo(-32, -20 + i * 4); ctx.lineTo(-37, -20 + i * 4); } ctx.stroke();
+  } else if (k === 'stool') {
+    ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-12, -24); ctx.lineTo(-18, 0); ctx.moveTo(12, -24); ctx.lineTo(18, 0); ctx.moveTo(0, -24); ctx.lineTo(0, 2); ctx.stroke();
+    ctx.fillStyle = '#b07a42'; ctx.beginPath(); ctx.ellipse(0, -27, 20, 7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#c99060'; ctx.beginPath(); ctx.ellipse(0, -29, 17, 5, 0, 0, TAU); ctx.fill();
+  } else if (k === 'lamp') {
+    ctx.fillStyle = '#c56a3a';
+    ctx.beginPath(); ctx.ellipse(0, -9, 18, 9, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(12, -12); ctx.lineTo(26, -14); ctx.lineTo(24, -8); ctx.lineTo(12, -6); ctx.fill();
+    ctx.fillStyle = '#8a4b1c'; ctx.beginPath(); ctx.arc(0, -14, 4, 0, TAU); ctx.fill();
+    const fl = 1 + Math.sin(t * 14 + it.phase) * 0.15;
+    ctx.fillStyle = '#ffb703';
+    ctx.beginPath(); ctx.moveTo(25, -14); ctx.quadraticCurveTo(31, -22 * fl, 26, -30 * fl); ctx.quadraticCurveTo(21, -22 * fl, 25, -14); ctx.fill();
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.ellipse(26, -19, 2, 4, 0, 0, TAU); ctx.fill();
+  } else if (k === 'basket') {
+    for (const [fx, fy, c] of [[-10, -30, '#e63946'], [2, -34, '#f4a261'], [12, -29, '#7a4fa0'], [-2, -27, '#6b8e3a']]) {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(fx, fy, 7, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#c9a15a';
+    ctx.beginPath(); ctx.moveTo(-22, -28); ctx.lineTo(22, -28); ctx.lineTo(16, 0); ctx.lineTo(-16, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#9a7432'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 1; i < 4; i++) { ctx.moveTo(-22 + i * 1.5, -28 + i * 7); ctx.lineTo(22 - i * 1.5, -28 + i * 7); }
+    for (let i = -2; i <= 2; i++) { ctx.moveTo(i * 8, -28); ctx.lineTo(i * 6, 0); }
+    ctx.stroke();
+  } else if (k === 'silk') {
+    const cols = ['#7a4fa0', '#2a9d8f', '#e9b949'];
+    [[-12, -8], [12, -8], [0, -26]].forEach(([sx, sy], i) => {
+      ctx.fillStyle = cols[i]; roundRect(sx - 14, sy - 9, 28, 18, 8); ctx.fill();
+      ctx.fillStyle = shade(cols[i], -35); ctx.beginPath(); ctx.ellipse(sx + 13, sy, 4, 9, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = shade(cols[i], 50); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(sx - 10, sy - 4); ctx.lineTo(sx + 8, sy - 4); ctx.stroke();
+    });
+  } else if (k === 'scales') {
+    ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -44); ctx.moveTo(-24, -40); ctx.lineTo(24, -40); ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-24, -40); ctx.lineTo(-30, -22); ctx.moveTo(-24, -40); ctx.lineTo(-18, -22); ctx.moveTo(24, -40); ctx.lineTo(18, -22); ctx.moveTo(24, -40); ctx.lineTo(30, -22); ctx.stroke();
+    ctx.fillStyle = '#e0a526';
+    ctx.beginPath(); ctx.ellipse(-24, -21, 9, 3.5, 0, 0, Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(24, -21, 9, 3.5, 0, 0, Math.PI); ctx.fill();
+    ctx.fillRect(-8, -3, 16, 4);
+    ctx.beginPath(); ctx.arc(0, -46, 3, 0, TAU); ctx.fill();
+  } else if (k === 'casket') {
+    ctx.fillStyle = '#7a3f7a'; ctx.strokeStyle = '#4a204a'; ctx.lineWidth = 1.5;
+    roundRect(-20, -22, 40, 22, 3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5a2a5a';
+    ctx.beginPath(); ctx.moveTo(-20, -22); ctx.lineTo(-24, -40); ctx.lineTo(20, -40); ctx.lineTo(20, -22); ctx.fill();
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = '#f6f3ec'; ctx.beginPath(); ctx.arc(-14 + i * 5.6, -24 - (i % 2) * 3, 3.2, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#e0a526'; ctx.fillRect(-3, -16, 6, 6);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Part 2: the pearl of great price
+// ============================================================
+function makePearl(perfect, m, flaw = null) {
+  const p = {
+    perfect, flaw: perfect ? null : flaw,
+    size: 1, squash: 1, lustre: 1, tint: 0, tintCol: '#e6c77a',
+    bump: 0, bumpA: rand(0, TAU), spot: 0, spotA: rand(0, TAU), spotD: rand(0.25, 0.6),
+    crack: 0, crackA: rand(0, TAU), rot: rand(-0.6, 0.6), rejected: false, phase: rand(0, TAU),
+    x: 0, y: 0, r: 20, stall: 0,
+  };
+  const mm = m * rand(0.9, 1.1);
+  switch (p.flaw) {
+    case 'shape': p.squash = 1 - 0.26 * mm; break;
+    case 'bump': p.bump = 0.4 * mm; break;
+    case 'dull': p.lustre = 1 - 0.8 * mm; break;
+    case 'tint': p.tint = 0.8 * mm; p.tintCol = pick(['#e6c77a', '#b0a898', '#e7b0a0']); break;
+    case 'spot': p.spot = 0.2 * mm; break;
+    case 'crack': p.crack = mm; break;
+    case 'small': p.size = 1 - 0.3 * mm; break;
+  }
+  return p;
+}
+const PERFECT = makePearl(true, 0);
+
+function startPearl() {
+  stage = 'pearl';
+  pearls = [];
+  const n = cfg.pearls;
+  const bag = [];
+  while (bag.length < n - 1) bag.push(...[...FLAWS].sort(() => Math.random() - 0.5));
+  const good = Math.floor(Math.random() * n);
+  for (let i = 0, j = 0; i < n; i++) pearls.push(i === good ? makePearl(true, 0) : makePearl(false, cfg.flaw, bag[j++]));
+  // share them out between the stalls
+  const S = cfg.stalls;
+  pearls.forEach((p, i) => { p.stall = Math.floor(i * S / n); });
+  timeLeft = cfg.marketTime;
+  mistakes = 0;
+  examining = null; exam = { t: 0, wrong: null, wrongT: 0 };
+  pearlWon = null;
+  pcursor = 0; pearlKb = false;
+  particles = []; floaters = [];
+  if (level === 1) hint = { t: 2.4, text: isTouch() ? 'Tap a pearl to look closely' : 'Click a pearl to look closely (or arrows + Space)' };
+}
+
+function marketLayout() {
+  const S = cfg.stalls;
+  const sw = Math.min((W - 24) / S, 480);
+  const m = (W - sw * S) / 2;
+  const L = { S, sw, awTop: 232, tableY: 440, trayTop: 458, trayBot: H - 132, stalls: [] };
+  for (let s = 0; s < S; s++) {
+    const x0 = m + s * sw;
+    const list = pearls.filter((p) => p.stall === s);
+    const n = list.length;
+    const maxCols = Math.max(2, Math.floor((sw - 24) / 78));
+    let cols = Math.min(maxCols, n);
+    const rows = Math.ceil(n / cols);
+    cols = Math.ceil(n / rows);
+    const slotW = (sw - 24) / cols;
+    const avail = L.trayBot - L.trayTop - 16;
+    const slotH = Math.min(avail / rows, 110);
+    const r = Math.min(slotW * 0.3, slotH * 0.32, 30);
+    const yTop = L.trayTop + 8 + (avail - rows * slotH) / 2;
+    list.forEach((p, i) => {
+      const c = i % cols, row = Math.floor(i / cols);
+      const rowN = Math.min(cols, n - row * cols);
+      p.x = x0 + 12 + slotW * (c + 0.5 + (cols - rowN) / 2);
+      p.y = yTop + slotH * (row + 0.5);
+      p.r = r;
+    });
+    L.stalls.push({ x0, w: sw, cx: x0 + sw / 2 });
+  }
+  return L;
+}
+
+function lensLayout() {
+  const R = Math.min(W * 0.34, 165);
+  const cy = 440;
+  return { cx: W / 2, cy, R, buy: { x: W / 2, y: cy + R + 58, w: 236, h: 54 }, back: { x: W / 2, y: cy + R + 122, w: 170, h: 44 } };
+}
+const inBtn = (b, x, y) => Math.abs(x - b.x) < b.w / 2 && Math.abs(y - b.y) < b.h / 2;
+
+function pearlTap(x, y) {
+  if (state !== 'play' || stage !== 'pearl' || trans || pearlWon) return;
+  if (examining) {
+    if (exam.wrong) return;
+    const Ls = lensLayout();
+    if (inBtn(Ls.buy, x, y)) buyPearl();
+    else if (inBtn(Ls.back, x, y) || Math.hypot(x - Ls.cx, y - Ls.cy) > Ls.R + 10) closeExam();
+    return;
+  }
+  marketLayout();
+  let hit = null, bd = 1e9;
+  for (const p of pearls) {
+    if (p.rejected) continue;
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d < Math.max(p.r + 16, 30) && d < bd) { bd = d; hit = p; }
+  }
+  if (hit) openExam(hit);
+}
+
+function openExam(p) {
+  if (p.rejected) return;
+  examining = p;
+  exam = { t: 0, wrong: null, wrongT: 0 };
+  pcursor = pearls.indexOf(p);
+  sfx.lens();
+  hint = null;
+}
+function closeExam() { examining = null; exam.wrong = null; }
+
+function buyPearl() {
+  const p = examining;
+  if (!p || exam.wrong) return;
+  if (p.perfect) {
+    pearlWon = { p, t: 0 };
+    examining = null;
+    pts.pearl = Math.round(timeLeft * 8) + (mistakes === 0 ? 300 : 0);
+    sparkleBurst(p.x, p.y, 60);
+    flashT = 0.3;
+    showMessage('The pearl of great price!', 2.4);
+    sfx.found();
+    return;
+  }
+  // Not this one: the flaw shows up under the glass
+  exam.wrong = FLAW_TEXT[p.flaw];
+  exam.wrongT = 1.8;
+  p.rejected = true;
+  mistakes++;
+  timeLeft = Math.max(0, timeLeft - cfg.wrongCost);
+  flashMood(MERCHANT, 'worried', 1.4);
+  flashMood(SELLERS[p.stall], 'worried', 1.4);
+  const Ls = lensLayout();
+  floater(W / 2, Ls.cy + Ls.R + 56, `−${cfg.wrongCost} seconds`, '#c92a2a', 1.6, 24);
+  sfx.bounce();
+}
+
+function updatePearl(dt) {
+  if (exam.wrongT > 0) {
+    exam.wrongT -= dt;
+    if (exam.wrongT <= 0) closeExam();
+  }
+  if (examining) exam.t += dt;
+  if (pearlWon) {
+    const was = pearlWon.t;
+    pearlWon.t += dt;
+    if (Math.random() < dt * 16) spawn(pearlWon.p.x + rand(-30, 30), pearlWon.p.y - rand(0, 60), 0, -30, 1, '#fff6d0', 3, 0, 'star');
+    if (was < 2.8 && pearlWon.t >= 2.8) goStage(() => startSell('pearl'));
+    return;
+  }
+  if (trans) return;
+  timeLeft -= dt;
+  if (timeLeft <= 0) { timeLeft = 0; fail('closed'); }
+}
+
+// Keyboard: walk along the pearls, look closely, buy or put back
+function pearlKey(code) {
+  if (pearlWon || trans) return;
+  pearlKb = true;
+  const live = pearls.map((p, i) => i).filter((i) => !pearls[i].rejected);
+  if (!live.length) return;
+  if (examining) {
+    if (exam.wrong) return;
+    if (code === 'Space' || code === 'Enter') buyPearl();
+    else closeExam();
+    return;
+  }
+  if (!live.includes(pcursor)) pcursor = live[0];
+  const k = live.indexOf(pcursor);
+  if (code === 'ArrowRight' || code === 'ArrowDown') pcursor = live[(k + 1) % live.length];
+  else if (code === 'ArrowLeft' || code === 'ArrowUp') pcursor = live[(k - 1 + live.length) % live.length];
+  else if (code === 'Space' || code === 'Enter') openExam(pearls[pcursor]);
+}
+
+// One pearl: round, bright and smooth, unless it has a flaw
+function drawPearl(x, y, r, p) {
+  const R = r * p.size;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(R * 0.1, R * 0.95 * p.squash, R * 0.85, R * 0.22, 0, 0, TAU); ctx.fill();
+  ctx.rotate(p.rot);
+  ctx.scale(1, p.squash);
+  let body = p.tint ? mix('#f6f3ec', p.tintCol, p.tint) : '#f6f3ec';
+  if (p.lustre < 1) body = mix(body, '#a9a59c', (1 - p.lustre) * 0.7);
+  ctx.rotate(-p.rot);   // keep the light coming from the top-left
+  const hx = -R * 0.35, hy = -R * 0.4;
+  const g = ctx.createRadialGradient(hx, hy, R * 0.05, 0, 0, R * 1.15);
+  g.addColorStop(0, mix(body, '#ffffff', 0.4 + 0.6 * p.lustre));
+  g.addColorStop(0.45, body);
+  g.addColorStop(1, shade(body, -55));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, TAU);
+  if (p.bump) {
+    const bx = Math.cos(p.bumpA) * R * 0.85, by = Math.sin(p.bumpA) * R * 0.85;
+    ctx.moveTo(bx + R * p.bump, by); ctx.arc(bx, by, R * p.bump, 0, TAU);
+  }
+  ctx.fill();
+  // the soft rainbow "orient" of a fine pearl
+  if (p.lustre > 0.5) {
+    ctx.globalAlpha = 0.28 * p.lustre;
+    ctx.strokeStyle = '#ffc9e0'; ctx.lineWidth = R * 0.12;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.78, 0.2 * Math.PI, 0.7 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = '#c9f2e6';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.78, 0.7 * Math.PI, 1.0 * Math.PI); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  // highlight
+  ctx.fillStyle = `rgba(255,255,255,${0.25 + 0.7 * p.lustre})`;
+  ctx.beginPath(); ctx.ellipse(hx, hy, R * 0.26, R * 0.16, -0.6, 0, TAU); ctx.fill();
+  if (p.spot) {
+    ctx.fillStyle = 'rgba(80,60,45,0.9)';
+    ctx.beginPath(); ctx.arc(Math.cos(p.spotA) * R * p.spotD, Math.sin(p.spotA) * R * p.spotD, R * p.spot, 0, TAU); ctx.fill();
+  }
+  if (p.crack) {
+    ctx.strokeStyle = 'rgba(95,80,70,0.85)'; ctx.lineWidth = Math.max(0.8, R * 0.035);
+    const a = p.crackA, len = R * 1.1 * p.crack;
+    let cx = Math.cos(a) * R * 0.2, cy = Math.sin(a) * R * 0.2;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    for (let k = 1; k <= 4; k++) {
+      const f = k / 4;
+      const px = Math.cos(a) * R * 0.2 + Math.cos(a + 0.2) * len * f + (k % 2 ? 1 : -1) * R * 0.06;
+      const py = Math.sin(a) * R * 0.2 + Math.sin(a + 0.2) * len * f + (k % 2 ? -1 : 1) * R * 0.06;
+      ctx.lineTo(clamp(px, -R * 0.9, R * 0.9), clamp(py, -R * 0.9, R * 0.9));
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Where to point at a flaw once it has been found
+function flawSpot(p, R) {
+  switch (p.flaw) {
+    case 'bump': return { x: Math.cos(p.bumpA) * R * 0.95, y: Math.sin(p.bumpA) * R * 0.95, r: R * (p.bump + 0.25) };
+    case 'spot': return { x: Math.cos(p.spotA) * R * p.spotD, y: Math.sin(p.spotA) * R * p.spotD, r: R * (p.spot + 0.18) };
+    case 'crack': return { x: Math.cos(p.crackA) * R * 0.55, y: Math.sin(p.crackA) * R * 0.55, r: R * 0.5 };
+    default: return { x: 0, y: 0, r: R * 1.15 };
+  }
+}
+
+function drawPearlScene() {
+  const L = marketLayout();
+  // sky and the town
+  const g = ctx.createLinearGradient(0, -offY, 0, 300);
+  g.addColorStop(0, '#8fd0f7'); g.addColorStop(1, '#fdf1d8');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  drawCloud(W * 0.3, 100, 120, 32);
+  for (let k = 0; k < 9; k++) {
+    const hx = W * k / 8 - 30, hh = 50 + hash(k, 9) * 50;
+    ctx.fillStyle = k % 2 ? '#e8d3aa' : '#dcc497';
+    ctx.fillRect(hx, 250 - hh, 70, hh + 20);
+    ctx.fillStyle = '#b89a6a'; ctx.fillRect(hx - 3, 246 - hh, 76, 6);
+    ctx.fillStyle = '#6b5238'; ctx.fillRect(hx + 28, 250 - hh + 18, 12, 14);
+  }
+  ctx.fillStyle = '#e6cf9f'; ctx.fillRect(-offX, 250, viewW, H - 250);
+  // the stalls, each with its keeper behind the table
+  const cols = ['#e63946', '#2a9d8f', '#f4a261'];
+  const sk = clamp(L.sw / 200, 0.85, 1.3);
+  L.stalls.forEach((st, s) => {
+    drawStallBack(st.x0 + 2, st.w - 4, L.awTop, L.tableY + 10, cols[s % 3], true);
+    const seller = SELLERS[s];
+    drawPerson(seller, st.cx, L.tableY + 16, 1.15 * sk, examining ? W / 2 : st.cx, examining ? 400 : L.trayTop + 60);
+    // table and velvet tray
+    ctx.fillStyle = '#a0703a'; roundRect(st.x0 + 4, L.tableY, st.w - 8, L.trayBot - L.tableY + 30, 8); ctx.fill();
+    ctx.fillStyle = '#8a5a2b'; ctx.fillRect(st.x0 + 4, L.tableY, st.w - 8, 8);
+    ctx.fillStyle = '#3b2a6b'; roundRect(st.x0 + 12, L.trayTop, st.w - 24, L.trayBot - L.trayTop, 10); ctx.fill();
+    ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2; ctx.stroke();
+  });
+  // the pearls
+  pearls.forEach((p, i) => {
+    if (pearlWon && pearlWon.p === p) return;
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.35, 0, TAU); ctx.fill();
+    ctx.globalAlpha = p.rejected ? 0.35 : 1;
+    drawPearl(p.x, p.y, p.r, p);
+    ctx.globalAlpha = 1;
+    if (p.rejected) {
+      ctx.strokeStyle = 'rgba(255,140,140,0.8)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(p.x - 8, p.y + p.r + 4); ctx.lineTo(p.x + 8, p.y + p.r + 12); ctx.moveTo(p.x + 8, p.y + p.r + 4); ctx.lineTo(p.x - 8, p.y + p.r + 12); ctx.stroke();
+    }
+    // on level 1 the perfect pearl twinkles now and then
+    if (cfg.glint && p.perfect && !p.rejected) {
+      const tw = Math.max(0, Math.sin(t * 2.2 + p.phase));
+      if (tw > 0.85) { ctx.fillStyle = `rgba(255,255,240,${(tw - 0.85) * 6})`; drawStar(p.x - p.r * 0.35, p.y - p.r * 0.4, p.r * 0.7); }
+    }
+    if (pearlKb && i === pcursor && !examining) {
+      ctx.strokeStyle = `rgba(255,215,90,${0.7 + 0.3 * Math.sin(t * 6)})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9, 0, TAU); ctx.stroke();
+    }
+  });
+  // The merchant with his magnifying glass
+  const mk = clamp(W / 640, 1, 1.25);
+  MERCHANT.lens = true;
+  drawPerson(MERCHANT, 44 * mk, H - 14, 1.1 * mk, W / 2, 500);
+  MERCHANT.lens = false;
+  // The found pearl lifted up in glory
+  if (pearlWon) {
+    const p = pearlWon.p;
+    const f = ease(clamp(pearlWon.t / 1.2, 0, 1));
+    const x = lerp(p.x, W / 2, f), y = lerp(p.y, 400, f);
+    const r = lerp(p.r, 60, f);
+    const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 3);
+    glow.addColorStop(0, 'rgba(255,248,220,0.9)'); glow.addColorStop(1, 'rgba(255,248,220,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
+    drawPearl(x, y, r, p);
+  }
+  drawParticles();
+  if (examining) drawLens();
+  drawFloaters();
+}
+
+function drawLens() {
+  const Ls = lensLayout();
+  const p = examining;
+  const f = ease(clamp(exam.t / 0.25, 0, 1));
+  ctx.fillStyle = `rgba(30,20,50,${0.55 * f})`;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  ctx.save();
+  ctx.translate(Ls.cx, Ls.cy); ctx.scale(0.6 + 0.4 * f, 0.6 + 0.4 * f);
+  // handle
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 22; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(Ls.R * 0.72, Ls.R * 0.72); ctx.lineTo(Ls.R * 1.08, Ls.R * 1.08); ctx.stroke();
+  // glass
+  const bg = ctx.createRadialGradient(0, -Ls.R * 0.3, 10, 0, 0, Ls.R);
+  bg.addColorStop(0, '#5a4a8a'); bg.addColorStop(1, '#2a1f4a');
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, Ls.R, 0, TAU); ctx.fill();
+  drawPearl(0, 0, Ls.R * 0.55, p);
+  if (exam.wrong) {
+    const fs = flawSpot(p, Ls.R * 0.55 * p.size);
+    ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 4; ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.arc(fs.x, fs.y, fs.r, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // glint on the glass and the gold rim
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.ellipse(-Ls.R * 0.45, -Ls.R * 0.5, Ls.R * 0.3, Ls.R * 0.12, -0.7, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.arc(0, 0, Ls.R, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, Ls.R + 6, 0, TAU); ctx.stroke();
+  ctx.restore();
+  if (f < 1) return;
+  // caption and buttons
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.lineJoin = 'round';
+  const cap = exam.wrong || 'Look closely… is it perfect?';
+  ctx.strokeStyle = 'rgba(30,20,50,0.9)'; ctx.strokeText(cap, W / 2, Ls.cy - Ls.R - 30);
+  ctx.fillStyle = exam.wrong ? '#ffb3b3' : '#fff3c4'; ctx.fillText(cap, W / 2, Ls.cy - Ls.R - 30);
+  if (exam.wrong) return;
+  const b = Ls.buy;
+  ctx.fillStyle = '#a8741a'; roundRect(b.x - b.w / 2, b.y - b.h / 2 + 4, b.w, b.h, b.h / 2); ctx.fill();
+  const bgr = ctx.createLinearGradient(0, b.y - b.h / 2, 0, b.y + b.h / 2);
+  bgr.addColorStop(0, '#f7c948'); bgr.addColorStop(1, '#d9961c');
+  ctx.fillStyle = bgr; roundRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, b.h / 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.fillText('This is the one!', b.x, b.y + 1);
+  const k = Ls.back;
+  ctx.fillStyle = '#fff'; roundRect(k.x - k.w / 2, k.y - k.h / 2, k.w, k.h, k.h / 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(224,165,38,0.8)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#a8741a'; ctx.font = '600 17px Fredoka, sans-serif';
+  ctx.fillText('Put it back', k.x, k.y + 1);
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  const levelBonus = level * 500;
+  const score = pts.field + pts.sell1 + pts.pearl + pts.sell2 + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('treasureBest', best); } catch (e) {} }
+  lastScore = { ...pts, levelBonus, score };
+  const L = sellLayout();
+  sparkleBurst(L.seller.x, L.seller.y - 90, 70);
+  showMessage('Worth more than everything!', 2.6);
+  sfx.win();
+  endTimer = 2.6;
+}
+
+function fail(reason) {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failStage = stage;
+  failReason = reason;
+  examining = null;
+  hint = null;
+  sfx.fail();
+  endTimer = 1.6;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+// Show a message after the current one has had a moment
+function later(text) {
+  if (message.t > 0.3) hint = { t: 1.3, text };
+  else showMessage(text, 1.8);
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  stage = 'intro1';
+  cfg = makeConfig(1);
+  bubble = null; trans = null;
+  showOverlay('The Hidden Treasure', 'A parable of two great finds',
+    `${verseHTML('field')}
+     <ul>
+       <li><b>Part 1:</b> dig in the field to find the <b>hidden treasure</b>. Each hole <b>shimmers</b> &mdash; <span style="color:#d9480f"><b>hot</b></span> colours mean you're close, <span style="color:#4263eb"><b>cold</b></span> ones mean you're far away. Find it before the sun goes down!</li>
+       <li>Then <b>sell everything</b> he has to buy that field.</li>
+       <li><b>Part 2:</b> at the market, look closely at the pearls and find the <b>one perfect pearl</b>: round, bright and smooth. Then sell everything again to buy it!</li>
+       <li><b>Touch / mouse:</b> tap to dig, tap to sell, tap a pearl to look through the glass. <b>Keys:</b> <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> choose, <kbd>Space</kbd> digs, sells or picks.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Tell me the story', () => { level = 1; totalScore = 0; told = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; floaters = [];
+  pts = { field: 0, sell1: 0, pearl: 0, sell2: 0 };
+  bubble = null; trans = null; hint = null;
+  endTimer = 0; failSoon = 0;
+  flashT = shakeT = 0;
+  examining = null; pearlWon = null; found = null; sell = null;
+  timeLeft = cfg.marketTime; digsLeft = cfg.digs; lastBand = 9; lastDist = null;
+  keys.clear();
+}
+
+// retry: skip the story and start digging straight away
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  if (retry || told === level) {
+    startField();
+    showMessage(`Level ${level}: ${cfg.name}`);
+    return;
+  }
+  told = level;
+  startIntro(1);
+}
+
+// Try again from the part that went wrong, keeping what was already done
+function retryPart() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  particles = []; floaters = []; hint = null; endTimer = 0; failSoon = 0;
+  sfx.levelStart();
+  if (failStage === 'pearl') { startPearl(); showMessage('The market opens again…'); }
+  else { pts.field = 0; startField(); showMessage('A new day in the field…'); }
+}
+
+// ---- Jesus tells the story ----
+const introDur = () => (level === 1 ? [4.2, 5.6] : [3.2, 4.2]);
+function say(key, dur) { bubble = { key, t: dur }; }
+
+function startIntro(n) {
+  stage = n === 1 ? 'intro1' : 'intro2';
+  introStep = 0; introT = 0;
+  particles = []; floaters = [];
+  say(n === 1 ? 'tell1' : 'tell3', introDur()[0]);
+  if (n === 1) showMessage(level === 1 ? 'Jesus told the people a story…' : `Level ${level}: ${cfg.name}`, 2.4);
+  else showMessage('Jesus went on…', 2);
+}
+
+function advanceIntro() {
+  if (trans || state !== 'play') return;
+  if (introStep === 0) {
+    introStep = 1; introT = 0;
+    say(stage === 'intro1' ? 'tell2' : 'pearlFound', introDur()[1]);
+  } else {
+    if (bubble) bubble.t = Math.min(bubble.t, 0.4);
+    goStage(stage === 'intro1' ? startField : startPearl);
+  }
+}
+
+function updateIntro(dt) {
+  introT += dt;
+  if (!trans && introT > introDur()[introStep]) advanceIntro();
+}
+
+// Fade out, switch scene, fade back in
+function goStage(fn) {
+  if (trans) return;
+  trans = { t: 0, fn, called: false };
+}
+function updateTrans(dt) {
+  if (!trans) return;
+  trans.t += dt;
+  if (!trans.called && trans.t >= 0.45) { trans.called = true; trans.fn(); }
+  if (trans && trans.t >= 0.9) trans = null;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Worth everything!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('sellField')}
+       <p style="text-align:center">Jesus said that belonging to God&rsquo;s kingdom is the greatest treasure of all &mdash; worth more than everything we have!</p>
+       ${verseHTML('pearlWin')}
+       <p class="score">Treasure found: <b>${s.field}</b><br>Sold all for the field: <b>${s.sell1}</b><br>Perfect pearl: <b>${s.pearl}</b><br>Sold all for the pearl: <b>${s.sell2}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const lines = failStage === 'pearl'
+      ? ['The market closed!', 'The stalls packed up before the perfect pearl was found. Look through the glass: the best pearl is <b>round</b>, <b>bright</b> and perfectly <b>smooth</b>.']
+      : ['The sun went down!', 'The day ended before the treasure was found. Watch the shimmer: <b>warm</b> colours mean you&rsquo;re close, so dig next to the hottest hole.'];
+    showOverlay(lines[0], `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${lines[1]}</p>
+       ${verseHTML('tell3')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', retryPart);
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = 'play';
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  keys.add(e.code);
+  if (e.repeat && (e.code === 'Space' || e.code === 'Enter')) return;
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && endTimer < 1.8) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || trans) return;
+  const act = e.code === 'Space' || e.code === 'Enter';
+  if (stage === 'intro1' || stage === 'intro2') { if (act) advanceIntro(); return; }
+  if (stage === 'field') {
+    const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], KeyA: [-1, 0], KeyD: [1, 0], KeyW: [0, -1], KeyS: [0, 1] }[e.code];
+    if (mv) {
+      if (cursor.show) { cursor.c = clamp(cursor.c + mv[0], 0, cfg.cols - 1); cursor.r = clamp(cursor.r + mv[1], 0, cfg.rows - 1); }
+      cursor.show = true;
+    } else if (act) { cursor.show = true; digAt(grid[cursor.r * cfg.cols + cursor.c]); }
+    return;
+  }
+  if (stage === 'sell1' || stage === 'sell2') { if (act) sellNext(); return; }
+  if (stage === 'pearl' && (act || e.code.startsWith('Arrow') || e.code === 'Backspace' || e.code === 'KeyX')) pearlKey(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && endTimer < 1.8) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || trans) return;
+  if (stage === 'intro1' || stage === 'intro2') advanceIntro();
+  else if (stage === 'field') { cursor.show = false; digAt(cellAt(p.x, p.y)); }
+  else if (stage === 'sell1' || stage === 'sell2') sellAt(p.x, p.y);
+  else if (stage === 'pearl') { pearlKb = false; pearlTap(p.x, p.y); }
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    Music.tap(height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) Music.fail(); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // ---- Extra sounds for digging, selling and the market ----
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  dig() { this.noiseBurst(500, 0.22, 0.4, 0.7, 180, 'lowpass'); this.tone(140, 0.12, 'sine', 0.25, 0, 80); },
+  clonk() { this.tone(330, 0.12, 'triangle', 0.25); this.tone(250, 0.16, 'triangle', 0.18, 0.07); },
+  clunkWood() { this.tone(180, 0.2, 'triangle', 0.35, 0, 120); this.tone(240, 0.15, 'triangle', 0.2, 0.08, 160); },
+  clink() { this.tone(1250, 0.14, 'triangle', 0.18); this.tone(1680, 0.2, 'triangle', 0.12, 0.07); },
+  // The shimmer: more bells, higher and brighter, the closer the spade is to the chest
+  shimmerPing(band) {
+    if (!this.ctx) return;
+    const n = 6 - band;
+    const base = [1047, 1175, 1319, 1568, 1760, 2093, 2349];
+    for (let i = 0; i < n; i++) this.tone(base[Math.min(i + (5 - band), 6)], 0.5, 'sine', 0.06 + (5 - band) * 0.012, 0.12 + i * 0.07);
+  },
+  found() {
+    if (!this.ctx) return;
+    [1568, 2093, 2637, 3136, 4186].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.13, i * 0.07));
+  },
+  sellNote(f) { this.tap(f); },
+  lens() { this.noiseBurst(1800, 0.25, 0.12, 0.8, 3200); },
+  baa() { this.tone(420, 0.35, 'sawtooth', 0.05, 0.05, 380); this.tone(400, 0.25, 'triangle', 0.08, 0.05, 360); },
+  cluck() { for (let i = 0; i < 3; i++) this.tone(700 + i * 60, 0.06, 'square', 0.04, 0.05 + i * 0.09, 500); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function hudMeter() {
+  if (state === 'title') return null;
+  if (stage === 'field') return { label: 'DAYLIGHT', f: digsLeft / cfg.digs, text: `${digsLeft} dig${digsLeft === 1 ? '' : 's'}`, cols: ['#ffb347', '#fff1a8'], low: digsLeft <= 3 };
+  if (stage === 'sell1' || stage === 'sell2') return sell ? { label: 'COINS', f: sell.coins / sell.price, text: `${sell.coins} / ${sell.price}`, cols: ['#e0a526', '#fff1a8'], low: false } : null;
+  if (stage === 'pearl') return { label: 'MARKET', f: timeLeft / cfg.marketTime, text: `${Math.ceil(timeLeft)}s`, cols: ['#9775fa', '#e5dbff'], low: timeLeft < 10 };
+  return null;
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + the meter for this part of the story
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const story = stage === 'intro1' || stage === 'intro2';
+  ctx.fillText(state === 'title' ? 'The Hidden Treasure' : story ? 'Jesus tells a story' : `Level ${level} · ${cfg.name}`, 12, 26);
+  const m = hudMeter();
+  if (m) {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(m.label, 12, 49);
+    const bx = 12 + ctx.measureText(m.label).width + 8, bw = 110;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(90,66,16,0.25)';
+    roundRect(bx, 38, bw, 13, 6.5); ctx.fill();
+    const gg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    gg.addColorStop(0, m.cols[0]); gg.addColorStop(1, m.cols[1]);
+    ctx.fillStyle = m.low && Math.sin(t * 10) > 0 ? '#ff6b6b' : gg;
+    const f = clamp(m.f, 0, 1);
+    if (f > 0) { roundRect(bx, 38, Math.max(13, bw * f), 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#5a4210';
+    ctx.font = '700 13px Fredoka, sans-serif';
+    ctx.fillText(m.text, bx + bw + 8, 49);
+  }
+
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score, and the four parts of the story (dig, sell, pearl, sell)
+  const rx = viewW - 12;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SCORE', rx, 20);
+  ctx.font = '700 16px Fredoka, sans-serif';
+  ctx.fillText(`${totalScore}`, rx, 40);
+  if (state !== 'title') {
+    ctx.shadowBlur = 0;
+    const steps = ['field', 'sell1', 'pearl', 'sell2'];
+    const at = stage === 'intro1' ? -0.5 : stage === 'intro2' ? 1.5 : steps.indexOf(stage);
+    for (let i = 0; i < 4; i++) {
+      const x = rx - 8 - (3 - i) * 26, y = 60;
+      const done = i < at || state === 'win';
+      const now = i === at && state !== 'win';
+      ctx.fillStyle = done ? '#69b34c' : now ? '#f7c948' : 'rgba(255,255,255,0.7)';
+      ctx.beginPath(); ctx.arc(x, y, now ? 10 : 8, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 1.5; ctx.stroke();
+      // tiny icons: spade, coin, pearl, coin
+      ctx.save(); ctx.translate(x, y);
+      if (i === 0) { ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-3, -5); ctx.lineTo(2, 2); ctx.stroke(); ctx.fillStyle = '#5a4210'; ctx.beginPath(); ctx.ellipse(3, 3.5, 2.6, 3.4, -0.6, 0, TAU); ctx.fill(); }
+      else if (i === 2) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.fill(); ctx.strokeStyle = '#9a8a6a'; ctx.lineWidth = 1; ctx.stroke(); }
+      else { ctx.fillStyle = '#e0a526'; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.fill(); ctx.strokeStyle = '#8a6a1e'; ctx.lineWidth = 1; ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+// Messages sit in open sky above each scene
+function messageY() {
+  if (inStory()) return 150 + Math.max(0, offY) * 0.4;
+  if (stage === 'field') return offY + 176;
+  if (stage === 'pearl') return offY + (examining ? 200 : 190);
+  return offY + 318;
+}
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = messageY();
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#7a5200';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  if (inStory()) drawStory();
+  else if (stage === 'field') drawFieldScene();
+  else if (stage === 'sell1' || stage === 'sell2') drawSellScene();
+  else if (stage === 'pearl') drawPearlScene();
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  if (trans) {
+    const a = trans.t < 0.45 ? trans.t / 0.45 : 1 - (trans.t - 0.45) / 0.45;
+    ctx.fillStyle = `rgba(255,246,220,${clamp(a, 0, 1)})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  updateTrans(dt);
+  if (state === 'play') {
+    if (stage === 'intro1' || stage === 'intro2') updateIntro(dt);
+    else if (stage === 'field') updateField(dt);
+    else if (stage === 'sell1' || stage === 'sell2') updateSell(dt);
+    else if (stage === 'pearl') updatePearl(dt);
+  } else if (state === 'win') {
+    if (Math.random() < dt * 10) spawn(rand(0, W), rand(120, 500), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  }
+  if (hint) { hint.t -= dt; if (hint.t <= 0) { showMessage(hint.text, 2.4); hint = null; } }
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0 && !(state === 'play' && (stage === 'intro1' || stage === 'intro2'))) bubble = null; }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,2380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>The Wise Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Wise Builder</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: false };
+
+// Scripture shown in this game. KJV is filled in; other versions are added later.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  wiseMan:   { ref: 'Matthew 7:24', KJV: '...I will liken him unto a wise man, which built his house upon a rock', NKJV: '...I will liken him to a wise man who built his house on the rock', NIV: '...is like a wise man who built his house on the rock', NLT: '...is wise, like a person who builds a house on solid rock' },
+  fellNot:   { ref: 'Matthew 7:25', KJV: 'it fell not', NKJV: 'it did not fall', NIV: 'it did not fall', NLT: 'it won’t collapse' },
+  wiseWin:   { ref: 'Matthew 7:24-25', KJV: '...I will liken him unto a wise man, which built his house upon a rock: and the rain descended, and the floods came, and the winds blew, and beat upon that house; and it fell not: for it was founded upon a rock.', NKJV: '...I will liken him to a wise man who built his house on the rock: and the rain descended, the floods came, and the winds blew and beat on that house; and it did not fall, for it was founded on the rock.', NIV: '...is like a wise man who built his house on the rock. The rain came down, the streams rose, and the winds blew and beat against that house; yet it did not fall, because it had its foundation on the rock.', NLT: '...is wise, like a person who builds a house on solid rock. Though the rain comes in torrents and the floodwaters rise and the winds beat against that house, it won’t collapse because it is built on bedrock.' },
+  foolish:   { ref: 'Matthew 7:26-27', KJV: '...a foolish man, which built his house upon the sand: and the rain descended, and the floods came, and the winds blew, and beat upon that house; and it fell: and great was the fall of it.', NKJV: '...a foolish man who built his house on the sand: and the rain descended, the floods came, and the winds blew and beat on that house; and it fell. And great was its fall.', NIV: '...a foolish man who built his house on sand. The rain came down, the streams rose, and the winds blew and beat against that house, and it fell with a great crash.', NLT: '...foolish, like a person who builds a house on sand. When the rains and floods come and the winds beat against that house, it will collapse with a mighty crash.' },
+  greatFall: { ref: 'Matthew 7:27', KJV: 'great was the fall of it', NKJV: 'great was its fall', NIV: 'it fell with a great crash', NLT: 'it will collapse with a mighty crash' },
+  heareth:   { ref: 'Matthew 7:24', KJV: 'Therefore whosoever heareth these sayings of mine, and doeth them...', NKJV: 'Therefore whoever hears these sayings of Mine, and does them...', NIV: 'Therefore everyone who hears these words of mine and puts them into practice...', NLT: 'Anyone who listens to my teaching and follows it...' },
+  rain:      { ref: 'Matthew 7:25', KJV: 'And the rain descended', NKJV: 'And the rain descended', NIV: 'The rain came down', NLT: 'Though the rain comes in torrents' },
+  floods:    { ref: 'Matthew 7:25', KJV: 'and the floods came', NKJV: 'the floods came', NIV: 'the streams rose', NLT: 'and the floodwaters rise' },
+  winds:     { ref: 'Matthew 7:25', KJV: 'and the winds blew', NKJV: 'and the winds blew', NIV: 'and the winds blew', NLT: 'and the winds beat' },
+  beat:      { ref: 'Matthew 7:25', KJV: 'and beat upon that house', NKJV: 'and beat on that house', NIV: 'and beat against that house', NLT: 'against that house' },
+  digged:    { ref: 'Luke 6:48', KJV: 'He is like a man which built an house, and digged deep, and laid the foundation on a rock', NKJV: 'He is like a man building a house, who dug deep and laid the foundation on the rock', NIV: 'They are like a man building a house, who dug down deep and laid the foundation on rock', NLT: 'It is like a person building a house who digs deep and lays the foundation on solid rock' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+// blend two #rrggbb colours
+function mix(a, b, f) {
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  const ch = (s) => Math.round(lerp((A >> s) & 255, (B >> s) & 255, f));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const BS = 48;            // one block, in world pixels
+const GCOLS = 14;         // the sandy land you may build on: columns 0..13 (with a few spots of rock)
+const GROWS = 10;         // ...and rows 0..9 above the valley floor
+const WCOLS = 20;         // simulated columns: the land, a gap (14), the neighbour's plot (15..19)
+const NB_C0 = 15;         // the neighbour's plot starts here
+const RIVER_C0 = 20;      // the river runs from here
+const WORLD_L = -4 * BS;  // the rocky hill where Jesus teaches
+const WORLD_R = 23 * BS;
+const GROUND_Y = 670;     // logical y of the valley floor
+const MAX_SPAN = 3;       // a block can reach this far sideways from a wall or pillar
+const STORM_DUR = 12.5;   // seconds of storm
+const BASE_FLOOD = -0.6;  // the river's normal level, in rows above the valley floor
+
+// wind: how easily a loosely held block blows away; water: chance per tick to wash away when under the flood
+const BLOCKS = {
+  stone: { name: 'Stone',      cost: 2, wind: 0.3, water: 0 },
+  plank: { name: 'Wood plank', cost: 1, wind: 1,   water: 0.06 },
+  log:   { name: 'Log pillar', cost: 1, wind: 0.7, water: 0.03 },
+  glass: { name: 'Window',     cost: 2, wind: 0.6, water: 0 },
+  door:  { name: 'Door',       cost: 2, wind: 0.5, water: 0 },
+  roof:  { name: 'Roof tile',  cost: 1, wind: 1.2, water: 0.08 },
+};
+const PALETTE = ['stone', 'plank', 'log', 'glass', 'door', 'roof', 'erase'];
+
+// spots: [first column, width] of each rock that pokes up out of the sand
+const LEVELS = [
+  { name: 'The Rocky Hill',  spots: [[1, 6]],                  budget: 30, tall: 3, rooms: 1, windows: 1, flood: 0.7,  wind: 0.5,  gusts: [6, 7.6, 9.2],
+    tip: 'Find the grey rock in the sand!' },
+  { name: 'Windy Valley',    spots: [[0, 2], [7, 5]],          budget: 26, tall: 4, rooms: 1, windows: 2, flood: 1.0,  wind: 0.8,  gusts: [5.4, 6.6, 7.8, 9.2],
+    tip: 'Strong winds: keep your roof close to the walls!' },
+  { name: 'Two Rooms',       spots: [[1, 3], [8, 6]],          budget: 30, tall: 3, rooms: 2, windows: 2, flood: 1.3,  wind: 1.0,  gusts: [5.2, 6.2, 7.2, 8.2, 9.2],
+    tip: 'The flood reaches the rock now: stone is strongest down low!' },
+  { name: 'The Watchtower',  spots: [[1, 2], [6, 4]],          budget: 26, tall: 6, rooms: 1, windows: 2, flood: 1.45, wind: 1.15, gusts: [5.2, 6.2, 7.2, 8.2, 9.2], tower: true,
+    tip: 'Build up high, on the rock!' },
+  { name: 'The Great Storm', spots: [[0, 2], [4, 2], [8, 5]],  budget: 32, tall: 6, rooms: 2, windows: 2, flood: 1.55, wind: 1.3,  gusts: [5, 5.9, 6.8, 7.7, 8.6, 9.4], tower: true,
+    tip: 'The great storm is coming. Build wisely!' },
+];
+
+function makeConfig(n) {
+  const base = LEVELS[Math.min(n, LEVELS.length) - 1];
+  const extra = Math.max(0, n - LEVELS.length);
+  return {
+    ...base,
+    name: n <= LEVELS.length ? base.name : `Storm ${n}`,
+    spots: base.spots.map(([c0, w]) => ({ c0, w })),
+    budget: Math.max(24, base.budget - extra * 2),
+    wind: Math.min(base.wind + extra * 0.1, 2),
+    waterMul: 1 + extra * 0.15,
+  };
+}
+
+// The level's goal, as one short sentence (there is no checklist on screen)
+function goalText() {
+  const bits = ['a door'];
+  bits.push(cfg.windows > 1 ? `${cfg.windows} windows` : 'a window');
+  bits.push(cfg.rooms > 1 ? `${cfg.rooms} rooms under a roof` : 'a roof');
+  const what = cfg.tower ? `a tower ${cfg.tall} blocks tall` : `a house ${cfg.tall} blocks tall`;
+  return `Build ${what} with ${bits.slice(0, -1).join(', ')} and ${bits[bits.length - 1]} — on the rock!`;
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('buildersBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let phase = 'build';      // build | storm (while state === 'play')
+let buildT = 0, stormT = 0;
+let grid = new Array(WCOLS * GROWS).fill(null);   // {type, owner:'p'|'n', doom}
+let er = new Array(WCOLS).fill(0);                // how many sand rows the flood has washed out, per column
+let front = RIVER_C0;     // the flood's erosion front (a column), moving from the river toward the rock
+let floodH = BASE_FLOOD;  // flood surface, in rows above the valley floor
+let dark = 0, rainAmt = 0, windFx = 0;
+let coins = 0, sel = 'stone', cursor = { c: 2, r: 1 }, hover = null, kbUsed = false;
+let debris = [];
+let particles = [];
+let message = { text: '', t: 0 };
+let msgQueue = [];
+let flashT = 0, shakeT = 0, endTimer = 0;
+let lastScore = null, lastFail = null;
+let nbIdx = 0, nbTimer = 0, nbSay = { text: '', t: 0 }, nbSayIdx = 0, nbSayCd = 0, nbFell = false, nbShockT = 0;
+let gustIdx = 0, tickT = 0, initialCount = 0, onRock = false, pShockT = 0, readyJoyT = 0, wasReady = false;
+let stormMsg = 0, stormEndT = 0, bolt = null;
+let ana = null, reqs = [];
+let goalT = 0;            // how long the level's goal stays up in the banner
+let cam = { x: 0, zoom: 1 };
+
+const idx = (c, r) => r * WCOLS + c;
+function get(c, r) {
+  if (c < 0 || c >= WCOLS || r < 0 || r >= GROWS) return null;
+  return grid[idx(c, r)];
+}
+function setCell(c, r, v) { grid[idx(c, r)] = v; }
+function spotAt(c) { return cfg.spots.find((q) => c >= q.c0 && c < q.c0 + q.w) || null; }
+const colIsRock = (c) => c >= 0 && c < GCOLS && !!spotAt(c);
+const groundRow = (c) => (colIsRock(c) ? 1 : 0);      // on the rock, row 0 is the rock itself
+const groundOK = (c) => colIsRock(c) || er[c] === 0;   // is there still ground under this column?
+
+// World y of the top of the ground in any column (y grows downward, valley floor = 0)
+function terrainTop(c) {
+  if (c < 0) return -2 * BS;                 // the hill where Jesus teaches
+  if (colIsRock(c)) return -BS;              // a rock poking up out of the sand: it never washes away
+  if (c < RIVER_C0) return (er[c] || 0) * BS; // sand, lower as it washes away
+  return 2.2 * BS;                           // river bed
+}
+
+// The foolish neighbour's house, in the order he builds it
+const NB_PLAN = [
+  [15, 0, 'door'], [19, 0, 'plank'], [15, 1, 'plank'], [19, 1, 'glass'], [15, 2, 'plank'], [19, 2, 'plank'],
+  [15, 3, 'roof'], [16, 3, 'roof'], [17, 3, 'roof'], [18, 3, 'roof'], [19, 3, 'roof'],
+  [16, 4, 'roof'], [17, 4, 'roof'], [18, 4, 'roof'],
+];
+const NB_LINES = [
+  'Sand is soft, so quick to build!',
+  'Rock? Too much hard work!',
+  'What a lovely river view!',
+  'Storms? Never happen here!',
+  'Done already! Easy!',
+];
+// A sample house on the rock for the title screen
+const DEMO_HOUSE = [
+  [2, 1, 'door'], [2, 2, 'stone'], [5, 1, 'stone'], [5, 2, 'glass'],
+  [2, 3, 'roof'], [3, 3, 'roof'], [4, 3, 'roof'], [5, 3, 'roof'],
+];
+
+// ============================================================
+//  Support: blocks need something holding them up
+// ============================================================
+// Each block gets a "reach": 0 if it stands on a column going down to solid
+// ground, +1 for every step sideways (or hanging) away from such a column.
+// Anything further than MAX_SPAN away (or cut off completely) falls.
+function computeSupport() {
+  const N = WCOLS * GROWS;
+  const d = new Array(N).fill(Infinity);
+  for (let c = 0; c < WCOLS; c++) {
+    const r = groundRow(c);
+    if (grid[idx(c, r)] && groundOK(c)) d[idx(c, r)] = 0;
+  }
+  let changed = true, guard = 0;
+  while (changed && guard++ < N) {
+    changed = false;
+    for (let r = 0; r < GROWS; r++) {
+      for (let c = 0; c < WCOLS; c++) {
+        const i = idx(c, r);
+        if (!grid[i] || d[i] === 0) continue;
+        let b = d[i];
+        if (r > 0 && grid[idx(c, r - 1)]) b = Math.min(b, d[idx(c, r - 1)]);            // resting on
+        if (r < GROWS - 1 && grid[idx(c, r + 1)]) b = Math.min(b, d[idx(c, r + 1)] + 1); // hanging from
+        if (c > 0 && grid[idx(c - 1, r)]) b = Math.min(b, d[idx(c - 1, r)] + 1);
+        if (c < WCOLS - 1 && grid[idx(c + 1, r)]) b = Math.min(b, d[idx(c + 1, r)] + 1);
+        if (b < d[i]) { d[i] = b; changed = true; }
+      }
+    }
+  }
+  return d;
+}
+
+// ============================================================
+//  Checking the house
+// ============================================================
+function analyse() {
+  const top = new Array(GCOLS).fill(-1), topType = new Array(GCOLS).fill(null);
+  let count = 0, height = 0, doors = 0, windows = 0, rockN = 0;
+  for (let c = 0; c < GCOLS; c++) {
+    for (let r = 0; r < GROWS; r++) {
+      const b = get(c, r);
+      if (!b || b.owner !== 'p') continue;
+      count++;
+      if (colIsRock(c)) rockN++;
+      if (r > top[c]) { top[c] = r; topType[c] = b.type; }
+      height = Math.max(height, r - groundRow(c) + 1);
+      if (b.type === 'door' && r === groundRow(c)) doors++;
+      if (b.type === 'glass') windows++;
+    }
+  }
+  const isP = (c, r) => { const b = get(c, r); return !!(b && b.owner === 'p'); };
+  // Inside a room: an empty cell with a block above it and walls to its left and right
+  const inside = new Uint8Array(GCOLS * GROWS);
+  for (let c = 0; c < GCOLS; c++) {
+    for (let r = groundRow(c); r < top[c]; r++) {
+      if (get(c, r)) continue;
+      let L = false, R = false;
+      for (let k = c - 1; k >= 0 && !L; k--) L = isP(k, r);
+      for (let k = c + 1; k < GCOLS && !R; k++) R = isP(k, r);
+      if (L && R) inside[r * GCOLS + c] = 1;
+    }
+  }
+  // Count rooms (connected pockets) and check each is under roof tiles
+  let rooms = 0, roofOK = true, anyInside = false;
+  const seen = new Uint8Array(GCOLS * GROWS);
+  for (let s = 0; s < inside.length; s++) {
+    if (!inside[s] || seen[s]) continue;
+    rooms++;
+    const stack = [s]; seen[s] = 1;
+    while (stack.length) {
+      const k = stack.pop(), c = k % GCOLS, r = (k / GCOLS) | 0;
+      anyInside = true;
+      if (topType[c] !== 'roof') roofOK = false;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= GCOLS || nr < 0 || nr >= GROWS) continue;
+        const nk = nr * GCOLS + nc;
+        if (inside[nk] && !seen[nk]) { seen[nk] = 1; stack.push(nk); }
+      }
+    }
+  }
+  if (!anyInside) roofOK = false;
+  return { count, height, doors, windows, rooms, roofOK, rockN, inside };
+}
+
+// After the storm, every room must still be under its roof (no holes blown in it)
+let insideBefore = null;
+function roofIntact(a) {
+  if (!insideBefore) return true;
+  for (let k = 0; k < insideBefore.length; k++) if (insideBefore[k] && !a.inside[k]) return false;
+  return true;
+}
+
+function reqList(a) {
+  const sealed = phase === 'build' || roofIntact(a);
+  const moreWin = cfg.windows - a.windows;
+  return [
+    { label: cfg.tower ? `A tower ${cfg.tall} blocks tall` : `At least ${cfg.tall} blocks tall`,
+      ok: a.height >= cfg.tall, short: `${cfg.tall} blocks tall` },
+    { label: cfg.rooms > 1 ? `${cfg.rooms} rooms under a roof` : 'A roof over a room',
+      ok: a.roofOK && a.rooms >= cfg.rooms && sealed,
+      short: cfg.rooms > 1 ? `${cfg.rooms} rooms under a roof` : 'a room with a roof' },
+    { label: 'A door on the ground', ok: a.doors >= 1, short: 'a door on the ground' },
+    { label: cfg.windows > 1 ? `${cfg.windows} windows` : 'A window',
+      ok: a.windows >= cfg.windows, short: moreWin > 1 ? `${moreWin} windows` : cfg.windows > 1 && a.windows > 0 ? '1 more window' : 'a window' },
+  ];
+}
+
+// ============================================================
+//  Building
+// ============================================================
+function canTouch(c, r) {
+  if (r === groundRow(c)) return true;
+  for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const b = get(c + dc, r + dr);
+    if (b && c + dc < GCOLS) return true;
+  }
+  return false;
+}
+
+function placeCheck(c, r, type) {
+  if (c < 0 || c >= GCOLS || r < 0 || r >= GROWS) return 'Build on your own land';
+  if (r < groundRow(c)) return 'That is solid rock!';
+  const cur = get(c, r);
+  if (type === 'erase') return cur ? '' : 'Nothing to clear there';
+  if (cur) {
+    if (cur.type === type) return 'Already there';
+    return coins >= BLOCKS[type].cost - BLOCKS[cur.type].cost ? '' : 'Not enough coins!';
+  }
+  if (coins < BLOCKS[type].cost) return 'Not enough coins!';
+  if (!canTouch(c, r)) return "Can't build in mid-air!";
+  return '';
+}
+
+function tryPlace(c, r, type) {
+  if (state !== 'play' || phase !== 'build') return false;
+  const why = placeCheck(c, r, type);
+  if (why) {
+    if (why !== 'Already there' && why !== 'Nothing to clear there') { showMessage(why); sfx.bounce(); }
+    return false;
+  }
+  if (type === 'erase') { eraseAt(c, r); return true; }
+  const cur = get(c, r);
+  if (cur) {
+    coins -= BLOCKS[type].cost - BLOCKS[cur.type].cost;
+    cur.type = type;
+  } else {
+    setCell(c, r, { type, owner: 'p', doom: -1 });
+    const d = computeSupport();
+    if (d[idx(c, r)] > MAX_SPAN) {
+      setCell(c, r, null);
+      showMessage('Too far from a wall. Add a pillar!');
+      sfx.bounce();
+      return false;
+    }
+    coins -= BLOCKS[type].cost;
+  }
+  puffAt(c, r, '#ffffff');
+  sfx.tap(r / (GROWS - 1));
+  return true;
+}
+
+function eraseAt(c, r) {
+  const b = get(c, r);
+  if (!b || b.owner !== 'p') return;
+  coins += BLOCKS[b.type].cost;
+  setCell(c, r, null);
+  puffAt(c, r, '#fff6d0');
+  // anything that was only held up by it comes down too (and you get the coins back)
+  const d = computeSupport();
+  for (let rr = 0; rr < GROWS; rr++) {
+    for (let cc = 0; cc < GCOLS; cc++) {
+      const o = get(cc, rr);
+      if (o && o.owner === 'p' && d[idx(cc, rr)] > MAX_SPAN) {
+        coins += BLOCKS[o.type].cost;
+        setCell(cc, rr, null);
+        puffAt(cc, rr, '#fff6d0');
+      }
+    }
+  }
+  sfx.erase();
+}
+
+function puffAt(c, r, color) {
+  const x = (c + 0.5) * BS, y = -(r + 0.5) * BS;
+  for (let i = 0; i < 10; i++) {
+    const a = rand(0, TAU), sp = rand(30, 110);
+    spawn(x + Math.cos(a) * 14, y + Math.sin(a) * 14, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.6), color, rand(3, 6));
+  }
+}
+
+function updateNeighbourBuild(dt) {
+  if (nbIdx >= NB_PLAN.length) return;
+  nbTimer -= dt;
+  if (nbTimer > 0 || buildT < 0.8) return;
+  const [c, r, type] = NB_PLAN[nbIdx++];
+  setCell(c, r, { type, owner: 'n', doom: -1 });
+  puffAt(c, r, '#fff3c4');
+  nbTimer = 0.38;
+}
+function finishNeighbour() {
+  while (nbIdx < NB_PLAN.length) {
+    const [c, r, type] = NB_PLAN[nbIdx++];
+    setCell(c, r, { type, owner: 'n', doom: -1 });
+  }
+}
+
+// ============================================================
+//  The storm
+// ============================================================
+const STORM_LINES = [[0, 'rain'], [2.3, 'floods'], [5, 'winds'], [7.8, 'beat']];
+
+function startStorm() {
+  if (state !== 'play' || phase !== 'build') return;
+  const missing = reqs.filter((q) => !q.ok);
+  if (missing.length) {
+    showMessage('Still needed: ' + missing.map((q) => q.short).join(', '));
+    message.t = 3.5;
+    goalT = Math.max(goalT, 4);      // bring the goal back up for a moment
+    sfx.bounce();
+    return;
+  }
+  finishNeighbour();
+  phase = 'storm';
+  stormT = 0; stormMsg = 0; gustIdx = 0; tickT = 0; stormEndT = 0;
+  initialCount = ana.count;
+  insideBefore = ana.inside;
+  onRock = ana.rockN >= ana.count * 0.9;
+  hover = null;
+  nbSay = { text: 'Uh oh... run for the rock!', t: 2.5 };
+  sfx.thunder();
+}
+
+function updateStorm(dt) {
+  stormT += dt;
+  const T = STORM_DUR;
+  const calm = T - 2.8;         // when the storm starts to clear
+  dark = lerp(dark, stormT < calm ? 1 : 0, Math.min(1, dt * (stormT < calm ? 1.5 : 1)));
+  rainAmt = stormT < calm ? clamp(stormT / 1.2, 0, 1) : clamp(1 - (stormT - calm) / 1.8, 0, 1);
+
+  // Narration
+  while (stormMsg < STORM_LINES.length && stormT >= STORM_LINES[stormMsg][0]) {
+    const v = Bible.verse(VERSES[STORM_LINES[stormMsg][1]]).text;
+    showMessage(stormMsg === 0 ? `"${v}..."` : stormMsg === 3 ? `"...${v}!"` : `"...${v}..."`);
+    stormMsg++;
+  }
+
+  // The flood rises, holds, then drains away
+  if (stormT < 2) floodH = BASE_FLOOD;
+  else if (stormT < 6) { const f = (stormT - 2) / 4; floodH = lerp(BASE_FLOOD, cfg.flood, f * f * (3 - 2 * f)); }
+  else if (stormT < calm) floodH = cfg.flood + Math.sin(stormT * 3) * 0.04;
+  else floodH = lerp(cfg.flood, BASE_FLOOD, clamp((stormT - calm) / 2.5, 0, 1));
+
+  // The flood washes the sand away, from the river toward the rock. The rock does not move.
+  if (stormT > 3) {
+    const speed = RIVER_C0 / 5.2;
+    front = Math.max(0, RIVER_C0 - (stormT - 3) * speed);
+    for (let c = 0; c < WCOLS; c++) {
+      if (colIsRock(c)) continue;            // the rock does not move
+      const want = c >= front + 1.5 ? 2 : c >= front ? 1 : 0;
+      if (want > er[c]) {
+        er[c] = want;
+        const x = (c + 0.5) * BS;
+        for (let i = 0; i < 8; i++) spawn(x + rand(-20, 20), (want - 1) * BS + 10, rand(-40, 40), rand(-120, -40), 0.7, '#e8cf8a', rand(3, 6), 300);
+      }
+    }
+  }
+
+  // Wind gusts
+  windFx = Math.max(0, windFx - dt * 0.9);
+  if (gustIdx < cfg.gusts.length && stormT >= cfg.gusts[gustIdx]) {
+    gustIdx++;
+    windFx = 1;
+    sfx.gust();
+    applyWind();
+  }
+
+  // Lightning
+  if (stormT > 0.8 && stormT < calm && Math.random() < dt * 0.4) {
+    flashT = 0.25;
+    bolt = { x: rand(40, W - 40), t: 0.22, seed: Math.random() };
+    sfx.thunder();
+  }
+
+  // Water soaks and washes away weak blocks under the flood
+  tickT -= dt;
+  if (tickT <= 0) {
+    tickT = 0.3;
+    const yf = -floodH * BS;
+    for (let r = 0; r < GROWS; r++) {
+      for (let c = 0; c < WCOLS; c++) {
+        const b = get(c, r);
+        if (!b || b.doom >= 0) continue;
+        if (-r * BS > yf + 8 && Math.random() < BLOCKS[b.type].water * cfg.waterMul) knockOff(c, r, 'wash');
+      }
+    }
+  }
+
+  settleBlocks(dt);
+
+  // Neighbour's house falls
+  if (!nbFell) {
+    let n = 0;
+    for (const b of grid) if (b && b.owner === 'n' && b.doom < 0) n++;
+    if (n < NB_PLAN.length * 0.5) {
+      nbFell = true; nbShockT = 2.6;
+      nbSay = { text: 'My house!', t: 2.6 };
+      showMessage(cap(Bible.verse(VERSES.greatFall).text) + '!');
+      shakeT = 0.5;
+      sfx.crash();
+    }
+  }
+
+  // Finish once the storm is over and everything has settled
+  if (stormT >= T) {
+    const busy = grid.some((b) => b && b.doom >= 0) || debris.some((d) => !d.landed && !d.float);
+    stormEndT += dt;
+    if (!busy || stormEndT > 2) evaluate();
+  }
+}
+
+// Anything that has lost its support starts to wobble, then falls
+function settleBlocks(dt) {
+  const d = computeSupport();
+  for (let r = 0; r < GROWS; r++) {
+    for (let c = 0; c < WCOLS; c++) {
+      const b = get(c, r);
+      if (!b) continue;
+      if (b.doom < 0 && d[idx(c, r)] > MAX_SPAN) b.doom = 0.06 + r * 0.05 + rand(0, 0.12);
+      if (b.doom >= 0) {
+        b.doom -= dt;
+        if (b.doom <= 0) knockOff(c, r, 'fall');
+      }
+    }
+  }
+}
+
+// Wind blows off blocks that are held only loosely (two or more steps from a wall or pillar)
+function applyWind() {
+  const d = computeSupport();
+  for (let r = GROWS - 1; r >= 0; r--) {
+    for (let c = 0; c < WCOLS; c++) {
+      const b = get(c, r);
+      if (!b || b.doom >= 0) continue;
+      const reach = d[idx(c, r)];
+      if (reach < 2 || reach > MAX_SPAN) continue;
+      const p = 0.18 * reach * cfg.wind * BLOCKS[b.type].wind;
+      if (Math.random() < p) knockOff(c, r, 'wind');
+    }
+  }
+}
+
+function knockOff(c, r, how) {
+  const b = get(c, r);
+  if (!b) return;
+  setCell(c, r, null);
+  const x = (c + 0.5) * BS, y = -(r + 0.5) * BS;
+  let vx = rand(-40, 40), vy = rand(-60, 0), vr = rand(-3, 3);
+  if (how === 'wind') { vx = rand(220, 320); vy = rand(-220, -120); vr = rand(4, 8); }
+  if (how === 'wash') { vx = rand(40, 90); vy = 0; vr = rand(-1, 1); }
+  debris.push({ x, y, vx, vy, rot: 0, vr, type: b.type, life: 4.5, landed: false, float: false, owner: b.owner });
+  if (b.owner === 'p') pShockT = 1.2;
+  if (Math.random() < 0.5) sfx.thud();
+}
+
+function updateDebris(dt) {
+  const yf = -floodH * BS;
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    const col = Math.floor(d.x / BS);
+    const top = terrainTop(col);
+    const wet = yf < top && d.y > yf - 4;
+    if (wet) {
+      // bob on the flood and drift off toward the river
+      if (!d.float) {
+        d.float = true;
+        for (let k = 0; k < 8; k++) spawn(d.x + rand(-15, 15), yf, rand(-60, 60), rand(-140, -60), 0.6, '#d6efff', rand(2, 4), 400);
+      }
+      d.vy += (yf - 6 - d.y) * 10 * dt;
+      d.vy *= Math.pow(0.1, dt);
+      d.vx += (70 - d.vx) * dt;
+      d.vr *= Math.pow(0.3, dt);
+    } else if (!d.landed) {
+      d.vy += 900 * dt;
+      if (d.y + BS * 0.42 >= top && d.vy > 0) {
+        d.y = top - BS * 0.42;
+        if (d.vy > 120) { d.vy = -d.vy * 0.3; d.vx *= 0.6; d.vr *= -0.5; }
+        else { d.landed = true; d.vy = 0; d.vx = 0; d.vr = 0; }
+      }
+    }
+    if (d.landed) {
+      d.float = false;
+      if (d.y + BS * 0.42 < top - 2) d.landed = false;  // ground washed out from under it
+    }
+    d.x += d.vx * dt; d.y += d.vy * dt; d.rot += d.vr * dt;
+    if (d.landed || d.float) d.life -= dt;
+    if (d.life <= 0 || d.x > WORLD_R + 300) debris.splice(i, 1);
+  }
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function evaluate() {
+  phase = 'done';
+  const a = analyse();
+  const rq = reqList(a);
+  const met = rq.filter((q) => q.ok).length;
+  const survive = initialCount ? a.count / initialCount : 0;
+  const stands = survive >= 0.7 && met === rq.length;
+  dark = Math.min(dark, 0.3);
+  rainAmt = 0;
+  if (stands) {
+    state = 'win';
+    syncAmbience();
+    const blocksPts = a.count * 20;
+    const reqPts = met * 100;
+    const coinPts = coins * 10;
+    const rockPts = onRock ? 400 : 0;
+    const levelBonus = level * 300;
+    const score = blocksPts + reqPts + coinPts + rockPts + levelBonus;
+    totalScore += score;
+    if (totalScore > best) { best = totalScore; try { localStorage.setItem('buildersBest', best); } catch (e) {} }
+    lastScore = { blocksPts, blocks: a.count, total: initialCount, reqPts, coinPts, rockPts, levelBonus, score };
+    const hx = houseCentre();
+    for (let i = 0; i < 70; i++) {
+      const ang = rand(0, TAU), sp = rand(60, 220);
+      spawn(hx, -3 * BS, Math.cos(ang) * sp, Math.sin(ang) * sp, rand(0.8, 1.8),
+        ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(3, 5.5), 40);
+    }
+    nbSay = { text: 'Next time... the rock!', t: 4 };
+    showMessage(cap(Bible.verse(VERSES.fellNot).text) + '!');
+    sfx.win();
+    endTimer = 2.4;
+  } else {
+    state = 'fail';
+    syncAmbience();
+    lastFail = { survive, onRock, missing: rq.filter((q) => !q.ok).map((q) => q.label) };
+    showMessage('Oh... no');
+    sfx.fail();
+    endTimer = 2.2;
+  }
+}
+
+function houseCentre() {
+  let s = 0, n = 0;
+  for (let c = 0; c < GCOLS; c++) for (let r = 0; r < GROWS; r++) { const b = get(c, r); if (b && b.owner === 'p') { s += c; n++; } }
+  return n ? (s / n + 0.5) * BS : 3 * BS;
+}
+
+function showMessage(text) { message = { text, t: 2.4 }; }
+
+// ============================================================
+//  People (drawn like the disciples in Jesus Rises)
+// ============================================================
+function drawDisciple(slot, look = { lx: 0, ly: -1 }) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(x, slot.y - jump * s);
+  ctx.scale(s, s);
+  if (slot.row === 0) ctx.filter = 'brightness(0.92)';
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  // Look toward whatever they are watching
+  const { lx, ly } = look;
+
+  // Arms raised behind the head for joy / pointing up in wonder
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 3 === 0) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Resting arms
+  if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+    if (mood === 'doubt') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); } // folded arms
+    else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Beard
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  The builders, the neighbour and Jesus
+// ============================================================
+const BUILDER = {
+  name: 'You', robe: '#3f6fb5', hair: '#6b3f1d', beard: false, skin: '#e3b184', i: 0,
+  mood: 'watch', switchT: 0, delay: 0.05, blinkT: 2, blink: 0, phase: 0.5,
+};
+const NEIGHBOUR = {
+  name: 'Neighbour', robe: '#d9822b', hair: '#2e1d10', beard: true, skin: '#c98d56', scarf: '#efd98a', i: 1,
+  mood: 'joy', switchT: 0, delay: 0.1, blinkT: 3, blink: 0, phase: 2.1,
+};
+const FOLK = [BUILDER, NEIGHBOUR];
+const JESUS = { x: -1.95 * BS, y: -2 * BS, face: 'calm', teach: true };
+const BUILDER_X = -0.55 * BS, BUILDER_Y = -2 * BS;
+const NB_X = 14.5 * BS;       // his spot next to his house
+const NB_SAFE = -3.45 * BS;   // where he runs to when the storm comes: the rock!
+let nbX = NB_X, nbY = 0;
+
+function folkMoods() {
+  let me = 'watch', nb = 'joy';
+  if (state === 'win') { me = 'joy'; nb = 'dismay'; }
+  else if (state === 'fail') { me = 'dismay'; nb = 'dismay'; }
+  else if (state === 'play' && phase === 'build') {
+    me = readyJoyT > 0 ? 'joy' : 'watch';
+    nb = nbIdx < NB_PLAN.length ? 'joy' : 'watch';
+  } else if (state === 'play') {
+    me = pShockT > 0 ? 'shock' : 'worried';
+    nb = nbShockT > 0 ? 'shock' : nbFell ? 'dismay' : 'worried';
+  }
+  return [me, nb];
+}
+
+function updateFolk(dt) {
+  const moods = folkMoods();
+  FOLK.forEach((d, k) => {
+    const want = moods[k];
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  });
+  JESUS.face = state === 'win' ? 'joy' : 'calm';
+  JESUS.teach = state !== 'win';
+  // when the storm comes, the neighbour runs for the rock
+  let moving = false;
+  if (state !== 'title' && (phase !== 'build' || state !== 'play') && stormT > 1) {
+    const step = 380 * dt;
+    if (Math.abs(nbX - NB_SAFE) > step) { nbX += Math.sign(NB_SAFE - nbX) * step; moving = true; }
+    else nbX = NB_SAFE;
+  }
+  const nc = Math.floor(nbX / BS);
+  const groundY = nc < 0 ? -2 * BS : colIsRock(nc) ? -BS : 0;
+  nbY = lerp(nbY, groundY - (moving ? Math.abs(Math.sin(t * 14)) * 7 : 0), Math.min(1, dt * 12));
+  // neighbour chatter while building
+  nbSay.t -= dt;
+  if (state === 'play' && phase === 'build') {
+    nbSayCd -= dt;
+    if (nbSayCd <= 0) {
+      nbSay = { text: NB_LINES[nbSayIdx % NB_LINES.length], t: 3 };
+      nbSayIdx++;
+      nbSayCd = 5.5;
+    }
+  }
+}
+
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+
+  const up = j.face === 'joy';
+
+  if (up) {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 75);
+    g.addColorStop(0, 'rgba(255,235,150,0.55)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 75, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Sandals
+  ctx.fillStyle = '#8a5a2b';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 5, 2.5, 0, 0, TAU); ctx.ellipse(6, 0, 5, 2.5, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: raised in joy, or one hand lifted as He teaches
+  let hands = [[-20, -22], [20, -22]];
+  if (up) hands = [[-21, -66], [21, -66]];
+  else if (j.teach) hands = [[-20, -22], [24, -50 + Math.sin(t * 2) * 3]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Chunky pixel textures (16 x 16, drawn without smoothing)
+// ============================================================
+function mkRng(seed) {
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function makeTex(seed, draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 16;
+  const g = c.getContext('2d');
+  const R = mkRng(seed);
+  const px = (x, y, col) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+  const pick = (arr) => arr[Math.floor(R() * arr.length)];
+  draw(g, px, pick, R);
+  return c;
+}
+function noiseFill(px, pick, cols) { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, pick(cols)); }
+function edges(g, light, darkC) {
+  g.fillStyle = light; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16);
+  g.fillStyle = darkC; g.fillRect(0, 15, 16, 1); g.fillRect(15, 0, 1, 16);
+}
+
+const TEX = {
+  stone: makeTex(11, (g, px, pick) => {
+    noiseFill(px, pick, ['#a2a8af', '#adb2b8', '#979da4', '#b6bbc0']);
+    g.fillStyle = '#7b8188';
+    for (const [x, y, w, h] of [[0, 5, 8, 1], [7, 0, 1, 5], [4, 5, 1, 5], [0, 10, 11, 1], [10, 5, 1, 5], [10, 5, 6, 1], [12, 10, 1, 6], [6, 10, 1, 6]]) g.fillRect(x, y, w, h);
+    edges(g, '#c9cdd2', '#666c73');
+  }),
+  plank: makeTex(22, (g, px, pick) => {
+    noiseFill(px, pick, ['#c8904f', '#c28a4a', '#cf9857', '#c48c4c']);
+    g.fillStyle = '#8b5a2b';
+    for (const y of [3, 7, 11]) g.fillRect(0, y, 16, 1);
+    for (const [x, y] of [[5, 0], [11, 4], [3, 8], [9, 12]]) g.fillRect(x, y, 1, 3);
+    g.fillStyle = '#e0ad6c';
+    for (const y of [0, 4, 8, 12]) g.fillRect(1, y, 14, 1);
+    edges(g, '#dcaa6a', '#7a4d22');
+  }),
+  log: makeTex(33, (g, px, pick) => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, x % 4 === 1 ? '#5e3c1f' : pick(['#7a5230', '#74502c', '#80583a']));
+    g.fillStyle = '#b98a52'; g.fillRect(2, 0, 12, 1);
+    g.fillStyle = '#4a2f16'; g.fillRect(0, 0, 2, 16); g.fillRect(14, 0, 2, 16);
+    g.fillStyle = '#8f6a42'; g.fillRect(2, 0, 1, 16);
+  }),
+  glass: makeTex(44, (g, px) => {
+    g.fillStyle = 'rgba(160,215,245,0.78)'; g.fillRect(0, 0, 16, 16);
+    g.fillStyle = '#9a6a3a'; g.fillRect(0, 0, 16, 2); g.fillRect(0, 14, 16, 2); g.fillRect(0, 0, 2, 16); g.fillRect(14, 0, 2, 16);
+    g.fillStyle = '#c8904f'; g.fillRect(7, 2, 2, 12); g.fillRect(2, 7, 12, 2);
+    for (let k = 0; k < 4; k++) { px(3 + k, 6 - k, '#ffffff'); px(10 + k, 13 - k, 'rgba(255,255,255,0.8)'); px(4 + k, 6 - k, 'rgba(255,255,255,0.6)'); }
+  }),
+  door: makeTex(55, (g, px, pick) => {
+    noiseFill(px, pick, ['#a86e36', '#a26932', '#b0773d']);
+    g.fillStyle = '#83521f'; g.fillRect(5, 0, 1, 16); g.fillRect(10, 0, 1, 16);
+    g.fillStyle = 'rgba(175,225,248,1)'; g.fillRect(4, 2, 8, 4);
+    g.fillStyle = '#6b4219'; g.fillRect(4, 4, 8, 1); g.fillRect(7, 2, 2, 4);
+    g.fillStyle = '#6b4219'; g.fillRect(3, 8, 10, 1); g.fillRect(3, 13, 10, 1);
+    px(12, 10, '#f5c542'); px(12, 11, '#c9951f');
+    edges(g, '#6b4219', '#4e2f10');
+  }),
+  roof: makeTex(66, (g, px, pick) => {
+    noiseFill(px, pick, ['#d65a3a', '#d05536', '#dc6242']);
+    for (let band = 0; band < 4; band++) {
+      const y0 = band * 4, off = band % 2 ? 2 : 0;
+      g.fillStyle = '#9e3a22'; g.fillRect(0, y0 + 3, 16, 1);
+      g.fillStyle = '#ef7d5a'; g.fillRect(0, y0, 16, 1);
+      for (let x = off; x < 16; x += 4) { px(x, y0 + 1, '#9e3a22'); px(x, y0 + 2, '#9e3a22'); }
+    }
+    edges(g, '#f08b68', '#8a2f1a');
+  }),
+  rock: makeTex(77, (g, px, pick, R) => {
+    noiseFill(px, pick, ['#7d828c', '#868b95', '#737882', '#8f949e']);
+    for (let k = 0; k < 5; k++) {
+      let x = Math.floor(R() * 16), y = Math.floor(R() * 16);
+      for (let s = 0; s < 4; s++) { px(x, y, '#5d626b'); x += R() < 0.5 ? 1 : 0; y += 1; }
+    }
+    edges(g, '#9aa0a9', '#62666f');
+  }),
+  sand: makeTex(88, (g, px, pick, R) => {
+    noiseFill(px, pick, ['#f1d58c', '#ead089', '#f6dea0', '#e8cb80']);
+    for (let k = 0; k < 10; k++) px(Math.floor(R() * 16), Math.floor(R() * 16), '#d4ad5c');
+  }),
+};
+TEX.rockTop = makeTex(99, (g, px, pick) => {
+  g.drawImage(TEX.rock, 0, 0);
+  for (let x = 0; x < 16; x++) {
+    const h = 2 + (x * 7 % 3);
+    for (let y = 0; y < h; y++) px(x, y, pick(['#7cc15a', '#6aad4b', '#86cb63']));
+  }
+});
+TEX.sandTop = makeTex(100, (g, px, pick) => {
+  g.drawImage(TEX.sand, 0, 0);
+  for (let x = 0; x < 16; x++) px(x, 0, pick(['#fbeabb', '#f7e2a8']));
+});
+// Rock with a dusting of sand on top
+TEX.rockSand = makeTex(102, (g, px, pick, R) => {
+  g.drawImage(TEX.rock, 0, 0);
+  for (let x = 0; x < 16; x++) { if (R() < 0.6) px(x, 0, pick(['#f1d58c', '#e8cb80'])); if (R() < 0.25) px(x, 1, '#ead089'); }
+});
+
+function drawTex(name, x, y, s = BS) {
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(TEX[name], x, y, s, s);
+  ctx.imageSmoothingEnabled = true;
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    Music.tap(height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) Music.fail(); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // --- extra effects for the builder game ---
+  erase() { this.puff(0.2); this.tone(520, 0.12, 'triangle', 0.18, 0, 260); },
+  thud() { this.tone(rand(110, 150), 0.16, 'triangle', 0.3, 0, 60); this.puff(0.12); },
+  gust() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(300, t0); bp.frequency.exponentialRampToValueAtTime(1300, t0 + 0.6); bp.frequency.exponentialRampToValueAtTime(400, t0 + 1.3);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.4); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.4);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 1.5);
+  },
+  crash() {
+    this.thunder();
+    for (let i = 0; i < 4; i++) this.tone(140 - i * 20, 0.25, 'triangle', 0.3, i * 0.12, 50);
+  },
+};
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; ovBtn.blur(); ovBtn2.blur(); }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetWorld() {
+  grid = new Array(WCOLS * GROWS).fill(null);
+  er = new Array(WCOLS).fill(0);
+  front = RIVER_C0; floodH = BASE_FLOOD;
+  debris = []; particles = [];
+  nbIdx = 0; nbTimer = 0; nbFell = false; nbShockT = 0; nbX = NB_X; nbY = 0; stormT = 0;
+  nbSay = { text: '', t: 0 }; nbSayIdx = 0; nbSayCd = 2.5;
+  dark = 0; rainAmt = 0; windFx = 0; flashT = 0; shakeT = 0; bolt = null;
+  pShockT = 0; readyJoyT = 0; wasReady = false;
+  insideBefore = null;
+}
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  phase = 'build';
+  cfg = makeConfig(1);
+  resetWorld();
+  finishNeighbour();
+  for (const [c, r, type] of DEMO_HOUSE) setCell(c, r, { type, owner: 'p', doom: -1 });
+  const num = (n) => `<b style="color:var(--gold-dark);font-size:1.25em;margin-right:6px">${n}.</b>`;
+  showOverlay('The Wise Builder', 'Build your house upon the rock',
+    `${verseHTML('wiseMan')}
+     <ul style="list-style:none;padding-left:0;font-size:1.05rem">
+       <li>${num(1)}Pick a block, then <b>tap</b> to build.</li>
+       <li>${num(2)}Build on the grey <b>rock</b>, not the sand!</li>
+       <li>${num(3)}Blocks cost <b>coins</b>. Don't run out!</li>
+       <li>${num(4)}Then <b>let the storm come!</b></li>
+     </ul>
+     <p style="text-align:center;font-size:0.85rem;color:#7a6640;margin:6px 0 0">Keys: <kbd>1</kbd>&ndash;<kbd>7</kbd> pick &middot; arrows move &middot; <kbd>Space</kbd> build &middot; <kbd>X</kbd> remove &middot; <kbd>Enter</kbd> storm</p>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = makeConfig(level);
+  resetWorld();
+  phase = 'build';
+  buildT = 0; stormT = 0;
+  coins = cfg.budget;
+  sel = 'stone';
+  const sp = cfg.spots[cfg.spots.length - 1];
+  cursor = { c: sp.c0, r: groundRow(sp.c0) };
+  hover = null; kbUsed = false;
+  ripples.length = 0;
+  state = 'play';
+  hideOverlay();
+  goalT = 8;
+  showMessage(`Level ${level}: ${cfg.name}`);
+  msgQueue = [{ at: 2.6, text: cfg.tip }];
+  if (level === 1) {
+    msgQueue.push({ at: 5.4, text: matchMedia('(pointer: coarse)').matches ? 'Tap a block below, then tap to build' : 'Pick a block (1-7), then click or press Space' });
+  }
+  sfx.levelStart();
+  syncAmbience();
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay(cap(Bible.verse(VERSES.fellNot).text) + '!', `Level ${level} complete: ${cfg.name}`,
+      `${verseHTML('wiseWin')}
+       <p class="score">Blocks standing (${s.blocks}/${s.total}): <b>${s.blocksPts}</b><br>Goals met: <b>${s.reqPts}</b><br>Coins saved: <b>${s.coinPts}</b><br>${s.rockPts ? `Built on the rock: <b>${s.rockPts}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const f = lastFail;
+    const lost = f.missing.length ? `<br><small>Lost: ${f.missing.join(', ').toLowerCase()}</small>` : '';
+    showOverlay('Oh... no', f.onRock ? 'The storm broke your house' : 'The house on the sand fell down',
+      f.onRock
+        ? `<p style="text-align:center">Keep your roof close to the walls, and use <b>stone</b> down low: wood washes away in the flood.${lost}</p>
+           ${verseHTML('digged')}`
+        : `<p style="text-align:center;font-size:1.2rem"><b>Build on the rock!</b><br><small>The flood washed the sand away. Look for the grey rock.</small></p>
+           ${verseHTML('foolish')}`,
+      'Try Again', () => startLevel());
+  }
+}
+
+// The ambient bed plays only during active, unmuted play on a visible page
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    sfx.thrust(0);
+    showOverlay('Paused', `Level ${level}: ${cfg.name}`,
+      `<p style="text-align:center">${goalText()}</p><p style="text-align:center">Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>`,
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+  syncAmbience();
+}
+
+// ============================================================
+//  Camera: the whole valley, or zoomed in on your plot
+// ============================================================
+function camTarget() {
+  const all = state !== 'play' || phase !== 'build' || buildT < 2.2;
+  const x0 = all ? WORLD_L : -1.6 * BS, x1 = all ? 21 * BS : 14.4 * BS;
+  const zoom = Math.min(1, W / (x1 - x0), (GROUND_Y - 170) / (GROWS * BS));
+  const half = (W / 2) / zoom;
+  let x = (x0 + x1) / 2;
+  if (half * 2 >= WORLD_R - WORLD_L) x = (WORLD_L + WORLD_R) / 2;
+  else x = clamp(x, WORLD_L + half, WORLD_R - half);
+  return { x, zoom };
+}
+function updateCamera(dt, snap) {
+  const tg = camTarget();
+  const f = snap ? 1 : Math.min(1, dt * 3);
+  cam.x = lerp(cam.x, tg.x, f);
+  cam.zoom = lerp(cam.zoom, tg.zoom, f);
+}
+function toWorld(lx, ly) { return { x: (lx - W / 2) / cam.zoom + cam.x, y: (ly - GROUND_Y) / cam.zoom }; }
+function toLogical(wx, wy) { return { x: W / 2 + (wx - cam.x) * cam.zoom, y: GROUND_Y + wy * cam.zoom }; }
+
+// ============================================================
+//  Input
+// ============================================================
+const ripples = [];
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Backspace'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || phase !== 'build') return;
+  const dig = /^(Digit|Numpad)([1-7])$/.exec(e.code);
+  if (dig) { sel = PALETTE[+dig[2] - 1]; sfx.puff(0.12); return; }
+  const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.code];
+  if (mv) {
+    kbUsed = true;
+    cursor.c = clamp(cursor.c + mv[0], 0, GCOLS - 1);
+    cursor.r = clamp(cursor.r + mv[1], 0, GROWS - 1);
+    if (cursor.r < groundRow(cursor.c)) cursor.r = groundRow(cursor.c);
+    return;
+  }
+  if (e.code === 'Space') { kbUsed = true; tryPlace(cursor.c, cursor.r, sel); return; }
+  if (e.code === 'KeyX' || e.code === 'Backspace' || e.code === 'Delete') { kbUsed = true; tryPlace(cursor.c, cursor.r, 'erase'); return; }
+  if (e.code === 'Enter' && !e.repeat) startStorm();
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function cellAt(p) {
+  const w = toWorld(p.x, p.y);
+  return { c: Math.floor(w.x / BS), r: Math.floor(-w.y / BS) };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play' || phase !== 'build') return;
+  kbUsed = false;
+  const L = barLayout();
+  for (const s of L.slots) {
+    if (p.x >= s.x - 3 && p.x <= s.x + s.w + 3 && p.y >= s.y - 6 && p.y <= s.y + s.w + 6) { sel = s.type; sfx.puff(0.12); return; }
+  }
+  const b = L.btn;
+  if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { startStorm(); return; }
+  if (p.y > L.top) return;
+  const { c, r: rawR } = cellAt(p);
+  if (c >= 0 && c < GCOLS && rawR >= -1 && rawR < GROWS) {
+    const r = Math.max(rawR, groundRow(c));    // a tap on the ground builds right on top of it
+    cursor = { c, r };
+    ripples.push({ x: p.x, y: p.y, t: 0 });
+    tryPlace(c, r, sel);
+  } else if (c >= NB_C0 && c < RIVER_C0 && r >= 0 && r < GROWS && get(c, r)) {
+    showMessage("That's your neighbour's house!");
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const p = toPlayfield(e);
+  const { c, r } = cellAt(p);
+  hover = c >= 0 && c < GCOLS && r >= groundRow(c) && r < GROWS && p.y < barLayout().top ? { c, r } : null;
+  if (hover) kbUsed = false;
+});
+canvas.addEventListener('pointerleave', () => { hover = null; });
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+canvas.addEventListener('pointercancel', () => { hover = null; });
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// The hotbar and the storm button, in playfield coordinates
+function barLayout() {
+  const n = PALETTE.length, gap = 6;
+  const sw = Math.min(62, (W - 24 - gap * (n - 1)) / n);
+  const total = n * sw + (n - 1) * gap;
+  const x0 = (W - total) / 2, y = H - 124;
+  const slots = PALETTE.map((type, i) => ({ type, i, x: x0 + i * (sw + gap), y, w: sw }));
+  const bw = Math.min(300, W - 190);
+  const pw = Math.min(W - 16, Math.max(total + 36, 600));
+  return { top: H - 134, slots, btn: { x: (W - bw) / 2, y: H - 54, w: bw, h: 44 }, px: (W - pw) / 2, pw };
+}
+
+// ============================================================
+//  Rendering: sky and scenery
+// ============================================================
+const bgClouds = Array.from({ length: 6 }, () => ({ f: Math.random(), y: rand(140, 330), w: rand(80, 160), speed: rand(4, 10) }));
+const rain = Array.from({ length: 170 }, () => ({ x: Math.random(), y: rand(-1, 1), sp: rand(700, 950), len: rand(14, 24) }));
+const stormClouds = [0.15, 0.5, 0.85].map((f, i) => ({ f, y: [70, 110, 60][i], phase: i * 2, w: 150 }));
+
+function drawSky() {
+  const k = dark;
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, mix('#bfe6ff', '#4b5568', k));
+  g.addColorStop(0.55, mix('#8fcaf0', '#6a768a', k));
+  g.addColorStop(1, mix('#e2f4ff', '#8e98a8', k));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+
+  // Sun
+  const sa = 1 - k;
+  if (sa > 0.02) {
+    const sx = W * 0.6, sy = 110;
+    ctx.globalAlpha = sa;
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(t * 0.1);
+    ctx.fillStyle = 'rgba(255,236,150,0.35)';
+    for (let i = 0; i < 12; i++) {
+      ctx.rotate(TAU / 12);
+      ctx.beginPath(); ctx.moveTo(-8, 44); ctx.lineTo(0, 78); ctx.lineTo(8, 44); ctx.fill();
+    }
+    ctx.restore();
+    const sg = ctx.createRadialGradient(sx, sy, 8, sx, sy, 40);
+    sg.addColorStop(0, '#fff6c2'); sg.addColorStop(1, '#ffd24a');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sx, sy, 38, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Fluffy clouds, greyer in the storm
+  for (const c of bgClouds) {
+    const x = -offX - 150 + c.f * (viewW + 300);
+    drawCloud(x, c.y, c.w, c.w * 0.3, mix('#ffffff', '#8a93a3', k), mix('#dbe9f6', '#6d7686', k));
+  }
+
+  // Distant hills
+  ctx.fillStyle = mix('#b3d69a', '#6f8872', k);
+  ctx.beginPath(); ctx.moveTo(-offX, GROUND_Y + 10);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, GROUND_Y - 70 - Math.sin(x / 110) * 26 - Math.sin(x / 41) * 8);
+  ctx.lineTo(W + offX + 20, GROUND_Y + 10); ctx.fill();
+}
+
+function drawStormClouds() {
+  if (dark < 0.05) return;
+  ctx.globalAlpha = clamp(dark * 1.3, 0, 1);
+  for (const s of stormClouds) {
+    const x = -offX + s.f * viewW + Math.sin(t * 0.4 + s.phase) * 20;
+    const y = s.y - offY * 0.5 + Math.sin(t * 1.5 + s.phase) * 3;
+    drawCloud(x, y, s.w + 20, 50, '#6b7285', '#474d5c');
+    // grumpy face
+    ctx.strokeStyle = '#2d3140'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - 16, y - 16); ctx.lineTo(x - 5, y - 12);
+    ctx.moveTo(x + 16, y - 16); ctx.lineTo(x + 5, y - 12);
+    ctx.stroke();
+    ctx.fillStyle = '#2d3140';
+    ctx.beginPath(); ctx.arc(x - 9, y - 7, 2.3, 0, TAU); ctx.arc(x + 9, y - 7, 2.3, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + 5, 5, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBolt() {
+  if (!bolt || bolt.t <= 0) return;
+  const R = mkRng(Math.floor(bolt.seed * 1e6));
+  ctx.strokeStyle = '#fff59a'; ctx.lineWidth = 4; ctx.shadowColor = '#fff59a'; ctx.shadowBlur = 14; ctx.lineCap = 'round';
+  ctx.beginPath();
+  let x = bolt.x, y = 90 - offY * 0.5;
+  ctx.moveTo(x, y);
+  while (y < GROUND_Y - 160) { x += (R() - 0.5) * 60; y += 30 + R() * 25; ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.shadowBlur = 0;
+}
+
+function drawRain() {
+  if (rainAmt <= 0.01) return;
+  const n = Math.floor(rain.length * rainAmt);
+  const slant = 0.25 + windFx * 0.5;
+  ctx.strokeStyle = 'rgba(220,235,255,0.6)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const d = rain[i];
+    const x = -offX + d.x * viewW, y = -offY + d.y * viewH;
+    ctx.moveTo(x, y); ctx.lineTo(x - d.len * slant, y - d.len);
+  }
+  ctx.stroke();
+  // gust streaks
+  if (windFx > 0.05) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * windFx})`; ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {
+      const y = 180 + i * 37 + Math.sin(i * 3.1) * 20;
+      const x = -offX + ((i * 0.137 + t * 0.9) % 1) * (viewW + 200) - 100;
+      ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 40, y - 6, x + 90, y);
+    }
+    ctx.stroke();
+  }
+}
+
+function updateScenery(dt) {
+  for (const c of bgClouds) {
+    c.f += (c.speed * (1 + dark * 4) * dt) / (viewW + 300);
+    if (c.f > 1) c.f -= 1;
+  }
+  const fall = 1 / viewH;
+  for (const d of rain) {
+    d.y += d.sp * dt * fall;
+    d.x += d.sp * (0.25 + windFx * 0.5) * dt / viewW;
+    if (d.y > 1) { d.y -= 1.05; d.x = Math.random(); }
+    if (d.x > 1) d.x -= 1;
+  }
+  if (bolt) bolt.t -= dt;
+}
+
+// ============================================================
+//  Rendering: the valley (world coordinates)
+// ============================================================
+function drawTerrain(visL, visR) {
+  const c0 = Math.floor(visL / BS) - 1, c1 = Math.ceil(visR / BS) + 1;
+  for (let c = c0; c <= c1; c++) {
+    const x = c * BS;
+    if (c < 0) {
+      // the rocky hill where Jesus teaches
+      for (let r = -2; r < 3; r++) drawTex(r === -2 ? 'rockTop' : 'rock', x, r * BS);
+      ctx.fillStyle = '#5f636c'; ctx.fillRect(x, 3 * BS, BS + 0.8, 40 * BS);
+    } else if (colIsRock(c)) {
+      // a spot of rock poking up out of the sand: build on this!
+      for (let r = -1; r < 3; r++) drawTex(r === -1 ? 'rockSand' : 'rock', x, r * BS);
+      ctx.fillStyle = '#5f636c'; ctx.fillRect(x, 3 * BS, BS + 0.8, 40 * BS);
+    } else if (c < RIVER_C0) {
+      // sand, washed away row by row in the flood
+      const e = er[c] || 0;
+      ctx.fillStyle = '#8f7446'; ctx.fillRect(x, e * BS, BS + 0.8, 2 * BS - e * BS);
+      for (let r = e; r < 2; r++) drawTex(r === e ? 'sandTop' : 'sand', x, r * BS);
+      ctx.fillStyle = e >= 2 ? '#8f7446' : '#c9a060'; ctx.fillRect(x, 2 * BS, BS + 0.8, 40 * BS);
+    } else {
+      // river bed
+      ctx.fillStyle = '#b39159'; ctx.fillRect(x, 2.2 * BS, BS + 0.8, 40 * BS);
+      ctx.fillStyle = '#9c7c47'; ctx.fillRect(x, 2.2 * BS, BS + 0.8, 6);
+    }
+  }
+  // a smooth sandy bank down into the river
+  ctx.fillStyle = '#e8cb80';
+  const bx = RIVER_C0 * BS;
+  ctx.beginPath(); ctx.moveTo(bx, (er[WCOLS - 1] || 0) * BS); ctx.quadraticCurveTo(bx + 20, 1.6 * BS, bx + 46, 2.2 * BS); ctx.lineTo(bx, 2.2 * BS); ctx.fill();
+
+  // gentle labels in the ground
+  ctx.font = '700 15px Fredoka, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  for (const sp of cfg.spots) ctx.fillText('ROCK', (sp.c0 + sp.w / 2) * BS, 0.7 * BS);
+  ctx.fillStyle = 'rgba(140,100,30,0.55)';
+  let run = 0;
+  for (let c = 0; c <= GCOLS; c++) {
+    if (c < GCOLS && !colIsRock(c)) { run++; continue; }
+    if (run >= 3 && (er[c - 1] || 0) < 2) ctx.fillText('SAND', (c - run / 2) * BS, 1.2 * BS);
+    run = 0;
+  }
+
+  // Level 1: a gentle sparkle on the rock
+  if (level === 1 && state === 'play' && phase === 'build' && buildT < 12) {
+    for (const sp of cfg.spots) {
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 0.8 + k / 3) % 1;
+        const x = (sp.c0 + ((k * 0.37 + Math.floor(t * 0.8 + k / 3) * 0.61) % 1) * sp.w) * BS;
+        const y = -BS + 10 + ((k * 0.53) % 1) * 24;
+        const sz = Math.sin(ph * Math.PI) * 7;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath();
+        ctx.moveTo(x, y - sz); ctx.lineTo(x + sz * 0.3, y - sz * 0.3); ctx.lineTo(x + sz, y); ctx.lineTo(x + sz * 0.3, y + sz * 0.3);
+        ctx.lineTo(x, y + sz); ctx.lineTo(x - sz * 0.3, y + sz * 0.3); ctx.lineTo(x - sz, y); ctx.lineTo(x - sz * 0.3, y - sz * 0.3);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawSignpost() {
+  if (level !== 1 || state !== 'play' || phase !== 'build') return;
+  const x = -3.25 * BS, y = -2 * BS;
+  ctx.fillStyle = '#7a5230';
+  ctx.fillRect(x - 3, y - 64, 6, 64);
+  ctx.save();
+  ctx.translate(x, y - 58 + Math.sin(t * 2) * 1.5);
+  ctx.fillStyle = '#d9a866'; ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-34, -12); ctx.lineTo(28, -12); ctx.lineTo(42, 0); ctx.lineTo(28, 12); ctx.lineTo(-34, 12); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5a3a18';
+  ctx.font = '700 11px Fredoka, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Build on', 2, -1);
+  ctx.fillText('the ROCK', 2, 10);
+  ctx.restore();
+}
+
+function drawBlocks() {
+  for (let r = 0; r < GROWS; r++) {
+    for (let c = 0; c < WCOLS; c++) {
+      const b = get(c, r);
+      if (!b) continue;
+      let dx = 0, dy = 0;
+      if (b.doom >= 0) { dx = rand(-2.5, 2.5); dy = rand(-1, 1); }
+      drawTex(b.type, c * BS + dx, -(r + 1) * BS + dy);
+    }
+  }
+}
+
+function drawDebris() {
+  for (const d of debris) {
+    ctx.save();
+    ctx.globalAlpha = clamp(d.life, 0, 1);
+    ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+    drawTex(d.type, -BS * 0.42, -BS * 0.42, BS * 0.84);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawWater(visL, visR) {
+  const yf = -floodH * BS;
+  const c0 = Math.floor(visL / BS) - 1, c1 = Math.ceil(visR / BS) + 1;
+  ctx.fillStyle = 'rgba(58,140,220,0.55)';
+  const cols = [];
+  for (let c = c0; c <= c1; c++) {
+    const top = terrainTop(c);
+    if (top > yf) { ctx.fillRect(c * BS, yf, BS + 0.5, top - yf); cols.push(c); }
+  }
+  // wavy, shining surface
+  ctx.strokeStyle = 'rgba(225,245,255,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const c of cols) {
+    for (let k = 0; k <= 4; k++) {
+      const x = c * BS + k * BS / 4;
+      const y = yf + Math.sin(x / 18 + t * (3 + dark * 3)) * (1.5 + dark * 2.5);
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+  // the river flows
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const x = RIVER_C0 * BS + ((i * 57 + t * 40) % (3.5 * BS)) + 10;
+    const y = yf + 14 + (i % 3) * 14;
+    if (y < 2.2 * BS - 6) { ctx.moveTo(x, y); ctx.lineTo(x + 16, y); }
+  }
+  ctx.stroke();
+}
+
+function drawGuide() {
+  if (state !== 'play' || phase !== 'build') return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let c = 0; c < GCOLS; c++) {
+    for (let r = groundRow(c); r < GROWS; r++) ctx.rect(c * BS + 0.5, -(r + 1) * BS + 0.5, BS - 1, BS - 1);
+  }
+  ctx.stroke();
+  // cursor (keyboard) or hover (mouse)
+  const cur = kbUsed ? cursor : hover;
+  if (!cur) return;
+  const why = placeCheck(cur.c, cur.r, sel);
+  const ok = !why;
+  const x = cur.c * BS, y = -(cur.r + 1) * BS;
+  if (ok && sel !== 'erase' && !get(cur.c, cur.r)) {
+    ctx.globalAlpha = 0.5; drawTex(sel, x, y); ctx.globalAlpha = 1;
+  }
+  const pulse = 0.6 + 0.4 * Math.sin(t * 8);
+  ctx.strokeStyle = ok ? (sel === 'erase' ? `rgba(240,90,120,${pulse})` : `rgba(255,255,255,${pulse})`) : `rgba(220,60,60,${pulse})`;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(x + 2, y + 2, BS - 4, BS - 4);
+}
+
+function drawRainbow() {
+  if (state !== 'win') return;
+  const cx = houseCentre();
+  const bows = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa'];
+  ctx.globalAlpha = 0.55; ctx.lineWidth = 12;
+  bows.forEach((c, i) => {
+    ctx.strokeStyle = c;
+    ctx.beginPath(); ctx.arc(cx, 0, 7.5 * BS - i * 12, Math.PI, TAU); ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawPeople() {
+  drawJesus(JESUS);
+  drawDisciple({ d: BUILDER, x: BUILDER_X, y: BUILDER_Y, s: 0.95, row: 1 }, lookFor(BUILDER_X, BUILDER_Y));
+  drawDisciple({ d: NEIGHBOUR, x: nbX, y: nbY, s: 0.95, row: 1 }, lookFor(nbX, nbY));
+  if (state === 'play' && phase === 'build') {
+    ctx.font = '700 13px Fredoka, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#2f4f8a';
+    ctx.strokeText('You', BUILDER_X, BUILDER_Y + 16); ctx.fillText('You', BUILDER_X, BUILDER_Y + 16);
+  }
+}
+
+// where each person is looking
+function lookFor(x, y) {
+  let tx, ty;
+  if (state === 'play' && phase === 'build') {
+    const cur = kbUsed ? cursor : hover || cursor;
+    tx = (cur.c + 0.5) * BS; ty = -(cur.r + 0.5) * BS;
+  } else { tx = houseCentre(); ty = -2 * BS; }
+  if (x === nbX) { tx = 17 * BS; ty = -3 * BS; if (state === 'play' && phase === 'build' && nbIdx >= NB_PLAN.length) tx = x - 200; }
+  const dx = tx - x, dy = ty - (y - 52);
+  const len = Math.hypot(dx, dy) || 1;
+  return { lx: dx / len, ly: dy / len };
+}
+
+function drawBubble(text, wx, wy) {
+  const p = toLogical(wx, wy);
+  ctx.font = '600 14px Fredoka, sans-serif';
+  const tw = ctx.measureText(text).width;
+  const w = tw + 20, h = 28;
+  const x = clamp(p.x - w / 2, 8 - offX, W + offX - w - 8);
+  const y = p.y - h - 12;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.strokeStyle = 'rgba(120,90,40,0.5)'; ctx.lineWidth = 2;
+  roundRect(x, y, w, h, 12); ctx.fill(); ctx.stroke();
+  const tx = clamp(p.x, x + 14, x + w - 14);
+  ctx.beginPath(); ctx.moveTo(tx - 7, y + h - 1); ctx.lineTo(tx, y + h + 9); ctx.lineTo(tx + 7, y + h - 1); ctx.fill();
+  ctx.fillStyle = '#5a4210';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x + w / 2, y + 19);
+}
+
+// ============================================================
+//  Rendering: HUD, goal banner, hotbar
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = dark > 0.5 ? '#fff6dc' : '#5a4210';
+  ctx.shadowColor = dark > 0.5 ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Wise Builder' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 13px Fredoka, sans-serif';
+  if (state !== 'title') ctx.fillText(`SCORE ${totalScore}`, 12, 48);
+  ctx.shadowBlur = 0;
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  drawGoalBanner();
+  ctx.restore();
+}
+
+// The level's goal in one short sentence, shown for a few seconds at the start
+// of each level (and again if the storm is called before the house is ready)
+let bannerBottom = 0;
+function wrapText(text, maxW) {
+  const lines = [];
+  for (const word of text.split(' ')) {
+    const tryLine = lines.length ? lines[lines.length - 1] + ' ' + word : word;
+    if (lines.length && ctx.measureText(tryLine).width <= maxW) lines[lines.length - 1] = tryLine;
+    else lines.push(word);
+  }
+  return lines;
+}
+function drawGoalBanner() {
+  bannerBottom = 0;
+  if (state !== 'play' || phase !== 'build' || goalT <= 0) return;
+  const a = clamp(goalT / 0.5, 0, 1);
+  const w = Math.min(viewW - 20, 600);
+  const x = (viewW - w) / 2, y = 112;
+  const icon = 40;
+  ctx.font = '700 21px Fredoka, sans-serif';
+  const lines = wrapText(goalText(), w - icon - 44);
+  const h = 22 + lines.length * 26;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(x, y, w, h, 18); ctx.fill(); ctx.stroke();
+  // a little house picture
+  const ix = x + 14, iy = y + (h - icon) / 2;
+  drawTex('roof', ix, iy, icon / 2); drawTex('roof', ix + icon / 2, iy, icon / 2);
+  drawTex('door', ix, iy + icon / 2, icon / 2); drawTex('glass', ix + icon / 2, iy + icon / 2, icon / 2);
+  ctx.fillStyle = '#5a4210';
+  ctx.textAlign = 'center';
+  const tx = x + icon + 24 + (w - icon - 34) / 2;
+  lines.forEach((ln, i) => ctx.fillText(ln, tx, y + 31 + i * 26));
+  ctx.restore();
+  bannerBottom = y + h;
+}
+
+function drawCoin(x, y, r) {
+  ctx.fillStyle = '#e0a526';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffd766';
+  ctx.beginPath(); ctx.arc(x - r * 0.1, y - r * 0.1, r * 0.72, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#b8801a'; ctx.lineWidth = Math.max(1.5, r * 0.18);
+  ctx.beginPath(); ctx.moveTo(x - r * 0.1, y - r * 0.42); ctx.lineTo(x - r * 0.1, y + r * 0.3); ctx.stroke();
+}
+
+function drawEraser(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-0.6);
+  ctx.fillStyle = '#f28fb0'; roundRect(-s * 0.45, -s * 0.2, s * 0.9, s * 0.4, 5); ctx.fill();
+  ctx.fillStyle = '#5a8fd6'; ctx.fillRect(-s * 0.05, -s * 0.2, s * 0.22, s * 0.4);
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1.5; roundRect(-s * 0.45, -s * 0.2, s * 0.9, s * 0.4, 5); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBar() {
+  const L = barLayout();
+  // hotbar panel
+  ctx.fillStyle = 'rgba(58,44,28,0.8)';
+  roundRect(L.px, L.top, L.pw, H - L.top + 30, 18); ctx.fill();
+
+  if (state === 'play' && phase === 'build') {
+    for (const s of L.slots) {
+      const on = s.type === sel;
+      const y = s.y - (on ? 4 : 0);
+      ctx.fillStyle = on ? 'rgba(255,240,190,0.95)' : 'rgba(255,255,255,0.16)';
+      roundRect(s.x, y, s.w, s.w, 10); ctx.fill();
+      if (on) { ctx.strokeStyle = '#f7c948'; ctx.lineWidth = 3.5; roundRect(s.x, y, s.w, s.w, 10); ctx.stroke(); }
+      const is = s.w * 0.56;
+      if (s.type === 'erase') drawEraser(s.x + s.w / 2, y + s.w * 0.42, is);
+      else drawTex(s.type, s.x + (s.w - is) / 2, y + 7, is);
+      ctx.font = '700 11px Fredoka, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = on ? '#8a5a00' : 'rgba(255,255,255,0.7)';
+      ctx.fillText(String(s.i + 1), s.x + 5, y + 13);
+      ctx.textAlign = 'center';
+      if (s.type !== 'erase') {
+        const cost = BLOCKS[s.type].cost;
+        const cy = y + s.w - 9;
+        drawCoin(s.x + s.w / 2 - 7, cy - 4, 5.5);
+        ctx.fillStyle = on ? '#5a4210' : '#fff6dc';
+        ctx.font = '700 13px Fredoka, sans-serif';
+        ctx.fillText(String(cost), s.x + s.w / 2 + 6, cy + 1);
+      } else {
+        ctx.fillStyle = on ? '#5a4210' : '#fff6dc';
+        ctx.font = '700 10px Fredoka, sans-serif';
+        ctx.fillText('ERASE', s.x + s.w / 2, y + s.w - 6);
+      }
+    }
+
+    // coins left
+    drawCoin(L.px + 22, H - 32, 12);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = coins <= 3 ? '#ff9b8a' : '#fff6dc';
+    ctx.font = '700 22px Fredoka, sans-serif';
+    ctx.fillText(String(coins), L.px + 39, H - 24);
+    ctx.font = '600 10px Fredoka, sans-serif';
+    ctx.fillStyle = 'rgba(255,246,220,0.7)';
+    ctx.fillText('COINS', L.px + 10, H - 48);
+
+    // selected block name
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff6dc';
+    ctx.font = '600 13px Fredoka, sans-serif';
+    const nm = sel === 'erase' ? 'Eraser' : BLOCKS[sel].name;
+    ctx.fillText(nm, L.px + L.pw - 10, H - 30);
+    ctx.fillStyle = 'rgba(255,246,220,0.6)'; ctx.font = '600 10px Fredoka, sans-serif';
+    ctx.fillText('SELECTED', L.px + L.pw - 10, H - 46);
+
+    // storm button
+    const b = L.btn;
+    const ready = reqs.every((q) => q.ok);
+    const pulse = ready ? Math.sin(t * 5) * 2 : 0;
+    ctx.fillStyle = ready ? '#a8741a' : '#6d6150';
+    roundRect(b.x - pulse, b.y + 3 - pulse / 2, b.w + pulse * 2, b.h + pulse, 22); ctx.fill();
+    const g = ctx.createLinearGradient(0, b.y, 0, b.y + b.h);
+    if (ready) { g.addColorStop(0, '#f7c948'); g.addColorStop(1, '#d9961c'); }
+    else { g.addColorStop(0, '#bdb3a2'); g.addColorStop(1, '#9d927f'); }
+    ctx.fillStyle = g;
+    roundRect(b.x - pulse, b.y - pulse / 2, b.w + pulse * 2, b.h + pulse - 2, 22); ctx.fill();
+    ctx.fillStyle = ready ? '#fff' : 'rgba(255,255,255,0.85)';
+    ctx.textAlign = 'center';
+    ctx.font = '700 19px Fredoka, sans-serif';
+    ctx.shadowColor = 'rgba(120,70,0,0.6)'; ctx.shadowBlur = ready ? 3 : 0;
+    ctx.fillText('Let the storm come!', b.x + b.w / 2, b.y + 28);
+    ctx.shadowBlur = 0;
+  } else {
+    // Matthew 7:25, lit up as it happens
+    const vt = (k) => Bible.verse(VERSES[k]).text;
+    // Comma before a clause that starts afresh ("and the floods came"); none where
+    // the verse runs straight on (NLT: "and the winds beat against that house")
+    const sep = (next) => /^(and|the)\b/i.test(vt(next)) ? ', ' : ' ';
+    const parts = [
+      [vt('rain') + sep('floods'), 0], [vt('floods') + sep('winds'), 2.3],
+      [vt('winds') + sep('beat'), 5], [vt('beat'), 7.8],
+    ];
+    const lines = [[parts[0], parts[1]], [parts[2], parts[3]]];
+    ctx.font = 'italic 600 16px Fredoka, sans-serif';
+    // Shrink the text if a longer translation would reach the panel's edges
+    const widest = Math.max(...lines.map((ln) => ln.reduce((s, p) => s + ctx.measureText(p[0]).width, 0)));
+    const room = W - 48;
+    if (widest > room) ctx.font = `italic 600 ${Math.floor(16 * room / widest * 10) / 10}px Fredoka, sans-serif`;
+    ctx.textAlign = 'left';
+    const live = state === 'play' ? stormT : 99;
+    lines.forEach((ln, i) => {
+      const total = ln.reduce((s, p) => s + ctx.measureText(p[0]).width, 0);
+      let x = W / 2 - total / 2;
+      for (const [txt, at] of ln) {
+        ctx.fillStyle = live >= at ? '#fff6dc' : 'rgba(255,246,220,0.3)';
+        ctx.fillText(txt, x, H - 88 + i * 26);
+        x += ctx.measureText(txt).width;
+      }
+    });
+    ctx.textAlign = 'center';
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillStyle = 'rgba(255,246,220,0.6)';
+    ctx.fillText(Bible.verse(VERSES.rain).cite, W / 2, H - 28);
+  }
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  const y = Math.max(bannerBottom ? bannerBottom - offY + 38 : 160, GROUND_Y - GROWS * BS * cam.zoom - 24);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  // greedy word wrap, so long verses fit on a phone
+  const lines = wrapText(message.text, Math.min(W - 44, 760));
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#7a5200';
+  lines.forEach((ln, i) => {
+    ctx.strokeText(ln, W / 2, y + i * 29);
+    ctx.fillText(ln, W / 2, y + i * 29);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  drawSky();
+  drawStormClouds();
+  drawBolt();
+
+  // The valley, through the camera
+  ctx.save();
+  ctx.translate(W / 2, GROUND_Y);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cam.x, 0);
+  const visL = cam.x - (W / 2 + offX + 10) / cam.zoom, visR = cam.x + (W / 2 + offX + 10) / cam.zoom;
+  drawRainbow();
+  drawTerrain(visL, visR);
+  drawSignpost();
+  drawGuide();
+  drawBlocks();
+  drawPeople();
+  drawDebris();
+  drawWater(visL, visR);
+  drawParticles();
+  ctx.restore();
+
+  // Speech bubbles
+  if (nbSay.t > 0) drawBubble(nbSay.text, nbX, nbY - 70);
+
+  drawRain();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 50, 0, TAU); ctx.stroke();
+  }
+
+  if (state !== 'title') drawBar();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let camSnapped = false;
+function update(dt) {
+  t += dt;
+  updateScenery(dt);
+  updateParticles(dt);
+  updateFolk(dt);
+  updateCamera(dt, !camSnapped);
+  camSnapped = true;
+  if (state === 'play' || state === 'win' || state === 'fail') {
+    ana = analyse();
+    reqs = reqList(ana);
+  }
+  if (state === 'play' && phase === 'build') {
+    buildT += dt;
+    updateNeighbourBuild(dt);
+    while (msgQueue.length && buildT >= msgQueue[0].at) showMessage(msgQueue.shift().text);
+    const ready = reqs.every((q) => q.ok);
+    if (ready && !wasReady) { readyJoyT = 1.6; goalT = Math.min(goalT, 0.5); showMessage('House ready! Let the storm come!'); }
+    wasReady = ready;
+  } else if (state === 'play' && phase === 'storm') {
+    updateStorm(dt);
+  }
+  if (state === 'play' || state === 'win' || state === 'fail') updateDebris(dt);
+  if (state === 'win' || state === 'fail') {
+    dark = lerp(dark, 0, Math.min(1, dt * 1.5));
+    floodH = lerp(floodH, BASE_FLOOD, Math.min(1, dt));
+    if (state === 'win' && Math.random() < dt * 10) {
+      spawn(houseCentre() + rand(-90, 90), -rand(0, 5) * BS, 0, -25, 1.2, '#fff6d0', 3);
+    }
+  }
+  pShockT = Math.max(0, pShockT - dt);
+  nbShockT = Math.max(0, nbShockT - dt);
+  readyJoyT = Math.max(0, readyJoyT - dt);
+  if (state === 'play') goalT = Math.max(0, goalT - dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.thrust(state === 'play' ? rainAmt * 0.8 : 0);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

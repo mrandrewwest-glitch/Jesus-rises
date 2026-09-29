@@ -1,0 +1,2454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f7c99a">
+<title>The Workers in the Vineyard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Workers in the Vineyard</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+
+// The shared sound engine: Ode to Joy on the shepherd's pipe with harp, birdsong, light percussion
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: true };
+
+// Scripture shown in this game, looked up in the player's chosen version.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  householder: { ref: 'Matthew 20:1', KJV: 'For the kingdom of heaven is like unto a man that is an householder, which went out early in the morning to hire labourers into his vineyard.', NKJV: 'For the kingdom of heaven is like a landowner who went out early in the morning to hire laborers for his vineyard.', NIV: 'For the kingdom of heaven is like a landowner who went out early in the morning to hire workers for his vineyard.', NLT: 'For the Kingdom of Heaven is like the landowner who went out early one morning to hire workers for his vineyard.' },   // title card + Jesus's bubble
+  idle:      { ref: 'Matthew 20:6', KJV: 'Why stand ye here all the day idle?', NKJV: 'Why have you been standing here idle all day?', NIV: 'Why have you been standing here all day long doing nothing?', NLT: 'Why haven’t you been working today?' },   // householder at the eleventh hour
+  noMan:     { ref: 'Matthew 20:7', KJV: 'Because no man hath hired us.', NKJV: 'Because no one hired us.', NIV: 'Because no one has hired us', NLT: 'Because no one hired us.' },   // idle labourer's reply
+  goYe:      { ref: 'Matthew 20:7', KJV: 'Go ye also into the vineyard', NKJV: 'You also go into the vineyard', NIV: 'You also go and work in my vineyard', NLT: 'Then go out and join the others in my vineyard' },   // householder hiring
+  grumble:   { ref: 'Matthew 20:12', KJV: 'These last have wrought but one hour, and thou hast made them equal unto us, which have borne the burden and heat of the day.', NKJV: 'These last men have worked only one hour, and you made them equal to us who have borne the burden and the heat of the day.', NIV: 'These who were hired last worked only one hour... and you have made them equal to us who have borne the burden of the work and the heat of the day.', NLT: 'Those people worked only one hour, and yet you’ve paid them just as much as you paid us who worked all day in the scorching heat.' },   // grumbling bubble + fail card
+  noWrong:   { ref: 'Matthew 20:13', KJV: 'Friend, I do thee no wrong: didst not thou agree with me for a penny?', NKJV: 'Friend, I am doing you no wrong. Did you not agree with me for a denarius?', NIV: 'I am not being unfair to you, friend. Didn’t you agree to work for a denarius?', NLT: 'Friend, I haven’t been unfair! Didn’t you agree to work all day for the usual wage?' },   // householder's answer
+  evil:      { ref: 'Matthew 20:15', KJV: 'Is thine eye evil, because I am good?', NKJV: 'Or is your eye evil because I am good?', NIV: 'Or are you envious because I am generous?', NLT: 'Should you be jealous because I am kind to others?' },   // householder's answer + win card
+  lastFirst: { ref: 'Matthew 20:16', KJV: 'So the last shall be first, and the first last.', NKJV: 'So the last will be first, and the first last.', NIV: 'So the last will be first, and the first will be last.', NLT: 'So those who are last now will be first then, and those who are first will be last.' },   // closing banner + win card
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', () => { const oldW = W; resize(); if (W !== oldW && slots.length) relayout(); });
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Blend two #rrggbb colours (used for the sky as the day passes)
+function mix(a, b, f) {
+  const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(lerp((x >> s) & 255, (y >> s) & 255, f));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+// ============================================================
+//  Tuning
+// ============================================================
+const CH = 1.12;                  // drawing scale for people in the vineyard
+const HORIZON = 330;              // where the far hills meet the fields
+const MARKET_Y = 420;             // feet of labourers waiting in the marketplace
+const PRESS_Y = 446;              // base of the winepress
+const ROWS_Y = [552, 690, 828];   // base of each row of vines
+const AISLE = 26;                 // pickers stand this far in front of their row
+const CAP_W = 3;                  // bunches a hired labourer carries at once
+const WAVES = [0, 3, 6, 9, 11];   // hours when labourers wait in the marketplace
+const HOUR_NAMES = ['Dawn', '1st hour', '2nd hour', '3rd hour', '4th hour', '5th hour', '6th hour', '7th hour', '8th hour', '9th hour', '10th hour', '11th hour', 'Evening'];
+const FADE = 0.35;                // scene fade (each way)
+
+const LEVEL_NAMES = [
+  'Dawn in the Vineyard',
+  'The Third Hour',
+  'Heat of the Day',
+  'A Bumper Crop',
+  'Wasps in the Vines',
+  'The Great Vintage',
+];
+
+function makeConfig(n) {
+  const k = Math.min(n, 6) - 1;
+  return {
+    name: LEVEL_NAMES[n - 1] || `Vintage ${n}`,
+    dayLen: [120, 112, 106, 100, 96, 92][k],                   // seconds from dawn to evening
+    waves: [[2, 2, 1, 1, 2], [2, 2, 2, 1, 2], [2, 2, 2, 2, 3], [3, 2, 2, 2, 3], [3, 3, 2, 2, 3], [3, 3, 3, 2, 3]][k],
+    // bunches the winepress needs by evening (a wider field has more vines, so it needs more)
+    quota: Math.round(([50, 62, 63, 65, 66, 68][k] + Math.max(0, n - 6) * 2) * (1 + 0.45 * clamp((W - 480) / 820, 0, 1))),
+    basket: [5, 5, 4, 4, 4, 3][k],                             // bunches the householder carries
+    wasps: [1, 2, 2, 3, 4, 5][k],                              // most wasps in the vines at once
+    waspEvery: [13, 10, 8, 7, 6, 5][k],
+    waspStay: [14, 13, 12, 11, 10, 10][k],
+    regrow: [11, 12, 13, 14, 15, 16][k],                       // seconds for a vine to ripen another bunch
+    patience: n === 1 ? 2 : 1,                                 // bells an idle labourer waits before wandering off
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let scene = 'frame';      // frame | vineyard | payday
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('vineyardBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0, sceneT = 0;
+let dayT = 0;             // seconds since dawn
+let nextWave = 0;
+let dusk = null;          // the short pause when evening comes
+let boss = null;          // the householder (you)
+let folk = [];            // labourers: waiting, walking, picking
+let slots = [];           // places on the vines where bunches grow
+let wasps = [];
+let listeners = [];
+let pay = null;           // the evening pay line
+let pressed = 0, pressFx = 0;
+let particles = [], ripples = [], bubbles = [], pops = [], timers = [];
+let banner = null, hint = null;
+let message = { text: '', t: 0 };
+let fade = null;
+let flashT = 0, shakeT = 0;
+let endTimer = 0;
+let lastScore = null;
+let failReason = '';
+let seenIntro = false;
+let stats = null;
+let msgCd = 0;
+let waspT = 0;
+let firstWasp = true, quotaMet = false, askedIdle = false;
+const keys = new Set();
+
+// ============================================================
+//  Geometry
+// ============================================================
+function marketW() { return clamp(W * 0.3, 140, 330); }
+function pressX() { return W - clamp(W * 0.11, 66, 130); }
+function pressHalf() { return clamp(W * 0.075, 44, 66); }
+function pressSpot() { return { x: pressX() - pressHalf() - 20, y: PRESS_Y + 18 }; }
+function idleSpot(k) {
+  const mw = marketW(), cols = 4;
+  return { x: 24 + (k % cols) * ((mw - 44) / (cols - 1)) + (Math.floor(k / cols) % 2) * 12, y: MARKET_Y - Math.floor(k / cols) * 16 };
+}
+function spdK() { return clamp(W / 760, 0.85, 1.45); }
+function hourNow() { return clamp(dayT / cfg.dayLen, 0, 1) * 12; }
+function dayF() { return scene === 'payday' ? 1 : scene === 'frame' ? 0.3 : clamp(dayT / cfg.dayLen, 0, 1); }
+
+function makeSlots() {
+  slots = [];
+  const x0 = 34, x1 = W - 34;
+  const n = clamp(Math.floor((x1 - x0) / 66), 6, 12);
+  ROWS_Y.forEach((ry, r) => {
+    for (let i = 0; i < n; i++) {
+      const x = x0 + (i + 0.5) * (x1 - x0) / n + (r % 2 ? 9 : -9);
+      slots.push({ x, y: ry - 58, row: r, ry, i, grow: Math.random() < 0.75 ? 1 : rand(0.3, 0.9), claim: null, wasp: null, sway: rand(0, TAU) });
+    }
+  });
+}
+
+// When the window changes width mid-game, slide everything along with it
+function relayout() {
+  if (!slots.length) return;
+  const old = slots;
+  const n = old.filter((s) => s.row === 0).length;
+  const x0 = 34, x1 = W - 34;
+  for (const s of old) s.x = x0 + (s.i + 0.5) * (x1 - x0) / n + (s.row % 2 ? 9 : -9);
+  for (const p of folk) if (p.state === 'idle') { const sp = idleSpot(p.spot); p.x = sp.x; p.y = sp.y; }
+  if (boss) boss.x = clamp(boss.x, 16, W - 16);
+}
+
+// ============================================================
+//  People
+// ============================================================
+const ROBES = ['#b5503f', '#6b8e3a', '#d9a13a', '#3c8f86', '#a0673a', '#5a6475', '#c46b8c', '#4b7f4b', '#8a6fb0', '#c9874a', '#3f6fb5', '#b08a2e'];
+const SKINS = ['#d9a066', '#c98d56', '#e3b184', '#b87a48', '#c58a55', '#8d5a34', '#dca678', '#a86e40'];
+const HAIRS = ['#2e1d10', '#4a2f1a', '#8a8a8a', '#6b3f1d', '#1f140c', '#d0d0d0', '#5c3a1c'];
+const SCARVES = ['#e8dcc0', '#c9b27a', '#d8c7a0', '#9fc4d8', '#e6b3c4', '#b8d4a0'];
+
+let personCount = 0;
+function person(look, extra) {
+  return {
+    ...look, i: personCount++,
+    s: CH, pose: 'stand', mood: 'watch', facing: 1, walkT: 0,
+    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), shake: 0,
+    ...(extra || {}),
+  };
+}
+
+function randomLook() {
+  const woman = Math.random() < 0.35;
+  const old = Math.random() < 0.25;
+  return {
+    robe: pick(ROBES), skin: pick(SKINS),
+    hair: old ? pick(['#8a8a8a', '#d0d0d0', '#b8b8b8']) : pick(HAIRS),
+    beard: !woman && Math.random() < 0.65,
+    scarf: woman ? pick(SCARVES) : (Math.random() < 0.3 ? pick(SCARVES) : null),
+    hat: !woman && Math.random() < 0.2,
+    woman,
+  };
+}
+
+const BOSS_LOOK = { robe: '#7a3fa0', trim: '#f2c94c', hair: '#9a9a9a', beard: true, longBeard: true, skin: '#d9a066', scarf: '#f4e7c4', tall: true };
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  const blush = (a = 0.45) => {
+    ctx.fillStyle = `rgba(255,120,120,${a})`;
+    ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  };
+  const happyEyes = () => {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+    ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      happyEyes();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      blush();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        eyes(3.5, 3.5, 2);
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+    case 'grumpy':         // the all-day labourers, not at all pleased
+      eyes(3.5, 3, 2);
+      brows(-5, -10, -5, -10);
+      mouthLine(() => { ctx.moveTo(-5, mouthY + 1); ctx.quadraticCurveTo(0, mouthY - 3, 5, mouthY + 1); });
+      break;
+    case 'sad':            // waiting in the marketplace, hoping someone will hire them
+      eyes(3.2, 3.6, 1.8);
+      brows(-9, -5, -9, -5);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 3.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'munch':          // sneaking a grape
+      happyEyes();
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.4, 1.5 + Math.abs(Math.sin(t * 12 + d.phase)) * 2.4, 0, 0, TAU));
+      blush();
+      break;
+  }
+}
+
+// A wicker basket, with a mound of grapes that grows as it fills
+function drawBasket(x, y, n, cap, tilt = 0, k = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.scale(k, k);
+  const fill = cap ? clamp(n / cap, 0, 1) : 0;
+  if (fill > 0) {
+    ctx.fillStyle = '#6b2f8a';
+    const r = 3.6;
+    const cols = [[-7, -2], [0, -3], [7, -2], [-3.5, -7], [3.5, -7], [0, -11]];
+    const m = Math.ceil(fill * cols.length);
+    for (let i = 0; i < m; i++) { ctx.beginPath(); ctx.arc(cols[i][0], cols[i][1], r, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (let i = 0; i < m; i++) { ctx.beginPath(); ctx.arc(cols[i][0] - 1.2, cols[i][1] - 1.2, 1.1, 0, TAU); ctx.fill(); }
+  }
+  ctx.fillStyle = '#c99a52'; ctx.strokeStyle = '#8a6326'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-12, -1); ctx.lineTo(12, -1); ctx.lineTo(9, 12); ctx.lineTo(-9, 12); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-11, 4); ctx.lineTo(11, 4); ctx.moveTo(-10, 8); ctx.lineTo(10, 8); ctx.stroke();
+  ctx.restore();
+}
+
+// A person, side-on-ish: robe, arms, head and a reacting face.
+// p.pose: stand walk pick tip cheer sit sad open pay fold shrug
+// props: basket (bunches carried) + cap, bag (the householder's purse), coin (a penny held up)
+function drawPerson(p) {
+  const s = p.s || 1, pose = p.pose || 'stand', mood = p.mood || 'watch', f = p.facing || 1;
+  const ph = p.phase || 0, w = p.walkT || 0;
+  const walking = pose === 'walk';
+  let bob = 0;
+  if (walking) bob = Math.abs(Math.sin(w)) * 3;
+  if (pose === 'cheer') bob = Math.abs(Math.sin(t * 6 + ph)) * 10;
+  const dimA = p.dim ? -18 : 0;            // people further back are a little darker
+  const C = (hex, a = 0) => shade(hex, a + dimA);
+
+  ctx.save();
+  ctx.translate(p.x, p.y - bob * s);
+  ctx.scale(s, s);
+
+  const sit = pose === 'sit';
+  const top = sit ? -24 : -37;
+  const hem = sit ? -4 : 0;
+  const hy = top - 16 + (mood === 'sad' ? 1.5 : 0);
+  const sleeve = C(p.robe, -25);
+  const skin = C(p.skin);
+  const sh = top + 5;
+
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const foot = (x, y) => {
+    ctx.fillStyle = C(p.skin, -12);
+    ctx.beginPath(); ctx.ellipse(x + f * 2, y, 5.5, 3, 0, 0, TAU); ctx.fill();
+  };
+
+  // Feet
+  if (sit) { foot(f * 24, -2); foot(f * 17, -1); }
+  else {
+    const sw = walking ? Math.sin(w) * 6 : 0;
+    foot(-6 + sw, -1); foot(6 - sw, -1);
+  }
+
+  // Robe
+  ctx.fillStyle = C(p.robe);
+  ctx.strokeStyle = C(p.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, hem);
+  ctx.quadraticCurveTo(-17, top + 7, -11, top);
+  ctx.quadraticCurveTo(0, top - 4, 11, top);
+  ctx.quadraticCurveTo(17, top + 7, 18, hem);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (sit) { ctx.beginPath(); ctx.ellipse(f * 12, -8, 14, 8, 0, 0, TAU); ctx.fill(); ctx.stroke(); }
+  if (p.trim) {
+    ctx.strokeStyle = C(p.trim); ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, top - 1); ctx.lineTo(0, hem - 1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-17, hem - 3); ctx.quadraticCurveTo(0, hem - 1, 17, hem - 3); ctx.stroke();
+  }
+  // Belt
+  ctx.strokeStyle = p.trim ? C(p.trim) : C('#c9b07a'); ctx.lineWidth = 2.5;
+  const by = sit ? top + 13 : top + 20;
+  ctx.beginPath(); ctx.moveTo(-16, by); ctx.quadraticCurveTo(0, by + 3, 16, by); ctx.stroke();
+  // The householder's purse of pennies
+  if (p.bag) {
+    ctx.fillStyle = '#8a5a2e';
+    ctx.beginPath(); ctx.ellipse(-f * 12, by + 9, 7, 8, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-f * 17, by + 2); ctx.lineTo(-f * 7, by + 2); ctx.stroke();
+  }
+
+  // Arms
+  const wave = Math.sin(t * 9 + ph) * 4;
+  let hand = null;
+  switch (pose) {
+    case 'cheer': arm(-f * 11, sh, -f * (24 - wave), top - 30); hand = [f * (24 + wave), top - 30]; break;
+    case 'open': arm(-f * 11, sh, -f * 27, sh - 10); hand = [f * 27, sh - 10]; break;
+    case 'pick': arm(-f * 11, sh, -f * 15, -12); hand = [f * 21, top - 30 + Math.sin(t * 14 + ph) * 3]; break;
+    case 'tip': arm(-f * 11, sh, f * 16, sh + 12); hand = [f * 24, sh + 6]; break;
+    case 'pay': arm(-f * 11, sh, -f * 15, -12); hand = [f * 31, sh - 2]; break;
+    case 'shrug': arm(-f * 11, sh, -f * 24, sh - 7); hand = [f * 24, sh - 7]; break;
+    case 'fold': arm(-f * 11, sh, f * 5, sh + 9); hand = [-f * 5, sh + 11]; break;
+    case 'sad': arm(-f * 11, sh, -f * 12, -5); hand = [f * 12, -5]; break;
+    case 'sit': arm(-f * 8, sh, -f * 4, sh + 12); hand = [f * 22, -10]; break;
+    case 'walk': arm(-f * 11, sh, -f * (15 + Math.sin(w) * 5), -12); hand = [f * (15 + Math.sin(w) * 5), -12]; break;
+    default: arm(-f * 11, sh, -f * 15, -12); hand = [f * 15, -12];
+  }
+  // A basket rides on the hip (or tips into the press)
+  const hasBasket = p.basket !== undefined && (p.basket > 0 || p.alwaysBasket);
+  if (hasBasket && pose !== 'tip') drawBasket(f * 17, -16, p.basket, p.cap || 3);
+  arm(f * 11, sh, hand[0], hand[1]);
+  if (hasBasket && pose === 'tip') drawBasket(f * 30, sh + 4, p.basket, p.cap || 3, f * 1.1);
+  if (p.coin) {            // a shiny penny held up
+    ctx.fillStyle = '#f5c542'; ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(hand[0], hand[1] - 6, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(hand[0] - 1.5, hand[1] - 7.5, 1.4, 0, TAU); ctx.fill();
+  }
+
+  // Head (shakes "no" when p.shake is set)
+  const hx = p.shake > 0 ? Math.sin(p.shake * 40) * 4 : 0;
+  ctx.save();
+  ctx.translate(hx, 0);
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (p.scarf) {
+    ctx.fillStyle = C(p.scarf);
+    if (p.tall) { ctx.beginPath(); ctx.ellipse(0, hy - 16, 15, 10, 0, 0, TAU); ctx.fill(); }
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = p.tall ? '#b58a2a' : C(p.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = C(p.hair);
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (p.hat) {              // a labourer's straw hat against the sun
+    ctx.fillStyle = C('#d8b56a');
+    ctx.beginPath(); ctx.ellipse(0, hy - 12, 24, 5, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, hy - 17, 11, 8, 0, Math.PI, TAU); ctx.fill();
+    ctx.strokeStyle = C('#a8803a'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-11, hy - 14); ctx.lineTo(11, hy - 14); ctx.stroke();
+  }
+  if (p.beard) {
+    const len = p.longBeard ? 30 : 21;
+    ctx.fillStyle = C(p.hair);
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + len, 0, hy + len + 1);
+    ctx.quadraticCurveTo(14, hy + len, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  const lx = p.lx !== undefined ? p.lx : f * 0.5;
+  const ly = p.ly !== undefined ? p.ly : 0;
+  drawFace(p, mood, hy, lx, ly);
+  // a drop of sweat in the heat of the day
+  if (p.sweat) {
+    ctx.fillStyle = '#7cc4f2';
+    ctx.beginPath(); ctx.moveTo(-15, hy - 10); ctx.quadraticCurveTo(-11, hy - 3, -15, hy - 2); ctx.quadraticCurveTo(-19, hy - 3, -15, hy - 10); ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+// Jesus exactly as in the collection (white robe, red sash, halo), without His cloud, teaching
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(j.s || 1, j.s || 1);
+  const teach = j.pose === 'teach';
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+  // Feet
+  ctx.fillStyle = '#c9905e';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 5, 2.6, 0, 0, TAU); ctx.ellipse(7, 0, 5, 2.6, 0, 0, TAU); ctx.fill();
+
+  // Arms: one hand raised as He tells the story, the other open
+  const hands = teach ? [[-20, -22], [22, -60 + Math.sin(t * 2.2) * 3]] : [[-20, -22], [20, -22]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  Level setup
+// ============================================================
+function resetLevelState() {
+  cfg = makeConfig(level);
+  dayT = 0; nextWave = 0; dusk = null;
+  folk = []; slots = []; wasps = []; pay = null;
+  pressed = 0; pressFx = 0;
+  particles = []; ripples = []; bubbles = []; pops = []; timers = [];
+  banner = null; hint = null; fade = null;
+  flashT = shakeT = 0; endTimer = 0; msgCd = 0;
+  waspT = cfg.waspEvery * 0.8;
+  firstWasp = true; quotaMet = false; askedIdle = false;
+  stats = { offered: 0, hired: 0, missed: 0, shooed: 0, stings: 0, paid: 0 };
+  boss = person(BOSS_LOOK, { basket: 0, cap: cfg.basket, alwaysBasket: true, tx: null, ty: null, action: null, busy: 0, stun: 0, mood: 'joy' });
+  makeListeners();
+}
+
+// ============================================================
+//  Speech, banners, hints
+// ============================================================
+function say(p, text, dur = 3) {
+  bubbles = bubbles.filter((b) => b.p !== p);
+  bubbles.push({ p, text, t: dur });
+}
+function setBanner(key, dur = 4) {
+  const v = Bible.verse(VERSES[key]);
+  banner = { text: v.text, cite: v.cite, t: dur, age: 0 };
+}
+function setBannerText(text, dur = 3.5) { banner = { text, cite: '', t: dur, age: 0 }; }
+function showHint(text, dur = 3.5) { hint = { text, t: dur }; }
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+function nag(text) { if (msgCd <= 0) { showMessage(text, 1.8); msgCd = 2.2; } }
+function pop(x, y, text, color = '#6b2f8a') { pops.push({ x, y, text, color, t: 1 }); }
+function later(sec, fn) { timers.push({ t: sec, fn }); }
+
+const HIRE_LINES = ['Thank you, master!', 'Work at last!', 'I’m on my way!', 'Gladly!', 'Bless you, sir!', 'I love picking grapes!'];
+const PICK_LINES = ['Mmm, these smell sweet!', 'What a harvest!', 'Plump as can be!', 'One more for the press!', 'The sun is hot today…', 'Just one grape for me…'];
+const THANKS_LINES = ['A whole penny? Thank you!', 'A full day’s pay!', 'How generous!', 'My family will eat tonight!', 'Bless you, master!', 'For one hour’s work?!'];
+
+// ============================================================
+//  Scenes
+// ============================================================
+function fadeTo(next) { if (!fade) fade = { t: 0, next, done: false }; }
+
+function setScene(name) {
+  scene = name;
+  sceneT = 0;
+  particles = [];
+  bubbles = [];
+  hint = null;
+  if (name === 'frame') {
+    say(listeners[1], 'Master, what is the kingdom of heaven like?', 3.2);
+    setBannerText('Jesus tells His disciples a story', 3.2);
+  } else if (name === 'vineyard') {
+    seenIntro = true;
+    startDay();
+  } else if (name === 'payday') {
+    startPayday();
+  }
+}
+
+// ---------- The framing scene: Jesus teaching on a hillside ----------
+function makeListeners() {
+  const looks = [
+    { robe: '#6b8e3a', hair: '#4a2f1a', beard: true, skin: '#c98d56' },
+    { robe: '#3f6fb5', hair: '#8a8a8a', beard: true, skin: '#d9a066' },   // Peter asks
+    { robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070' },
+    { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+    { robe: '#7a4fa0', hair: '#3a2716', beard: true, skin: '#c58a55', scarf: '#e8dcc0' },
+    { robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678', scarf: '#e6b3c4', woman: true },
+  ];
+  listeners = looks.map((l) => person(l, { mood: 'watch', delay: rand(0.05, 0.5), switchT: 0 }));
+}
+
+function frameTap() {
+  if (sceneT < 0.5) return;
+  if (sceneT < 3) { sceneT = 3; return; }          // hurry the question along
+  if (sceneT > 3.6) fadeTo('vineyard');
+}
+
+function updateFrame() {
+  if (sceneT >= 3 && !bubbles.some((b) => b.p === 'jesus') && sceneT < 3.2) {
+    bubbles = [];
+    say('jesus', verseText('householder'), 60);
+    showHint(isTouch() ? 'Tap to hear the story' : 'Tap or press Space to hear the story', 60);
+  }
+}
+
+// ---------- The vineyard: one long day ----------
+function startDay() {
+  makeSlots();
+  folk = []; wasps = [];
+  dayT = 0; nextWave = 0; dusk = null;
+  const sp = idleSpot(0);
+  boss.x = marketW() * 0.62 + 30; boss.y = MARKET_Y + 34; boss.facing = -1;
+  boss.basket = 0; boss.tx = null; boss.action = null; boss.busy = 0; boss.stun = 0;
+  spawnWave(0, true);
+  setBannerText('Early in the morning, the householder goes out to hire labourers', level === 1 ? 5 : 3.5);
+  showHint(isTouch() ? 'Tap the waiting labourers to hire them for a penny a day' : 'Tap the waiting labourers (or walk near and press Space) to hire them', 6);
+  if (sp) boss.lx = -1;
+}
+
+function freeSpot() {
+  const used = new Set(folk.filter((p) => p.state === 'idle' || p.state === 'arrive').map((p) => p.spot));
+  for (let k = 0; k < 12; k++) if (!used.has(k)) return k;
+  return 0;
+}
+
+// Labourers arrive in the marketplace at each hour
+function spawnWave(i, instant = false) {
+  const n = cfg.waves[i] || 0;
+  for (let c = 0; c < n; c++) {
+    const spot = freeSpot();
+    const sp = idleSpot(spot);
+    const p = person(randomLook(), {
+      state: instant ? 'idle' : 'arrive', spot, wave: i, hour: WAVES[i],
+      x: instant ? sp.x : -30 - c * 34, y: sp.y, facing: 1, mood: 'sad',
+      leaveHour: WAVES[i + cfg.patience] ?? 12,
+      carry: 0, basket: 0, cap: CAP_W, target: null, timer: 0, chatCd: rand(6, 14),
+    });
+    folk.push(p);
+    stats.offered++;
+  }
+  if (i > 0) {
+    sfx.bell();
+    const hr = WAVES[i];
+    setBannerText(hr === 11 ? 'The eleventh hour: still more labourers stand idle in the marketplace' : `The ${HOUR_NAMES[hr]}: more labourers are waiting in the marketplace`, 3.8);
+    showMessage(`${HOUR_NAMES[hr][0].toUpperCase() + HOUR_NAMES[hr].slice(1)}!`, 1.8);
+  }
+}
+
+function idlers() { return folk.filter((p) => p.state === 'idle' || p.state === 'arrive'); }
+function workers() { return folk.filter((p) => p.hired); }
+function inMarket(p) { return p.x < marketW() + 34 && p.y < MARKET_Y + 80; }
+function ripe(s) { return s.grow >= 1; }
+
+function hire(p) {
+  if (p.state !== 'idle' && p.state !== 'arrive') return;
+  p.state = 'hired'; p.hired = true; p.mood = 'joy'; p.pose = 'cheer'; p.timer = 0.6;
+  stats.hired++;
+  const firstOfWave = !folk.some((o) => o !== p && o.hired && o.wave === p.wave);
+  if (firstOfWave) {
+    if (p.wave === 0) { say(boss, 'A penny for the day?', 2.2); later(0.9, () => say(p, 'Agreed!', 1.8)); }
+    else say(boss, verseText('goYe'), 2.6);
+  } else say(p, pick(HIRE_LINES), 1.8);
+  for (let k = 0; k < 10; k++) spawn(p.x + rand(-14, 14), p.y - rand(40, 90), rand(-40, 40), rand(-80, -20), 0.8, pick(['#ffe27a', '#fff6d0', '#b3e07a']), rand(2, 4));
+  pop(p.x, p.y - 100, 'Hired!', '#2b8a3e');
+  sfx.clink();
+  if (!idlers().length) hint = null;
+}
+
+// Boss orders from a tap or a key
+function orderBoss(action) {
+  const b = boss;
+  b.action = action;
+  let spot;
+  if (action.type === 'pick') {
+    spot = { x: action.slot.x, y: action.slot.ry + AISLE };
+    // the householder's choice wins: a labourer heading there picks another bunch
+    const c = action.slot.claim;
+    if (c) { action.slot.claim = null; if (c.target === action.slot) { c.target = null; if (c.state === 'toBunch' || c.state === 'pick') chooseSlot(c); } }
+  }
+  else if (action.type === 'tip') spot = pressSpot();
+  else if (action.type === 'hire') spot = inMarket(b) && Math.hypot(b.x - action.p.x, b.y - action.p.y) < 170 ? { x: b.x, y: b.y } : { x: clamp(action.p.x + 30, 20, W - 20), y: MARKET_Y + 30 };
+  else spot = { x: action.x, y: action.y };
+  b.tx = spot.x; b.ty = clamp(spot.y, MARKET_Y - 6, H - 44);
+}
+
+function startBossAction() {
+  const b = boss, a = b.action;
+  b.tx = null;
+  if (!a) return;
+  if (a.type === 'pick') {
+    const s = a.slot;
+    if (!ripe(s)) { nag('That bunch isn’t ripe yet'); b.action = null; return; }
+    if (b.basket >= cfg.basket) { nag(isTouch() ? 'Basket full! Tap the winepress' : 'Basket full! Take it to the winepress'); b.action = null; return; }
+    if (s.wasp && s.wasp.state === 'sit') { sting(s.wasp); b.action = null; return; }
+    b.busy = 0.5; b.pose = 'pick'; b.facing = 1;
+  } else if (a.type === 'tip') {
+    if (!b.basket) { nag('Your basket is empty'); b.action = null; return; }
+    b.busy = 0.45; b.pose = 'tip'; b.facing = 1;
+  } else if (a.type === 'hire') {
+    hire(a.p); b.action = null;
+    b.facing = a.p.x < b.x ? -1 : 1;
+  } else b.action = null;
+}
+
+function finishBossAction() {
+  const b = boss, a = b.action;
+  b.action = null; b.pose = 'stand';
+  if (!a) return;
+  if (a.type === 'pick') {
+    const s = a.slot;
+    if (s.wasp && s.wasp.state === 'sit') { sting(s.wasp); return; }
+    if (!ripe(s) || b.basket >= cfg.basket) return;
+    pickSlot(s);
+    b.basket++;
+    sfx.tap(b.basket / cfg.basket);
+    if (b.basket >= cfg.basket) showHint(isTouch() ? 'Basket full! Tap the winepress to tip it in' : 'Basket full! Tap the winepress (or walk there and press Space)', 3);
+  } else if (a.type === 'tip') {
+    pressGrapes(b.basket, b);
+    b.basket = 0;
+  }
+}
+
+function pickSlot(s) {
+  s.grow = 0;
+  if (s.claim && s.claim.target === s) s.claim.target = null;
+  s.claim = null;
+  for (let k = 0; k < 6; k++) spawn(s.x + rand(-8, 8), s.y + rand(-6, 10), rand(-30, 30), rand(-70, -20), 0.6, pick(['#8e44ad', '#b07cc6', '#7ab04a']), rand(2, 3.5), 160);
+}
+
+function pressGrapes(n, who) {
+  if (n <= 0) return;
+  pressed += n;
+  pressFx = 0.7;
+  const px = pressX();
+  for (let k = 0; k < 8 + n * 2; k++) spawn(px + rand(-30, 30), PRESS_Y - 60, rand(-60, 60), rand(-150, -60), 0.9, pick(['#7b2d8e', '#9b4dca', '#5e1a73']), rand(2.5, 4.5), 320);
+  pop(px, PRESS_Y - 110, `+${n}`, '#7b2d8e');
+  sfx.squish();
+  if (who === boss) sfx.ding();
+  if (!quotaMet && pressed >= cfg.quota) {
+    quotaMet = true;
+    showMessage('The winepress is full! Extra grapes = bonus', 2.6);
+    sfx.win();
+  }
+}
+
+function sting(w) {
+  const b = boss;
+  b.stun = 1.1; b.pose = 'stand'; b.mood = 'shock';
+  b.action = null; b.tx = null;
+  stats.stings++;
+  if (b.basket > 0) {
+    b.basket--;
+    for (let k = 0; k < 5; k++) spawn(b.x + rand(-10, 10), b.y - 20, rand(-50, 50), rand(-90, -30), 0.8, '#8e44ad', rand(2.5, 4), 300);
+  }
+  shakeT = 0.25;
+  showMessage('Ouch! Mind the wasps!', 1.8);
+  pop(b.x, b.y - 110, 'Ouch!', '#c92a2a');
+  sfx.buzz(); sfx.bounce();
+  waspLeave(w, b.x < w.x ? 1 : -1);
+}
+
+// ---------- Wasps ----------
+function spawnWasp() {
+  const open = slots.filter((s) => ripe(s) && !s.wasp);
+  if (!open.length) return;
+  // wasps like the bunches nearest the householder best
+  open.sort((a, c) => Math.hypot(a.x - boss.x, a.y - boss.y) - Math.hypot(c.x - boss.x, c.y - boss.y));
+  const s = open[Math.floor(Math.random() * Math.min(open.length, 5))];
+  const left = Math.random() < 0.5;
+  const w = { x: left ? -30 : W + 30, y: rand(220, 420), slot: s, state: 'fly', t: 0, stay: cfg.waspStay * rand(0.8, 1.2), ph: rand(0, TAU), vx: 0, vy: 0, facing: left ? 1 : -1 };
+  s.wasp = w;
+  wasps.push(w);
+}
+
+function waspLeave(w, dir) {
+  if (w.slot && w.slot.wasp === w) w.slot.wasp = null;
+  w.state = 'leave';
+  w.vx = (dir || (w.x < W / 2 ? -1 : 1)) * 260;
+  w.vy = -160;
+  w.facing = Math.sign(w.vx);
+}
+
+function shoo(w) {
+  waspLeave(w, w.x < boss.x ? -1 : 1);
+  stats.shooed++;
+  pop(w.x, w.y - 26, 'Shoo!', '#b8860b');
+  sfx.buzz();
+}
+
+function updateWasps(dt) {
+  waspT -= dt;
+  if (waspT <= 0 && !dusk) {
+    waspT = cfg.waspEvery * rand(0.7, 1.3);
+    if (wasps.filter((w) => w.state !== 'leave').length < cfg.wasps && hourNow() < 11.6) spawnWasp();
+  }
+  for (let i = wasps.length - 1; i >= 0; i--) {
+    const w = wasps[i];
+    w.t += dt;
+    if (w.state === 'fly') {
+      const s = w.slot;
+      if (!ripe(s)) { waspLeave(w); continue; }
+      const dx = s.x - w.x, dy = s.y - 14 - w.y, d = Math.hypot(dx, dy);
+      if (d < 8) { w.state = 'sit'; w.t = 0; if (firstWasp) { firstWasp = false; showHint(isTouch() ? 'A wasp! Tap it to shoo it away before you pick that bunch' : 'A wasp! Tap it (or press Space nearby) to shoo it away', 4.5); } }
+      else { w.x += dx / d * 150 * dt; w.y += dy / d * 150 * dt + Math.sin(t * 9 + w.ph) * 30 * dt; w.facing = dx > 0 ? 1 : -1; }
+    } else if (w.state === 'sit') {
+      const s = w.slot;
+      w.x = s.x + Math.cos(t * 5 + w.ph) * 13;
+      w.y = s.y - 12 + Math.sin(t * 8 + w.ph) * 6;
+      w.facing = -Math.sin(t * 5 + w.ph) > 0 ? 1 : -1;
+      if (w.t > w.stay || !ripe(s)) waspLeave(w);
+    } else {
+      w.x += w.vx * dt; w.y += w.vy * dt;
+      if (w.x < -60 || w.x > W + 60 || w.y < -offY - 60) wasps.splice(i, 1);
+    }
+  }
+}
+
+// ---------- Hired labourers pick on their own ----------
+function chooseSlot(p) {
+  let bestS = null, bestD = 1e9;
+  const bossSlot = boss.action && boss.action.type === 'pick' ? boss.action.slot : null;
+  for (const s of slots) {
+    if (!ripe(s) || s.wasp || s.claim || s === bossSlot) continue;
+    const d = Math.hypot(s.x - p.x, s.ry + AISLE - p.y) + rand(0, 40);
+    if (d < bestD) { bestD = d; bestS = s; }
+  }
+  if (bestS) { bestS.claim = p; p.target = bestS; p.state = 'toBunch'; }
+  else if (p.carry > 0) { p.state = 'toPress'; }
+  else { p.state = 'wait'; p.timer = 0.8; }
+}
+
+function walkTo(p, x, y, speed, dt) {
+  const dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
+  if (d < 3) { p.x = x; p.y = y; p.pose = 'stand'; return true; }
+  const step = Math.min(d, speed * dt);
+  p.x += dx / d * step; p.y += dy / d * step;
+  p.pose = 'walk'; p.walkT += dt * 11;
+  if (Math.abs(dx) > 2) p.facing = dx > 0 ? 1 : -1;
+  return false;
+}
+
+function updateFolk(dt) {
+  const spd = 110 * spdK();
+  const hr = hourNow();
+  for (let i = folk.length - 1; i >= 0; i--) {
+    const p = folk[i];
+    p.basket = p.carry;
+    p.sweat = p.hired && hr > 5 && hr < 9 && p.hour <= 3;
+    switch (p.state) {
+      case 'arrive': {
+        const sp = idleSpot(p.spot);
+        if (walkTo(p, sp.x, sp.y, spd * 1.1, dt)) p.state = 'idle';
+        break;
+      }
+      case 'idle':
+        p.pose = 'sad';
+        p.mood = Math.hypot(boss.x - p.x, boss.y - p.y) < 160 ? 'wow' : 'sad';
+        p.facing = boss.x < p.x ? -1 : 1;
+        if (hr >= p.leaveHour) {
+          p.state = 'leave'; stats.missed++;
+          say(p, 'Nobody wants us today…', 2);
+          nag('A labourer wandered off, never hired');
+        }
+        break;
+      case 'leave':
+        p.mood = 'sad';
+        if (walkTo(p, -60, p.y, spd, dt)) folk.splice(i, 1);
+        break;
+      case 'hired':
+        p.timer -= dt;
+        if (p.timer <= 0) chooseSlot(p);
+        break;
+      case 'wait':
+        p.pose = 'stand'; p.mood = 'watch';
+        p.timer -= dt;
+        if (p.timer <= 0) chooseSlot(p);
+        break;
+      case 'toBunch': {
+        const s = p.target;
+        if (!s || !ripe(s) || s.wasp || s.claim !== p) {
+          if (s && s.claim === p) s.claim = null;
+          if (s && s.wasp && Math.random() < 0.5) say(p, 'Bzz! Not that one!', 1.4);
+          p.target = null; chooseSlot(p); break;
+        }
+        p.mood = 'joy';
+        if (walkTo(p, s.x, s.ry + AISLE, spd, dt)) { p.state = 'pick'; p.timer = 0.9; p.pose = 'pick'; p.facing = 1; }
+        break;
+      }
+      case 'pick': {
+        p.pose = 'pick';
+        p.timer -= dt;
+        const s = p.target;
+        if (!s || !ripe(s) || s.wasp) { if (s && s.claim === p) s.claim = null; p.target = null; chooseSlot(p); break; }
+        if (p.timer <= 0) {
+          pickSlot(s);
+          p.target = null;
+          p.carry++;
+          p.chatCd -= 1;
+          if (p.chatCd <= 0 && !bubbles.length) { say(p, pick(PICK_LINES), 1.8); p.chatCd = rand(10, 20); }
+          if (p.carry >= CAP_W) p.state = 'toPress';
+          else chooseSlot(p);
+        }
+        break;
+      }
+      case 'toPress': {
+        const sp = pressSpot();
+        if (walkTo(p, sp.x - (p.i % 3) * 14, sp.y + (p.i % 3) * 8, spd, dt)) { p.state = 'tip'; p.timer = 0.7; p.facing = 1; }
+        break;
+      }
+      case 'tip':
+        p.pose = 'tip';
+        p.timer -= dt;
+        if (p.timer <= 0) { pressGrapes(p.carry, p); p.carry = 0; p.basket = 0; chooseSlot(p); }
+        break;
+      case 'rest':
+        p.pose = 'stand';
+        break;
+    }
+  }
+}
+
+// ---------- The householder: that's you ----------
+function updateBoss(dt) {
+  const b = boss;
+  const spd = 165 * spdK();
+  if (b.stun > 0) { b.stun -= dt; b.mood = 'shock'; b.pose = 'stand'; return; }
+  if (b.busy > 0) {
+    b.busy -= dt;
+    if (b.busy <= 0) finishBossAction();
+    return;
+  }
+  const kx = (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0);
+  const ky = (keys.has('ArrowDown') || keys.has('KeyS') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0);
+  if (kx || ky) {
+    b.tx = null; b.action = null;
+    const n = Math.hypot(kx, ky);
+    b.x = clamp(b.x + kx / n * spd * dt, 16, W - 16);
+    b.y = clamp(b.y + ky / n * spd * dt, MARKET_Y - 6, H - 44);
+    b.pose = 'walk'; b.walkT += dt * 12;
+    if (kx) b.facing = kx;
+  } else if (b.tx !== null) {
+    if (walkTo(b, b.tx, b.ty, spd, dt)) startBossAction();
+  } else if (b.pose === 'walk') b.pose = 'stand';
+
+  b.mood = b.basket >= cfg.basket ? 'wow' : 'joy';
+  // The eleventh hour: "Why stand ye here all the day idle?"
+  if (!askedIdle && hourNow() >= 11 && inMarket(b)) {
+    const late = folk.find((p) => p.state === 'idle' && p.wave === 4);
+    if (late) {
+      askedIdle = true;
+      say(b, verseText('idle'), 2.6);
+      later(1.5, () => { if (late.state === 'idle') say(late, verseText('noMan'), 2.4); });
+    }
+  }
+}
+
+function updateVineyard(dt) {
+  if (dusk) {
+    dusk.t += dt;
+    for (const p of folk) if (p.hired) { p.state = 'rest'; p.pose = dusk.t > 0.6 ? 'cheer' : 'stand'; p.mood = 'joy'; }
+    boss.pose = 'open'; boss.mood = 'joy';
+    updateFolk(dt);
+    updateWasps(dt);   // any wasps still about fly home
+    if (dusk.t > 2.2 && !dusk.done) {
+      dusk.done = true;
+      if (pressed >= cfg.quota) fadeTo('payday');
+      else fail('short');
+    }
+    return;
+  }
+  dayT += dt;
+  while (nextWave < WAVES.length && hourNow() >= WAVES[nextWave]) {
+    if (nextWave > 0) spawnWave(nextWave);
+    nextWave++;
+  }
+  for (const s of slots) if (s.grow < 1) s.grow = Math.min(1, s.grow + dt / cfg.regrow);
+  updateBoss(dt);
+  updateFolk(dt);
+  updateWasps(dt);
+  if (dayT >= cfg.dayLen) {
+    dusk = { t: 0, done: false };
+    for (const s of slots) s.claim = null;
+    for (const w of wasps) if (w.state !== 'leave') waspLeave(w);
+    for (const p of folk) if (p.state === 'idle' || p.state === 'arrive') { p.state = 'leave'; stats.missed++; }
+    boss.action = null; boss.tx = null; boss.busy = 0;
+    sfx.bell();
+    setBannerText(pressed >= cfg.quota ? 'Evening! The work is done: time to pay the labourers' : 'Evening! But the winepress is not full…', 3);
+  }
+}
+
+// ---------- Tapping in the vineyard ----------
+function vineyardTap(x, y) {
+  if (dusk || boss.stun > 0) return;
+  // 1. wasps
+  let bw = null, bd = 46;
+  for (const w of wasps) { if (w.state === 'leave') continue; const d = Math.hypot(w.x - x, w.y - y); if (d < bd) { bd = d; bw = w; } }
+  if (bw) { shoo(bw); return; }
+  // 2. labourers waiting in the marketplace
+  let bp = null; bd = 1e9;
+  for (const p of idlers()) {
+    if (Math.abs(x - p.x) < 24 * p.s && y > p.y - 90 * p.s && y < p.y + 10) {
+      const d = Math.abs(x - p.x) + Math.abs(y - (p.y - 40 * p.s)) * 0.5;
+      if (d < bd) { bd = d; bp = p; }
+    }
+  }
+  if (bp) { orderBoss({ type: 'hire', p: bp }); return; }
+  // 3. bunches of grapes
+  let bs = null; bd = 38;
+  for (const s of slots) { const d = Math.hypot(s.x - x, s.y + 4 - y); if (d < bd) { bd = d; bs = s; } }
+  if (bs) { orderBoss({ type: 'pick', slot: bs }); return; }
+  // 4. the winepress
+  const px = pressX(), ph = pressHalf();
+  if (x > px - ph - 24 && x < px + ph + 40 && y > PRESS_Y - 130 && y < PRESS_Y + 24) { orderBoss({ type: 'tip' }); return; }
+  // 5. anywhere else: walk there
+  orderBoss({ type: 'walk', x: clamp(x, 16, W - 16), y });
+}
+
+// Space: do the most useful thing nearby
+function vineyardKey() {
+  if (dusk || boss.stun > 0 || boss.busy > 0) return;
+  const b = boss;
+  let bw = null, bd = 110;
+  for (const w of wasps) { if (w.state === 'leave') continue; const d = Math.hypot(w.x - b.x, w.y - (b.y - 60)); if (d < bd) { bd = d; bw = w; } }
+  if (bw) { shoo(bw); return; }
+  if (inMarket(b)) {
+    let bp = null; bd = 220;
+    for (const p of idlers()) { const d = Math.hypot(p.x - b.x, p.y - b.y); if (d < bd) { bd = d; bp = p; } }
+    if (bp) { orderBoss({ type: 'hire', p: bp }); return; }
+  }
+  const ps = pressSpot();
+  if (b.basket > 0 && Math.hypot(ps.x - b.x, ps.y - b.y) < 90) { orderBoss({ type: 'tip' }); return; }
+  let bs = null; bd = 70;
+  for (const s of slots) { if (!ripe(s)) continue; const d = Math.hypot(s.x - b.x, s.ry + AISLE - b.y); if (d < bd) { bd = d; bs = s; } }
+  if (bs) { orderBoss({ type: 'pick', slot: bs }); return; }
+  if (b.basket >= cfg.basket) nag('Basket full! Walk to the winepress');
+  else nag('Walk up to a ripe bunch');
+}
+
+// ============================================================
+//  Evening: everyone receives a penny
+// ============================================================
+function payLayout() {
+  const narrow = W < 700;
+  const hx = clamp(W * 0.17, 72, 210);
+  // householder and the labourer being paid in front, the queue behind them, the paid crowd at the back
+  return { narrow, hx, y: H - 170, fx: hx + (narrow ? 66 : 90), qy: H - 260, py: H - 360, s: narrow ? 1.05 : 1.4 };
+}
+
+function startPayday() {
+  const L = payLayout();
+  const ws = workers();
+  // The last hired are paid first (20:8); a stable sort keeps each hour's group together
+  const queue = ws.slice().sort((a, c) => c.hour - a.hour);
+  const minH = ws.length ? Math.min(...ws.map((p) => p.hour)) : 0;
+  const maxH = ws.length ? Math.max(...ws.map((p) => p.hour)) : 0;
+  pay = { wait: queue, front: null, done: [], coin: null, phase: 'pay', t: 0, gap: 0, minH, maxH, grumble: minH < maxH, spoke: false, expect: false };
+  boss.x = L.hx; boss.y = L.y; boss.s = L.s; boss.facing = 1; boss.pose = 'stand'; boss.mood = 'joy'; boss.bag = true; boss.basket = undefined;
+  queue.forEach((p, j) => {
+    p.x = L.fx + 60 + j * 40; p.y = L.qy; p.s = L.s * 0.9; p.carry = 0; p.basket = undefined; p.pose = 'stand'; p.mood = 'watch'; p.coin = false; p.facing = -1; p.state = 'queue'; p.sweat = false;
+  });
+  if (!queue.length) { pay.phase = 'end'; pay.t = 0; setBanner('lastFirst', 99); return; }
+  setBannerText('Evening: the householder pays the labourers, beginning with the last', 3.5);
+  showHint(isTouch() ? 'Tap to give each labourer a penny' : 'Tap or press Space to give each labourer a penny', 6);
+}
+
+function payTargets() {
+  const L = payLayout();
+  const n = pay.wait.length;
+  const sp = clamp((W - L.fx - 90) / Math.max(1, n), 26, 56);
+  pay.wait.forEach((p, j) => { p.gx = L.fx + 64 + j * sp; p.gy = L.qy; p.gs = L.s * 0.95; p.dim = false; });
+  if (pay.front) { pay.front.gx = L.fx; pay.front.gy = L.y; pay.front.gs = L.s; pay.front.dim = false; }
+  const m = pay.done.length;
+  const x0 = L.narrow ? W * 0.3 : W * 0.36, x1 = W - 34;
+  pay.done.forEach((p, j) => {
+    p.gx = m === 1 ? (x0 + x1) / 2 : lerp(x0, x1, j / (m - 1));
+    p.gy = L.py + (j % 2) * 18; p.gs = L.s * 0.92; p.dim = false;
+  });
+}
+
+function giveCoin() {
+  const p = pay.front;
+  if (!p || pay.coin || Math.hypot(p.x - p.gx, p.y - p.gy) > 8) return;
+  boss.pose = 'pay';
+  pay.coin = { p, t: 0 };
+  sfx.clink();
+}
+
+function coinArrived(p) {
+  pay.coin = null;
+  stats.paid++;
+  p.coin = true;
+  sfx.coin();
+  pop(p.x, p.y - 100 * p.s, '1 penny', '#b8860b');
+  for (let k = 0; k < 10; k++) spawn(p.x + rand(-10, 10), p.y - 70 * p.s, rand(-60, 60), rand(-110, -30), 0.9, pick(['#ffe27a', '#fff6d0', '#f5c542']), rand(2, 4), 120);
+  const early = pay.grumble && p.hour === pay.minH;
+  if (early) {
+    p.mood = 'doubt'; p.pose = 'stand';
+    if (!pay.spoke) { pay.spoke = true; say(p, 'Just… one penny?', 2); }
+  } else {
+    p.mood = 'joy'; p.pose = 'cheer';
+    say(p, pick(THANKS_LINES), 1.8);
+    // The all-day labourers see this and expect more
+    if (pay.grumble && !pay.expect) {
+      pay.expect = true;
+      const g = pay.wait.find((o) => o.hour === pay.minH);
+      if (g) later(1.0, () => say(g, 'A penny for one hour? Then we’ll get much more!', 2.4));
+    }
+  }
+  pay.done.push(p);
+  pay.front = null;
+  pay.gap = 0.35;
+  boss.pose = 'stand';
+}
+
+function payTap() {
+  if (!pay || fade) return;
+  if (pay.phase === 'pay') { giveCoin(); return; }
+  if (pay.t < 0.8) return;
+  const g = pay.done.find((p) => p.hour === pay.minH);
+  if (pay.phase === 'grumble') { pay.phase = 'reply'; pay.t = 0; say(boss, verseText('noWrong'), 99); }
+  else if (pay.phase === 'reply') { pay.phase = 'good'; pay.t = 0; bubbles = bubbles.filter((b) => b.p !== g); say(boss, verseText('evil'), 99); }
+  else if (pay.phase === 'good') {
+    pay.phase = 'end'; pay.t = 0; bubbles = [];
+    setBanner('lastFirst', 99);
+    hint = null;
+    for (const p of pay.done) { p.pose = 'cheer'; p.mood = p.hour === pay.minH ? 'wow' : 'joy'; }
+    if (g) say(g, 'Oh… you are right. Thank you, master.', 3);
+    sfx.win();
+  }
+}
+
+function updatePayday(dt) {
+  pay.t += dt;
+  pay.gap -= dt;
+  if (pay.phase === 'pay' && !pay.front && pay.wait.length && pay.gap <= 0) {
+    pay.front = pay.wait.shift();
+    const p = pay.front;
+    if (pay.grumble && p.hour === pay.minH && !pay.hoped) { pay.hoped = true; p.mood = 'wow'; say(p, 'Here we come, all-day workers!', 1.8); }
+  }
+  payTargets();
+  for (const p of [...pay.wait, ...pay.done, ...(pay.front ? [pay.front] : [])]) {
+    p.s = lerp(p.s, p.gs, Math.min(1, dt * 6));
+    const moving = !walkTo(p, p.gx, p.gy, 280, dt);
+    if (!moving) {
+      p.facing = pay.done.includes(p) ? -1 : -1;
+      if (pay.done.includes(p)) p.pose = p.mood === 'joy' && pay.phase !== 'grumble' && pay.phase !== 'reply' ? 'cheer' : p.hour === pay.minH && pay.grumble && pay.phase !== 'end' ? 'fold' : (pay.phase === 'end' ? 'cheer' : 'stand');
+      else p.pose = 'stand';
+    }
+    // those waiting look toward the householder; the all-day labourers look hopeful
+    if (pay.wait.includes(p)) p.mood = pay.expect && p.hour === pay.minH && pay.grumble ? 'wow' : 'watch';
+  }
+  if (pay.coin) {
+    pay.coin.t += dt;
+    if (pay.coin.t >= 0.5) coinArrived(pay.coin.p);
+  }
+  if (pay.phase === 'pay' && !pay.front && !pay.wait.length && !pay.coin && pay.gap <= 0) {
+    if (pay.grumble) {
+      pay.phase = 'grumble'; pay.t = 0;
+      const g = pay.done.find((p) => p.hour === pay.minH);
+      for (const p of pay.done) if (p.hour === pay.minH) { p.mood = p === g ? 'grumpy' : 'dismay'; p.coin = true; }
+      for (const p of pay.done) if (p.hour !== pay.minH) p.mood = 'worried';
+      say(g, verseText('grumble'), 99);
+      showHint(isTouch() ? 'Tap to hear the householder’s answer' : 'Tap or press Space for the householder’s answer', 99);
+    } else {
+      pay.phase = 'end'; pay.t = 0;
+      setBanner('lastFirst', 99);
+      hint = null;
+      sfx.win();
+    }
+  }
+  if (pay.phase === 'good') for (const p of pay.done) if (p.hour === pay.minH) p.mood = 'worried';
+  if (pay.phase === 'end') {
+    if (Math.random() < dt * 10) spawn(rand(20, W - 20), -offY - 10, rand(-20, 20), rand(60, 120), 3, pick(['#ffe27a', '#ffd1e8', '#b3e07a', '#9fd3ff']), rand(3, 5), 20);
+    if (pay.t > 3 && state === 'play') win();
+  }
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  const s = {
+    harvest: pressed * 10,
+    hired: stats.hired * 40,
+    everyone: stats.offered && stats.hired === stats.offered ? 300 : 0,
+    pennies: stats.paid * 20,
+    levelBonus: level * 200,
+  };
+  s.score = s.harvest + s.hired + s.everyone + s.pennies + s.levelBonus;
+  totalScore += s.score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('vineyardBest', best); } catch (e) {} }
+  lastScore = s;
+  sfx.win();
+  syncAmbience();
+  endTimer = 2.2;
+}
+
+function fail(reason) {
+  state = 'fail';
+  failReason = reason;
+  boss.mood = 'dismay'; boss.pose = 'shrug';
+  for (const p of folk) if (p.hired) { p.mood = 'worried'; p.pose = 'stand'; }
+  sfx.fail();
+  syncAmbience();
+  endTimer = 1.6;
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = pops.length - 1; i >= 0; i--) { pops[i].t -= dt * 0.8; pops[i].y -= 30 * dt; if (pops[i].t <= 0) pops.splice(i, 1); }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 18px Fredoka, sans-serif';
+  ctx.lineJoin = 'round';
+  for (const p of pops) {
+    ctx.globalAlpha = clamp(p.t * 2, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevelState();
+  scene = 'frame'; sceneT = 0;
+  syncAmbience();
+  showOverlay('The Workers in the Vineyard', 'A parable of generosity',
+    `${verseHTML('householder')}
+     <ul>
+       <li>Jesus tells of a householder who hires labourers for his vineyard, all through one long day.</li>
+       <li><b>Tap</b> ripe purple bunches to pick them into your basket, then tap the <b>winepress</b> to tip them in.</li>
+       <li><b>Wasps!</b> Tap a wasp to shoo it away before you pick its bunch.</li>
+       <li>At dawn, and at the 3rd, 6th, 9th and 11th hours, labourers wait in the <b>marketplace</b>. Tap them to hire them &mdash; they pick grapes too!</li>
+       <li>Fill the winepress by evening&hellip; then pay everyone. A penny each!</li>
+       <li><b>Keyboard:</b> <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> walk, <kbd>Space</kbd> pick / tip / hire / shoo.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Tell the story', () => { level = 1; totalScore = 0; startLevel(false); });
+}
+
+// skipIntro: a retry starts at dawn in the vineyard instead of with the story
+function startLevel(skipIntro = false) {
+  resetLevelState();
+  state = 'play';
+  hideOverlay();
+  if (!skipIntro) seenIntro = false;
+  setScene(skipIntro ? 'vineyard' : 'frame');
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+  syncAmbience();
+}
+
+function restartLevel() { startLevel(seenIntro); }
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('A penny for everyone!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('evil')}${verseHTML('lastFirst')}
+       <p class="score">Grapes pressed: <b>${s.harvest}</b><br>Labourers hired: <b>${s.hired}</b>${s.everyone ? `<br>Everyone hired: <b>${s.everyone}</b>` : ''}<br>Pennies paid: <b>${s.pennies}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Day', () => { level++; startLevel(true); });
+  } else if (state === 'fail') {
+    showOverlay('Oh… no', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The sun went down before the winepress was full (${pressed} of ${cfg.quota} bunches). Hire more labourers, and hire them early!</p>
+       ${verseHTML('grumble')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    keys.clear();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', restartLevel);
+    syncAmbience();
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+    syncAmbience();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+// One tap = one action. x/y are playfield coordinates.
+function handleTap(x, y) {
+  if (state !== 'play' || fade) return;
+  switch (scene) {
+    case 'frame': frameTap(); break;
+    case 'vineyard': vineyardTap(x, y); break;
+    case 'payday': payTap(); break;
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { restartLevel(); return; }
+  keys.add(e.code);
+  if (e.repeat || state !== 'play' || fade) return;
+  const act = e.code === 'Space' || e.code === 'Enter';
+  if (!act) return;
+  if (scene === 'frame') frameTap();
+  else if (scene === 'vineyard') vineyardKey();
+  else if (scene === 'payday') payTap();
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  handleTap(p.x, p.y);
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// The theme's ambient bed plays only during active play, with sound on and the page in view
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);   // the shared music plays through the same mute
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { Music.win(); },
+  levelStart() { Music.start(); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.12);
+    Music.tap(height);
+  },
+  puff(vol = 0.35, freq = 1100, dur = 0.16, delay = 0) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.04);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { Music.fail(); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // small extra effects for this game
+  bell() { for (const d of [0, 0.55]) { this.tone(784, 1.3, 'sine', 0.2, d); this.tone(1568, 0.7, 'sine', 0.06, d); this.tone(392, 1.5, 'triangle', 0.07, d); } },
+  clink() { this.tone(1760, 0.18, 'triangle', 0.16); this.tone(2640, 0.2, 'sine', 0.08, 0.03); },
+  coin() { this.tone(1318, 0.1, 'square', 0.05); this.tone(1976, 0.35, 'sine', 0.16, 0.07); },
+  ding() { this.tone(880, 0.25, 'sine', 0.12); this.tone(1320, 0.3, 'sine', 0.08, 0.07); },
+  buzz() { this.tone(170, 0.32, 'sawtooth', 0.06, 0, 260); this.tone(175, 0.28, 'sawtooth', 0.04, 0.05, 250); },
+  squish() { this.puff(0.3, 500, 0.25); this.tone(140, 0.2, 'sine', 0.2, 0, 90); },
+};
+
+// ============================================================
+//  Rendering: sky, sun, hills, fields
+// ============================================================
+// Sky colours through the day: dawn, morning, noon, afternoon, sunset, dusk
+const SKY = [
+  [0.0, '#f6a88a', '#ffe0b0'],
+  [0.15, '#8fcaf0', '#e4f4fb'],
+  [0.5, '#6fb8ec', '#d8effa'],
+  [0.8, '#86c2ec', '#f4ecd0'],
+  [0.93, '#f29a6a', '#ffd49a'],
+  [1.0, '#8a6aae', '#f7a56e'],
+];
+function skyAt(f) {
+  for (let i = 1; i < SKY.length; i++) {
+    if (f <= SKY[i][0]) {
+      const k = (f - SKY[i - 1][0]) / (SKY[i][0] - SKY[i - 1][0]);
+      return [mix(SKY[i - 1][1], SKY[i][1], k), mix(SKY[i - 1][2], SKY[i][2], k)];
+    }
+  }
+  return [SKY[SKY.length - 1][1], SKY[SKY.length - 1][2]];
+}
+// how much the evening light tints the land
+function duskAmt(f) { return clamp((f - 0.82) / 0.18, 0, 1) * 0.35 + clamp((0.1 - f) / 0.1, 0, 1) * 0.15; }
+function land(hex, f) { return mix(hex, '#7a5a8a', duskAmt(f)); }
+
+function drawSky(f) {
+  const [top, bottom] = skyAt(f);
+  const g = ctx.createLinearGradient(0, -offY, 0, HORIZON + 40);
+  g.addColorStop(0, top);
+  g.addColorStop(1, bottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // the sun crosses the sky as the day passes
+  const x0 = -offX + 30, x1 = W + offX - 30;
+  const sx = lerp(x0, x1, f);
+  const sy = HORIZON - 10 - Math.sin(f * Math.PI) * (HORIZON - 150 + Math.min(offY, 200));
+  const glow = ctx.createRadialGradient(sx, sy, 5, sx, sy, 90);
+  glow.addColorStop(0, 'rgba(255,245,200,0.9)');
+  glow.addColorStop(1, 'rgba(255,245,200,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(sx, sy, 90, 0, TAU); ctx.fill();
+  ctx.fillStyle = f > 0.9 || f < 0.08 ? '#ffb347' : '#ffe066';
+  ctx.beginPath(); ctx.arc(sx, sy, 28, 0, TAU); ctx.fill();
+  // a few soft clouds
+  for (let k = 0; k < 4; k++) {
+    const cx = ((k * 0.29 + t * 0.004) % 1.2 - 0.1) * (viewW + 200) - offX - 100;
+    drawCloudShape(cx, 150 + k * 38 - Math.min(offY, 120) * 0.5, 90 + k * 20, 26);
+  }
+}
+
+function drawCloudShape(cx, cy, w, h) {
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  const n = Math.max(3, Math.round(w / 24));
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.5 + 0.45 * Math.sin(f * Math.PI));
+    const px = cx - w / 2 + h * 0.4 + f * (w - h * 0.8);
+    ctx.moveTo(px + r, cy - r * 0.3); ctx.arc(px, cy - r * 0.3, r, 0, TAU);
+  }
+  ctx.fill();
+}
+
+function hash(i) { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+
+function drawHills(f) {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // far hills
+  ctx.fillStyle = land('#a9cf8e', f);
+  ctx.beginPath(); ctx.moveTo(x0, HORIZON + 60);
+  for (let x = x0; x <= x1; x += 16) ctx.lineTo(x, HORIZON - 40 + Math.sin(x / 120) * 22 + Math.sin(x / 47) * 7);
+  ctx.lineTo(x1, HORIZON + 60); ctx.fill();
+  // the town on the hill behind the marketplace
+  for (let k = 0; k < 7; k++) {
+    const hx = -offX * 0.3 + 12 + k * 34 + (k % 2) * 6, hh = 26 + hash(k) * 22, hw = 30 + hash(k + 9) * 10;
+    const base = HORIZON - 16 + Math.sin(hx / 120) * 10;
+    ctx.fillStyle = land(k % 2 ? '#efdcb4' : '#e6cfa2', f);
+    ctx.fillRect(hx, base - hh, hw, hh + 20);
+    ctx.fillStyle = land('#b89a6a', f);
+    ctx.fillRect(hx + hw * 0.4, base - hh * 0.5, 7, 10);
+    if (k === 3) { ctx.fillStyle = land('#e6cfa2', f); roundRect(hx + 6, base - hh - 16, 18, 18, [9, 9, 0, 0]); ctx.fill(); }
+  }
+  // near slope with distant vine rows
+  ctx.fillStyle = land('#95c46e', f);
+  ctx.beginPath(); ctx.moveTo(x0, H);
+  for (let x = x0; x <= x1; x += 16) ctx.lineTo(x, HORIZON + 10 + Math.sin(x / 200 + 1) * 10);
+  ctx.lineTo(x1, H); ctx.fill();
+  ctx.strokeStyle = land('#6f9e4a', f); ctx.lineWidth = 3; ctx.setLineDash([6, 8]);
+  for (let r = 0; r < 3; r++) {
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 16) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, HORIZON + 22 + r * 12 + Math.sin(x / 200 + 1) * 10);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function drawFields(f) {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // the grassy vineyard floor
+  ctx.fillStyle = land('#a8cf72', f);
+  ctx.fillRect(x0, HORIZON + 50, x1 - x0, H - HORIZON);
+  // the dusty lane from the marketplace to the winepress
+  ctx.fillStyle = land('#e2c996', f);
+  ctx.beginPath(); ctx.moveTo(x0, MARKET_Y - 34); ctx.quadraticCurveTo(W / 2, MARKET_Y - 22, x1, PRESS_Y - 30);
+  ctx.lineTo(x1, PRESS_Y + 36); ctx.quadraticCurveTo(W / 2, MARKET_Y + 56, x0, MARKET_Y + 60); ctx.closePath(); ctx.fill();
+  // paving stones in the marketplace
+  const mw = marketW();
+  ctx.fillStyle = land('#d9c4a0', f);
+  roundRect(-offX - 10, MARKET_Y - 40, mw + offX + 20, 104, 18); ctx.fill();
+  ctx.strokeStyle = land('#c4ab80', f); ctx.lineWidth = 1.5;
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 12; c++) {
+    const sx = -offX + c * 30 + (r % 2) * 15, sy = MARKET_Y - 30 + r * 24;
+    if (sx > mw) continue;
+    roundRect(sx, sy, 26, 20, 5); ctx.stroke();
+  }
+  // dirt aisles in front of each row of vines
+  for (const ry of ROWS_Y) {
+    ctx.fillStyle = land('#d8bf8a', f);
+    roundRect(12, ry + 4, W - 24, 42, 16); ctx.fill();
+  }
+}
+
+function drawMarketStall(f) {
+  const mw = marketW();
+  const x = 10, w = Math.min(mw - 20, 190), y = MARKET_Y - 128;
+  // posts
+  ctx.fillStyle = land('#8a6a44', f);
+  ctx.fillRect(x + 6, y + 10, 6, 84); ctx.fillRect(x + w - 12, y + 10, 6, 84);
+  // table with produce
+  ctx.fillStyle = land('#b8905a', f);
+  roundRect(x, y + 66, w, 16, 4); ctx.fill();
+  const fruit = ['#e8590c', '#fab005', '#8e44ad', '#74b816', '#e03131'];
+  for (let k = 0; k < Math.floor(w / 26); k++) {
+    ctx.fillStyle = land('#c99a52', f); roundRect(x + 8 + k * 26, y + 56, 20, 12, 3); ctx.fill();
+    ctx.fillStyle = land(fruit[k % fruit.length], f);
+    ctx.beginPath(); ctx.arc(x + 13 + k * 26, y + 54, 4.5, 0, TAU); ctx.arc(x + 22 + k * 26, y + 54, 4.5, 0, TAU); ctx.arc(x + 18 + k * 26, y + 49, 4.5, 0, TAU); ctx.fill();
+  }
+  // striped awning
+  const stripes = Math.max(4, Math.round(w / 22));
+  for (let k = 0; k < stripes; k++) {
+    ctx.fillStyle = land(k % 2 ? '#fff4dc' : '#d9534f', f);
+    const sx = x - 6 + k * (w + 12) / stripes;
+    ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx + (w + 12) / stripes, y); ctx.lineTo(sx + (w + 12) / stripes, y + 20);
+    ctx.quadraticCurveTo(sx + (w + 12) / stripes / 2, y + 30, sx, y + 20); ctx.closePath(); ctx.fill();
+  }
+  // sign
+  ctx.fillStyle = land('#f7e4bf', f); ctx.strokeStyle = land('#a8803a', f); ctx.lineWidth = 2;
+  roundRect(x + w / 2 - 50, y - 24, 100, 22, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#6a4a14'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Marketplace', x + w / 2, y - 13);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawPress(f) {
+  const px = pressX(), ph = pressHalf(), base = PRESS_Y;
+  // big clay jar behind, filling with new wine
+  const jx = px + ph * 0.55, jh = 84, jw = 46, jb = base - 36;
+  ctx.fillStyle = land('#c8743e', f); ctx.strokeStyle = land('#8a4a22', f); ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(jx - 10, jb - jh); ctx.lineTo(jx + 10, jb - jh);
+  ctx.quadraticCurveTo(jx + jw * 0.7, jb - jh * 0.7, jx + jw * 0.5, jb - 6);
+  ctx.quadraticCurveTo(jx, jb + 4, jx - jw * 0.5, jb - 6);
+  ctx.quadraticCurveTo(jx - jw * 0.7, jb - jh * 0.7, jx - 10, jb - jh);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  const fill = clamp(pressed / cfg.quota, 0, 1);
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#6a1f7e';
+  ctx.fillRect(jx - jw, jb + 4 - (jh + 4) * fill, jw * 2, (jh + 4) * fill);
+  ctx.restore();
+  ctx.strokeStyle = land('#8a4a22', f); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(jx - jw * 0.55, jb - jh * 0.45); ctx.lineTo(jx + jw * 0.55, jb - jh * 0.45); ctx.stroke();
+  // stone basin
+  ctx.fillStyle = land('#b9ad9c', f); ctx.strokeStyle = land('#857a6a', f); ctx.lineWidth = 2;
+  roundRect(px - ph, base - 52, ph * 2, 52, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = land('#a09482', f);
+  ctx.beginPath(); ctx.ellipse(px, base - 52, ph, 13, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  // juice inside, splashing when grapes go in
+  ctx.fillStyle = '#7b2d8e';
+  ctx.beginPath(); ctx.ellipse(px, base - 50 + Math.sin(t * 3) * 0.8, ph - 8, 8 + pressFx * 3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath(); ctx.ellipse(px - ph * 0.3, base - 52, ph * 0.25, 2.5, 0, 0, TAU); ctx.fill();
+  // spout and little bowl
+  ctx.fillStyle = land('#857a6a', f); ctx.fillRect(px - ph - 10, base - 24, 12, 7);
+  ctx.fillStyle = '#7b2d8e'; ctx.fillRect(px - ph - 8, base - 18, 3, 10 + Math.sin(t * 6) * 2);
+  // label + count
+  ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineJoin = 'round';
+  const label = `Winepress ${pressed}/${cfg.quota}`;
+  const lx = clamp(px, 70, W - 70);
+  ctx.strokeText(label, lx, base - 130);
+  ctx.fillStyle = pressed >= cfg.quota ? '#2b8a3e' : '#5a2a6a';
+  ctx.fillText(label, lx, base - 130);
+  // a gentle bouncing arrow while the basket is full
+  if (scene === 'vineyard' && boss && boss.basket >= cfg.basket && state === 'play') {
+    const ay = base - 150 - Math.abs(Math.sin(t * 5)) * 8;
+    ctx.fillStyle = '#e0a526';
+    ctx.beginPath(); ctx.moveTo(lx - 9, ay); ctx.lineTo(lx + 9, ay); ctx.lineTo(lx, ay + 11); ctx.fill();
+  }
+}
+
+// A bunch of grapes: small and green while growing, plump and purple when ripe
+function drawBunch(s) {
+  const g = s.grow;
+  const sway = Math.sin(t * 1.6 + s.sway) * 1.5;
+  const x = s.x + sway, y = s.y;
+  const k = 0.45 + 0.55 * Math.min(1, g);
+  const col = g >= 1 ? '#7b2d8e' : mix('#9ccc5a', '#a066b8', clamp((g - 0.5) * 2, 0, 1));
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(s.x, y - 22); ctx.lineTo(x, y - 12); ctx.stroke();
+  if (g >= 1) {
+    ctx.fillStyle = '#5f9e3a';
+    ctx.beginPath(); ctx.ellipse(x + 8, y - 16, 8, 4.5, -0.5, 0, TAU); ctx.fill();
+    // a soft glow behind ripe bunches so they are easy to spot
+    ctx.fillStyle = 'rgba(255,240,180,0.35)';
+    ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fill();
+  }
+  const rows = [[-6, 0, 6], [-6, 0, 6], [-3, 3], [0]];
+  const r = 4.6 * k;
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  rows.forEach((row, ri) => row.forEach((dx) => { const gx = x + dx * k * 1.05 + (ri === 1 ? 0 : 0), gy = y - 8 * k + ri * 7.5 * k; ctx.moveTo(gx + r, gy); ctx.arc(gx, gy, r, 0, TAU); }));
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  rows.forEach((row, ri) => row.forEach((dx) => { const gx = x + dx * k * 1.05 - r * 0.3, gy = y - 8 * k + ri * 7.5 * k - r * 0.3; ctx.moveTo(gx + r * 0.3, gy); ctx.arc(gx, gy, r * 0.3, 0, TAU); }));
+  ctx.fill();
+}
+
+// A row of vines on a trellis, with its bunches
+function drawRow(r, f) {
+  const ry = ROWS_Y[r];
+  const x0 = 22, x1 = W - 22;
+  const wire = ry - 84;
+  // posts
+  ctx.fillStyle = land('#7a5634', f);
+  const nPosts = Math.max(3, Math.round((x1 - x0) / 150));
+  for (let k = 0; k <= nPosts; k++) { const px = lerp(x0, x1, k / nPosts); ctx.fillRect(px - 3, wire - 8, 6, ry - wire + 8); }
+  // wires
+  ctx.strokeStyle = land('#8a7a60', f); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0, wire); ctx.lineTo(x1, wire); ctx.moveTo(x0, wire + 36); ctx.lineTo(x1, wire + 36); ctx.stroke();
+  // twisting vine and leaves
+  ctx.strokeStyle = land('#6b4a2b', f); ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, wire + 2 + Math.sin(x / 23 + r) * 4);
+  ctx.stroke();
+  const leafA = land('#5f9e3a', f), leafB = land('#79b84a', f);
+  for (let x = x0 + 6, k = 0; x <= x1; x += 17, k++) {
+    ctx.fillStyle = k % 2 ? leafA : leafB;
+    const ly = wire - 4 + Math.sin(x / 23 + r) * 4 + (k % 3) * 3;
+    ctx.beginPath(); ctx.ellipse(x, ly, 12, 8, (k % 3 - 1) * 0.5, 0, TAU); ctx.fill();
+  }
+  for (const s of slots) if (s.row === r) drawBunch(s);
+}
+
+function drawWasp(w) {
+  ctx.save();
+  ctx.translate(w.x, w.y);
+  ctx.scale(w.facing || 1, 1);
+  // wings, fluttering
+  const fl = Math.sin(t * 60) * 0.35;
+  ctx.fillStyle = 'rgba(230,245,255,0.85)'; ctx.strokeStyle = 'rgba(120,150,180,0.7)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(-2, -9, 6, 9, -0.5 + fl, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(4, -8, 5, 8, 0.4 - fl, 0, TAU); ctx.fill(); ctx.stroke();
+  // striped body
+  ctx.fillStyle = '#ffd43b';
+  ctx.beginPath(); ctx.ellipse(-3, 0, 10, 7, 0, 0, TAU); ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#2b2b2b';
+  ctx.fillRect(-9, -8, 3.5, 16); ctx.fillRect(-2, -8, 3.5, 16);
+  ctx.restore();
+  ctx.fillStyle = '#2b2b2b';
+  ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(-18, 1); ctx.lineTo(-13, 3); ctx.fill();   // tiny stinger
+  // head with a cheeky face
+  ctx.fillStyle = '#ffd43b';
+  ctx.beginPath(); ctx.arc(9, -1, 6, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b2b2b';
+  ctx.beginPath(); ctx.arc(10.5, -2.5, 1.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(10, 0.5, 2.4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(11, -6); ctx.quadraticCurveTo(13, -11, 16, -11); ctx.stroke();
+  ctx.restore();
+  // "bzz" drifting
+  if (w.state === 'sit' && Math.sin(t * 2 + w.ph) > 0.4) {
+    ctx.font = 'italic 600 12px Fredoka, sans-serif'; ctx.fillStyle = 'rgba(90,66,16,0.75)'; ctx.textAlign = 'center';
+    ctx.fillText('bzz', w.x + 16, w.y - 18);
+  }
+}
+
+function drawVineyardScene() {
+  const f = dayF();
+  drawSky(f);
+  drawHills(f);
+  drawFields(f);
+  drawMarketStall(f);
+  // depth-sorted: rows, the winepress and people
+  const items = [];
+  items.push({ y: PRESS_Y, fn: () => drawPress(f) });
+  ROWS_Y.forEach((ry, r) => items.push({ y: ry, fn: () => drawRow(r, f) }));
+  for (const p of folk) items.push({ y: p.y, fn: () => drawPerson(p) });
+  if (boss) items.push({ y: boss.y + 0.1, fn: () => drawPerson(boss) });
+  items.sort((a, b) => a.y - b.y);
+  for (const it of items) it.fn();
+  // a golden ring marks where the householder is heading
+  if (boss && boss.tx !== null && state === 'play') {
+    ctx.strokeStyle = 'rgba(224,165,38,0.7)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(boss.tx, boss.ty + 2, 14, 5, 0, 0, TAU); ctx.stroke();
+  }
+  for (const w of wasps) drawWasp(w);
+  // a warm evening glow
+  const da = duskAmt(f);
+  if (da > 0.02) { ctx.fillStyle = `rgba(255,140,80,${da * 0.25})`; ctx.fillRect(-offX, -offY, viewW, viewH); }
+}
+
+// ============================================================
+//  The framing scene
+// ============================================================
+function frameLayout() {
+  const narrow = W < 700;
+  const s = narrow ? 1.3 : 1.7;
+  const gy = H - 150;
+  const jx = clamp(W * 0.18, 70, 240);
+  const a = jx + (narrow ? 84 : 140), b = W - (narrow ? 40 : 80);
+  return { narrow, s, gy, jx, a, b };
+}
+
+function drawFrameScene() {
+  const f = 0.3;
+  drawSky(f);
+  drawHills(f);
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // a grassy hillside in Judea
+  ctx.fillStyle = '#9fcb6c';
+  ctx.beginPath(); ctx.moveTo(x0, H);
+  for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, H - 250 + Math.sin(x / 160) * 16);
+  ctx.lineTo(x1, H); ctx.fill();
+  ctx.fillStyle = '#8dbb5c'; ctx.fillRect(x0, H - 140, x1 - x0, 140);
+  // a few wildflowers
+  for (let k = 0; k < 18; k++) {
+    const fx = x0 + hash(k) * (x1 - x0), fy = H - 200 + hash(k + 40) * 180;
+    ctx.fillStyle = ['#ffd43b', '#ff8fab', '#ffffff'][k % 3];
+    ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
+  }
+  const L = frameLayout();
+  // a flat rock for Jesus to stand beside
+  ctx.fillStyle = '#b9ad9c';
+  roundRect(L.jx - 40 * L.s * 0.6, L.gy - 8, 80 * L.s * 0.6, 20, 10); ctx.fill();
+
+  const back = listeners.slice(0, 3), front = listeners.slice(3);
+  back.forEach((d, k) => { d.x = lerp(L.a + 40, L.b - 20, k / 2); d.y = L.gy - 52; d.s = L.s * 0.85; d.facing = -1; d.dim = true; d.pose = 'sit'; });
+  front.forEach((d, k) => { d.x = lerp(L.a + 10, L.b - 10, k / 2); d.y = L.gy + 6; d.s = L.s; d.facing = -1; d.pose = 'sit'; d.dim = false; });
+  for (const d of listeners) {
+    const dx = L.jx - d.x, dy = (L.gy - 80) - (d.y - 50);
+    const len = Math.hypot(dx, dy) || 1;
+    d.lx = dx / len; d.ly = dy / len * 0.4;
+  }
+  back.forEach(drawPerson);
+  front.forEach(drawPerson);
+  drawJesus({ x: L.jx, y: L.gy, s: L.s * 1.1, pose: 'teach', face: state === 'title' ? 'calm' : sceneT > 3.6 ? 'joy' : 'calm' });
+}
+
+function updateListeners(dt) {
+  for (const d of listeners) {
+    let want = 'watch';
+    if (scene === 'frame' && state === 'play') want = sceneT > 3.8 ? 'joy' : sceneT > 3 ? 'wow' : 'watch';
+    if (want !== d.mood) { d.switchT += dt; if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; } }
+  }
+}
+
+// ============================================================
+//  The evening pay line
+// ============================================================
+function drawPaydayScene() {
+  const f = 1;
+  drawSky(f);
+  drawHills(f);
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  ctx.fillStyle = land('#a8cf72', f);
+  ctx.fillRect(x0, HORIZON + 50, x1 - x0, H - HORIZON);
+  drawRow(0, f);
+  // the yard in front of the householder's house
+  ctx.fillStyle = land('#e2c996', f);
+  ctx.beginPath(); ctx.ellipse(W / 2, H - 150, W * 0.66 + offX, 330, 0, 0, TAU); ctx.fill();
+  const L = payLayout();
+  // a little table with the pennies
+  ctx.fillStyle = land('#9a6a38', f);
+  roundRect(L.hx - 52, L.y - 44, 34, 40, 4); ctx.fill();
+  ctx.fillStyle = land('#b8905a', f); roundRect(L.hx - 58, L.y - 50, 46, 10, 3); ctx.fill();
+  ctx.fillStyle = '#f5c542';
+  for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.ellipse(L.hx - 44 + (k % 3) * 8, L.y - 53 - Math.floor(k / 3) * 3, 4.5, 2.2, 0, 0, TAU); ctx.fill(); }
+
+  if (pay) {
+    // depth-sorted so walkers pass behind and in front properly
+    const all = [...pay.wait, ...pay.done, boss, ...(pay.front ? [pay.front] : [])];
+    all.sort((a, b) => a.y - b.y);
+    for (const p of all) drawPerson(p);
+    // a penny flying from the householder's hand
+    if (pay.coin) {
+      const p = pay.coin.p, k = clamp(pay.coin.t / 0.5, 0, 1);
+      const sx = boss.x + 30 * boss.s, sy = boss.y - 40 * boss.s, ex = p.x, ey = p.y - 50 * p.s;
+      const cx = lerp(sx, ex, k), cy = lerp(sy, ey, k) - Math.sin(k * Math.PI) * 50;
+      ctx.fillStyle = '#f5c542'; ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 7 * Math.abs(Math.cos(t * 14)) + 1.5, 7, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+  } else if (boss) drawPerson(boss);
+  const da = duskAmt(f);
+  ctx.fillStyle = `rgba(255,140,80,${da * 0.2})`; ctx.fillRect(-offX, -offY, viewW, viewH);
+}
+
+// ============================================================
+//  Bubbles, banners, messages, HUD
+// ============================================================
+function bubbleAnchor(p) {
+  if (p === 'jesus') { const L = frameLayout(); return { x: L.jx + 6, y: L.gy - 76 * L.s * 1.1 }; }
+  if (!p || p.x === undefined) return null;
+  const head = p.pose === 'sit' ? 66 : 84;
+  return { x: p.x, y: p.y - head * (p.s || 1) };
+}
+
+function drawSpeech(text, ax, ay, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const maxW = Math.min(W - 44, 420);
+  const lines = wrapText(text, maxW - 26);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 26, h = lines.length * 21 + 16;
+  const bx = clamp(ax - w * 0.35, 10, W - 10 - w);
+  const by = clamp(ay - 22 - h, 132, H - 20 - h);
+  const tx = clamp(ax, bx + 20, bx + w - 20);
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 14); ctx.fill(); ctx.stroke();
+  if (ay > by + h) {
+    ctx.beginPath(); ctx.moveTo(tx - 10, by + h - 1.5); ctx.lineTo(ax, Math.max(ay, by + h + 12)); ctx.lineTo(tx + 10, by + h - 1.5); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx - 10, by + h); ctx.lineTo(ax, Math.max(ay, by + h + 12)); ctx.lineTo(tx + 10, by + h); ctx.stroke();
+    ctx.fillStyle = '#fffbe8'; ctx.fillRect(tx - 9, by + h - 5, 18, 4);
+  }
+  ctx.fillStyle = '#8a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 13, by + 8 + 10.5 + i * 21));
+  ctx.restore();
+}
+
+function drawBubbles() {
+  for (const b of bubbles) {
+    if (b.t <= 0) continue;
+    const a = bubbleAnchor(b.p);
+    if (!a || a.x < -40 || a.x > W + 40) continue;
+    drawSpeech(b.text, a.x, a.y, clamp(b.t / 0.3, 0, 1));
+  }
+}
+
+function drawBanner() {
+  if (!banner || banner.t <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(banner.t / 0.4, 0, 1) * clamp(banner.age / 0.3, 0, 1);
+  const maxW = Math.min(W - 40, 700);
+  ctx.font = 'italic 600 19px Fredoka, sans-serif';
+  const lines = wrapText(banner.text, maxW - 36);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = Math.min(maxW, tw + 36), h = lines.length * 24 + (banner.cite ? 34 : 18);
+  const bx = W / 2 - w / 2, by = 116;
+  ctx.fillStyle = 'rgba(255,246,220,0.95)'; ctx.strokeStyle = '#c9a15a'; ctx.lineWidth = 2.5;
+  roundRect(bx, by, w, h, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#6a4a14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 9 + 12 + i * 24));
+  if (banner.cite) {
+    ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillStyle = '#9a7a40';
+    ctx.fillText(banner.cite, W / 2, by + h - 13);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = `700 ${W < 560 ? 21 : 24}px Fredoka, sans-serif`;
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  const y = scene === 'payday' ? H * 0.4 : 300;
+  ctx.strokeText(message.text, W / 2, y);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, y);
+  ctx.restore();
+}
+
+function drawHint() {
+  if (!hint || hint.t <= 0 || state !== 'play') return;
+  ctx.save();
+  ctx.globalAlpha = clamp(hint.t / 0.4, 0, 1) * (0.8 + 0.2 * Math.sin(t * 4));
+  ctx.font = `700 ${W < 560 ? 17 : 20}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center';
+  const lines = wrapText(hint.text, W - 40);
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#5a3a00';
+  const baseY = H - 18;
+  lines.forEach((l, i) => {
+    const y = baseY - (lines.length - 1 - i) * 22;
+    ctx.strokeText(l, W / 2, y); ctx.fillText(l, W / 2, y);
+  });
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  const dark = '#5a4210';
+
+  // Left: level + the day passing
+  ctx.textAlign = 'left';
+  ctx.fillStyle = dark;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Workers in the Vineyard' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title' && scene !== 'frame') {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('DAY', 12, 48);
+    ctx.shadowBlur = 0;
+    const bx = 44, bw = 110;
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    g.addColorStop(0, '#f6a88a'); g.addColorStop(0.2, '#8fcaf0'); g.addColorStop(0.8, '#8fcaf0'); g.addColorStop(1, '#8a6aae');
+    ctx.fillStyle = g;
+    roundRect(bx, 38, bw, 13, 6.5); ctx.fill();
+    // hour ticks for the marketplace visits
+    ctx.fillStyle = 'rgba(90,66,16,0.5)';
+    for (const h of WAVES) ctx.fillRect(bx + bw * h / 12 - 1, 36, 2, 17);
+    const df = dayF();
+    ctx.fillStyle = '#ffd43b'; ctx.strokeStyle = '#e8590c'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(bx + bw * df, 44.5, 7.5, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = dark; ctx.font = '700 13px Fredoka, sans-serif';
+    ctx.fillText(scene === 'frame' ? '' : HOUR_NAMES[Math.min(12, Math.floor(df * 12 + 1e-6))], bx + bw + 12, 49);
+  }
+
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: grapes pressed, score, labourers
+  if (state !== 'title' && scene !== 'frame') {
+    const rx = viewW - 12;
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 4;
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillStyle = pressed >= cfg.quota ? '#2b8a3e' : '#5a2a6a';
+    ctx.fillText(`Grapes ${pressed}/${cfg.quota}`, rx, 24);
+    ctx.fillStyle = dark;
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore}`, rx, 44);
+    ctx.fillText(`Labourers ${folk.filter((p) => p.hired).length}`, rx, 62);
+    const waiting = scene === 'vineyard' && !dusk ? folk.filter((p) => p.state === 'idle').length : 0;
+    if (waiting) {
+      ctx.fillStyle = Math.sin(t * 6) > 0 ? '#e8590c' : '#b8860b';
+      ctx.font = '700 13px Fredoka, sans-serif';
+      ctx.fillText(`${waiting} waiting in the market!`, rx, 80);
+    }
+  }
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  if (scene === 'frame') drawFrameScene();
+  else if (scene === 'payday') drawPaydayScene();
+  else drawVineyardScene();
+  drawParticles();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  if (state !== 'title') {
+    drawBubbles();
+    drawBanner();
+    drawMessage();
+    drawHint();
+  }
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (fade) {
+    const a = fade.t < FADE ? fade.t / FADE : 1 - (fade.t - FADE) / FADE;
+    ctx.fillStyle = `rgba(255,246,220,${clamp(a, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updatePeople(dt) {
+  const all = [boss, ...listeners, ...folk];
+  for (const d of all) {
+    if (!d) continue;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+    if (d.shake > 0) d.shake -= dt;
+  }
+  updateListeners(dt);
+}
+
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  if (fade) {
+    fade.t += dt;
+    if (fade.t >= FADE && !fade.done) { fade.done = true; setScene(fade.next); }
+    if (fade.t >= FADE * 2) fade = null;
+  }
+  if (state === 'play') {
+    sceneT += dt;
+    for (let i = timers.length - 1; i >= 0; i--) { timers[i].t -= dt; if (timers[i].t <= 0) { const fn = timers[i].fn; timers.splice(i, 1); fn(); } }
+    switch (scene) {
+      case 'frame': updateFrame(dt); break;
+      case 'vineyard': if (!fade) updateVineyard(dt); break;
+      case 'payday': if (pay) updatePayday(dt); break;
+    }
+  } else if (state === 'title') {
+    sceneT += dt;
+  } else if (state === 'win' && scene === 'payday' && pay) {
+    for (const p of pay.done) p.pose = 'cheer';
+  }
+  for (const b of bubbles) b.t -= dt;
+  bubbles = bubbles.filter((b) => b.t > 0);
+  if (banner) { banner.t -= dt; banner.age += dt; }
+  if (hint) hint.t -= dt;
+  pressFx = Math.max(0, pressFx - dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  msgCd -= dt;
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  syncAmbience();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

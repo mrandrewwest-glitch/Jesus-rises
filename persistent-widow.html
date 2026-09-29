@@ -1,0 +1,2192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>The Persistent Widow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Persistent Widow</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+
+// The collection's shared sound engine: harp leading, shepherd's pipe beneath, a busy market around
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'pipe', ambience: 'market', percussion: false };
+
+// Scripture shown in this game, looked up in the player's chosen version when displayed.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  pray:    { ref: 'Luke 18:1', KJV: 'Men ought always to pray, and not to faint.', NKJV: 'Men always ought to pray and not lose heart.', NIV: 'They should always pray and not give up.', NLT: 'They should always pray and never give up.' },
+  judge:   { ref: 'Luke 18:2', KJV: 'There was in a city a judge, which feared not God, neither regarded man.', NKJV: 'There was in a certain city a judge who did not fear God nor regard man.', NIV: 'In a certain town there was a judge who neither feared God nor cared what people thought.', NLT: 'There was a judge in a certain city... who neither feared God nor cared about people.' },
+  plea:    { ref: 'Luke 18:3', KJV: 'Avenge me of mine adversary.', NKJV: 'Get justice for me from my adversary.', NIV: 'Grant me justice against my adversary.', NLT: 'Give me justice in this dispute with my enemy.' },
+  refused: { ref: 'Luke 18:4', KJV: 'And he would not for a while...', NKJV: 'And he would not for a while...', NIV: 'For some time he refused...', NLT: 'The judge ignored her for a while...' },
+  weary:   { ref: 'Luke 18:5', KJV: 'Because this widow troubleth me, I will avenge her, lest by her continual coming she weary me.', NKJV: 'Because this widow troubles me I will avenge her, lest by her continual coming she weary me.', NIV: 'Because this widow keeps bothering me, I will see that she gets justice, so that she won’t eventually come and attack me!', NLT: 'This woman is driving me crazy. I’m going to see that she gets justice, because she is wearing me out with her constant requests!' },
+  cry:     { ref: 'Luke 18:7', KJV: 'Shall not God avenge his own elect, which cry day and night unto him?', NKJV: 'Shall God not avenge His own elect who cry out day and night to Him?', NIV: 'Will not God bring about justice for his chosen ones, who cry out to him day and night?', NLT: 'So don’t you think God will surely give justice to his chosen people who cry out to him day and night?' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+// Colours: '#rrggbb' or 'rgb(r,g,b)'
+function parseCol(c) {
+  if (c[0] === '#') { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  const m = c.match(/\d+/g); return [+m[0], +m[1], +m[2]];
+}
+function shade(c, amt) {
+  const [r, g, b] = parseCol(c);
+  return `rgb(${clamp(r + amt, 0, 255)},${clamp(g + amt, 0, 255)},${clamp(b + amt, 0, 255)})`;
+}
+function mixCol(c1, c2, f) {
+  const a = parseCol(c1), b = parseCol(c2);
+  return `rgb(${Math.round(lerp(a[0], b[0], f))},${Math.round(lerp(a[1], b[1], f))},${Math.round(lerp(a[2], b[2], f))})`;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const GROUND = 740;       // where feet stand on the street
+const WALK = 185;         // the widow's walking speed (px/s)
+const DASH = 380;         // scurrying past a guard
+const HUT_X = 78;         // the widow's little house
+const MAX_HOPE = 3;       // hearts per level
+const WIN_DELAY = 5.2;    // time to read the judge's words before the card
+
+const LEVEL_NAMES = [
+  'The First Knock',
+  'Past the Guard',
+  'Day After Day',
+  'Knock, Knock, Knock!',
+  'The Weary Judge',
+  'Night and Day',
+];
+
+// Knock patterns, counted in eighth notes
+const PATTERNS = [
+  [[0, 2, 4], [0, 2, 4, 6]],
+  [[0, 2, 4, 6], [0, 1, 2, 4], [0, 2, 3, 4]],
+  [[0, 1, 2, 4, 6], [0, 2, 3, 4, 6], [0, 2, 4, 5, 6]],
+  [[0, 1, 2, 4, 5, 6], [0, 2, 3, 4, 6, 7], [0, 1, 2, 3, 4, 6], [0, 2, 4, 6, 8, 10]],
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Day and Night ${n}`,
+    guards: n === 1 ? 0 : n === 2 ? 1 : n <= 4 ? 2 : 3,
+    away: Math.max(2.3 - (n - 1) * 0.28, 0.85),       // how long a guard looks away
+    watch: Math.min(1.5 + n * 0.18, 2.8),             // how long he stares
+    sleep: Math.max(2.8 - (n - 1) * 0.35, 1.0),       // the doorkeeper's naps
+    awake: Math.min(1.3 + n * 0.18, 2.6),
+    warn: n === 1 ? 0.8 : Math.max(0.6 - n * 0.03, 0.35),
+    bpm: Math.min(84 + (n - 1) * 9, 132),
+    days: n === 1 ? 2 : n <= 3 ? 3 : 4,
+    perfect: n === 1 ? 0.09 : Math.max(0.08 - n * 0.003, 0.06),
+    good: n === 1 ? 0.2 : Math.max(0.17 - n * 0.008, 0.12),
+  };
+}
+
+function pickPattern(n) {
+  let hits;
+  if (n <= PATTERNS.length) hits = pick(PATTERNS[n - 1]).slice();
+  else {
+    // Longer made-up patterns: two bars, with a few quick double knocks
+    const count = Math.min(5 + n - 4, 9);
+    const set = new Set([0]);
+    while (set.size < count) {
+      const e = Math.floor(rand(1, 15));
+      if (!set.has(e - 1) || Math.random() < 0.5) set.add(e);
+    }
+    hits = [...set].sort((a, b) => a - b);
+  }
+  const last = hits[hits.length - 1];
+  return { hits, span: last < 7 ? 8 : 16 };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let phase = 'dawn';       // frame | dawn | walk | wait | dash | caught | knock | react | night | giveIn
+let phaseT = 0;
+let level = 1;
+let totalScore = 0;
+let levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('widowBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let day = 1, hope = MAX_HOPE;
+let meter = 0, meterShown = 0;   // the judge's annoyance, 0..1
+let stats = { perfect: 0, good: 0 };
+let widow, judge, obstacles = [], crowd = [], listeners = [];
+let doorX = 500, worldW = 700, camX = 0;
+let knock = null;
+let particles = [], bubbles = [], popups = [];
+let message = { text: '', t: 0 };
+let hintsSeen = {};
+let shockT = 0, worryT = 0, wowT = 0, shakeT = 0, fadeT = 0, doorShake = 0, doorOpen = 0;
+let endTimer = 0;
+let lastScore = null;
+
+function makeWidow() {
+  return {
+    x: HUT_X + 22, y: GROUND, s: 1.5,
+    robe: '#6b4a7a', hair: '#9a9a9a', skin: '#d9a066', scarf: '#3f5a8a', beard: false,
+    mood: 'determined', pose: 'walk', dir: 1, lx: 0.6, ly: 0, i: 1, phase: 0,
+    walkT: 0, knockAnim: 0, hop: 0, kneel: false, blink: 0, blinkT: 2,
+  };
+}
+
+function makeJudge() {
+  return {
+    x: 0, y: 0, s: 1.25,
+    robe: '#7a2438', hair: '#c9c9c9', skin: '#e3b184', beard: true, hat: 'judge',
+    mood: 'grumpy', pose: 'fold', lx: -0.5, ly: 0.4, i: 0, phase: 0, flush: 0,
+    up: 0, show: false, blink: 0, blinkT: 3,
+  };
+}
+
+// ============================================================
+//  World layout: the widow's house on the left, the judge's hall on the right
+// ============================================================
+function buildWorld() {
+  obstacles = [];
+  for (let i = 0; i < cfg.guards; i++) {
+    obstacles.push(makeObstacle('guard', 350 + i * 230, i));
+  }
+  const keeperX = 350 + cfg.guards * 230 + (cfg.guards ? 30 : 10);
+  obstacles.push(makeObstacle('keeper', keeperX, 9));
+  doorX = keeperX + 160;
+  // On wide screens spread the street out (a little) so it fills the view
+  const extra = clamp(W - 200 - doorX, 0, 340);
+  obstacles.forEach((o, k) => { o.x += extra * (k + 1) / obstacles.length; });
+  doorX += extra;
+  worldW = Math.max(W, doorX + 175);
+
+  // Townsfolk watching from the pavement
+  crowd = [];
+  const looks = [
+    { robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+    { robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678', scarf: '#f0d9a0' },
+    { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+    { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184', small: true },
+    { robe: '#3c8f86', hair: '#1f140c', beard: true,  skin: '#b87a48', scarf: '#e8dcc0' },
+    { robe: '#b5503f', hair: '#2e1d10', beard: false, skin: '#d7a070', scarf: '#e6b3c4' },
+    { robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55' },
+  ];
+  const spots = [];
+  for (let x = 205; x < doorX - 190; x += 125) spots.push(x);
+  for (let x = doorX + 215; x < worldW - 30; x += 125) spots.push(x);
+  spots.forEach((x, k) => {
+    const l = looks[k % looks.length];
+    crowd.push({ ...l, x: x + rand(-14, 14), y: GROUND - 58, s: l.small ? 0.8 : 1.0, dim: true, i: k, mood: 'watch',
+      switchT: 0, delay: rand(0.05, 0.45), blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU), pose: 'rest', lx: 0, ly: 0.2 });
+  });
+}
+
+function makeObstacle(type, x, i) {
+  const o = {
+    type, x, i, passed: false, mode: 'watch', t: rand(0.6, 1.4), bubbleCd: 0,
+    p: type === 'guard'
+      ? { robe: ['#8a5a3a', '#6d6a45', '#7a4e5a'][i % 3], hair: '#2a1a0e', beard: i % 2 === 0, skin: ['#c98d56', '#d9a066', '#b87a48'][i % 3],
+          hat: 'helmet', mood: 'grumpy', pose: 'stop', i: i + 3, phase: rand(0, TAU), s: 1.45, blink: 0, blinkT: 2 }
+      : { robe: '#4b7f4b', hair: '#6b4a2b', beard: true, skin: '#c78f5c', hat: 'turban',
+          mood: 'sleep', pose: 'fold', i: 7, phase: 0, s: 1.4, blink: 0, blinkT: 3, sitting: true },
+  };
+  return o;
+}
+
+function waitSpot(o) { return o.x - (o.type === 'keeper' ? 84 : 94); }
+function knockSpot() { return doorX - 72; }
+function currentObstacle() { return obstacles.find((o) => !o.passed) || null; }
+
+// Each guard or doorkeeper cycles: watching -> looking away (safe) -> turning back (warning) -> watching
+function cycleLen(o, mode) {
+  const k = rand(0.8, 1.25);
+  if (mode === 'safe') return (o.type === 'guard' ? cfg.away : cfg.sleep) * k;
+  if (mode === 'warn') return cfg.warn;
+  return (o.type === 'guard' ? cfg.watch : cfg.awake) * k;
+}
+
+function updateObstacle(o, dt) {
+  o.t -= dt;
+  o.bubbleCd = Math.max(0, o.bubbleCd - dt);
+  if (o.t <= 0) {
+    o.mode = o.mode === 'watch' ? 'safe' : o.mode === 'safe' ? 'warn' : 'watch';
+    o.t = cycleLen(o, o.mode);
+    if (o.type === 'keeper' && o.mode === 'watch' && !o.passed && o === currentObstacle() && phase === 'wait') sfx.snort();
+  }
+  const p = o.p;
+  if (o.type === 'guard') {
+    p.back = o.mode === 'safe';
+    p.pose = o.mode === 'watch' ? 'stop' : o.mode === 'warn' ? 'staff' : 'staffBack';
+    p.mood = o.mode === 'watch' ? 'grumpy' : 'watch';
+    p.lx = o.mode === 'warn' ? 0.9 : widow ? clamp((widow.x - o.x) / 200, -1, 1) : 0;
+    p.ly = 0.1;
+    if (phase === 'caught' && o === currentObstacle()) { p.pose = 'shoo'; p.back = false; p.mood = 'grumpy'; }
+  } else {
+    p.mood = o.mode === 'safe' ? 'sleep' : o.mode === 'warn' ? 'peek' : 'grumpy';
+    p.tilt = o.mode === 'safe' ? 0.14 + Math.sin(t * 1.6) * 0.03 : o.mode === 'warn' ? 0.06 : 0;
+    p.pose = phase === 'caught' && o === currentObstacle() ? 'shoo' : 'fold';
+    p.lx = -0.8; p.ly = 0.1;
+    if (o.mode === 'safe' && Math.random() < dt * 1.6) {
+      spawn(o.x + 14, GROUND - 96, rand(8, 18), rand(-30, -20), 1.8, '#6a5a8a', rand(15, 20), 0, 'z');
+    }
+  }
+  blinkTick(p, dt);
+}
+
+function blinkTick(p, dt) {
+  p.blinkT -= dt;
+  if (p.blinkT <= 0) { p.blink = 0.13; p.blinkT = rand(1.5, 5); }
+  if (p.blink > 0) p.blink -= dt;
+}
+
+// ============================================================
+//  Particles, bubbles and pop-up words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, glyph = null) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, glyph });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    ctx.fillStyle = p.color;
+    if (p.glyph) {
+      ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.glyph, p.x, p.y);
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// who: an object with x/y (world), or 'jesus' for the framing scene
+function say(who, text, dur, opts = {}) {
+  bubbles = bubbles.filter((b) => b.who !== who);
+  bubbles.push({ who, text, t: dur, max: dur, big: !!opts.big, color: opts.color || '#6b4a7a' });
+}
+
+function updateBubbles(dt) {
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    bubbles[i].t -= dt;
+    if (bubbles[i].t <= 0) bubbles.splice(i, 1);
+  }
+  for (let i = popups.length - 1; i >= 0; i--) {
+    popups[i].t += dt;
+    if (popups[i].t > 0.9) popups.splice(i, 1);
+  }
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Draws a speech bubble whose tail points at (ax, ay); minX/maxX keep it on screen
+function drawBubble(b, ax, ay, minX, maxX) {
+  const fs = b.big ? 19 : 17;
+  ctx.font = `600 ${fs}px Fredoka, sans-serif`;
+  const maxW = Math.min(b.big ? 470 : 330, maxX - minX - 28);
+  const lines = wrapText(b.text, maxW);
+  const lh = fs * 1.28;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
+  const h = lines.length * lh + 18;
+  const x = clamp(ax - w / 2, minX, maxX - w);
+  const y = ay - 16 - h;
+  ctx.globalAlpha = clamp(b.t / 0.25, 0, 1) * clamp((b.max - b.t) / 0.15 + 0.2, 0, 1);
+  ctx.fillStyle = '#fffdf5';
+  ctx.strokeStyle = b.color; ctx.lineWidth = 3;
+  roundRect(x, y, w, h, 16); ctx.fill(); ctx.stroke();
+  const tx = clamp(ax, x + 20, x + w - 20);
+  ctx.beginPath();
+  ctx.moveTo(tx - 10, y + h - 1.5); ctx.lineTo(ax, ay - 2); ctx.lineTo(tx + 10, y + h - 1.5);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fffdf5'; ctx.fillRect(tx - 8.5, y + h - 4, 17, 4);
+  ctx.fillStyle = '#3b2f1e';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, k) => ctx.fillText(l, x + w / 2, y + 9 + lh * (k + 0.5)));
+  ctx.textBaseline = 'alphabetic';
+  ctx.globalAlpha = 1;
+}
+
+function popup(text, x, y, color) { popups.push({ text, x, y, color, t: 0 }); }
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+function isTouch() { return matchMedia('(pointer: coarse)').matches; }
+
+// ============================================================
+//  People (the same cartoon style as the disciples)
+// ============================================================
+const DISCIPLES = [
+  { name: 'Peter',  robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { name: 'Andrew', robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { name: 'James',  robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { name: 'John',   robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { name: 'Philip', robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55', scarf: '#e8dcc0' },
+  { name: 'Thomas', robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+];
+
+function makeListeners() {
+  listeners = DISCIPLES.map((d, i) => ({
+    ...d, i, mood: 'watch', switchT: 0, delay: rand(0.05, 0.5),
+    blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU), pose: 'rest', lx: -1, ly: 0,
+  }));
+}
+
+// What the watching townsfolk feel right now
+function crowdMood() {
+  if (state === 'title') return 'watch';
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (shockT > 0) return 'shock';
+  if (worryT > 0) return 'worried';
+  if (wowT > 0) return 'wow';
+  if (phase === 'react' && meterShown > 0.6) return 'wow';
+  return 'watch';
+}
+
+function updateCrowd(dt) {
+  const target = crowdMood();
+  for (const d of crowd) {
+    let want = target;
+    if (d.i === 2 && want === 'watch' && phase === 'react') want = 'doubt';
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.pose = d.mood === 'joy' ? 'joy' : d.mood === 'worried' ? 'clasp' : d.mood === 'doubt' ? 'fold' : 'rest';
+    if (widow) { const dx = widow.x - d.x; d.lx = clamp(dx / 160, -0.9, 0.9); d.ly = 0.3; }
+    blinkTick(d, dt);
+  }
+  // Listeners in the framing scene
+  let want = 'watch';
+  if (phase === 'frame' && state === 'play') want = phaseT > 4.2 ? 'wow' : phaseT > 1.6 ? 'shock' : 'watch';
+  for (const d of listeners) {
+    let w = want;
+    if (d.name === 'Thomas' && w === 'wow') w = 'doubt';
+    if (w !== d.mood) { d.switchT += dt; if (d.switchT > d.delay) { d.mood = w; d.switchT = 0; } }
+    d.pose = d.mood === 'shock' ? 'shock' : d.mood === 'doubt' ? 'fold' : 'rest';
+    blinkTick(d, dt);
+  }
+}
+
+// p: { x, y, s, robe, hair, skin, beard, scarf, hat, mood, pose, dir, lx, ly, back, dim, flush, kneel, sitting, tilt }
+function drawPerson(p) {
+  const s = p.s || 1;
+  const mood = p.mood || 'watch';
+  const C = (c) => (p.dim ? shade(c, -22) : c);
+  const skin = C(p.skin), robe = C(p.robe), hair = C(p.hair);
+  let jump = p.hop || 0;
+  if (mood === 'joy') jump += Math.abs(Math.sin(t * 7 + (p.phase || 0))) * 10;
+  if (mood === 'shock') jump += Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(p.x, p.y - jump * s);
+  ctx.scale(s, s);
+  const low = p.kneel ? 12 : p.sitting ? 16 : 0;    // kneeling or sitting sits the body lower
+  ctx.translate(0, low);
+  if (p.tilt) { ctx.translate(0, -30); ctx.rotate(p.tilt); ctx.translate(0, 30); }
+  const bottom = -low;
+  const dir = p.dir || 1;
+  const pose = p.pose || 'rest';
+
+  const sleeve = shade(robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const staff = (x) => {
+    ctx.strokeStyle = C('#8a5a2b'); ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, -92); ctx.lineTo(x, bottom + 2); ctx.stroke();
+    ctx.fillStyle = C('#c9a44a'); ctx.beginPath(); ctx.arc(x, -94, 4, 0, TAU); ctx.fill();
+  };
+
+  // Arms raised behind the head
+  if (pose === 'joy' || pose === 'surrender') {
+    const wave = pose === 'joy' ? Math.sin(t * 9 + (p.phase || 0)) * 4 : Math.sin(t * 5) * 3;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  if (pose === 'staffBack') staff(-19);
+  if (p.sitting) {           // the doorkeeper's stool peeks out either side of his robe
+    ctx.fillStyle = C('#8a5a2b');
+    roundRect(-25, bottom - 24, 50, 7, 3); ctx.fill();
+    ctx.fillRect(-23, bottom - 18, 5, 18); ctx.fillRect(18, bottom - 18, 5, 18);
+  }
+
+  // Robe
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, bottom);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, bottom);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = C(p.hat === 'judge' ? '#e0a526' : '#c9b07a'); ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  if (p.hat === 'judge') {   // a fine gold-trimmed robe
+    ctx.strokeStyle = C('#e0a526'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -39); ctx.lineTo(0, bottom); ctx.stroke();
+  }
+
+  // Arms in front
+  switch (pose) {
+    case 'rest': arm(-11, -32, -15, -12); arm(11, -32, 15, -12); break;
+    case 'walk': {
+      const sw = Math.sin((p.walkT || 0) * 10) * 5;
+      arm(-11, -32, -15 + sw, -12); arm(11, -32, 15 - sw, -12); break;
+    }
+    case 'fold': arm(-11, -32, 4, -26); arm(11, -32, -4, -24); break;
+    case 'clasp': arm(-11, -32, -2, -28); arm(11, -32, 2, -28); break;
+    case 'pray': arm(-11, -32, -1.5, -42); arm(11, -32, 1.5, -42); break;
+    case 'knock': {
+      const k = p.knockAnim > 0 ? 1 : 0;
+      arm(-11 * dir, -32, -15 * dir, -12);
+      arm(11 * dir, -32, (25 + k * 6) * dir, -48 + k * 3);
+      break;
+    }
+    case 'shoo': {
+      const w = Math.sin(t * 18) * 7;
+      arm(11, -32, 15, -12);
+      arm(-11, -32, -27, -46 + w);
+      break;
+    }
+    case 'stop': staff(19); arm(11, -32, 19, -34); arm(-11, -32, -27, -44); break;
+    case 'staff': staff(19); arm(11, -32, 19, -34); arm(-11, -32, -15, -12); break;
+    case 'staffBack': arm(-11, -32, -19, -34); arm(11, -32, 15, -12); break;
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (p.flush > 0 && !p.back) {
+    ctx.fillStyle = `rgba(235,60,40,${p.flush * 0.45})`;
+    ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  }
+
+  if (p.back) {
+    // Seen from behind: all hair (or helmet), no face
+    ctx.fillStyle = hair;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 16.5, 0, TAU); ctx.fill();
+  } else if (p.scarf) {
+    ctx.fillStyle = C(p.scarf);
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(C(p.scarf), -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    if (p === widow) {   // her veil falls over her shoulders
+      ctx.fillStyle = C(p.scarf);
+      ctx.beginPath();
+      ctx.moveTo(-18, hy + 8); ctx.quadraticCurveTo(-22, hy + 26, -16, hy + 34); ctx.lineTo(-11, hy + 16); ctx.closePath();
+      ctx.moveTo(18, hy + 8); ctx.quadraticCurveTo(22, hy + 26, 16, hy + 34); ctx.lineTo(11, hy + 16); ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (p.beard && !p.back) {
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  // Hats
+  if (p.hat === 'helmet') {
+    ctx.fillStyle = C('#c9a44a'); ctx.strokeStyle = C('#8a6a1a'); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, hy - 3, 18, Math.PI, TAU); ctx.closePath(); ctx.fill(); ctx.stroke();
+    roundRect(-20, hy - 5, 40, 6, 3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C('#d9443a');     // a soft red plume
+    ctx.beginPath(); ctx.ellipse(0, hy - 24, 14, 6, 0, Math.PI, TAU); ctx.fill();
+  } else if (p.hat === 'judge') {
+    ctx.fillStyle = C('#5a1a2a');
+    roundRect(-14, hy - 44, 28, 32, [10, 10, 2, 2]); ctx.fill();
+    ctx.fillStyle = C('#e0a526'); ctx.fillRect(-15, hy - 19, 30, 6);
+    ctx.fillStyle = C('#f7d774'); ctx.beginPath(); ctx.arc(0, hy - 32, 3.5, 0, TAU); ctx.fill();
+  } else if (p.hat === 'turban') {
+    ctx.fillStyle = C('#f0e2c0'); ctx.strokeStyle = C('#c9b07a'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, hy - 11, 18, 11, 0, Math.PI * 0.95, Math.PI * 2.05); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-16, hy - 9); ctx.quadraticCurveTo(0, hy - 18, 16, hy - 13); ctx.stroke();
+  }
+
+  if (!p.back) drawFace(p, mood, hy, p.lx || 0, p.ly || 0);
+
+  // Hands over the face come last
+  if (pose === 'shock' || (mood === 'shock' && pose === 'rest')) {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && p.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const closed = (sx) => {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, ey - 1, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'determined':
+      eyes(3.5, 4.2, 2);
+      brows(-6, -8, -6, -8);
+      mouthLine(() => ctx.arc(0, mouthY - 4, 4.5, 0.25 * Math.PI, 0.75 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+    case 'grumpy':
+      eyes(3.5, 3.6, 2);
+      brows(-4, -9, -4, -9);
+      mouthLine(() => ctx.arc(0, mouthY + 4, 5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'fume':
+      eyes(4, 3.2, 1.8);
+      brows(-2, -10, -2, -10);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 1.5;
+      roundRect(-6, mouthY - 3, 12, 6, 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, mouthY - 3); ctx.lineTo(-2, mouthY + 3); ctx.moveTo(2, mouthY - 3); ctx.lineTo(2, mouthY + 3); ctx.stroke();
+      break;
+    case 'giveup':
+      // eyes rolled up to the sky, a big weary sigh
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(-ex, ey, 3.6, 4.2, 0, 0, TAU); ctx.ellipse(ex, ey, 3.6, 4.2, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(-ex + 1, ey - 2.4, 1.8, 0, TAU); ctx.arc(ex - 1, ey - 2.4, 1.8, 0, TAU); ctx.fill();
+      brows(-10, -6, -10, -6);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 5, 3, 0, 0, TAU));
+      break;
+    case 'sleep':
+      closed(-ex); closed(ex);
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.4, 2.8 + Math.sin(t * 3) * 0.8, 0, 0, TAU));
+      break;
+    case 'peek':
+      closed(-ex);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, ey, 3.5, 3, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(ex + lx * 1.5, ey, 1.8, 0, TAU); ctx.fill();
+      brows(-6, -6, -9, -8);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.lineTo(4, mouthY - 1); });
+      break;
+    default:
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+  }
+}
+
+// ============================================================
+//  Jesus (standing, telling the story)
+// ============================================================
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(j.s || 1, j.s || 1);
+
+  const up = j.face === 'joy' && j.pose === 'up';
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+  // Feet
+  ctx.fillStyle = '#c9905e';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 4.5, 2.2, 0, 0, TAU); ctx.ellipse(6, 0, 4.5, 2.2, 0, 0, TAU); ctx.fill();
+
+  // Arms: one hand raised while He teaches, open and welcoming otherwise
+  let hands = up ? [[-21, -66], [21, -66]] : [[-20, -22], [20, -22]];
+  if (j.pose === 'teach') hands = [[-20, -22], [24, -60 + Math.sin(t * 2.2) * 3]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  The story, day by day
+// ============================================================
+function setPhase(p) { phase = p; phaseT = 0; }
+
+function startDay() {
+  setPhase('dawn');
+  widow.x = HUT_X + 22; widow.kneel = false; widow.pose = 'walk'; widow.mood = 'determined'; widow.lx = 0.6;
+  judge.show = false;
+  doorOpen = 0;
+  for (const o of obstacles) { o.passed = false; o.mode = 'watch'; o.t = rand(0.5, 1.3); }
+  showMessage(day === 1 ? `Level ${level}: ${cfg.name}` : `Day ${day}: back again!`);
+}
+
+// A tap (or Space) does whatever the moment needs
+function action() {
+  if (state === 'win' && endTimer > 0 && endTimer < WIN_DELAY - 1.4) { endTimer = 0.01; return; }
+  if (state !== 'play') return;
+  if (phase === 'frame') {
+    if (phaseT > 0.6) { fadeT = 0.5; startDay(); sfx.levelStart(); }
+  } else if (phase === 'wait') {
+    tryPass();
+  } else if (phase === 'knock') {
+    knockTap();
+  }
+}
+
+// Slip past the guard (or doorkeeper) she is waiting at, if he is not watching
+function tryPass() {
+  const o = currentObstacle();
+  if (!o) return;
+  if (o.mode !== 'watch') {
+    setPhase('dash');
+    widow.mood = 'wow';
+    levelScore += o.mode === 'safe' ? 60 : 40;
+    popup(o.mode === 'safe' ? 'Tiptoe!' : 'Just in time!', o.x, GROUND - 170, '#2f9e44');
+    sfx.tiptoe();
+    wowT = 0.5;
+  } else {
+    setPhase('caught');
+    hope--;
+    widow.mood = 'worried';
+    o.t = Math.max(o.t, 1.2);
+    say(o.p, o.type === 'guard' ? pick(['Halt! Not so fast!', 'Stop right there!', 'No widows today!']) : pick(['Hm? Shoo, shoo!', 'Who goes there? Off you go!']), 1.6, { color: '#8a5a3a' });
+    shockT = 1; worryT = 1.6; shakeT = 0.25;
+    sfx.bounce();
+    if (hope <= 0) { fail('caught'); }
+  }
+}
+
+function startKnock() {
+  setPhase('knock');
+  widow.pose = 'knock'; widow.dir = 1; widow.lx = 0.9; widow.ly = -0.3; widow.mood = 'determined';
+  const pat = pickPattern(level);
+  const eighth = 30 / cfg.bpm;
+  knock = {
+    eighth, span: pat.span,
+    marks: pat.hits.map((e) => ({ e, time: e * eighth, res: null })),
+    t: -8 * eighth - 0.9,      // a moment for her plea, then a four-beat count-in
+    beat: -99, extra: 0, done: false, q: 0,
+  };
+  say(widow, verseText('plea'), 2.4, { color: '#6b4a7a' });
+  if (!hintsSeen.knock && level <= 2) {
+    hintsSeen.knock = true;
+    knock.hint = true;
+  }
+}
+
+function knockTap() {
+  const k = knock;
+  widow.knockAnim = 0.13;
+  doorShake = 0.15;
+  sfx.knock();
+  if (k.t < -k.eighth * 1.5) return;          // eager knocks during the count-in don't count
+  let bestM = null, bestD = 1e9;
+  for (const m of k.marks) {
+    if (m.res) continue;
+    const d = Math.abs(k.t - m.time);
+    if (d < bestD) { bestD = d; bestM = m; }
+  }
+  if (bestM && bestD <= cfg.good) {
+    bestM.res = bestD <= cfg.perfect ? 'perfect' : 'good';
+    const idx = k.marks.indexOf(bestM);
+    if (bestM.res === 'perfect') { stats.perfect++; levelScore += 100; } else { stats.good++; levelScore += 50; }
+    popup(bestM.res === 'perfect' ? 'Perfect!' : 'Good', stripX(bestM.time), 0, bestM.res === 'perfect' ? '#d9961c' : '#2f9e44');
+    sfx.tap(idx / Math.max(1, k.marks.length - 1));
+    wowT = 0.35;
+    for (let i = 0; i < 6; i++) spawn(doorX - 40, GROUND - 95, rand(-40, 40), rand(-60, -10), 0.5, '#ffe27a', rand(2, 3.5));
+  } else {
+    k.extra++;
+    popup('Off beat!', stripX(clamp(k.t, -k.eighth, k.span * k.eighth)), 0, '#c92a2a');
+  }
+}
+
+function updateKnock(dt) {
+  const k = knock;
+  k.t += dt;
+  // metronome: a tick on every beat, louder for the count-in
+  const beat = Math.floor(k.t / (2 * k.eighth) + 1e-6);
+  if (beat !== k.beat && k.t > -8 * k.eighth - 0.01) {
+    k.beat = beat;
+    if (k.t < k.span * k.eighth) sfx.tick(beat < 0);
+  }
+  for (const m of k.marks) {
+    if (!m.res && k.t > m.time + cfg.good) { m.res = 'miss'; popup('Miss', stripX(m.time), 0, '#868e96'); }
+  }
+  const lastT = k.marks[k.marks.length - 1].time;
+  if (k.t > Math.max(lastT + cfg.good + 0.3, k.span * k.eighth)) finishKnock();
+}
+
+function finishKnock() {
+  const k = knock;
+  const n = k.marks.length;
+  const sum = k.marks.reduce((s, m) => s + (m.res === 'perfect' ? 1 : m.res === 'good' ? 0.65 : 0), 0);
+  k.q = clamp((sum - k.extra * 0.4) / n, 0, 1);
+  k.done = true;
+  setPhase('react');
+  widow.pose = 'rest'; widow.lx = 0.4; widow.ly = -0.6;
+  judge.show = true; judge.up = 0;
+  if (k.q < 0.35) {
+    // Too quiet: he didn't even notice
+    judge.mood = 'sleep'; judge.pose = 'fold';
+    say(judge, pick(['Zzz... did someone knock? No? Good.', 'Hmm? Just the wind, I expect.']), 2.4, { color: '#7a2438' });
+    widow.mood = 'worried'; worryT = 1.2;
+    if (level >= 2) {
+      hope--;
+      showMessage('Knock in time with the light!');
+      if (hope <= 0) { fail('timid'); return; }
+    }
+    return;
+  }
+  const gain = k.q * 1.2 / cfg.days;
+  meter = Math.min(1, meter + gain);
+  if (meter >= 1) {
+    judge.mood = 'fume'; judge.pose = 'shoo';
+    say(judge, 'ENOUGH! Enough knocking!', 1.6, { color: '#7a2438' });
+    shakeT = 0.3;
+  } else {
+    const lines = meter < 0.34 ? ['Hmph! Go away!', 'Not today, widow!', 'Case closed. Goodbye!']
+      : meter < 0.67 ? ['You AGAIN?!', 'Every single day?!', 'I was having my nap!']
+      : ['Can a judge get no peace?!', 'My ears! My poor ears!', 'Not the knocking again!'];
+    judge.mood = meter < 0.34 ? 'grumpy' : 'fume';
+    judge.pose = meter < 0.34 ? 'fold' : 'shoo';
+    say(judge, pick(lines), 2.2, { color: '#7a2438' });
+  }
+  sfx.grumble(meter);
+}
+
+function updateReact(dt) {
+  judge.up = Math.min(1, judge.up + dt * 5);
+  meterShown += (meter - meterShown) * Math.min(1, dt * 3);
+  judge.flush = meterShown;
+  if (meter >= 1 && phaseT > 1.6) { giveIn(); return; }
+  if (phaseT > 2.6) {
+    judge.show = false;
+    sfx.slam();
+    doorShake = 0.3;
+    startNight();
+  }
+}
+
+function startNight() {
+  setPhase('night');
+  widow.pose = 'walk';
+}
+
+// Night: she goes home and prays, then comes back at dawn
+function updateNight(dt) {
+  if (phaseT < 0.9) {
+    widow.x = Math.max(HUT_X + 22, widow.x - WALK * 1.4 * dt);
+    widow.dir = -1; widow.lx = -0.6; widow.walkT += dt;
+  } else if (!widow.kneel && phaseT < 2.8) {
+    widow.x = HUT_X + 34; widow.kneel = true; widow.pose = 'pray'; widow.mood = 'sleep'; widow.lx = 0;
+    camX = 0;
+    showMessage('Night falls... she prays, and does not give up.', 2.1);
+  }
+  if (phaseT > 3.4) {
+    day++;
+    startDay();
+  }
+}
+
+function nightAmount() {
+  if (phase !== 'night') return 0;
+  return clamp(Math.min(phaseT / 0.9, (3.4 - phaseT) / 0.6), 0, 1);
+}
+
+function updatePlay(dt) {
+  phaseT += dt;
+  widow.knockAnim = Math.max(0, widow.knockAnim - dt);
+  widow.hop = 0;
+  switch (phase) {
+    case 'frame':
+      if (phaseT > 0.4 && !bubbles.some((b) => b.who === 'jesus')) {
+        say('jesus', verseText('judge'), 999, { color: '#e0a526', big: true });
+      }
+      break;
+    case 'dawn':
+      if (phaseT > 1.0) setPhase('walk');
+      break;
+    case 'walk': {
+      const o = currentObstacle();
+      const target = o ? waitSpot(o) : knockSpot();
+      widow.pose = 'walk'; widow.dir = 1; widow.lx = 0.6; widow.ly = 0;
+      if (widow.x < target - 1) {
+        widow.x = Math.min(target, widow.x + WALK * dt);
+        widow.walkT += dt;
+        widow.hop = Math.abs(Math.sin(widow.walkT * 9)) * 3;
+      } else if (o) {
+        setPhase('wait');
+        widow.pose = 'clasp'; widow.mood = 'determined';
+        if (!hintsSeen[o.type] && level <= 2) {
+          hintsSeen[o.type] = true;
+          showMessage(o.type === 'guard' ? 'Tap when the guard turns away!' : 'Tap while the doorkeeper snoozes!', 3);
+        }
+      } else startKnock();
+      break;
+    }
+    case 'wait': {
+      const o = currentObstacle();
+      widow.lx = 0.9; widow.ly = 0;
+      widow.mood = o && o.mode === 'watch' ? 'worried' : 'determined';
+      break;
+    }
+    case 'dash': {
+      const o = currentObstacle();
+      const target = o.x + 64;
+      widow.x = Math.min(target, widow.x + DASH * dt);
+      widow.walkT += dt * 1.6;
+      widow.pose = 'walk';
+      widow.hop = Math.abs(Math.sin(widow.walkT * 9)) * 9;
+      if (widow.x >= target) { o.passed = true; setPhase('walk'); widow.mood = 'determined'; }
+      break;
+    }
+    case 'caught': {
+      widow.hop = phaseT < 0.35 ? Math.sin(phaseT / 0.35 * Math.PI) * 14 : 0;
+      if (phaseT > 1.1) { setPhase('wait'); widow.mood = 'determined'; }
+      break;
+    }
+    case 'knock': updateKnock(dt); break;
+    case 'react': updateReact(dt); break;
+    case 'night': updateNight(dt); break;
+  }
+  if (phase !== 'react') meterShown += (meter - meterShown) * Math.min(1, dt * 3);
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function giveIn() {
+  setPhase('giveIn');
+  state = 'win';
+  judge.show = true; judge.atDoor = true;
+  judge.mood = 'giveup'; judge.pose = 'surrender'; judge.flush = 0.5;
+  widow.mood = 'joy'; widow.pose = 'joy';
+  say(judge, verseText('weary'), WIN_DELAY, { color: '#7a2438', big: true });
+  const hopeBonus = hope * 150;
+  const daysBonus = Math.max(0, cfg.days + 1 - day) * 200;
+  const levelBonus = level * 300;
+  const score = levelScore + hopeBonus + daysBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('widowBest', best); } catch (e) {} }
+  lastScore = { knocks: levelScore, hopeBonus, daysBonus, levelBonus, score, days: day };
+  for (let i = 0; i < 70; i++) {
+    const a = rand(0, TAU), sp = rand(40, 190);
+    spawn(widow.x, GROUND - 90, Math.cos(a) * sp, Math.sin(a) * sp - 60, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 60);
+  }
+  sfx.win();
+  endTimer = WIN_DELAY;
+  syncAmbience();
+}
+
+function fail(reason) {
+  state = 'fail';
+  lastScore = { reason };
+  widow.mood = 'worried'; widow.pose = 'clasp';
+  sfx.fail();
+  endTimer = 1.6;
+  syncAmbience();
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  cfg = makeConfig(1);
+  buildWorld();
+  widow = makeWidow();
+  judge = makeJudge();
+  makeListeners();
+  phase = 'dawn';
+  camX = 0;
+  showOverlay('The Persistent Widow', 'A parable of never giving up',
+    `${verseHTML('pray')}
+     <ul>
+       <li>Help the widow bring her case to the grumpy judge, <b>day after day</b>.</li>
+       <li>Slip past the guards and the snoozing doorkeeper: <b>tap</b> (or <kbd>Space</kbd>) when they look away or doze.</li>
+       <li>At the door, <b>knock in rhythm</b>: tap as the light reaches each fist.</li>
+       <li>Every good knock annoys the judge a little more. Keep coming back until he gives in!</li>
+       <li>Getting caught, or knocking too timidly, costs one of her 3 hearts.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Hear the Story', () => { level = 1; totalScore = 0; startLevel(); });
+  syncAmbience();
+}
+
+function startLevel(skipIntro = false) {
+  if (typeof skipIntro !== 'boolean') skipIntro = false;
+  cfg = makeConfig(level);
+  buildWorld();
+  widow = makeWidow();
+  judge = makeJudge();
+  judge.x = doorX;
+  day = 1; hope = MAX_HOPE; meter = 0; meterShown = 0;
+  levelScore = 0; stats = { perfect: 0, good: 0 };
+  particles = []; bubbles = []; popups = [];
+  knock = null;
+  shockT = worryT = wowT = shakeT = doorShake = doorOpen = 0;
+  endTimer = 0;
+  camX = 0;
+  state = 'play';
+  hideOverlay();
+  if (level === 1 && !skipIntro && !introSeen) {
+    introSeen = true;
+    makeListeners();
+    setPhase('frame');
+    message.t = 0;
+  } else {
+    startDay();
+    sfx.levelStart();
+  }
+  syncAmbience();
+}
+let introSeen = false;
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('She did not give up!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('cry')}
+       <p style="text-align:center">If even a grumpy judge gave in, how much more does God, who loves us, listen to His children day and night!</p>
+       <p class="score">Knocks &amp; tiptoes: <b>${s.knocks}</b><br>Hearts kept: <b>${s.hopeBonus}</b><br>Quick justice (${s.days} day${s.days > 1 ? 's' : ''}): <b>${s.daysBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; startLevel(true); });
+  } else if (state === 'fail') {
+    const text = lastScore.reason === 'timid'
+      ? 'Her knocks were too quiet for the judge to hear. Tap along with the light as it reaches each fist.'
+      : 'She was sent home for today. Watch for the moment the guards turn away and the doorkeeper dozes.';
+    showOverlay('Sent home... for now', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${text} But she never gives up, and neither should you!</p>
+       ${verseHTML('refused')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+  syncAmbience();
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const ripples = [];
+const ACTION_KEYS = ['Space', 'Enter', 'ArrowUp', 'ArrowRight', 'KeyK', 'KeyJ', 'KeyF'];
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction) { if (!e.repeat) ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (ACTION_KEYS.includes(e.code) && !e.repeat) action();
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play' && state !== 'win') return;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  action();
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth; music from the shared music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full music from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+    syncAmbience();
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  // a burst of filtered noise
+  noiseHit(type, freq, vol, dur, q = 0.7) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+  fail() { if (this.ctx) Music.fail(); },
+  puff(vol = 0.35) { this.noiseHit('bandpass', 1100, vol, 0.16); },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  thunder() { this.noiseHit('lowpass', 400, 0.9, 1.2, 1); },
+  // Knuckles on a wooden door
+  knock() { this.noiseHit('lowpass', 700, 0.7, 0.08, 1.5); this.tone(150, 0.1, 'sine', 0.45, 0, 80); },
+  tick(strong) { this.tone(strong ? 1320 : 990, 0.05, 'triangle', strong ? 0.12 : 0.05); },
+  tiptoe() { this.tone(660, 0.07, 'triangle', 0.12); this.tone(880, 0.07, 'triangle', 0.12, 0.09); this.tone(1100, 0.08, 'triangle', 0.12, 0.18); },
+  slam() { this.noiseHit('lowpass', 300, 0.8, 0.35, 1); this.tone(90, 0.2, 'sine', 0.4, 0, 50); },
+  snort() { this.tone(140, 0.22, 'sawtooth', 0.08, 0, 90); },
+  // the judge harrumphs, higher and crosser as he gets more annoyed
+  grumble(m) {
+    const f = 120 + m * 90;
+    this.tone(f, 0.16, 'sawtooth', 0.09, 0, f * 0.8);
+    this.tone(f * 1.1, 0.22, 'sawtooth', 0.09, 0.17, f * 0.7);
+  },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: the town
+// ============================================================
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+const bgClouds = Array.from({ length: 6 }, () => ({ f: Math.random(), y: rand(120, 360), w: rand(90, 170), speed: rand(4, 10) }));
+const stars = Array.from({ length: 60 }, () => ({ f: Math.random(), y: rand(-300, 420), r: rand(0.8, 2), tw: rand(0, TAU) }));
+
+function drawSky(night) {
+  const g = ctx.createLinearGradient(0, -offY, 0, GROUND);
+  g.addColorStop(0, mixCol('#8fcaf0', '#141a45', night));
+  g.addColorStop(0.6, mixCol('#c6e6f7', '#2a2f66', night));
+  g.addColorStop(1, mixCol('#fff0cf', '#4a3f70', night));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // the sun by day, the moon and stars by night
+  const sx = W - 110, sy = 150;
+  if (night < 1) {
+    ctx.globalAlpha = 1 - night;
+    const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 90);
+    sg.addColorStop(0, 'rgba(255,245,200,0.9)'); sg.addColorStop(1, 'rgba(255,245,200,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 90, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(sx, sy, 34, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (night > 0) {
+    ctx.globalAlpha = night;
+    ctx.fillStyle = '#fff';
+    for (const s of stars) {
+      ctx.globalAlpha = night * (0.6 + 0.4 * Math.sin(t * 3 + s.tw));
+      ctx.beginPath(); ctx.arc(-offX + s.f * viewW, s.y, s.r, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = night;
+    ctx.fillStyle = '#fff6d8'; ctx.beginPath(); ctx.arc(130, 140, 28, 0, TAU); ctx.fill();
+    ctx.fillStyle = mixCol('#8fcaf0', '#141a45', night); ctx.beginPath(); ctx.arc(142, 132, 24, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  const cc = mixCol('#ffffff', '#5a5f8a', night), cu = mixCol('#e3eef9', '#474b78', night);
+  for (const c of bgClouds) drawCloud(-offX - 150 + c.f * (viewW + 300), c.y, c.w, c.w * 0.3, cc, cu);
+}
+
+// Far hills and the distant town (drawn with a little parallax)
+function drawHills(night) {
+  const x0 = camX * 0.3 - offX - 20, x1 = x0 + viewW + 40;
+  ctx.fillStyle = mixCol('#e6cf9c', '#3c3a5e', night);
+  ctx.beginPath(); ctx.moveTo(x0, GROUND);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, GROUND - 250 + Math.sin(x / 110) * 22 + Math.sin(x / 43) * 7);
+  ctx.lineTo(x1, GROUND); ctx.fill();
+  // little flat-roofed houses on the hill
+  ctx.fillStyle = mixCol('#f3e3bf', '#4a4870', night);
+  for (let i = Math.floor(x0 / 90); i * 90 < x1; i++) {
+    const x = i * 90 + ((i * 53) % 40);
+    const h = 26 + ((i * 17) % 3) * 10;
+    const y = GROUND - 236 + Math.sin(x / 110) * 22;
+    ctx.fillRect(x, y - h, 34, h + 20);
+  }
+}
+
+// The row of houses and market stalls behind the pavement
+function drawBackHouses(night) {
+  const cols = ['#f3dcae', '#ead0a0', '#f6e3c0', '#e8c89a', '#efd6b0'];
+  const awn = ['#d9534f', '#4d8fc0', '#6b8e3a', '#e0a526'];
+  const base = GROUND - 62;
+  const from = Math.floor((camX - offX - 200) / 170), to = Math.ceil((camX + W + offX + 200) / 170);
+  for (let i = from; i <= to; i++) {
+    const x = i * 170 + 10, w = 150;
+    if (x + w > doorX - 170 && x < doorX + 180) continue;
+    if (x < HUT_X + 70) continue;
+    const h = 170 + (((i * 37) % 5) + 5) % 5 * 18;
+    const c = mixCol(cols[((i % 5) + 5) % 5], '#3a3860', night * 0.7);
+    ctx.fillStyle = c;
+    ctx.fillRect(x, base - h, w, h);
+    ctx.fillStyle = shade(c, -18);
+    ctx.fillRect(x - 5, base - h - 8, w + 10, 10);
+    ctx.fillStyle = mixCol('#6a4a30', '#201a30', night);
+    roundRect(x + 24, base - h + 34, 26, 32, [13, 13, 0, 0]); ctx.fill();
+    roundRect(x + w - 50, base - h + 34, 26, 32, [13, 13, 0, 0]); ctx.fill();
+    if (((i % 2) + 2) % 2 === 0) {
+      // a striped market awning with a few pots and baskets
+      const a = awn[((i % 4) + 4) % 4];
+      for (let k = 0; k < 6; k++) {
+        ctx.fillStyle = mixCol(k % 2 ? '#fff4dc' : a, '#3a3860', night * 0.7);
+        ctx.beginPath();
+        ctx.moveTo(x + 8 + k * 22.3, base - 92); ctx.lineTo(x + 8 + (k + 1) * 22.3, base - 92);
+        ctx.lineTo(x + 8 + (k + 1) * 22.3, base - 72); ctx.quadraticCurveTo(x + 8 + (k + 0.5) * 22.3, base - 64, x + 8 + k * 22.3, base - 72);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = mixCol('#c07a3a', '#3a3050', night * 0.7);
+      ctx.beginPath(); ctx.ellipse(x + 40, base - 12, 14, 12, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = mixCol('#e8a13a', '#3a3050', night * 0.7);
+      ctx.beginPath(); ctx.arc(x + 108, base - 12, 12, Math.PI, TAU); ctx.fill();
+      ctx.fillStyle = mixCol('#e74c3c', '#3a3050', night * 0.7);
+      for (const dx of [-6, 0, 6]) { ctx.beginPath(); ctx.arc(x + 108 + dx, base - 22, 4, 0, TAU); ctx.fill(); }
+    } else {
+      ctx.fillStyle = mixCol('#7a4e2c', '#201a30', night);
+      roundRect(x + w / 2 - 18, base - 64, 36, 64, [18, 18, 0, 0]); ctx.fill();
+    }
+  }
+}
+
+function drawStreetGround(night) {
+  const x0 = camX - offX - 10, x1 = camX + W + offX + 10;
+  ctx.fillStyle = mixCol('#dcc293', '#3e3a5a', night);
+  ctx.fillRect(x0, GROUND - 66, x1 - x0, 24);
+  ctx.fillStyle = mixCol('#c9ad7a', '#35304e', night);
+  ctx.fillRect(x0, GROUND - 44, x1 - x0, 4);
+  ctx.fillStyle = mixCol('#ead5aa', '#403c5e', night);
+  ctx.fillRect(x0, GROUND - 40, x1 - x0, H - GROUND + 60);
+  // cobbles
+  ctx.fillStyle = mixCol('#dcc497', '#37334f', night);
+  for (let row = 0; row < 5; row++) {
+    const y = GROUND - 22 + row * 34;
+    const step = 64;
+    for (let x = Math.floor(x0 / step) * step + (row % 2) * 32; x < x1; x += step) {
+      ctx.beginPath(); ctx.ellipse(x, y, 24, 9, 0, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+// The widow's little house
+function drawHut(night) {
+  const x = HUT_X, base = GROUND - 40;
+  ctx.fillStyle = mixCol('#d9b27a', '#3e3656', night * 0.8);
+  ctx.fillRect(x - 70, base - 150, 130, 150);
+  ctx.fillStyle = mixCol('#b88a55', '#322b48', night * 0.8);
+  ctx.fillRect(x - 76, base - 158, 142, 12);
+  ctx.strokeStyle = mixCol('#8a5a2b', '#2a2238', night); ctx.lineWidth = 5; ctx.lineCap = 'round';
+  for (const dx of [-60, -30, 0, 30, 58]) { ctx.beginPath(); ctx.moveTo(x + dx, base - 152); ctx.lineTo(x + dx, base - 146); ctx.stroke(); }
+  // doorway and a little window
+  ctx.fillStyle = mixCol('#5a3a24', '#1a1426', night);
+  roundRect(x - 44, base - 84, 36, 84, [18, 18, 0, 0]); ctx.fill();
+  roundRect(x + 14, base - 118, 26, 28, [13, 13, 0, 0]); ctx.fill();
+  if (night > 0) {
+    ctx.fillStyle = `rgba(255,210,110,${night})`;
+    roundRect(x + 14, base - 118, 26, 28, [13, 13, 0, 0]); ctx.fill();
+  }
+  // a pot of flowers
+  ctx.fillStyle = mixCol('#c0603a', '#3a2a40', night);
+  ctx.beginPath(); ctx.moveTo(x + 18, base - 20); ctx.lineTo(x + 42, base - 20); ctx.lineTo(x + 38, base); ctx.lineTo(x + 22, base); ctx.fill();
+  ctx.fillStyle = mixCol('#6b8e3a', '#2a3040', night);
+  ctx.beginPath(); ctx.arc(x + 30, base - 26, 10, 0, TAU); ctx.fill();
+  ctx.fillStyle = mixCol('#f28cb0', '#4a3a5a', night);
+  ctx.beginPath(); ctx.arc(x + 25, base - 30, 3.5, 0, TAU); ctx.arc(x + 35, base - 28, 3.5, 0, TAU); ctx.fill();
+}
+
+// The judge's fine hall: columns, a big door with a brass knocker, a window above
+function winRect() { return { x: doorX - 48, y: GROUND - 290, w: 96, h: 76 }; }
+
+function drawJudgeHouse(night) {
+  const base = GROUND - 40, left = doorX - 155, right = doorX + 165, top = GROUND - 440;
+  const stone = mixCol('#f4ead4', '#44405e', night * 0.8), dark = shade(stone, -26);
+  // chimney
+  ctx.fillStyle = mixCol('#d8c3a0', '#3a3654', night * 0.8);
+  ctx.fillRect(doorX + 102, top - 70, 30, 70);
+  ctx.fillStyle = dark; ctx.fillRect(doorX + 98, top - 76, 38, 9);
+  // body
+  ctx.fillStyle = stone; ctx.fillRect(left, top, right - left, base - top);
+  // pediment roof
+  ctx.fillStyle = dark;
+  ctx.beginPath(); ctx.moveTo(left - 14, top + 4); ctx.lineTo(doorX + 5, top - 56); ctx.lineTo(right + 14, top + 4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = stone;
+  ctx.beginPath(); ctx.moveTo(left + 12, top - 2); ctx.lineTo(doorX + 5, top - 44); ctx.lineTo(right - 12, top - 2); ctx.closePath(); ctx.fill();
+  // frieze with the sign
+  ctx.fillStyle = dark; ctx.fillRect(left - 10, top, right - left + 20, 12);
+  ctx.fillStyle = mixCol('#e9dcbf', '#3e3a58', night * 0.8); ctx.fillRect(left, top + 12, right - left, 44);
+  ctx.fillStyle = mixCol('#8a5a00', '#c9b37a', night * 0.5);
+  ctx.font = '700 24px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('THE JUDGE', doorX + 5, top + 43);
+  // columns
+  for (const cx of [left + 22, right - 22]) {
+    ctx.fillStyle = mixCol('#fbf4e2', '#4e4a68', night * 0.8);
+    ctx.fillRect(cx - 12, top + 56, 24, base - top - 64);
+    ctx.fillStyle = dark;
+    ctx.fillRect(cx - 16, top + 56, 32, 8); ctx.fillRect(cx - 16, base - 10, 32, 10);
+    ctx.strokeStyle = shade(stone, -12); ctx.lineWidth = 1.5;
+    for (const dx of [-5, 0, 5]) { ctx.beginPath(); ctx.moveTo(cx + dx, top + 66); ctx.lineTo(cx + dx, base - 12); ctx.stroke(); }
+  }
+  // steps
+  ctx.fillStyle = mixCol('#e2d4b4', '#3a3654', night * 0.8);
+  ctx.fillRect(doorX - 70, base - 4, 140, 12); ctx.fillRect(doorX - 84, base + 8, 168, 12);
+
+  // The window: the judge pops out of it to grumble
+  const wr = winRect();
+  ctx.fillStyle = '#3a2a1e';
+  roundRect(wr.x, wr.y, wr.w, wr.h, [38, 38, 4, 4]); ctx.fill();
+  if (judge && judge.show && !judge.atDoor) {
+    ctx.save();
+    roundRect(wr.x, wr.y, wr.w, wr.h, [38, 38, 4, 4]); ctx.clip();
+    judge.x = doorX; judge.y = wr.y + 104 + (1 - judge.up) * 100;
+    drawPerson(judge);
+    ctx.restore();
+  }
+  // shutters swing open when he appears
+  const open = judge && judge.show && !judge.atDoor ? judge.up : judge && judge.atDoor ? 1 : 0;
+  const sw = lerp(wr.w / 2, 12, open);
+  const shut = mixCol('#4d8fc0', '#2a3050', night);
+  ctx.fillStyle = shut; ctx.strokeStyle = shade(shut, -40); ctx.lineWidth = 2;
+  const jig = doorShake > 0 ? Math.sin(t * 90) * 1.5 : 0;
+  ctx.fillRect(wr.x - (open ? 12 : 0) + jig, wr.y + 10, sw, wr.h - 10); ctx.strokeRect(wr.x - (open ? 12 : 0) + jig, wr.y + 10, sw, wr.h - 10);
+  ctx.fillRect(wr.x + wr.w - sw + (open ? 12 : 0) - jig, wr.y + 10, sw, wr.h - 10); ctx.strokeRect(wr.x + wr.w - sw + (open ? 12 : 0) - jig, wr.y + 10, sw, wr.h - 10);
+  ctx.fillStyle = dark; ctx.fillRect(wr.x - 10, wr.y + wr.h, wr.w + 20, 8);
+
+  // The door
+  const dx = doorX + (doorShake > 0 ? Math.sin(t * 80) * 2 : 0), dTop = base - 150;
+  ctx.fillStyle = '#2a1c12';
+  roundRect(doorX - 44, dTop, 88, 150, [44, 44, 0, 0]); ctx.fill();
+  if (judge && judge.atDoor) {
+    judge.x = doorX + 4; judge.y = base - 2; judge.s = 1.4;
+    drawPerson(judge);
+  }
+  const dw = lerp(88, 16, doorOpen);
+  ctx.fillStyle = mixCol('#8a5a32', '#35283a', night * 0.8);
+  ctx.strokeStyle = mixCol('#5a361c', '#201828', night); ctx.lineWidth = 2;
+  roundRect(dx - 44 + (88 - dw) * (doorOpen > 0 ? 1 : 0), dTop, dw, 150, doorOpen > 0 ? 4 : [44, 44, 0, 0]); ctx.fill(); ctx.stroke();
+  if (doorOpen < 0.2) {
+    ctx.beginPath(); ctx.moveTo(dx, dTop + 4); ctx.lineTo(dx, base); ctx.stroke();
+    ctx.strokeStyle = mixCol('#6e4424', '#2a2030', night); ctx.lineWidth = 1.5;
+    for (const k of [-22, 22]) { ctx.beginPath(); ctx.moveTo(dx + k, dTop + 24); ctx.lineTo(dx + k, base - 6); ctx.stroke(); }
+    // brass knocker
+    ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(dx - 16, base - 82 + (doorShake > 0 ? 3 : 0), 8, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#e0a526'; ctx.beginPath(); ctx.arc(dx - 16, base - 92, 3.5, 0, TAU); ctx.fill();
+  }
+}
+
+// A little sign above whoever the widow must slip past
+function drawIndicator(o) {
+  const x = o.x, y = GROUND - (o.type === 'keeper' ? 160 : 190);
+  const col = o.mode === 'watch' ? '#e03131' : o.mode === 'warn' ? '#f59f00' : '#2f9e44';
+  const pulse = o.mode === 'safe' ? 1 + Math.sin(t * 8) * 0.06 : 1;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(pulse, pulse);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(0, 0, 19, 0, TAU); ctx.fill();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (o.mode === 'watch') {
+    // an open, watching eye
+    ctx.beginPath(); ctx.ellipse(0, 0, 10, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, TAU); ctx.fill();
+  } else if (o.mode === 'warn') {
+    ctx.font = '700 20px Fredoka, sans-serif'; ctx.fillText('!', 0, 1);
+  } else {
+    ctx.font = '700 14px Fredoka, sans-serif'; ctx.fillText('GO', 0, 1);
+  }
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+function drawStreet() {
+  const night = nightAmount();
+  drawSky(night);
+  ctx.save();
+  ctx.translate(-camX * 0.3, 0);
+  drawHills(night);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(-camX, 0);
+  drawBackHouses(night);
+  for (const d of crowd) drawPerson(d);
+  drawStreetGround(night);
+  drawHut(night);
+  drawJudgeHouse(night);
+
+  const cur = currentObstacle();
+  for (const o of obstacles) {
+    o.p.x = o.x; o.p.y = GROUND;
+    drawPerson(o.p);
+  }
+  if (widow) {
+    widow.y = GROUND;
+    drawPerson(widow);
+  }
+  if (cur && state !== 'title' && ['walk', 'wait', 'caught', 'dawn'].includes(phase)) drawIndicator(cur);
+  drawParticles();
+
+  // speech bubbles
+  for (const b of bubbles) {
+    if (b.who === 'jesus') continue;
+    const p = b.who;
+    let ay = p.y - 100 * (p.s || 1);
+    if (p === judge && !judge.atDoor) ay = winRect().y - 4;
+    drawBubble(b, p.x, ay, camX + 8, camX + W - 8);
+  }
+  for (const pp of popups) {
+    if (!pp.y) continue;
+    drawPopup(pp, pp.x, pp.y);
+  }
+  ctx.restore();
+
+  if (night > 0) {
+    ctx.fillStyle = `rgba(16,20,60,${0.45 * night})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+    // her lamp glows while she prays
+    if (widow && widow.kneel) {
+      const lx = HUT_X + 70 - camX, ly = GROUND - 30;
+      const g = ctx.createRadialGradient(lx, ly, 4, lx, ly, 120);
+      g.addColorStop(0, `rgba(255,214,120,${0.55 * night})`); g.addColorStop(1, 'rgba(255,214,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(lx, ly, 120, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#b87a3a'; ctx.beginPath(); ctx.ellipse(lx, ly, 10, 5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd36b'; ctx.beginPath(); ctx.ellipse(lx + 6, ly - 8 + Math.sin(t * 12), 3, 6, 0, 0, TAU); ctx.fill();
+    }
+  }
+
+  if (knock && (phase === 'knock' || (phase === 'react' && phaseT < 0.5))) drawStrip(phase === 'react' ? 1 - phaseT / 0.5 : 1);
+  for (const pp of popups) if (!pp.y && knock) drawPopup(pp, pp.x, stripGeom().y - 8);
+}
+
+function drawPopup(pp, x, y) {
+  const a = 1 - pp.t / 0.9;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '700 20px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(pp.text, x, y - pp.t * 30);
+  ctx.fillStyle = pp.color; ctx.fillText(pp.text, x, y - pp.t * 30);
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering: the knocking rhythm strip
+// ============================================================
+function stripGeom() {
+  const w = Math.min(W - 36, 620);
+  return { x0: (W - w) / 2, w, y: 150, h: 74 };
+}
+function stripX(time) {
+  const g = stripGeom(), k = knock;
+  const t0 = -k.eighth, t1 = k.span * k.eighth;
+  return g.x0 + 26 + (time - t0) / (t1 - t0) * (g.w - 52);
+}
+
+function drawFist(x, y, r, fill, stroke) {
+  ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.stroke();
+  // a little knocking fist
+  ctx.fillStyle = '#e0a877'; ctx.strokeStyle = '#9a6a42'; ctx.lineWidth = 1.3;
+  roundRect(x - r * 0.52, y - r * 0.42, r * 1.04, r * 0.84, r * 0.3); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  for (const k of [-0.26, 0, 0.26]) { ctx.moveTo(x + k * r, y - r * 0.42); ctx.lineTo(x + k * r, y - r * 0.05); }
+  ctx.stroke();
+}
+
+function drawStrip(alpha) {
+  const g = stripGeom(), k = knock;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(255,250,235,0.94)';
+  ctx.strokeStyle = 'rgba(168,116,26,0.8)'; ctx.lineWidth = 3;
+  roundRect(g.x0, g.y, g.w, g.h, 18); ctx.fill(); ctx.stroke();
+  const cy = g.y + g.h / 2;
+  // beat lines
+  ctx.strokeStyle = 'rgba(168,116,26,0.25)'; ctx.lineWidth = 2;
+  for (let e = 0; e <= k.span; e += 2) {
+    const x = stripX(e * k.eighth);
+    ctx.beginPath(); ctx.moveTo(x, g.y + 12); ctx.lineTo(x, g.y + g.h - 12); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(168,116,26,0.45)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(stripX(-k.eighth), cy); ctx.lineTo(stripX(k.span * k.eighth), cy); ctx.stroke();
+  // the knocks to make
+  for (const m of k.marks) {
+    const x = stripX(m.time);
+    const near = !m.res && Math.abs(k.t - m.time) < 0.25;
+    const r = 15 + (near ? 3 : 0);
+    const fill = m.res === 'perfect' ? '#ffd766' : m.res === 'good' ? '#8ce99a' : m.res === 'miss' ? '#dee2e6' : '#ffffff';
+    drawFist(x, cy, r, fill, m.res === 'miss' ? '#adb5bd' : '#a8741a');
+    if (m.res === 'miss') {
+      ctx.strokeStyle = '#c92a2a'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x - 7, cy - 7); ctx.lineTo(x + 7, cy + 7); ctx.moveTo(x + 7, cy - 7); ctx.lineTo(x - 7, cy + 7); ctx.stroke();
+    }
+  }
+  // the moving light
+  const px = stripX(clamp(k.t, -k.eighth, k.span * k.eighth));
+  const lg = ctx.createRadialGradient(px, cy, 2, px, cy, 34);
+  lg.addColorStop(0, 'rgba(255,230,120,0.9)'); lg.addColorStop(1, 'rgba(255,230,120,0)');
+  ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(px, cy, 34, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#f59f00'; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(px, g.y + 6); ctx.lineTo(px, g.y + g.h - 6); ctx.stroke();
+
+  // count-in
+  if (k.t < 0) {
+    const beatsLeft = Math.ceil(-k.t / (2 * k.eighth) - 1e-6);
+    const label = beatsLeft > 4 ? 'Get ready...' : beatsLeft === 4 ? 'Ready...' : String(beatsLeft);
+    ctx.font = '700 26px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineJoin = 'round';
+    ctx.strokeText(label, W / 2, g.y + g.h + 34);
+    ctx.fillStyle = '#a8741a'; ctx.fillText(label, W / 2, g.y + g.h + 34);
+  }
+  if (k.hint) {
+    ctx.font = '600 16px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    const txt = isTouch() ? 'Tap as the light reaches each fist!' : 'Tap or press Space as the light reaches each fist!';
+    ctx.strokeText(txt, W / 2, g.y - 14);
+    ctx.fillStyle = '#6a5a3c'; ctx.fillText(txt, W / 2, g.y - 14);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering: the framing scene (Jesus tells the story)
+// ============================================================
+function frameLayout() {
+  const narrow = W < 700;
+  const s = narrow ? 1.35 : 1.7;
+  const gy = H - 150;
+  const jx = clamp(W * 0.2, 70, 260);
+  const a = jx + (narrow ? 84 : 140), b = W - (narrow ? 34 : 80);
+  return { narrow, s, gy, jx, a, b };
+}
+
+function drawFrameScene() {
+  drawSky(0);
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  const L = frameLayout();
+  // a grassy hillside by the lake
+  ctx.fillStyle = '#9fd0ec'; ctx.fillRect(x0, L.gy - 260, x1 - x0, 60);
+  ctx.fillStyle = '#a7cf8a';
+  ctx.beginPath(); ctx.moveTo(x0, H);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, L.gy - 210 + Math.sin(x / 90) * 16 + Math.sin(x / 37) * 5);
+  ctx.lineTo(x1, H); ctx.fill();
+  ctx.fillStyle = '#86b95d';
+  ctx.beginPath(); ctx.moveTo(x0, H);
+  for (let x = x0; x <= x1; x += 10) ctx.lineTo(x, L.gy - 40 + Math.sin(x / 160) * 10);
+  ctx.lineTo(x1, H); ctx.fill();
+  ctx.fillStyle = '#f7f0a0';
+  for (let i = 0; i < 18; i++) { const fx = x0 + ((i * 97) % Math.max(1, x1 - x0)); ctx.beginPath(); ctx.arc(fx, L.gy + 40 + (i % 3) * 30, 3, 0, TAU); ctx.fill(); }
+
+  // Listeners look toward Jesus
+  const back = listeners.slice(0, 2), front = listeners.slice(2);
+  back.forEach((d, k) => { d.x = lerp(L.a + 40, L.b - 40, k); d.y = L.gy - 40; d.s = L.s * 0.85; d.dim = true; });
+  front.forEach((d, k) => { d.x = lerp(L.a, L.b, k / 3); d.y = L.gy; d.s = L.s; d.dim = false; });
+  for (const d of listeners) {
+    const dx = L.jx - d.x, dy = (L.gy - 70) - (d.y - 60);
+    const len = Math.hypot(dx, dy) || 1;
+    d.lx = dx / len; d.ly = dy / len * 0.4;
+  }
+  back.forEach(drawPerson);
+  front.forEach(drawPerson);
+  drawJesus({ x: L.jx, y: L.gy, s: L.s * 1.1, pose: 'teach', face: phaseT > 4.2 ? 'joy' : 'calm' });
+
+  for (const b of bubbles) if (b.who === 'jesus') drawBubble(b, L.jx + 10, L.gy - 80 * L.s * 1.1, 8, W - 8);
+  if (phaseT > 1.2) {
+    ctx.save();
+    ctx.globalAlpha = 0.65 + 0.35 * Math.sin(t * 4);
+    ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+    const txt = isTouch() ? 'Tap to see the story' : 'Tap or press Space to see the story';
+    ctx.strokeText(txt, W / 2, H - 40);
+    ctx.fillStyle = '#7a5200'; ctx.fillText(txt, W / 2, H - 40);
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHeart(x, y, r, full) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.7, y - r * 1.3, x, y - r * 0.45);
+  ctx.bezierCurveTo(x + r * 0.7, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9);
+  ctx.fillStyle = full ? '#e8465a' : 'rgba(90,66,16,0.2)';
+  ctx.fill();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const night = nightAmount();
+  ctx.shadowColor = night > 0.5 ? 'rgba(10,10,40,0.8)' : 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  const ink = mixCol('#5a4210', '#fff4d0', night);
+
+  // Left: level + the judge's annoyance
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ink;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' || phase === 'frame' ? 'The Persistent Widow' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('JUDGE', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(58, 38, 130, 13, 6.5); ctx.fill();
+  if (meterShown > 0.005) {
+    const gg = ctx.createLinearGradient(58, 0, 188, 0);
+    gg.addColorStop(0, '#ffd43b'); gg.addColorStop(0.5, '#ff922b'); gg.addColorStop(1, '#e03131');
+    ctx.fillStyle = gg;
+    roundRect(58, 38, 130 * clamp(meterShown, 0, 1), 13, 6.5); ctx.fill();
+  }
+  ctx.fillStyle = ink; ctx.font = '600 11px Fredoka, sans-serif';
+  ctx.fillText(meterShown > 0.67 ? 'fuming!' : meterShown > 0.34 ? 'annoyed' : 'grumpy', 194, 49);
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: day, hearts and score
+  if (state !== 'title' && phase !== 'frame') {
+    const rx = viewW - 12;
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = ink;
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('DAY', rx, 20);
+    ctx.font = '700 20px Fredoka, sans-serif';
+    ctx.fillText(`${day}`, rx, 42);
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < MAX_HOPE; i++) drawHeart(rx - 9 - i * 22, 60, 8, i < hope);
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = ink;
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'win' ? 0 : levelScore)}`, rx, 90);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const night = nightAmount() > 0.4;   // light words on the night sky
+  ctx.lineWidth = 5; ctx.strokeStyle = night ? 'rgba(20,24,70,0.9)' : 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  const lines = wrapText(message.text, W - 40);
+  lines.forEach((l, k) => {
+    const y = H * 0.29 + k * 30;
+    ctx.strokeText(l, W / 2, y);
+    ctx.fillStyle = night ? '#ffe9a8' : '#7a5200';
+    ctx.fillText(l, W / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  if (phase === 'frame' && state !== 'title') drawFrameScene();
+  else drawStreet();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawMessage();
+
+  if (fadeT > 0) {
+    ctx.fillStyle = `rgba(255,248,230,${clamp(fadeT / 0.5, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updateBubbles(dt);
+  updateCrowd(dt);
+  for (const c of bgClouds) { c.f += c.speed * dt / (viewW + 300); if (c.f > 1) c.f -= 1; }
+  if (widow) blinkTick(widow, dt);
+  if (judge) blinkTick(judge, dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') {
+    phaseT += dt;
+    doorOpen = Math.min(1, doorOpen + dt * 2.5);
+    judge.up = 1;
+    if (Math.random() < dt * 10) spawn(widow.x + rand(-40, 40), GROUND - rand(40, 130), 0, -20, 1, '#fff6d0', 3);
+  }
+  if (state !== 'pause') for (const o of obstacles) updateObstacle(o, dt);
+
+  // The judge's chimney puffs harder the crosser he gets
+  if ((state === 'play' || state === 'win') && phase !== 'frame' && meterShown > 0.2 && Math.random() < dt * meterShown * 5) {
+    spawn(doorX + 117, GROUND - 520, rand(-6, 6), rand(-45, -25), 2.2, 'rgba(160,160,170,0.55)', rand(9, 14), -4);
+  }
+
+  // Camera: follow the widow, show the judge's door while she knocks
+  const maxCam = Math.max(0, worldW - W);
+  let target = widow ? clamp(widow.x - W * 0.35, 0, maxCam) : 0;
+  if (['knock', 'react', 'giveIn'].includes(phase) || state === 'win') target = maxCam;
+  if (state === 'title') target = 0;
+  camX += (target - camX) * Math.min(1, dt * 3);
+  camX = clamp(camX, 0, maxCam);
+
+  shockT = Math.max(0, shockT - dt);
+  worryT = Math.max(0, worryT - dt);
+  wowT = Math.max(0, wowT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  fadeT = Math.max(0, fadeT - dt);
+  doorShake = Math.max(0, doorShake - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

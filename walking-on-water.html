@@ -88,6 +88,12 @@
     font-size: 0.92rem;
     margin: 10px 0 4px;
   }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
   .card .score {
     text-align: center;
     font-size: 1.1rem;
@@ -143,8 +149,29 @@
   </div>
 </div>
 
+<script src="bible.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
+
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'harp', accent: 'pipe', ambience: 'none', percussion: false };
+
+// Scripture shown in this game. KJV is filled in; other versions are added later.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  come:     { ref: 'Matthew 14:29',    KJV: 'And he said, Come. And when Peter was come down out of the ship, he walked on the water, to go to Jesus.', NKJV: 'So He said, “Come.” And when Peter had come down out of the boat, he walked on the water to go to Jesus.', NIV: '“Come,” he said. Then Peter got down out of the boat, walked on the water and came toward Jesus.', NLT: '“Yes, come,” Jesus said. So Peter went over the side of the boat and walked on the water toward Jesus.' },
+  sonOfGod: { ref: 'Matthew 14:32\u201333', KJV: 'And when they were come into the ship, the wind ceased. Then they that were in the ship came and worshipped him, saying, Of a truth thou art the Son of God.', NKJV: 'And when they got into the boat, the wind ceased. Then those who were in the boat came and worshiped Him, saying, “Truly You are the Son of God.”', NIV: 'And when they climbed into the boat, the wind died down. Then those who were in the boat worshiped him, saying, “Truly you are the Son of God.”', NLT: 'When they climbed back into the boat, the wind stopped. Then the disciples worshiped him. “You really are the Son of God!” they exclaimed.' },
+  caught:   { ref: 'Matthew 14:31',    KJV: 'And immediately Jesus stretched forth his hand, and caught him, and said unto him, O thou of little faith, wherefore didst thou doubt?', NKJV: 'And immediately Jesus stretched out His hand and caught him, and said to him, “O you of little faith, why did you doubt?”', NIV: 'Immediately Jesus reached out his hand and caught him. “You of little faith,” he said, “why did you doubt?”', NLT: 'Jesus immediately reached out and grabbed him. “You have so little faith,” Jesus said. “Why did you doubt me?”' },
+  saveMe:   { ref: 'Matthew 14:30',    KJV: 'Lord, save me!', NKJV: 'Lord, save me!', NIV: 'Lord, save me!', NLT: 'Save me, Lord!' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
 
 // ============================================================
 //  Setup & helpers
@@ -799,7 +826,7 @@ function drawBoat() {
 // ============================================================
 function win() {
   const p = peter;
-  state = 'win';
+  state = 'win'; syncAmbience();
   p.face = 'joy';
   jesusReach = true;
   const par = cfg.dist / 55;
@@ -820,9 +847,9 @@ function win() {
 }
 
 function fail() {
-  state = 'fail';
+  state = 'fail'; syncAmbience();
   jesusReach = false;
-  showMessage('"Lord, save me!"');
+  showMessage(`"${Bible.verse(VERSES.saveMe).text}"`);
   sfx.fail();
   endTimer = 3.2;
 }
@@ -864,26 +891,28 @@ function resetScene() {
 }
 
 function titleScreen() {
-  state = 'title';
+  state = 'title'; syncAmbience();
   level = 1;
   resetScene();
   const touch = matchMedia('(pointer: coarse)').matches;
   showOverlay('Walking on Water', 'Keep your eyes on Jesus',
-    `<p class="verse">"And he said, Come. And when Peter was come down out of the ship, he walked on the water, to go to Jesus." &mdash; Matthew 14:29</p>
+    `${verseHTML('come')}
      <ul>
        <li>Help Peter walk across the stormy sea to <b>Jesus</b>.</li>
        <li><b>Jump the waves:</b> ${touch ? '<b>tap</b> the screen' : '<kbd>&uarr;</kbd> / <kbd>Space</kbd>, or click'}.</li>
        <li><b>Fears</b> drift in to block his view of Jesus. ${touch ? '<b>Tap them</b>' : 'Click them or press <kbd>F</kbd>'} to chase them away.</li>
        <li>While Peter can't see Jesus his <b>Faith</b> drains and he starts to sink. Keep your eyes on Jesus!</li>
      </ul>
-     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
     'Step out of the boat', () => { level = 1; totalScore = 0; startLevel(); });
 }
 
 function startLevel() {
   resetScene();
-  state = 'play';
+  state = 'play'; syncAmbience();
   hideOverlay();
+  sfx.levelStart();
   showMessage(`Level ${level}: ${cfg.name}`);
   if (level === 1) {
     tutFear = false;
@@ -898,14 +927,15 @@ function endScreens(dt) {
   if (state === 'win') {
     const s = lastScore;
     showOverlay('Safe with Jesus!', `Level ${level} complete — ${cfg.name}`,
-      `<p class="verse">"And when they were come into the ship, the wind ceased. Then they that were in the ship came and worshipped him, saying, Of a truth thou art the Son of God." &mdash; Matthew 14:32&ndash;33</p>
+      `${verseHTML('sonOfGod')}
        <p class="score">Faith left: <b>${s.faith}</b><br>Quick steps: <b>${s.time}</b><br>Fears chased away: <b>${s.doubts}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
-       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
       'Next Crossing', () => { level++; startLevel(); });
   } else if (state === 'fail') {
     showOverlay('Jesus caught him!', `Level ${level} — ${cfg.name}`,
       `<p style="text-align:center">Peter looked at the storm and began to sink, but Jesus reached out His hand straight away.</p>
-       <p class="verse">"And immediately Jesus stretched forth his hand, and caught him, and said unto him, O thou of little faith, wherefore didst thou doubt?" &mdash; Matthew 14:31</p>
+       ${verseHTML('caught')}
        <p class="score">Score so far: <b>${totalScore}</b></p>`,
       'Try Again', () => startLevel());
   }
@@ -913,10 +943,10 @@ function endScreens(dt) {
 
 function togglePause() {
   if (state === 'play') {
-    state = 'pause';
+    state = 'pause'; syncAmbience();
     showOverlay('Paused', `Level ${level} — ${cfg.name}`, '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> or tap below to carry on.</p>', 'Resume', togglePause);
   } else if (state === 'pause') {
-    state = 'play';
+    state = 'play'; syncAmbience();
     hideOverlay();
   }
 }
@@ -982,6 +1012,11 @@ function hudButtons() {
 // ============================================================
 //  Sound (tiny WebAudio synth)
 // ============================================================
+// The theme's ambient bed plays only during active play: never behind a card, while muted or once the page is hidden
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+addEventListener('pagehide', () => Music.ambience(false));
+
 const sfx = {
   ctx: null, master: null, windGain: null, noise: null, muted: false,
   init() {
@@ -992,6 +1027,7 @@ const sfx = {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 0.5;
       this.master.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -1010,6 +1046,7 @@ const sfx = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
   },
   wind(level) {
     if (!this.windGain) return;
@@ -1041,14 +1078,9 @@ const sfx = {
   splash(v) { this.burst(1400, 0.5 * v, 0.35); },
   chime() { this.tone(1046.5, 0.35, 'triangle', 0.18); this.tone(1568, 0.4, 'sine', 0.1, 0.06); },
   thunder() { this.burst(300, 0.9, 1.3, 'lowpass'); },
-  win() {
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, i * 0.13));
-    [523.25, 659.25, 783.99].forEach((f) => { this.tone(f, 1.8, 'sine', 0.12, 0.55); this.tone(f * 1.005, 1.8, 'sine', 0.08, 0.55); });
-  },
-  fail() {
-    [392, 349.2, 293.7].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.2, i * 0.18));
-    [392, 493.9, 587.3].forEach((f) => this.tone(f, 1.4, 'sine', 0.1, 1.6));
-  },
+  win() { Music.win(); },
+  levelStart() { Music.start(); },
+  fail() { Music.fail(); },
 };
 
 // ============================================================

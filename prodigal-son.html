@@ -1,0 +1,2652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>The Prodigal Son</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Prodigal Son</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: false };
+
+// Scripture shown in this game, looked up in the player's chosen version.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  wayOff:    { ref: 'Luke 15:20', KJV: 'But when he was yet a great way off, his father saw him, and had compassion, and ran, and fell on his neck, and kissed him.', NKJV: 'But when he was still a great way off, his father saw him and had compassion, and ran and fell on his neck and kissed him.', NIV: 'But while he was still a long way off, his father saw him and was filled with compassion for him; he ran to his son, threw his arms around him and kissed him.', NLT: 'And while he was still a long way off, his father saw him coming. Filled with love and compassion, he ran to his son, embraced him, and kissed him.' },   // title card
+  aliveAgain: { ref: 'Luke 15:24', KJV: 'For this my son was dead, and is alive again; he was lost, and is found.', NKJV: 'For this my son was dead and is alive again; he was lost and is found.', NIV: 'For this son of mine was dead and is alive again; he was lost and is found.', NLT: 'For this son of mine was dead and has now returned to life. He was lost, but now he is found.' },   // win card
+  arise:     { ref: 'Luke 15:18', KJV: 'I will arise and go to my father', NKJV: 'I will arise and go to my father', NIV: 'I will set out and go back to my father', NLT: 'I will go home to my father' },   // son's bubble + fail card
+  twoSons:   { ref: 'Luke 15:11', KJV: 'A certain man had two sons', NKJV: 'A certain man had two sons', NIV: 'There was a man who had two sons', NLT: 'A man had two sons' },   // Jesus's bubble
+  husks:     { ref: 'Luke 15:16', KJV: 'And he would fain have filled his belly with the husks that the swine did eat', NKJV: 'And he would gladly have filled his stomach with the pods that the swine ate', NIV: 'He longed to fill his stomach with the pods that the pigs were eating', NLT: 'Even the pods he was feeding the pigs looked good to him' },   // banner
+  cameTo:    { ref: 'Luke 15:17', KJV: 'And when he came to himself', NKJV: 'But when he came to himself', NIV: 'When he came to his senses', NLT: 'When he finally came to his senses' },   // banner
+  ran:       { ref: 'Luke 15:20', KJV: 'His father saw him, and had compassion, and ran', NKJV: 'His father saw him and had compassion, and ran', NIV: 'His father saw him and was filled with compassion for him; he ran to his son', NLT: 'Filled with love and compassion, he ran to his son' },   // banner
+  embrace:   { ref: 'Luke 15:20', KJV: 'And fell on his neck, and kissed him', NKJV: 'And fell on his neck and kissed him', NIV: 'Threw his arms around him and kissed him', NLT: 'Embraced him, and kissed him' },   // banner
+  bestRobe:  { ref: 'Luke 15:22', KJV: 'Bring forth the best robe, and put it on him; and put a ring on his hand, and shoes on his feet', NKJV: 'Bring out the best robe and put it on him, and put a ring on his hand and sandals on his feet', NIV: 'Quick! Bring the best robe and put it on him. Put a ring on his finger and sandals on his feet', NLT: 'Quick! Bring the finest robe in the house and put it on him. Get a ring for his finger and sandals for his feet' },   // father's bubble
+  merry:     { ref: 'Luke 15:23', KJV: 'Let us eat, and be merry', NKJV: 'Let us eat and be merry', NIV: 'Let’s have a feast and celebrate', NLT: 'We must celebrate with a feast' },   // father's bubble
+  music:     { ref: 'Luke 15:25', KJV: 'He heard musick and dancing', NKJV: 'He heard music and dancing', NIV: 'He heard music and dancing', NLT: 'He heard music and dancing in the house' },   // banner
+  angry:     { ref: 'Luke 15:28', KJV: 'And he was angry, and would not go in', NKJV: 'But he was angry and would not go in', NIV: 'The older brother became angry and refused to go in', NLT: 'The older brother was angry and wouldn’t go in' },   // banner
+  ever:      { ref: 'Luke 15:31', KJV: 'Thou art ever with me, and all that I have is thine', NKJV: 'You are always with me, and all that I have is yours', NIV: 'You are always with me, and everything I have is yours', NLT: 'You have always stayed by me, and everything I have is yours' },   // father's bubble
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function mix(a, b, f) {
+  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(lerp((na >> s) & 255, (nb >> s) & 255, f));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+// ============================================================
+//  Tuning
+// ============================================================
+const CH = 1.55;          // drawing scale for people on the road
+const WALK_V = 150;       // the son's walking speed during a stride (px/s)
+const STRIDE = 0.75;      // one good tap keeps him walking this long (s)
+const STUMBLE_T = 0.9;    // time spent picking himself up after a stumble
+const RUN_KICK = 62;      // speed each tap gives the running father
+const RUN_MAX = 440;      // the father's top speed
+const RUN_DRAG = 1.3;     // he slows down quickly when you stop tapping
+const HOP_T = 0.55;       // time in the air for a hop
+const HOP_WIN = 150;      // a tap this close before an obstacle is a hop
+const SON_SLOW = 24;      // the son still trudges on while the father runs
+const MEET_D = 52;        // this close and they embrace
+const HUG_TAPS = 3;       // hugs to melt the older brother's frown
+const FADE = 0.35;        // scene fade (each way)
+
+const LEVEL_NAMES = [
+  'The Road Home',
+  'Over the Hills',
+  'The Long Valley',
+  'Past the Far-Country Inns',
+  'Dusty Roads',
+  'The Last Mile',
+];
+
+function makeConfig(n) {
+  const walkLen = Math.min(1500 + (n - 1) * 550, 4800);
+  const runLen = Math.min(1200 + (n - 1) * 400, 3400);
+  const walkStart = 460;
+  const walkEnd = walkStart + walkLen;
+  const homeX = walkEnd + runLen + 120;                 // where the father starts running
+  const obstacles = n === 1 ? 3 : Math.min(3 + (n - 1) * 2, Math.floor((runLen - 500) / 240));
+  return {
+    name: LEVEL_NAMES[n - 1] || `Homecoming ${n}`,
+    walkStart, walkEnd, homeX, runLen,
+    distractions: Math.min(n, 6),
+    shakes: Math.min(3 + Math.floor((n - 1) / 2), 6),   // head-shakes needed to say no
+    minGap: Math.min(0.26 + (n - 1) * 0.02, 0.36),     // tapping faster than this = stumble
+    sitAfter: Math.max(2.6 - (n - 1) * 0.2, 1.6),      // standing still this long = sits down
+    idleDrain: 5 + (n - 1) * 1.2,                      // hope per second while standing
+    sitDrain: 10 + (n - 1) * 2,                        // ...and while sitting
+    lureDrain: 4 + (n - 1) * 1.2,                      // ...and while being tempted
+    runDrain: 3 + (n - 1) * 0.9,                       // ...while waiting for the father
+    obstacles,
+    runPar: runLen / 250 + obstacles * 0.3,
+    feeds: 6,                                          // husks to toss before he comes to himself
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('prodigalBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let scene = 'frame';      // frame | pigs | walk | see | run | hug | feast
+let sceneT = 0;
+let seenIntro = false;    // retrying a level skips the story's opening scenes
+const cam = { x: 0 };
+let son, father, brother;
+let pigs = [], husks = [], distractions = [], obstacles = [], deco = [], guests = [];
+let particles = [], ripples = [];
+let bubbles = {};         // speech bubbles by speaker
+let banner = null;        // narration strip at the top
+let hint = null;          // instruction at the bottom
+let message = { text: '', t: 0 };
+let hope = 100;
+let lure = null;          // the distraction tempting him right now
+let stats;
+let feast;
+let drag = null;
+let fade = null;
+let pigPhase = 'feed', bulbT = 0, feedCount = 0, saidArise = false;
+let hugMid = 0;
+let shakeT = 0, flashT = 0;
+let endTimer = 0;
+let lastScore = null;
+let failReason = '';
+let musicT = 0, musicI = 0;
+
+// The people of the story
+const SON_LOOK = { robe: '#8a6a44', skin: '#dcaa78', hair: '#5a3a1c', beard: false, messy: true, rag: true, i: 1 };
+const FATHER_LOOK = { robe: '#2f5fa8', trim: '#f2c94c', skin: '#d9a070', hair: '#ece8de', brow: '#a39c90', beard: true, longBeard: true, sandals: true, i: 0 };
+const BROTHER_LOOK = { robe: '#4f7f3a', skin: '#d8a272', hair: '#3a2616', beard: true, sandals: true, i: 2 };
+
+function person(look, extra) {
+  return {
+    ...look, x: 0, y: 0, s: CH, mood: 'watch', pose: 'stand', facing: 1,
+    walkT: 0, blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU), shake: 0, ...extra,
+  };
+}
+
+function newSon() {
+  return person(SON_LOOK, {
+    x: 440, facing: -1, mood: 'longing', stride: 0, idle: 0, sitting: false, stumble: 0,
+    lastTap: -9, streak: 0, bulb: 0, toss: 0, fine: false, ring: false, shoes: false,
+  });
+}
+function newFather() {
+  return person(FATHER_LOOK, { x: cfg.homeX, facing: -1, v: 0, hop: 0, hopV: 0, stun: 0 });
+}
+function newBrother() { return person(BROTHER_LOOK, { mood: 'sulk', pose: 'fold', facing: -1 }); }
+
+// Jesus's listeners: tax collectors near Him, Pharisees standing apart
+const LISTENERS = [
+  { robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070', tax: true },
+  { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184', tax: true },
+  { robe: '#7a4fa0', hair: '#3a2716', beard: true, skin: '#c58a55', tax: true, scarf: '#e8dcc0' },
+  { robe: '#3d5a8a', hair: '#8a8a8a', beard: true, skin: '#d9a066', tax: false, scarf: '#f4f1e8', tall: true },
+  { robe: '#2f4f6f', hair: '#2a1a0e', beard: true, skin: '#c88e5a', tax: false, scarf: '#f4f1e8', tall: true },
+  { robe: '#44607f', hair: '#1c120b', beard: true, skin: '#c78f5c', tax: false, scarf: '#f4f1e8', tall: true },
+].map((d, i) => person(d, { i, mood: d.tax ? 'wow' : 'doubt', pose: d.tax ? 'stand' : 'fold', delay: rand(0.05, 0.5), switchT: 0 }));
+
+// Friends and servants at the feast
+const GUEST_LOOKS = [
+  { robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: true, skin: '#b87a48', scarf: '#e8dcc0' },
+  { robe: '#d9a13a', hair: '#2a1a0e', beard: false, skin: '#e3b184' },
+  { robe: '#7a4fa0', hair: '#3a2515', beard: true, skin: '#d39a66' },
+  { robe: '#a0673a', hair: '#6b3f1d', beard: true, skin: '#c98d56', lyre: true },   // the musician
+];
+
+// ============================================================
+//  World (the road from the far country home)
+// ============================================================
+function groundY(wx) {
+  return H - 150 + 34 * Math.sin(wx / 380) + 14 * Math.sin(wx / 150 + 1.3);
+}
+
+// 0 in the dusty far country, 1 in the green fields of home
+function countryF(wx) {
+  return clamp((wx - cfg.walkStart - 300) / Math.max(1, cfg.homeX - cfg.walkStart - 600), 0, 1);
+}
+
+const TENT_LINES = ["Come back! The party's just getting started!", 'Hey friend! Stay for one more song?', 'Why go home? The fun is here!'];
+const DICE_LINES = ['One more throw of the dice?', 'Feeling lucky? Sit down and play!', 'Just one game, friend!'];
+const NO_LINES = ["No thanks. I'm going home!", "Not again. I'm going home!", "No! Home is this way!"];
+
+function makeDistractions() {
+  const list = [];
+  const n = cfg.distractions;
+  const a = cfg.walkStart + 520, b = cfg.walkEnd - 260;
+  for (let i = 0; i < n; i++) {
+    const x = n === 1 ? (a + b) / 2 : lerp(a, b, i / (n - 1));
+    const kind = i % 2 === 0 ? 'tent' : 'dice';
+    const folk = kind === 'tent'
+      ? [person({ robe: '#e0527a', hair: '#2a1a0e', beard: false, skin: '#dca678', scarf: '#ffd84a' }, { i: 3, pose: 'beckon', mood: 'joy', facing: -1, dx: -64, s: CH * 0.9 })]
+      : [person({ robe: '#6b8e3a', hair: '#1c120b', beard: true, skin: '#c58a55' }, { i: 4, pose: 'beckon', mood: 'joy', facing: -1, dx: -58, s: CH * 0.9 }),
+         person({ robe: '#b08a2e', hair: '#4a2f1a', beard: true, skin: '#d7a070' }, { i: 5, pose: 'sit', mood: 'watch', facing: -1, dx: 50, s: CH * 0.9 })];
+    list.push({ x, kind, done: false, left: cfg.shakes, phase: rand(0, TAU), folk, line: (kind === 'tent' ? TENT_LINES : DICE_LINES)[Math.floor(i / 2) % 3] });
+  }
+  return list;
+}
+
+function makeObstacles() {
+  const list = [];
+  const n = cfg.obstacles;
+  const a = cfg.homeX - 260, b = cfg.walkEnd + 330;
+  const kinds = ['fence', 'goat', 'stream'];
+  for (let i = 0; i < n; i++) {
+    const kind = i < 3 ? kinds[i] : kinds[Math.floor(Math.random() * 3)];
+    const x = n === 1 ? (a + b) / 2 : lerp(a, b, i / (n - 1));
+    list.push({ x, kind, w: { fence: 34, goat: 54, stream: 100 }[kind], cleared: false, bumped: false, phase: rand(0, TAU), bleat: 0 });
+  }
+  return list;
+}
+
+function makeDeco() {
+  const list = [];
+  for (let x = -500; x < cfg.homeX + 1100; x += rand(170, 330)) {
+    if (x > 60 && x < 560) continue;   // keep the pig pen clear
+    list.push({ x, kind: Math.random() < 0.55 ? 'tree' : Math.random() < 0.6 ? 'bush' : 'rock', s: rand(0.7, 1.1), up: rand(18, 40) });
+  }
+  return list;
+}
+
+function makePigs() {
+  return [
+    { x: 200, f: 1, munch: 0, phase: rand(0, TAU) },
+    { x: 262, f: 1, munch: 0, phase: rand(0, TAU), back: true },
+    { x: 360, f: -1, munch: 0, phase: rand(0, TAU) },
+  ];
+}
+const TROUGH_X = 285;
+
+function makeGuests() {
+  return GUEST_LOOKS.map((g, i) => person(g, { i: i + 6, mood: 'wow', s: 1, dim: true }));
+}
+
+function resetLevelState() {
+  cfg = makeConfig(level);
+  son = newSon();
+  father = newFather();
+  brother = newBrother();
+  pigs = makePigs();
+  husks = [];
+  distractions = makeDistractions();
+  obstacles = makeObstacles();
+  deco = makeDeco();
+  guests = makeGuests();
+  particles = []; ripples = [];
+  bubbles = {}; banner = null; hint = null;
+  message = { text: '', t: 0 };
+  hope = 100;
+  lure = null;
+  stats = { steady: 0, resisted: 0, runTime: 0, hops: 0, items: 0, hopeAtMeet: 0 };
+  feast = {
+    step: 'dress', stepT: 0, lamps: 0, food: false, music: false, hugs: 0, hugFx: 0, bro: 0, fwalk: 0,
+    items: ['robe', 'ring', 'shoes'].map((kind, k) => ({ kind, k, placed: false, x: 0, y: 0, fly: null, back: null })),
+  };
+  drag = null; fade = null;
+  pigPhase = 'feed'; bulbT = 0; feedCount = 0; saidArise = false;
+  shakeT = flashT = 0;
+  endTimer = 0;
+  musicT = 0; musicI = 0;
+}
+
+// ============================================================
+//  Speech, banners, hints
+// ============================================================
+function say(who, text, dur = 3) { bubbles[who] = { text, t: dur }; }
+function setBanner(key, dur = 3.5) {
+  const v = Bible.verse(VERSES[key]);
+  banner = { text: v.text, cite: v.cite, t: dur, age: 0 };
+}
+function setBannerText(text, dur = 3.5) { banner = { text, cite: '', t: dur, age: 0 }; }
+function showHint(text, dur = 3) { hint = { text, t: dur }; }
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Scenes
+// ============================================================
+function fadeTo(next) { if (!fade) fade = { t: 0, next, done: false }; }
+
+function setScene(name) {
+  scene = name;
+  sceneT = 0;
+  particles = [];
+  bubbles = {};
+  hint = null;
+  if (name === 'frame') {
+    say('jesus', verseText('twoSons'), level === 1 ? 4.4 : 3.2);
+    setBannerText('Jesus tells a story to the tax collectors and Pharisees', level === 1 ? 4.4 : 3.2);
+  } else if (name === 'pigs') {
+    son.x = 440; son.facing = -1; son.mood = 'longing';
+    cam.x = 300 - W / 2;
+    setBannerText('The younger son spent everything in a far country…', 3);
+    showHint(isTouch() ? 'Tap to feed the pigs' : 'Tap / press Space to feed the pigs', 4);
+  } else if (name === 'walk') {
+    seenIntro = true;
+    son.x = cfg.walkStart - 20; son.facing = 1; son.bulb = 0; son.mood = 'watch';
+    son.lastTap = t - 1; son.stride = 0; son.idle = 0; son.sitting = false; son.stumble = 0;
+    cam.x = son.x - W * 0.35;
+    if (!saidArise) say('son', verseText('arise'), 3.2);
+    showHint(isTouch() ? 'Tap… tap… tap… a steady walk home' : 'Space… Space… a steady walk home', 4);
+  } else if (name === 'see') {
+    son.stride = 0; son.pose = 'trudge';
+    father.x = cfg.homeX; father.facing = -1; father.mood = 'watch'; father.pose = 'shade';
+    hope = Math.min(100, hope + 25);
+    setBanner('ran', 4.2);
+    sfx.ding();
+  } else if (name === 'run') {
+    father.pose = 'run'; father.mood = 'joy'; father.v = 0;
+    showHint(isTouch() ? 'You are the father! Tap fast to run!' : 'You are the father! Tap Space fast to run! ↑ to hop', 3.5);
+  } else if (name === 'hug') {
+    hugMid = (father.x + son.x) / 2;
+    stats.hopeAtMeet = hope;
+    setBanner('embrace', 3.8);
+    sfx.levelStart();
+  } else if (name === 'feast') {
+    son.fine = son.ring = son.shoes = false;
+    son.mood = 'worried'; son.lx = son.ly = undefined;
+    son.sitting = false; son.stumble = 0;
+    say('father', verseText('bestRobe'), 6);
+    showHint(isTouch() ? 'Drag the robe, ring and shoes onto your son' : 'Drag the robe, ring and shoes onto him (or press Space)', 6);
+  }
+}
+
+// ---------- Part 1: the far country ----------
+function feedPig() {
+  if (pigPhase !== 'feed' || feedCount + husks.length >= cfg.feeds + 2) return;
+  const pg = pigs[Math.floor(Math.random() * pigs.length)];
+  son.toss = 1;
+  husks.push({ x0: son.x - 22, y0: groundY(son.x) - 62, x1: TROUGH_X + (pg.x - TROUGH_X) * 0.5, y1: groundY(TROUGH_X) - 22, t: 0, dur: 0.45, pig: pg, spin: rand(-8, 8) });
+  sfx.puff(0.12);
+  if (feedCount === 0) setBanner('husks', 4.5);
+}
+
+function updatePigs(dt) {
+  cam.x += ((300 - W / 2) - cam.x) * Math.min(1, dt * 4);
+  son.toss = Math.max(0, son.toss - dt * 3);
+  son.pose = 'feed';
+  for (const pg of pigs) pg.munch = Math.max(0, pg.munch - dt);
+  for (let i = husks.length - 1; i >= 0; i--) {
+    const h = husks[i];
+    h.t += dt;
+    if (h.t >= h.dur) {
+      husks.splice(i, 1);
+      h.pig.munch = 1.4;
+      feedCount++;
+      sfx.oink();
+      for (let k = 0; k < 5; k++) spawn(h.x1 + rand(-10, 10), h.y1, rand(-40, 40), rand(-90, -30), 0.6, '#c9a15a', rand(2, 3.5), 200);
+      hearts(h.pig.x, groundY(h.pig.x) - 60, 2);
+      if (feedCount === 3) showMessage('Grumble… grumble… goes his tummy', 2);
+    }
+  }
+  if (pigPhase === 'feed') {
+    son.mood = 'longing'; son.facing = -1;
+    son.lx = -0.8; son.ly = 0.5;
+    if (feedCount >= cfg.feeds && husks.length === 0) {
+      pigPhase = 'bulb'; bulbT = 0;
+      sfx.ding(); flashT = 0.25;
+      setBanner('cameTo', 4);
+      son.lx = undefined; son.ly = undefined;
+    }
+  } else {
+    bulbT += dt;
+    son.bulb = Math.min(1, bulbT * 3);
+    son.mood = bulbT < 1.3 ? 'wow' : 'watch';
+    son.pose = 'stand';
+    if (bulbT > 1.3 && !saidArise) { saidArise = true; son.facing = 1; say('son', verseText('arise'), 4); }
+    if (bulbT > 2.6 && !hint) showHint(isTouch() ? 'Tap to set off for home!' : 'Press Space to set off for home!', 4);
+    if (bulbT > 6.5) fadeTo('walk');
+  }
+}
+
+// ---------- Part 2: the long walk home ----------
+function walkTap() {
+  const s = son;
+  if (lure) { shakeHead(); return; }
+  if (s.stumble > 0) return;
+  if (s.sitting) {
+    s.sitting = false; s.idle = 0; s.lastTap = t;
+    sfx.step(0.2);
+    showMessage('Up you get!', 1.2);
+    return;
+  }
+  const gap = t - s.lastTap;
+  s.lastTap = t;
+  if (gap < cfg.minGap) { stumble(); return; }
+  if (gap <= STRIDE + 0.35) { stats.steady++; s.streak++; hope = Math.min(100, hope + 1.5); }
+  else s.streak = 1;
+  s.stride = STRIDE;
+  s.idle = 0;
+  sfx.step(clamp((s.x - cfg.walkStart) / (cfg.walkEnd - cfg.walkStart), 0, 1));
+}
+
+function stumble() {
+  const s = son;
+  s.stumble = STUMBLE_T; s.stride = 0; s.streak = 0;
+  hope = Math.max(0, hope - 6);
+  shakeT = 0.2;
+  showMessage('Too fast! Steady now…', 1.6);
+  sfx.bounce();
+  for (let k = 0; k < 8; k++) spawn(s.x + rand(10, 40), groundY(s.x) - 4, rand(-30, 60), rand(-80, -20), 0.6, '#d9c08a', rand(3, 6), 160);
+}
+
+function shakeHead() {
+  const s = son, d = lure;
+  s.shake = 0.35;
+  d.left--;
+  sfx.no();
+  if (d.left <= 0) {
+    d.done = true;
+    lure = null;
+    stats.resisted++;
+    hope = Math.min(100, hope + 5);
+    say('son', NO_LINES[stats.resisted % NO_LINES.length], 2.2);
+    delete bubbles.lure;
+    for (const f of d.folk) { f.mood = 'watch'; f.pose = f.pose === 'beckon' ? 'stand' : f.pose; }
+    showMessage('Temptation resisted!', 1.6);
+    s.lastTap = t - 1;
+  }
+}
+
+function updateWalk(dt) {
+  const s = son;
+  const target = s.x - W * 0.35;
+  cam.x += (target - cam.x) * Math.min(1, dt * 5);
+  s.facing = 1;
+  s.shake = Math.max(0, s.shake - dt);
+
+  // A distraction just ahead tries to lure him back
+  if (!lure && s.stumble <= 0) {
+    for (const d of distractions) {
+      if (!d.done && s.x >= d.x - 150 && s.x < d.x) {
+        lure = d; s.stride = 0; s.sitting = false;
+        say('lure', d.line, 99);
+        showHint(isTouch() ? 'Tap to shake your head: No!' : 'Press Space to shake your head: No!', 99);
+        break;
+      }
+    }
+  }
+
+  if (s.stumble > 0) {
+    s.stumble -= dt;
+    s.pose = 'stumble'; s.mood = 'shock';
+  } else if (lure) {
+    s.pose = 'stand';
+    s.mood = lure.left > cfg.shakes / 2 ? 'longing' : 'doubt';
+    hope -= cfg.lureDrain * dt;
+  } else if (s.stride > 0) {
+    s.stride -= dt;
+    const ramp = clamp(s.stride / 0.2, 0, 1);
+    s.x += WALK_V * dt * ramp;
+    s.walkT += dt * 9 * ramp;
+    s.pose = 'trudge';
+    s.mood = hope > 45 ? 'watch' : 'worried';
+    if (hint && hint.t > 50) hint = null;
+  } else {
+    s.idle += dt;
+    if (!s.sitting && s.idle > cfg.sitAfter) {
+      s.sitting = true;
+      showHint(isTouch() ? 'He sat down, discouraged… tap to help him up!' : 'He sat down, discouraged… press Space!', 3);
+    }
+    if (s.sitting) { hope -= cfg.sitDrain * dt; s.pose = 'sit'; s.mood = 'sad'; }
+    else {
+      s.pose = 'stand'; s.mood = 'worried';
+      if (s.idle > 0.5) hope -= cfg.idleDrain * dt;
+      if (s.idle > 1 && (!hint || hint.t <= 0)) showHint('Keep walking!', 1.5);
+    }
+  }
+  if (!lure && hint && hint.t > 50) hint = null;
+  s.y = groundY(s.x);
+  if (hope <= 0) { hope = 0; fail('walk'); return; }
+  if (s.x >= cfg.walkEnd) setScene('see');
+}
+
+// ---------- Part 3: the father runs ----------
+function nextObstacle() {
+  let best = null;
+  for (const o of obstacles) {
+    if (o.cleared) continue;
+    const ahead = (father.x - 14) - (o.x + o.w / 2);
+    if (ahead >= -o.w && (!best || ahead < best.ahead)) best = { o, ahead };
+  }
+  return best;
+}
+
+function runTap(hopOnly = false) {
+  const f = father;
+  if (f.stun > 0) return;
+  const nx = nextObstacle();
+  if (f.hop <= 0 && nx && nx.ahead <= HOP_WIN) {
+    // Hop over it: always clears once you hop inside the window
+    const travel = Math.max(0, nx.ahead) + nx.o.w + 44;
+    f.hop = HOP_T; f.hopV = travel / HOP_T;
+    nx.o.cleared = true;
+    if (!nx.o.bumped) { stats.hops++; showMessage(['Hop!', 'Over the goat!', 'Splash-free!'][['fence', 'goat', 'stream'].indexOf(nx.o.kind)], 1); }
+    if (nx.o.kind === 'goat') { nx.o.bleat = 0.6; sfx.bleat(); }
+    sfx.hop();
+    return;
+  }
+  if (hopOnly) return;
+  f.v = Math.min(RUN_MAX, f.v + RUN_KICK);
+  sfx.patter();
+  if (Math.random() < 0.5) spawn(f.x + 12, groundY(f.x) - 3, rand(20, 60), rand(-50, -10), 0.5, '#e2cf9c', rand(3, 5), 100);
+}
+
+function updateSee(dt) {
+  const from = son.x - W * 0.35, to = cfg.homeX - W * 0.62;
+  cam.x = lerp(from, to, ease(clamp(sceneT / 1.8, 0, 1)));
+  son.x += SON_SLOW * dt; son.y = groundY(son.x); son.walkT += dt * 3; son.pose = 'trudge'; son.mood = 'worried';
+  father.y = groundY(father.x);
+  if (sceneT > 1.2) { father.pose = 'open'; father.mood = 'wow'; }
+  if (sceneT > 2.6) setScene('run');
+}
+
+function updateRun(dt) {
+  const f = father, s = son;
+  stats.runTime += dt;
+  f.v *= Math.exp(-RUN_DRAG * dt);
+  if (f.stun > 0) { f.stun -= dt; f.v = 0; f.pose = 'stand'; f.mood = 'shock'; }
+  if (f.hop > 0) {
+    f.hop -= dt;
+    f.x -= f.hopV * dt;
+    f.pose = 'hop';
+    f.lift = Math.sin(Math.PI * (1 - Math.max(0, f.hop) / HOP_T)) * 46;
+    if (f.hop <= 0) { f.lift = 0; f.v = Math.max(f.v, 120); }
+  } else if (f.stun <= 0) {
+    f.x -= f.v * dt;
+    f.walkT += dt * (4 + f.v / 22);
+    f.pose = f.v > 20 ? 'run' : 'stand';
+    f.mood = 'joy';
+    // Running into an obstacle without hopping
+    for (const o of obstacles) {
+      if (o.cleared) continue;
+      const ahead = (f.x - 14) - (o.x + o.w / 2);
+      if (ahead < 0 && f.x > o.x - o.w / 2) {
+        f.x = o.x + o.w / 2 + 15; f.v = 0; f.stun = 0.6; o.bumped = true;
+        shakeT = 0.2;
+        showMessage(o.kind === 'goat' ? 'Meh-eh-eh! Hop over the goat!' : o.kind === 'stream' ? 'Whoa! Hop over the stream!' : 'Oof! Hop over the fence!', 1.6);
+        if (o.kind === 'goat') { o.bleat = 0.8; sfx.bleat(); } else sfx.bounce();
+        break;
+      }
+    }
+  }
+  f.y = groundY(f.x);
+
+  // The son waits a great way off, losing heart
+  hope -= cfg.runDrain * dt;
+  const near = f.x - s.x < W * 0.7;
+  if (hope > 25) { s.x += SON_SLOW * dt; s.walkT += dt * 3; s.pose = near ? 'stand' : 'trudge'; s.mood = near ? 'wow' : 'worried'; }
+  else { s.pose = near ? 'stand' : 'sit'; s.mood = near ? 'wow' : 'sad'; }
+  s.y = groundY(s.x);
+
+  const target = f.x - W * 0.62;
+  cam.x += (target - cam.x) * Math.min(1, dt * 6);
+  for (const o of obstacles) o.bleat = Math.max(0, o.bleat - dt);
+
+  if (hope <= 0) { hope = 0; fail('run'); return; }
+  if (f.x - s.x < MEET_D) setScene('hug');
+}
+
+function updateHug(dt) {
+  const f = father, s = son;
+  f.lift = 0;
+  f.x = lerp(f.x, hugMid + 13, Math.min(1, dt * 6));
+  s.x = lerp(s.x, hugMid - 13, Math.min(1, dt * 6));
+  f.y = groundY(f.x); s.y = groundY(s.x);
+  f.pose = 'hug'; s.pose = 'hug'; f.facing = -1; s.facing = 1;
+  f.mood = 'joy'; s.mood = 'joy';
+  cam.x += ((hugMid - W / 2) - cam.x) * Math.min(1, dt * 3);
+  if (Math.random() < dt * 9) {
+    const who = Math.random() < 0.5 ? f : s;
+    spawn(who.x + rand(-9, 9), who.y - 50 * CH, rand(-15, 15), rand(-10, 20), 0.9, '#7cc4f2', 3, 260, 'tear');
+  }
+  if (Math.random() < dt * 5) spawn(hugMid + rand(-30, 30), s.y - 90 * CH, rand(-20, 20), rand(-60, -30), 1.6, '#ff6b8a', rand(5, 8), 0, 'heart');
+  if (sceneT > 3.9) fadeTo('feast');
+}
+
+// ---------- Part 4: the celebration ----------
+function feastLayout() {
+  const narrow = W < 700;
+  const gy = H - 150;
+  const ps = narrow ? 1.6 : 2.0;
+  const sonX = W * 0.5 + (narrow ? 14 : 0);
+  return {
+    gy, ps, narrow, sonX,
+    fatherX0: sonX - (narrow ? 84 : 118),
+    panelX: narrow ? 58 : Math.max(96, W * 0.15),
+    itemY: narrow ? [gy - 432, gy - 352, gy - 272] : [gy - 400, gy - 300, gy - 200],
+    lamps: (narrow ? [0.3, 0.52, 0.74] : [0.22, 0.5, 0.78]).map((f) => W * f), lampY: 300,
+    brotherX: W - (narrow ? 62 : 120),
+    tableY: gy + 58,
+    guestX: [0.32, 0.42, 0.6, 0.7, narrow ? 0.12 : 0.16].map((f) => W * f),
+    gs: narrow ? 1.15 : 1.55,
+  };
+}
+
+function itemHome(it, L) { return { x: L.panelX, y: L.itemY[it.k] }; }
+function sonTarget(L) { return { x: L.sonX, y: L.gy - 55 * L.ps }; }
+
+function placeItem(it) {
+  it.placed = true; it.fly = null; it.back = null;
+  if (it.kind === 'robe') son.fine = true;
+  if (it.kind === 'ring') son.ring = true;
+  if (it.kind === 'shoes') son.shoes = true;
+  stats.items++;
+  const L = feastLayout(), tg = sonTarget(L);
+  for (let i = 0; i < 24; i++) {
+    const a = rand(0, TAU), sp = rand(40, 160);
+    spawn(tg.x, tg.y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.2), ['#ffe27a', '#fff6d0', '#ffd1e8'][i % 3], rand(2, 4), 40);
+  }
+  showMessage({ robe: 'The best robe!', ring: 'A ring for his hand!', shoes: 'Shoes for his feet!' }[it.kind], 1.4);
+  sfx.chime(0.4 + stats.items * 0.1);
+  cheerGuests();
+  if (feast.items.every((x) => x.placed)) { feast.step = 'lampsWait'; feast.stepT = 0; hint = null; }
+}
+
+function flyItem(it) {
+  if (it.placed || it.fly) return;
+  it.fly = { t: 0, x0: it.x, y0: it.y };
+}
+
+function cheerGuests() {
+  const n = stats.items + feast.lamps;
+  guests.forEach((g, i) => { if (i < n) g.mood = 'joy'; });
+  son.mood = son.fine && son.ring && son.shoes ? 'joy' : son.fine ? 'wow' : 'worried';
+}
+
+function feastTap(x, y) {
+  const st = feast.step;
+  if (st === 'dress') {
+    // Tapping an item sends it flying onto him; tapping elsewhere just reminds you
+    const next = feast.items.find((it) => !it.placed && !it.fly);
+    if (x === null && next) { flyItem(next); return; }
+    showHint('Drag the robe, ring and shoes onto your son', 2.5);
+  } else if (st === 'lamps') {
+    feast.lamps++;
+    sfx.chime(0.3 + feast.lamps * 0.15);
+    const L = feastLayout();
+    const lx = L.lamps[feast.lamps - 1];
+    for (let i = 0; i < 14; i++) spawn(lx, L.lampY + 20, rand(-50, 50), rand(-70, 10), 0.8, '#ffd76a', rand(2, 4), 60);
+    cheerGuests();
+    if (feast.lamps >= 3) { stats.items++; feast.step = 'foodWait'; feast.stepT = 0; hint = null; }
+  } else if (st === 'food') {
+    feast.food = true; stats.items++;
+    sfx.chime(0.7);
+    say('father', verseText('merry'), 3.4);
+    guests.forEach((g) => (g.mood = 'joy'));
+    const L = feastLayout();
+    for (let i = 0; i < 20; i++) spawn(rand(W * 0.2, W * 0.8), L.tableY - 10, rand(-30, 30), rand(-90, -30), 0.9, '#fff6d0', rand(2, 4), 80);
+    feast.step = 'musicWait'; feast.stepT = 0; hint = null;
+  } else if (st === 'music') {
+    feast.music = true; stats.items++;
+    showMessage('Let the music play!', 1.8);
+    feast.step = 'dance'; feast.stepT = 0; hint = null;
+  } else if (st === 'hug') {
+    feast.hugs++;
+    feast.hugFx = 0.6;
+    hearts(brother.x - 20, brother.y - 100, 4);
+    sfx.chime(0.5 + feast.hugs * 0.15);
+    brother.mood = feast.hugs >= HUG_TAPS ? 'smallsmile' : feast.hugs === HUG_TAPS - 1 ? 'doubt' : 'sulk';
+    if (feast.hugs >= HUG_TAPS) {
+      brother.pose = 'stand';
+      showMessage('A small smile!', 1.6);
+      feast.step = 'smile'; feast.stepT = 0; hint = null;
+    }
+  }
+}
+
+function updateFeast(dt) {
+  const L = feastLayout();
+  feast.stepT += dt;
+  feast.hugFx = Math.max(0, feast.hugFx - dt);
+
+  // Items: dragged, flying to him, drifting back, or waiting in their slots
+  for (const it of feast.items) {
+    const home = itemHome(it, L), tg = sonTarget(L);
+    if (it.placed) continue;
+    if (drag && drag.item === it) continue;
+    if (it.fly) {
+      it.fly.t += dt / 0.45;
+      const f = ease(Math.min(1, it.fly.t));
+      it.x = lerp(it.fly.x0, tg.x, f); it.y = lerp(it.fly.y0, tg.y, f) - Math.sin(f * Math.PI) * 60;
+      if (it.fly.t >= 1) placeItem(it);
+    } else if (it.back) {
+      it.back.t += dt / 0.3;
+      const f = ease(Math.min(1, it.back.t));
+      it.x = lerp(it.back.x0, home.x, f); it.y = lerp(it.back.y0, home.y, f);
+      if (it.back.t >= 1) it.back = null;
+    } else { it.x = home.x; it.y = home.y + Math.sin(t * 2 + it.k) * 3; }
+  }
+
+  // People
+  son.x = L.sonX; son.y = L.gy; son.s = L.ps; son.facing = -1;
+  const fx0 = L.fatherX0, fx1 = L.brotherX - 36 * L.ps;
+  father.x = lerp(fx0, fx1, ease(feast.fwalk)); father.y = L.gy; father.s = L.ps; father.lift = 0;
+  guests.forEach((g, i) => { g.x = L.guestX[i]; g.y = L.gy - 70; g.s = L.gs; g.facing = g.x < L.sonX ? 1 : -1; });
+  const dancing = feast.music;
+  son.pose = dancing ? 'dance' : 'stand';
+  guests.forEach((g) => { g.pose = dancing ? (g.lyre ? 'play' : 'dance') : 'stand'; });
+
+  // Steps
+  const st = feast.step;
+  if (st === 'dress') {
+    father.pose = 'open'; father.mood = 'joy'; father.facing = 1;
+  } else if (st === 'lampsWait') {
+    if (feast.stepT > 0.8) { feast.step = 'lamps'; feast.stepT = 0; showHint(isTouch() ? 'Tap to light the lamps' : 'Tap / Space to light the lamps', 99); }
+  } else if (st === 'foodWait') {
+    if (feast.stepT > 0.7) { feast.step = 'food'; feast.stepT = 0; showHint(isTouch() ? 'Tap to lay the feast' : 'Tap / Space to lay the feast', 99); }
+  } else if (st === 'musicWait') {
+    if (feast.stepT > 2.2) { feast.step = 'music'; feast.stepT = 0; showHint(isTouch() ? 'Tap to start the music and dancing!' : 'Tap / Space to start the music and dancing!', 99); }
+  } else if (st === 'dance') {
+    father.pose = 'dance';
+    if (feast.stepT > 3.2) { feast.step = 'brother'; feast.stepT = 0; setBanner('music', 3.2); }
+  } else if (st === 'brother') {
+    feast.bro = Math.min(1, feast.bro + dt / 1.6);
+    if (feast.stepT > 3.2 && feast.stepT - dt <= 3.2) setBanner('angry', 4);
+    if (feast.stepT > 4.4) {
+      feast.fwalk = Math.min(1, feast.fwalk + dt / 1.4);
+      father.pose = feast.fwalk < 1 ? 'walk' : 'open'; father.walkT += dt * 8; father.facing = 1; father.mood = 'watch';
+    } else { father.pose = 'dance'; }
+    if (feast.fwalk >= 1) {
+      feast.step = 'hug'; feast.stepT = 0;
+      say('father', verseText('ever'), 5);
+      showHint(isTouch() ? 'Tap to give him a hug too!' : 'Tap / Space to give him a hug too!', 99);
+    }
+  } else if (st === 'hug' || st === 'smile') {
+    father.pose = feast.hugFx > 0 || st === 'smile' ? 'hug' : 'open';
+    father.facing = 1; father.mood = 'joy';
+    if (st === 'smile' && feast.stepT > 1.6 && state === 'play') win();
+  }
+  if (feast.fwalk >= 1 && (st === 'hug' || st === 'smile')) father.x = lerp(fx1, L.brotherX - 26 * L.ps, feast.hugFx > 0 || st === 'smile' ? 1 : 0);
+
+  // The older brother, sulking outside with folded arms
+  brother.x = lerp(W + 60, L.brotherX, ease(feast.bro)); brother.y = L.gy; brother.s = L.ps;
+  brother.facing = -1;
+  brother.pose = st === 'smile' || state === 'win' ? 'hug' : 'fold';
+  brother.walkT += dt * 8;
+  if (feast.bro > 0 && feast.bro < 1) brother.pose = 'walk';
+
+  // Music for the dancing
+  if (feast.music) {
+    musicT -= dt;
+    if (musicT <= 0) { musicT = 0.21; sfx.dance(musicI++); }
+    if (Math.random() < dt * 3) spawn(rand(W * 0.1, W * 0.9), L.gy - rand(160, 260), rand(-20, 20), -40, 1.6, ['#e0527a', '#4dabf7', '#f2a93b'][Math.floor(rand(0, 3))], 9, 0, 'note');
+  }
+}
+
+function brotherVisible() { return feast && feast.bro > 0; }
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  const walk = stats.steady * 10;
+  const resist = stats.resisted * 150;
+  const run = Math.max(0, Math.round((cfg.runPar - stats.runTime) * 80)) + stats.hops * 50;
+  const celebrate = stats.items * 150;
+  const hopeBonus = Math.round(stats.hopeAtMeet) * 3;
+  const levelBonus = level * 500;
+  const score = walk + resist + run + celebrate + hopeBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('prodigalBest', best); } catch (e) {} }
+  lastScore = { walk, resist, run, celebrate, hopeBonus, levelBonus, score };
+  brother.mood = 'joy';
+  for (let i = 0; i < 70; i++) {
+    const a = rand(0, TAU), sp = rand(40, 180);
+    spawn(W / 2, H * 0.45, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8), ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 30);
+  }
+  sfx.win();
+  endTimer = 2.2;
+}
+
+function fail(reason) {
+  state = 'fail';
+  syncAmbience();
+  failReason = reason;
+  lure = null;
+  son.pose = 'sit'; son.mood = 'dismay'; son.stride = 0;
+  delete bubbles.lure;
+  hint = null;
+  if (father) { father.pose = 'stand'; father.mood = 'worried'; father.lift = 0; father.hop = 0; }
+  sfx.fail();
+  endTimer = 1.6;
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+// Particles live in the current scene's coordinates (world x on the road).
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+
+function hearts(x, y, n) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-16, 16), y + rand(-8, 8), rand(-25, 25), rand(-70, -40), 1.2, '#ff6b8a', rand(5, 7), 0, 'heart');
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function heartPath(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.4, x, y - r * 0.5);
+  ctx.bezierCurveTo(x + r * 0.6, y - r * 1.4, x + r * 1.6, y - r * 0.2, x, y + r * 0.9);
+}
+
+function drawParticles(ox) {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    const x = p.x - ox;
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'heart') { heartPath(x, p.y, p.size); ctx.fill(); }
+    else if (p.kind === 'tear') {
+      ctx.beginPath(); ctx.moveTo(x, p.y - p.size * 2);
+      ctx.quadraticCurveTo(x + p.size * 1.3, p.y + p.size * 0.6, x, p.y + p.size);
+      ctx.quadraticCurveTo(x - p.size * 1.3, p.y + p.size * 0.6, x, p.y - p.size * 2);
+      ctx.fill();
+    } else if (p.kind === 'note') {
+      ctx.strokeStyle = p.color; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(x, p.y, 5, 3.8, -0.4, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x + 4.5, p.y - 1); ctx.lineTo(x + 4.5, p.y - 18); ctx.lineTo(x + 11, p.y - 14); ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevelState();
+  scene = 'frame'; sceneT = 0;
+  showOverlay('The Prodigal Son', 'The father runs',
+    `${verseHTML('wayOff')}
+     <ul>
+       <li>Jesus tells a story of a son who wasted everything far from home&hellip; and a father who never stopped watching the road.</li>
+       <li><b>The far country:</b> tap to feed the pigs until he <b>comes to himself</b>.</li>
+       <li><b>The walk home:</b> tap in a <b>steady rhythm</b>. Too fast and he stumbles; stop and he sits down. Tap to shake your head at the <b>party tent</b> and the <b>dice</b>.</li>
+       <li><b>The father runs:</b> now <b>you</b> are the father! Tap fast to run. Tap near a fence, goat or stream to <b>hop</b>.</li>
+       <li><b>Celebrate:</b> drag the <b>robe, ring and shoes</b> onto him, then tap to light the lamps, lay the feast and start the music.</li>
+       <li><b>Keyboard:</b> <kbd>Space</kbd> or <kbd>&rarr;</kbd> to tap, <kbd>&uarr;</kbd> to hop.</li>
+       <li>Keep his <b>Hope</b> from running out!</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Tell the story', () => { level = 1; totalScore = 0; seenIntro = false; startLevel(false); });
+}
+
+// skipIntro: a retry starts at the walk home instead of the far country
+function startLevel(skipIntro = false) {
+  resetLevelState();
+  state = 'play';
+  syncAmbience();
+  hideOverlay();
+  if (skipIntro) { saidArise = false; setScene('walk'); }
+  else setScene('frame');
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+}
+
+function restartLevel() { startLevel(seenIntro); }
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Hallelujah!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('aliveAgain')}
+       <p class="score">Steady steps: <b>${s.walk}</b><br>Temptations resisted: <b>${s.resist}</b><br>The father's run: <b>${s.run}</b><br>Celebration: <b>${s.celebrate}</b><br>Hope kept: <b>${s.hopeBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next Level', () => { level++; seenIntro = false; startLevel(false); });
+  } else if (state === 'fail') {
+    const line = failReason === 'run'
+      ? 'He lost heart before his father reached him. Tap faster, and hop over everything in the way!'
+      : 'He lost heart on the long road. Keep a steady rhythm and say no to the distractions.';
+    showOverlay('Oh… no', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${line}</p>
+       ${verseHTML('arise')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    syncAmbience();
+    drag = null;
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', restartLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+// One tap = one action. x/y are playfield coordinates (null for the keyboard).
+function handleTap(x, y) {
+  if (state !== 'play' || fade) return;
+  switch (scene) {
+    case 'frame': if (sceneT > 0.5) fadeTo('pigs'); break;
+    case 'pigs':
+      if (pigPhase === 'feed') feedPig();
+      else if (bulbT > 1.8) fadeTo('walk');
+      break;
+    case 'walk': walkTap(); break;
+    case 'run': runTap(); break;
+    case 'feast': feastTap(x, y); break;
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { restartLevel(); return; }
+  if (e.repeat) return;   // holding a key does nothing: every step is a tap
+  if (e.code === 'ArrowUp' && scene === 'run' && state === 'play') { runTap(true); return; }
+  if (['Space', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'Enter', 'KeyD', 'KeyA'].includes(e.code)) handleTap(null, null);
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  // Pick up a celebration gift to drag onto the son
+  if (scene === 'feast' && feast.step === 'dress' && !fade) {
+    for (const it of feast.items) {
+      if (it.placed || it.fly) continue;
+      if (Math.hypot(p.x - it.x, p.y - it.y) < 48) {
+        drag = { item: it, ox: it.x - p.x, oy: it.y - p.y, sx: p.x, sy: p.y, moved: false, id: e.pointerId };
+        it.back = null;
+        return;
+      }
+    }
+  }
+  handleTap(p.x, p.y);
+});
+window.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const p = toPlayfield(e);
+  drag.item.x = p.x + drag.ox; drag.item.y = p.y + drag.oy;
+  if (Math.hypot(p.x - drag.sx, p.y - drag.sy) > 12) drag.moved = true;
+});
+window.addEventListener('pointerup', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const it = drag.item;
+  const moved = drag.moved;
+  drag = null;
+  if (state !== 'play' || scene !== 'feast') return;
+  const tg = sonTarget(feastLayout());
+  if (!moved) flyItem(it);                         // a simple tap sends it flying to him
+  else if (Math.abs(it.x - tg.x) < 70 && Math.abs(it.y - tg.y) < 110) placeItem(it);
+  else it.back = { t: 0, x0: it.x, y0: it.y };     // missed: it drifts back to its place
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// Note names to frequencies (for the dance tune)
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    Music.tap(height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) Music.fail(); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // Extra effects for this game (same tone/noise helpers)
+  ding() { this.tone(1318, 0.5, 'sine', 0.22); this.tone(1760, 0.7, 'sine', 0.14, 0.08); },
+  step(h) {
+    if (!this.ctx) return;
+    this.tone(150, 0.1, 'triangle', 0.18);
+    Music.tap(h);
+  },
+  oink() { this.tone(430, 0.12, 'sawtooth', 0.08, 0, 260); this.tone(400, 0.12, 'sawtooth', 0.07, 0.14, 240); },
+  no() { this.tone(330, 0.09, 'triangle', 0.18); this.tone(262, 0.12, 'triangle', 0.18, 0.1); },
+  patter() { this.tone(rand(200, 260), 0.06, 'triangle', 0.14); },
+  hop() { this.tone(300, 0.22, 'sine', 0.25, 0, 640); },
+  bleat() {
+    this.tone(560, 0.12, 'sawtooth', 0.07, 0, 520);
+    this.tone(560, 0.12, 'sawtooth', 0.07, 0.13, 500);
+    this.tone(540, 0.2, 'sawtooth', 0.06, 0.26, 470);
+  },
+  chime(h) {
+    if (!this.ctx) return;
+    Music.tap(clamp(h, 0, 1));
+    this.tone(1568 * (0.8 + clamp(h, 0, 1) * 0.4), 0.4, 'sine', 0.1);
+  },
+  // One step of a little dance tune for the feast, with a bass note and a tambourine shake
+  dance(i) {
+    if (!this.ctx) return;
+    const n = DANCE[i % DANCE.length];
+    if (n) this.tone(noteFreq(n), 0.18, 'triangle', 0.11);
+    if (i % 4 === 0) this.tone(noteFreq(DANCE_BASS[Math.floor(i / 4) % DANCE_BASS.length]), 0.34, 'sine', 0.16);
+    if (i % 2 === 1) this.puff(0.05);
+  },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+const DANCE = ['D5', 'F#5', 'A5', 'F#5', 'G5', 'B5', 'A5', 'F#5', 'E5', 'G5', 'F#5', 'E5', 'D5', 'A4', 'D5', null];
+const DANCE_BASS = ['D3', 'G3', 'A3', 'D3'];
+
+// ============================================================
+//  People
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = d.brow || shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  const blush = (a = 0.45) => {
+    ctx.fillStyle = `rgba(255,120,120,${a})`;
+    ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  };
+  const happyEyes = () => {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+    ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      happyEyes();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      blush();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+    case 'sad':            // sitting by the road, looking at his feet
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1, 3, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.moveTo(ex + 3 * Math.cos(0.15 * Math.PI), ey + 1 + 3 * Math.sin(0.15 * Math.PI));
+      ctx.arc(ex, ey + 1, 3, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      brows(-9, -5, -9, -5);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 3.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'longing':        // gazing at the pigs' husks
+      eyes(4.2, 5.5, 2.3);
+      brows(-11, -8, -11, -8);
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.6, 2.2, 0, 0, TAU));
+      ctx.fillStyle = '#9fd8ff';
+      ctx.beginPath(); ctx.ellipse(3.5, mouthY + 4 + Math.abs(Math.sin(t * 2)) * 2, 1.4, 2.4, 0, 0, TAU); ctx.fill();
+      break;
+    case 'sulk':           // the older brother
+      eyes(3.5, 3, 2);
+      brows(-6, -10, -6, -10);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'smallsmile':
+      eyes(3.5, 4.5, 2);
+      brows(-8, -8, -8, -8);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 3.5, 0.25 * Math.PI, 0.75 * Math.PI));
+      blush(0.3);
+      break;
+  }
+}
+
+// A person seen side-on-ish: robe, arms, head and a reacting face.
+// p.pose: stand walk trudge run hop sit stumble hug fold beckon shade feed open dance play
+function drawPerson(p) {
+  const s = p.s || 1, pose = p.pose || 'stand', mood = p.mood || 'watch', f = p.facing || 1;
+  const ph = p.phase || 0, w = p.walkT || 0;
+  let bob = 0, lean = 0;
+  if (pose === 'walk' || pose === 'trudge') bob = Math.abs(Math.sin(w)) * (pose === 'walk' ? 3 : 1.8);
+  if (pose === 'run') { bob = Math.abs(Math.sin(w)) * 5; lean = 0.14 * f; }
+  if (pose === 'dance') bob = Math.abs(Math.sin(t * 6 + ph)) * 12;
+  if (pose === 'trudge') lean = 0.07 * f;
+  if (pose === 'stumble') lean = 0.45 * f;
+
+  ctx.save();
+  ctx.translate(p.x, p.y - (bob + (p.lift || 0)) * s);
+  ctx.scale(s, s);
+  if (lean) ctx.rotate(lean);
+
+  const sit = pose === 'sit';
+  const legsOut = pose === 'run' || pose === 'hop';
+  const top = sit ? -24 : -37;
+  const hem = legsOut ? -13 : sit ? -4 : 0;
+  const hy = top - 16 + (mood === 'sad' ? 2 : 0);
+  const robeCol = p.fine ? '#b3243a' : p.robe;
+  const sleeve = shade(robeCol, -25);
+  const skin = p.skin;
+  const sh = top + 5;
+  let ringAt = null;
+
+  const arm = (x1, y1, x2, y2, ring) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+    if (ring) ringAt = [x2, y2];
+  };
+  const foot = (x, y) => {
+    if (p.shoes || p.sandals) {
+      ctx.fillStyle = '#7a4a22'; ctx.beginPath(); ctx.ellipse(x + f * 2, y, 6.5, 3.2, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#a8703a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 2 + f * 2, y - 3); ctx.lineTo(x + 3 + f * 2, y - 3); ctx.stroke();
+    } else {
+      ctx.fillStyle = shade(skin, -12); ctx.beginPath(); ctx.ellipse(x + f * 2, y, 5.5, 3, 0, 0, TAU); ctx.fill();
+    }
+  };
+
+  // Legs and feet (behind the robe)
+  if (legsOut) {
+    const feet = pose === 'hop'
+      ? [[-f * 9, hem + 5], [f * 3, hem + 7]]
+      : [[f * Math.sin(w) * 13, -2 - Math.max(0, Math.cos(w)) * 7], [-f * Math.sin(w) * 13, -2 - Math.max(0, -Math.cos(w)) * 7]];
+    ctx.strokeStyle = shade(skin, -8); ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    feet.forEach(([fx, fy], k) => { ctx.beginPath(); ctx.moveTo(k ? 4 : -4, hem - 2); ctx.lineTo(fx, fy); ctx.stroke(); });
+    feet.forEach(([fx, fy]) => foot(fx, fy));
+  } else if (sit) {
+    foot(f * 24, -2); foot(f * 17, -1);
+  } else {
+    const sw = pose === 'walk' || pose === 'trudge' ? Math.sin(w) * 6 : 0;
+    foot(-6 + sw, -1); foot(6 - sw, -1);
+  }
+
+  // Robe (ragged for the son until he gets the best robe)
+  ctx.fillStyle = robeCol;
+  ctx.strokeStyle = shade(robeCol, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, hem);
+  ctx.quadraticCurveTo(-17, top + 7, -11, top);
+  ctx.quadraticCurveTo(0, top - 4, 11, top);
+  ctx.quadraticCurveTo(17, top + 7, 18, hem);
+  if (p.rag && !p.fine) { for (let x = 18; x > -18; x -= 6) { ctx.lineTo(x - 3, hem - 5); ctx.lineTo(x - 6, hem); } }
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (sit) { ctx.beginPath(); ctx.ellipse(f * 12, -8, 14, 8, 0, 0, TAU); ctx.fill(); ctx.stroke(); }
+  if (p.rag && !p.fine) {
+    ctx.fillStyle = '#b09062'; ctx.fillRect(-11, top + 13, 7, 7);
+    ctx.fillStyle = '#6e5436'; ctx.fillRect(5, hem - 15, 8, 6);
+    ctx.strokeStyle = '#4a3620'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-11, top + 13); ctx.lineTo(-4, top + 20); ctx.moveTo(5, hem - 15); ctx.lineTo(13, hem - 9); ctx.stroke();
+  }
+  if (p.trim || p.fine) {
+    ctx.strokeStyle = p.fine ? '#f2c94c' : p.trim; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, top - 1); ctx.lineTo(0, hem - 1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-17, hem - 3); ctx.quadraticCurveTo(0, hem - 1, 17, hem - 3); ctx.stroke();
+  }
+  // Belt
+  ctx.strokeStyle = p.fine ? '#f2c94c' : p.rag ? '#9c7a4a' : '#c9b07a'; ctx.lineWidth = 2.5;
+  const by = sit ? top + 13 : top + 20;
+  ctx.beginPath(); ctx.moveTo(-16, by); ctx.quadraticCurveTo(0, by + 3, 16, by); ctx.stroke();
+
+  // Arms
+  const wave = Math.sin(t * 9 + ph) * 4;
+  const lateArms = pose === 'shade';
+  switch (pose) {
+    case 'dance': arm(-11, sh, -24 + wave, top - 30); arm(11, sh, 24 - wave, top - 30, true); break;
+    case 'run': arm(-10, sh, -13, hem - 1); arm(10, sh, 13, hem - 1, true); break;       // lifting his robe to run
+    case 'hop': arm(-10, sh, -21, top - 8); arm(10, sh, 21, top - 8, true); break;
+    case 'hug': arm(-f * 9, sh, f * 20, sh + 9); arm(f * 9, sh, f * 25, sh + 3, true); break;
+    case 'fold': arm(-11, sh, 4, sh + 8); arm(11, sh, -4, sh + 10, true); break;
+    case 'beckon': arm(-f * 11, sh, -f * 15, -12); arm(f * 11, sh, f * 24, top - 6 + Math.sin(t * 8 + ph) * 7, true); break;
+    case 'feed': arm(-f * 11, sh, -f * 13, -14); arm(f * 11, sh, f * (20 + (p.toss || 0) * 5), sh + 6 - (p.toss || 0) * 18, true); break;
+    case 'sit': arm(-f * 6, sh, f * 20, -12); arm(f * 8, sh, f * 24, -10, true); break;
+    case 'stumble': arm(-8, sh, f * 20, -4); arm(8, sh, f * 24, -8, true); break;
+    case 'open': arm(-11, sh, -27, sh - 10); arm(11, sh, 27, sh - 10, true); break;
+    case 'play': arm(-11, sh, -6 * f, sh + 14); arm(11, sh, 10 * f + Math.sin(t * 14) * 3, sh + 10, true); break;
+    case 'trudge': arm(-11, sh, -13 - Math.sin(w) * 3, -8); arm(11, sh, 13 + Math.sin(w) * 3, -8, true); break;
+    case 'walk': arm(-11, sh, -15 - Math.sin(w) * 5, -12); arm(11, sh, 15 + Math.sin(w) * 5, -12, true); break;
+    case 'shade': arm(-f * 11, sh, -f * 15, -12); break;
+    default: arm(-11, sh, -15, -12); arm(11, sh, 15, -12, true);
+  }
+  if (pose === 'feed') {   // a basket of husks on his hip
+    const bx = -f * 15, byy = -14;
+    ctx.fillStyle = '#a8804a'; ctx.strokeStyle = '#6e5230'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(bx - 10, byy - 6); ctx.lineTo(bx + 10, byy - 6); ctx.lineTo(bx + 7, byy + 6); ctx.lineTo(bx - 7, byy + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c9a15a'; ctx.beginPath(); ctx.ellipse(bx, byy - 7, 9, 3.5, 0, 0, TAU); ctx.fill();
+  }
+  if (p.lyre) {            // the musician's lyre
+    const lx0 = 4 * f, ly0 = sh + 4;
+    ctx.strokeStyle = '#8a5a1a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(lx0 - 8, ly0 + 18); ctx.quadraticCurveTo(lx0 - 12, ly0, lx0 - 6, ly0 - 8); ctx.moveTo(lx0 + 8, ly0 + 18); ctx.quadraticCurveTo(lx0 + 12, ly0, lx0 + 6, ly0 - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx0 - 8, ly0 - 5); ctx.lineTo(lx0 + 8, ly0 - 5); ctx.stroke();
+    ctx.strokeStyle = '#f2e6c0'; ctx.lineWidth = 1;
+    ctx.beginPath(); for (let k = -1; k <= 1; k++) { ctx.moveTo(lx0 + k * 3.5, ly0 - 5); ctx.lineTo(lx0 + k * 3.5, ly0 + 17); } ctx.stroke();
+  }
+
+  // Head (shakes "no" when p.shake is set)
+  const hx = p.shake > 0 ? Math.sin(p.shake * 45) * 4 : 0;
+  ctx.save();
+  ctx.translate(hx, 0);
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (p.scarf) {
+    ctx.fillStyle = p.scarf;
+    if (p.tall) { ctx.beginPath(); ctx.ellipse(0, hy - 16, 15, 10, 0, 0, TAU); ctx.fill(); }
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = p.tall ? '#3d5a8a' : shade(p.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = p.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+    if (p.messy) {         // unkempt tufts after the far country
+      ctx.beginPath();
+      ctx.moveTo(-10, hy - 13); ctx.lineTo(-13, hy - 22); ctx.lineTo(-4, hy - 16);
+      ctx.lineTo(0, hy - 24); ctx.lineTo(4, hy - 16); ctx.lineTo(12, hy - 21); ctx.lineTo(10, hy - 12);
+      ctx.fill();
+    }
+  }
+  if (p.beard) {
+    const len = p.longBeard ? 30 : 21;
+    ctx.fillStyle = p.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + len, 0, hy + len + 1);
+    ctx.quadraticCurveTo(14, hy + len, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  const lx = p.lx !== undefined ? p.lx : f * 0.5;
+  const ly = p.ly !== undefined ? p.ly : 0;
+  drawFace(p, mood, hy, lx, ly);
+  ctx.restore();
+
+  if (lateArms) { arm(f * 11, sh, f * 8, hy - 8, true); }   // hand shading his eyes, looking down the road
+  if (p.ring && ringAt) {
+    ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(ringAt[0], ringAt[1], 4.6, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.arc(ringAt[0], ringAt[1] - 5, 1.8, 0, TAU); ctx.fill();
+    if (Math.sin(t * 4) > 0.6) { ctx.fillStyle = '#fff6d0'; ctx.beginPath(); ctx.arc(ringAt[0] + 5, ringAt[1] - 6, 1.6, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+// Jesus exactly as in the collection (white robe, red sash, halo), without His cloud, teaching
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(j.s || 1, j.s || 1);
+  const teach = j.pose === 'teach';
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+  // Feet
+  ctx.fillStyle = '#c9905e';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 5, 2.6, 0, 0, TAU); ctx.ellipse(7, 0, 5, 2.6, 0, 0, TAU); ctx.fill();
+
+  // Arms: one hand raised as He tells the story, the other open
+  const hands = teach ? [[-20, -22], [22, -60 + Math.sin(t * 2.2) * 3]] : [[-20, -22], [20, -22]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+function updatePeople(dt) {
+  const all = [son, father, brother, ...LISTENERS, ...guests];
+  for (const d of distractions) all.push(...d.folk);
+  for (const d of all) {
+    if (!d) continue;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+  // Jesus's listeners: tax collectors lean in with wonder, Pharisees fold their arms
+  const end = scene === 'frame' && sceneT > 2.4;
+  for (const d of LISTENERS) {
+    const want = d.tax ? (end ? 'joy' : 'wow') : 'doubt';
+    if (want !== d.mood) { d.switchT += dt; if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; } }
+  }
+}
+
+// ============================================================
+//  Animals and props
+// ============================================================
+function drawPig(pg, x, y) {
+  const m = pg.munch > 0;
+  const bob = m ? Math.abs(Math.sin(t * 14)) * 2 : Math.sin(t * 2 + pg.phase) * 1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(pg.f * 1.25, 1.25);
+  ctx.fillStyle = '#e58fa0';
+  for (const lx of [-16, -7, 8, 16]) { roundRect(lx - 3, -11, 6, 11, 2); ctx.fill(); }
+  // curly tail
+  ctx.strokeStyle = '#e58fa0'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(-29, -26, 4, 0.5, TAU * 0.9); ctx.stroke();
+  // body
+  ctx.fillStyle = '#f6a9b8';
+  ctx.beginPath(); ctx.ellipse(0, -21, 26, 15, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(160,110,60,0.35)';
+  ctx.beginPath(); ctx.ellipse(-8, -14, 7, 4, 0.3, 0, TAU); ctx.fill();   // a little mud
+  // head
+  const hy = -24 + bob;
+  ctx.fillStyle = '#f6a9b8';
+  ctx.beginPath(); ctx.ellipse(21, hy, 13, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e58fa0';
+  ctx.beginPath(); ctx.moveTo(14, hy - 9); ctx.lineTo(12, hy - 19); ctx.lineTo(20, hy - 11); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(23, hy - 11); ctx.lineTo(27, hy - 20); ctx.lineTo(29, hy - 8); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(32, hy + 2, 6, 5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#b8586b';
+  ctx.beginPath(); ctx.arc(30.5, hy + 2, 1.3, 0, TAU); ctx.arc(34, hy + 2, 1.3, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#2b1d12'; ctx.fillStyle = '#2b1d12'; ctx.lineWidth = 1.8;
+  if (m) { ctx.beginPath(); ctx.arc(20, hy - 2, 2.6, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.arc(20, hy - 2, 1.8, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,90,120,0.4)';
+  ctx.beginPath(); ctx.arc(24, hy + 5, 3, 0, TAU); ctx.fill();
+  if (m) { ctx.fillStyle = '#c9a15a'; ctx.beginPath(); ctx.ellipse(30, hy + 8, 4, 1.8, 0.4, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawHusk(x, y, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  ctx.fillStyle = '#c9a15a'; ctx.strokeStyle = '#8a6a30'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(0, 0, 8, 3, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPigPen() {
+  const x0 = 130 - cam.x, x1 = 410 - cam.x;
+  if (x1 < -offX - 50 || x0 > W + offX + 50) return;
+  // back fence
+  ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  for (let x = 130; x <= 410; x += 56) {
+    const gy = groundY(x) - 14;
+    ctx.beginPath(); ctx.moveTo(x - cam.x, gy); ctx.lineTo(x - cam.x, gy - 46); ctx.stroke();
+  }
+  ctx.lineWidth = 4;
+  for (const hgt of [18, 36]) {
+    ctx.beginPath();
+    for (let x = 130; x <= 410; x += 14) (x === 130 ? ctx.moveTo : ctx.lineTo).call(ctx, x - cam.x, groundY(x) - 14 - hgt);
+    ctx.stroke();
+  }
+  // mud puddle
+  ctx.fillStyle = 'rgba(130,95,55,0.55)';
+  ctx.beginPath(); ctx.ellipse(270 - cam.x, groundY(270) + 8, 120, 12, 0, 0, TAU); ctx.fill();
+  // a dry old tree
+  const tx = 70 - cam.x, ty = groundY(70);
+  ctx.strokeStyle = '#7a5a3a'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 4, ty - 90); ctx.moveTo(tx + 3, ty - 60); ctx.lineTo(tx - 22, ty - 90); ctx.moveTo(tx + 4, ty - 75); ctx.lineTo(tx + 26, ty - 100); ctx.stroke();
+}
+
+function drawTrough() {
+  const x = TROUGH_X - cam.x, y = groundY(TROUGH_X) + 4;
+  ctx.fillStyle = '#8a6a44'; ctx.strokeStyle = '#5e4526'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x - 46, y - 22); ctx.lineTo(x + 46, y - 22); ctx.lineTo(x + 38, y); ctx.lineTo(x - 38, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#c9a15a';
+  ctx.beginPath(); ctx.ellipse(x, y - 22, 40, 4, 0, 0, TAU); ctx.fill();
+}
+
+function drawSign(wx, text, arrowRight) {
+  const x = wx - cam.x, y = groundY(wx);
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 70); ctx.stroke();
+  ctx.fillStyle = '#e2c98f'; ctx.strokeStyle = '#8a6a30'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (arrowRight) { ctx.moveTo(x - 36, y - 88); ctx.lineTo(x + 30, y - 88); ctx.lineTo(x + 44, y - 76); ctx.lineTo(x + 30, y - 64); ctx.lineTo(x - 36, y - 64); }
+  else { roundRect(x - 40, y - 88, 80, 24, 4); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5a4210'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + (arrowRight ? 2 : 0), y - 76);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawTree(x, y, s, dry) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-6, -30, 2, -55); ctx.stroke();
+  if (dry) {
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(1, -40); ctx.lineTo(-16, -62); ctx.moveTo(2, -50); ctx.lineTo(18, -70); ctx.stroke();
+    ctx.fillStyle = '#b0a060';
+    ctx.beginPath(); ctx.arc(-16, -64, 7, 0, TAU); ctx.arc(18, -72, 8, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = '#7d9460';
+    ctx.beginPath();
+    for (const [dx, dy, r] of [[-18, -60, 18], [0, -72, 20], [18, -60, 17], [-6, -52, 15], [10, -50, 14]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGoat(o, x, y) {
+  const wob = Math.sin(t * 2 + o.phase) * 2;
+  ctx.save(); ctx.translate(x, y); ctx.scale(1.15, 1.15);
+  ctx.fillStyle = '#e8e2d4';
+  for (const lx of [-14, -6, 8, 15]) { roundRect(lx - 2.5, -12, 5, 12, 2); ctx.fill(); }
+  ctx.fillStyle = '#fbf8ef'; ctx.strokeStyle = '#c9c1ad'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(0, -22, 22, 12, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  // head (facing the father as he comes)
+  const hx = 20, hy = -34 + wob;
+  ctx.beginPath(); ctx.ellipse(hx, hy, 9, 11, 0.3, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#a89a7a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(hx - 3, hy - 9); ctx.quadraticCurveTo(hx - 8, hy - 18, hx - 14, hy - 15); ctx.moveTo(hx + 3, hy - 9); ctx.quadraticCurveTo(hx + 2, hy - 19, hx - 4, hy - 19); ctx.stroke();
+  ctx.fillStyle = '#d8d0bc';
+  ctx.beginPath(); ctx.moveTo(hx + 2, hy + 9); ctx.lineTo(hx + 6, hy + 18); ctx.lineTo(hx + 8, hy + 8); ctx.fill();   // beard
+  ctx.fillStyle = '#2b1d12';
+  ctx.beginPath(); ctx.arc(hx + 3, hy - 2, 1.8, 0, TAU); ctx.fill();
+  if (o.bleat > 0) { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(hx + 6, hy + 6, 2.5, 3, 0, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawFence(x, y) {
+  ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 14, y + 2); ctx.lineTo(x - 14, y - 48); ctx.moveTo(x + 14, y + 2); ctx.lineTo(x + 14, y - 48); ctx.stroke();
+  ctx.lineWidth = 4.5; ctx.strokeStyle = '#a8804a';
+  ctx.beginPath(); ctx.moveTo(x - 22, y - 18); ctx.lineTo(x + 22, y - 18); ctx.moveTo(x - 22, y - 38); ctx.lineTo(x + 22, y - 38); ctx.stroke();
+}
+
+function drawStream(o, x) {
+  const y = groundY(o.x);
+  ctx.fillStyle = '#5fb3e6';
+  ctx.beginPath(); ctx.ellipse(x, y + 6, o.w / 2 + 6, 13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8fd0f5';
+  ctx.beginPath(); ctx.ellipse(x, y + 3, o.w / 2 - 6, 7, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+  for (let k = -1; k <= 1; k++) {
+    const sx = x + k * 26 + Math.sin(t * 2 + k) * 5;
+    ctx.beginPath(); ctx.moveTo(sx - 8, y + 5); ctx.quadraticCurveTo(sx, y + 1, sx + 8, y + 5); ctx.stroke();
+  }
+  ctx.fillStyle = '#a3a39a';
+  ctx.beginPath(); ctx.ellipse(x - o.w / 2 - 4, y + 6, 7, 4, 0, 0, TAU); ctx.ellipse(x + o.w / 2 + 6, y + 8, 6, 3.5, 0, 0, TAU); ctx.fill();
+}
+
+function drawTent(d, x, y) {
+  // striped party tent with lanterns
+  ctx.save(); ctx.translate(x, y);
+  const stripes = ['#e0527a', '#fff3cf'];
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = stripes[k % 2];
+    ctx.beginPath(); ctx.moveTo(0, -130); ctx.lineTo(-70 + k * 23.3, 0); ctx.lineTo(-70 + (k + 1) * 23.3, 0); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#6a2a3a';
+  ctx.beginPath(); ctx.moveTo(0, -60); ctx.lineTo(-18, 0); ctx.lineTo(18, 0); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#8a5a1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, -130); ctx.lineTo(0, -150); ctx.stroke();
+  ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.moveTo(0, -150); ctx.lineTo(18, -144 + Math.sin(t * 4) * 2); ctx.lineTo(0, -138); ctx.fill();
+  // string of lanterns
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-6, -120); ctx.quadraticCurveTo(-70, -80, -120, -110); ctx.stroke();
+  ['#ffd84a', '#ff9f43', '#e0527a'].forEach((c, k) => {
+    const lx = -36 - k * 30, ly = -98 - (k === 2 ? 4 : 0) + (k === 1 ? 6 : 0);
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(lx, ly, 6, 8, 0, 0, TAU); ctx.fill();
+  });
+  ctx.restore();
+  if (!d.done && Math.random() < 0.04) spawn(d.x + rand(-40, 40), y - 90, rand(-15, 15), -35, 1.5, '#e0527a', 8, 0, 'note');
+}
+
+function drawDiceMat(d, x, y) {
+  ctx.fillStyle = '#b5503f';
+  ctx.beginPath(); ctx.ellipse(x, y + 2, 46, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8c070';
+  ctx.beginPath(); ctx.ellipse(x, y, 40, 6, 0, 0, TAU); ctx.fill();
+  const roll = d.done ? 0 : Math.sin(t * 3 + d.phase);
+  for (const [dx, pips] of [[-10, 3], [10, 5]]) {
+    const dy = -6 - Math.max(0, roll) * 10 * (dx < 0 ? 1 : 0.6);
+    ctx.save(); ctx.translate(x + dx, y + dy); ctx.rotate(roll * 0.6);
+    ctx.fillStyle = '#fffdf5'; ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 1;
+    roundRect(-6, -6, 12, 12, 2.5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2b1d12';
+    const pts = pips === 3 ? [[-3, -3], [0, 0], [3, 3]] : [[-3, -3], [3, -3], [0, 0], [-3, 3], [3, 3]];
+    for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, 1.2, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+}
+
+function drawHouse(wx) {
+  const x = wx - cam.x, y = groundY(wx) + 6;
+  if (x < -offX - 260 || x > W + offX + 260) return;
+  // olive tree behind
+  drawTree(x + 120, y - 4, 1.2, false);
+  ctx.fillStyle = '#ecdcb8'; ctx.strokeStyle = '#b8a078'; ctx.lineWidth = 2;
+  roundRect(x - 100, y - 150, 200, 150, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#d8c49a'; ctx.fillRect(x - 108, y - 162, 216, 16);   // flat roof
+  ctx.fillStyle = '#c4ad80'; ctx.fillRect(x - 108, y - 170, 216, 8);
+  ctx.fillStyle = '#7a4a22';
+  roundRect(x - 24, y - 84, 48, 84, [24, 24, 0, 0]); ctx.fill();
+  ctx.fillStyle = '#5a3a1c'; ctx.beginPath(); ctx.arc(x + 12, y - 40, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#6fa0c8';
+  roundRect(x - 80, y - 118, 34, 30, [16, 16, 2, 2]); ctx.fill();
+  roundRect(x + 46, y - 118, 34, 30, [16, 16, 2, 2]); ctx.fill();
+  // a few stones on the wall
+  ctx.fillStyle = 'rgba(184,160,120,0.45)';
+  for (const [sx, sy] of [[-70, -40], [60, -30], [-40, -140], [30, -130], [80, -70]]) { roundRect(x + sx, y + sy, 18, 9, 3); ctx.fill(); }
+  ctx.fillStyle = '#6f9e4a';
+  ctx.beginPath(); ctx.arc(x - 104, y - 6, 16, 0, TAU); ctx.arc(x + 100, y - 4, 14, 0, TAU); ctx.fill();
+}
+
+function drawBulb(x, y, a) {
+  // "he came to himself": a lightbulb moment
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(x, y);
+  ctx.scale(0.6 + a * 0.4, 0.6 + a * 0.4);
+  const g = ctx.createRadialGradient(0, -6, 2, 0, -6, 40);
+  g.addColorStop(0, 'rgba(255,240,150,0.9)'); g.addColorStop(1, 'rgba(255,240,150,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -6, 40, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let k = 0; k < 8; k++) {
+    const an = k * TAU / 8 + t;
+    ctx.beginPath(); ctx.moveTo(Math.cos(an) * 20, -6 + Math.sin(an) * 20); ctx.lineTo(Math.cos(an) * 28, -6 + Math.sin(an) * 28); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff176'; ctx.strokeStyle = '#d9a526'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -8, 12, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#b0a898'; roundRect(-6, 3, 12, 8, 2); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Scenes: drawing
+// ============================================================
+function drawSky(top, mid, bottom) {
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, top); g.addColorStop(0.45, mid); g.addColorStop(1, bottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+}
+
+const bgClouds = Array.from({ length: 7 }, (_, i) => ({ f: i / 7 + rand(0, 0.1), y: rand(150, 420), w: rand(80, 160), speed: rand(4, 10) }));
+
+function drawClouds(par) {
+  for (const c of bgClouds) {
+    const span = viewW + 400;
+    let x = ((c.f * span - (cam.x * par) + t * c.speed) % span + span) % span - 200 - offX;
+    drawCloudShape(x, c.y, c.w, c.w * 0.3);
+  }
+}
+
+function drawCloudShape(cx, cy, w, h) {
+  const n = Math.max(3, Math.round(w / 22));
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.42 + 0.38 * Math.sin(f * Math.PI));
+    const px = cx - w / 2 + h * 0.4 + f * (w - h * 0.8);
+    ctx.moveTo(px + r, cy - r * 0.3); ctx.arc(px, cy - r * 0.3, r, 0, TAU);
+  }
+  ctx.fill();
+}
+
+function drawHills(par, base, amp, col, period) {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(x0, H);
+  for (let x = x0; x <= x1; x += 16) {
+    const wx = x + cam.x * par;
+    ctx.lineTo(x, base + Math.sin(wx / period) * amp + Math.sin(wx / (period * 0.37) + 2) * amp * 0.35);
+  }
+  ctx.lineTo(x1, H); ctx.closePath(); ctx.fill();
+}
+
+function drawWorldScene() {
+  const cf = countryF(cam.x + W / 2);
+  drawSky(mix('#ffe2a8', '#fff3cf', cf), mix('#f5d9a0', '#b9e0f7', cf), mix('#e9cf98', '#8fcaf0', cf));
+  // sun
+  ctx.fillStyle = 'rgba(255,236,160,0.9)';
+  ctx.beginPath(); ctx.arc(W * 0.8, 170, 42, 0, TAU); ctx.fill();
+  drawHills(0.15, H - 330, 38, mix('#d8c090', '#a7cf8a', cf), 260);
+  drawClouds(0.1);
+  drawHills(0.45, H - 250, 30, mix('#c9ae78', '#94c472', cf), 200);
+
+  // the road's ground, dusty far away and green near home
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  const gg = ctx.createLinearGradient(x0, 0, x1, 0);
+  gg.addColorStop(0, mix('#cdb77f', '#86b95d', countryF(cam.x + x0)));
+  gg.addColorStop(1, mix('#cdb77f', '#86b95d', countryF(cam.x + x1)));
+  ctx.fillStyle = gg;
+  ctx.beginPath(); ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, groundY(x + cam.x));
+  ctx.lineTo(x1, H + 10); ctx.closePath(); ctx.fill();
+  // the path
+  ctx.strokeStyle = 'rgba(236,216,160,0.9)'; ctx.lineWidth = 16;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, groundY(x + cam.x) + 10);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(x0, H - 40, x1 - x0, 60);
+
+  // scenery behind the road
+  for (const d of deco) {
+    const x = d.x - cam.x;
+    if (x < x0 - 80 || x > x1 + 80) continue;
+    const y = groundY(d.x) - 6;
+    const dry = countryF(d.x) < 0.35;
+    if (d.kind === 'tree') drawTree(x, y, d.s * 0.9, dry);
+    else if (d.kind === 'bush') { ctx.fillStyle = dry ? '#b8a468' : '#6f9e4a'; ctx.beginPath(); ctx.arc(x - 10, y - 8, 12 * d.s, 0, TAU); ctx.arc(x + 6, y - 11, 14 * d.s, 0, TAU); ctx.arc(x + 20, y - 6, 10 * d.s, 0, TAU); ctx.fill(); }
+    else { ctx.fillStyle = '#b3a896'; ctx.beginPath(); ctx.ellipse(x, y - 4, 16 * d.s, 10 * d.s, 0, 0, TAU); ctx.fill(); }
+  }
+
+  drawPigPen();
+  drawSign(cfg.walkStart + 90, 'HOME', true);
+  drawHouse(cfg.homeX + 130);
+
+  // Distractions on the road
+  for (const d of distractions) {
+    const x = d.x - cam.x;
+    if (x < x0 - 200 || x > x1 + 200) continue;
+    const y = groundY(d.x);
+    if (d.kind === 'tent') drawTent(d, x + 30, y + 4);
+    else drawDiceMat(d, x, y + 4);
+    for (const p of d.folk) {
+      p.x = x + p.dx; p.y = groundY(d.x + p.dx);
+      p.lx = son.x < d.x ? -0.7 : 0.7; p.ly = 0;
+      drawPerson(p);
+    }
+  }
+
+  // Obstacles on the father's path
+  for (const o of obstacles) {
+    const x = o.x - cam.x;
+    if (x < x0 - 80 || x > x1 + 80) continue;
+    const y = groundY(o.x);
+    if (o.kind === 'stream') drawStream(o, x);
+    else if (o.kind === 'fence') drawFence(x, y);
+    else drawGoat(o, x + Math.sin(t * 0.8 + o.phase) * 4, y);
+    if (scene === 'run' && !o.cleared && state === 'play') {
+      const ahead = (father.x - 14) - (o.x + o.w / 2);
+      if (ahead > 0 && ahead < HOP_WIN) {   // "Hop!" marker when a tap will jump it
+        ctx.fillStyle = '#2b8a3e'; ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Hop!', x, y - 64 - Math.abs(Math.sin(t * 8)) * 4);
+      }
+    }
+  }
+
+  // The pigs and their trough
+  if (130 - cam.x < x1 + 60) {
+    for (const pg of pigs) if (pg.back) drawPig(pg, pg.x - cam.x, groundY(pg.x) - 2);
+    drawTrough();
+    for (const pg of pigs) if (!pg.back) drawPig(pg, pg.x - cam.x, groundY(pg.x) + 8);
+    for (const h of husks) {
+      const f = Math.min(1, h.t / h.dur);
+      drawHusk(lerp(h.x0, h.x1, f) - cam.x, lerp(h.y0, h.y1, f) - Math.sin(f * Math.PI) * 60, h.spin * f);
+    }
+  }
+
+  // The son and the father
+  const sp = { ...son, x: son.x - cam.x, y: groundY(son.x) };
+  const fp = { ...father, x: father.x - cam.x, y: groundY(father.x) };
+  drawPerson(sp);
+  if (scene === 'see' || scene === 'run' || scene === 'hug' || (state === 'fail' && failReason === 'run')) drawPerson(fp);
+  if (son.bulb > 0) drawBulb(sp.x, sp.y - 102 * CH, son.bulb);
+  if (scene === 'see' && sceneT > 1.2) {
+    ctx.fillStyle = '#e63946'; ctx.font = '700 34px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('!', fp.x, fp.y - 96 * CH - Math.abs(Math.sin(t * 6)) * 6);
+  }
+
+  // Resist meter while a distraction tempts him
+  if (lure) {
+    const n = cfg.shakes, bx = sp.x - (n - 1) * 9, byy = sp.y + 26;
+    for (let k = 0; k < n; k++) {
+      ctx.fillStyle = k < n - lure.left ? '#2b8a3e' : 'rgba(255,255,255,0.85)';
+      ctx.strokeStyle = '#2b8a3e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(bx + k * 18, byy, 6, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // Arrow toward the son when he is off the left edge during the run
+  if (scene === 'run' && sp.x < -offX + 10) {
+    const ay = groundY(cam.x - offX + 30) - 80;
+    ctx.fillStyle = '#7a5200'; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(-offX + 14, ay); ctx.lineTo(-offX + 34, ay - 14); ctx.lineTo(-offX + 34, ay + 14); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'left';
+    ctx.strokeText('Your son', -offX + 40, ay + 5); ctx.fillText('Your son', -offX + 40, ay + 5);
+  }
+}
+
+function frameLayout() {
+  const narrow = W < 700;
+  const s = narrow ? 1.2 : 1.6;
+  const gy = H - 150;
+  const jx = clamp(W * 0.2, 78, 260);
+  const a = jx + (narrow ? 72 : 110), b = W - (narrow ? 36 : 70);
+  const mid = lerp(a, b, 0.52);
+  return { narrow, s, gy, jx, a, b, mid };
+}
+
+function drawFrameScene() {
+  drawSky('#fff3cf', '#b9e0f7', '#8fcaf0');
+  ctx.fillStyle = 'rgba(255,236,160,0.9)';
+  ctx.beginPath(); ctx.arc(W * 0.82, 170, 40, 0, TAU); ctx.fill();
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // the Sea of Galilee beyond the hillside
+  ctx.fillStyle = '#6fb6e0'; ctx.fillRect(x0, H - 330, x1 - x0, 120);
+  ctx.fillStyle = '#a7cf8a';
+  ctx.beginPath(); ctx.moveTo(x0, H - 330);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, H - 350 + Math.sin(x / 110) * 16);
+  ctx.lineTo(x1, H - 330); ctx.closePath(); ctx.fill();
+  for (const c of bgClouds.slice(0, 4)) drawCloudShape(((c.f * (viewW + 300) + t * c.speed) % (viewW + 300)) - 150 - offX, c.y, c.w, c.w * 0.3);
+  const L = frameLayout();
+  ctx.fillStyle = '#86b95d';
+  ctx.beginPath(); ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 10) ctx.lineTo(x, L.gy + 10 - Math.exp(-Math.pow((x - L.jx) / 120, 2)) * 22);
+  ctx.lineTo(x1, H + 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#6f9e4a'; ctx.fillRect(x0, H - 40, x1 - x0, 60);
+  drawTree(L.jx - 60, L.gy + 4, 1.1, false);
+  drawTree(W - 30, L.gy + 6, 1.2, false);
+
+  // Pharisees stand apart at the back, tax collectors sit close to Jesus
+  const phar = LISTENERS.filter((d) => !d.tax), tax = LISTENERS.filter((d) => d.tax);
+  phar.forEach((d, k) => { d.x = lerp(L.mid + 26, L.b, k / 2); d.y = L.gy - 14; d.s = L.s * 0.95; d.facing = -1; d.dim = true; });
+  tax.forEach((d, k) => { d.x = lerp(L.a, L.mid - (L.narrow ? 10 : 50), k / 2); d.y = L.gy + 6; d.s = L.s; d.facing = -1; });
+  const jy = L.gy - 4;
+  for (const d of [...phar, ...tax]) {
+    const dx = L.jx - d.x, dy = (jy - 70) - (d.y - 60);
+    const len = Math.hypot(dx, dy) || 1;
+    d.lx = dx / len; d.ly = dy / len * 0.4;
+  }
+  phar.forEach(drawPerson);
+  drawJesus({ x: L.jx, y: jy, s: L.s * 1.1, pose: 'teach', face: state === 'title' ? 'calm' : sceneT > 2.4 ? 'joy' : 'calm' });
+  tax.forEach(drawPerson);
+
+  ctx.font = `600 ${L.narrow ? 12 : 14}px Fredoka, sans-serif`; ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(58,70,30,0.8)';
+  ctx.fillText('Tax collectors', (L.a + L.mid - (L.narrow ? 10 : 50)) / 2, L.gy + 36);
+  ctx.fillText('Pharisees', (L.mid + 26 + L.b) / 2, L.gy + 36);
+}
+
+function drawItem(it, x, y, sz = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(sz, sz);
+  if (it.kind === 'robe') {
+    ctx.fillStyle = '#b3243a'; ctx.strokeStyle = '#7a1526'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-14, -22); ctx.lineTo(14, -22); ctx.lineTo(26, -10); ctx.lineTo(18, -4); ctx.lineTo(16, 22); ctx.lineTo(-16, 22); ctx.lineTo(-18, -4); ctx.lineTo(-26, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(0, 22); ctx.moveTo(-16, 18); ctx.lineTo(16, 18); ctx.stroke();
+  } else if (it.kind === 'ring') {
+    ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(0, 4, 14, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#c98e1b'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 4, 17, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(8, -10); ctx.lineTo(0, -4); ctx.lineTo(-8, -10); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-2, -12, 1.8, 0, TAU); ctx.fill();
+  } else {
+    for (const dx of [-11, 11]) {
+      ctx.fillStyle = '#7a4a22'; ctx.beginPath(); ctx.ellipse(dx, 6, 9, 20, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#c9905e'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(dx - 8, -2); ctx.lineTo(dx + 8, 4); ctx.moveTo(dx + 8, -2); ctx.lineTo(dx - 8, 4); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawLamp(x, y, lit) {
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, 232); ctx.lineTo(x, y - 10); ctx.stroke();
+  if (lit) {
+    const g = ctx.createRadialGradient(x, y - 14, 4, x, y - 14, 110);
+    g.addColorStop(0, 'rgba(255,220,120,0.6)'); g.addColorStop(1, 'rgba(255,220,120,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 14, 110, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffb627';
+    ctx.beginPath(); ctx.moveTo(x + 12, y - 4); ctx.quadraticCurveTo(x + 20, y - 18 + Math.sin(t * 12) * 2, x + 14, y - 26); ctx.quadraticCurveTo(x + 8, y - 16, x + 12, y - 4); ctx.fill();
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(x + 13, y - 10, 3, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#b86b3a'; ctx.strokeStyle = '#7a4222'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x - 18, y - 6); ctx.quadraticCurveTo(x, y + 12, x + 16, y - 4); ctx.lineTo(x + 10, y - 8); ctx.quadraticCurveTo(x, y - 12, x - 18, y - 6); ctx.fill(); ctx.stroke();
+}
+
+function drawFeastScene() {
+  const L = feastLayout();
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // evening sky above the courtyard wall
+  drawSky('#2c3470', '#e58b6a', '#f6c48a');
+  ctx.fillStyle = '#fff6d0';
+  for (const [sx, sy] of [[0.1, 60], [0.3, 30], [0.55, 80], [0.75, 40], [0.9, 90]]) { ctx.beginPath(); ctx.arc(W * sx, sy - offY * 0.5, 2, 0, TAU); ctx.fill(); }
+  // house wall
+  const wg = ctx.createLinearGradient(0, 200, 0, L.gy);
+  wg.addColorStop(0, '#f1dfb8'); wg.addColorStop(1, '#e2c996');
+  ctx.fillStyle = wg; ctx.fillRect(x0, 210, x1 - x0, L.gy - 190);
+  ctx.fillStyle = '#8a5a2a'; ctx.fillRect(x0, 222, x1 - x0, 12);   // beam
+  // arched windows
+  ctx.fillStyle = '#e58b6a';
+  for (const f of [0.36, 0.64]) { roundRect(W * f - 26, 360, 52, 70, [26, 26, 3, 3]); ctx.fill(); }
+  ctx.fillStyle = '#fff6d0'; ctx.beginPath(); ctx.arc(W * 0.64 + 8, 380, 3, 0, TAU); ctx.fill();
+  // doorway on the right, where the older brother stands outside
+  ctx.fillStyle = '#6a4424'; roundRect(L.brotherX - 40, L.gy - 190, 80, 190, [40, 40, 0, 0]); ctx.fill();
+  ctx.fillStyle = '#3a2a4a'; roundRect(L.brotherX - 32, L.gy - 182, 64, 182, [32, 32, 0, 0]); ctx.fill();
+  // floor
+  ctx.fillStyle = '#c9a36a'; ctx.fillRect(x0, L.gy - 20, x1 - x0, H - L.gy + 40);
+  ctx.strokeStyle = 'rgba(120,80,40,0.25)'; ctx.lineWidth = 2;
+  for (let x = Math.floor(x0 / 60) * 60; x < x1; x += 60) { ctx.beginPath(); ctx.moveTo(x, L.gy - 20); ctx.lineTo(x - 30, H); ctx.stroke(); }
+
+  // lamps
+  L.lamps.forEach((lx, k) => drawLamp(lx, L.lampY, k < feast.lamps));
+
+  // guests at the back, then the father and son in front
+  guests.forEach(drawPerson);
+  drawPerson(son);
+  drawPerson(father);
+  if (brotherVisible()) drawPerson(brother);   // in front, so his face can be seen softening
+
+  // the darkness lifts as the lamps are lit
+  const dark = 0.32 * (1 - feast.lamps / 3);
+  if (dark > 0) {
+    ctx.fillStyle = `rgba(30,24,60,${dark})`;
+    ctx.fillRect(x0, -offY, x1 - x0, viewH);
+    L.lamps.forEach((lx, k) => { if (k < feast.lamps) drawLamp(lx, L.lampY, true); });
+  }
+
+  // the feast table in front
+  ctx.fillStyle = '#8a5a2a'; roundRect(W * 0.14, L.tableY, W * 0.72, 18, 6); ctx.fill();
+  ctx.fillStyle = '#f4ecd6'; roundRect(W * 0.13, L.tableY - 8, W * 0.74, 14, 5); ctx.fill();
+  ctx.fillStyle = '#6b4a2b'; ctx.fillRect(W * 0.18, L.tableY + 16, 10, 30); ctx.fillRect(W * 0.82 - 10, L.tableY + 16, 10, 30);
+  if (feast.food) {
+    const n = Math.max(4, Math.floor(W / 130));
+    for (let k = 0; k < n; k++) {
+      const fx = lerp(W * 0.2, W * 0.8, k / (n - 1)), fy = L.tableY - 8;
+      if (k % 3 === 0) { ctx.fillStyle = '#d9a35a'; ctx.beginPath(); ctx.ellipse(fx, fy - 7, 16, 9, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = '#a8703a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(fx - 7, fy - 12); ctx.lineTo(fx - 3, fy - 4); ctx.moveTo(fx + 3, fy - 12); ctx.lineTo(fx + 7, fy - 4); ctx.stroke(); }
+      else if (k % 3 === 1) { ctx.fillStyle = '#7a4fa0'; for (const [gx, gy2] of [[-5, -8], [5, -8], [0, -14], [-3, -2], [3, -2], [0, -8]]) { ctx.beginPath(); ctx.arc(fx + gx, fy + gy2, 4, 0, TAU); ctx.fill(); } }
+      else { ctx.fillStyle = '#c9905e'; ctx.fillRect(fx - 7, fy - 18, 14, 18); ctx.fillStyle = '#b3243a'; ctx.fillRect(fx - 6, fy - 16, 12, 4); }
+    }
+  }
+
+  // gifts waiting to be dragged onto the son
+  if (feast.items.some((it) => !it.placed)) {
+    ctx.fillStyle = 'rgba(255,251,232,0.92)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+    roundRect(L.panelX - 46, L.itemY[0] - 52, 92, L.itemY[2] - L.itemY[0] + 100, 16); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8a5a00'; ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    feast.items.forEach((it) => { if (!it.placed) ctx.fillText({ robe: 'Robe', ring: 'Ring', shoes: 'Shoes' }[it.kind], L.panelX, L.itemY[it.k] + 40); });
+    // a glowing target on the son
+    const tg = sonTarget(L);
+    ctx.strokeStyle = `rgba(245,190,40,${0.4 + 0.3 * Math.sin(t * 5)})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.ellipse(tg.x, tg.y, 44, 74, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    for (const it of feast.items) if (!it.placed) drawItem(it, it.x, it.y, drag && drag.item === it ? 1.15 : 1);
+  }
+  // pulsing arrows at what to tap
+  const st = feast.step;
+  if (state === 'play') {
+    let ax = null, ay = null;
+    if (st === 'lamps' && feast.lamps < 3) { ax = L.lamps[feast.lamps]; ay = L.lampY + 34; }
+    if (st === 'food') { ax = W / 2; ay = L.tableY - 40; }
+    if (st === 'music') { ax = guests[4].x; ay = guests[4].y - 120 * guests[4].s; }
+    if (st === 'hug') { ax = brother.x; ay = brother.y - 120 * brother.s; }
+    if (ax !== null) {
+      const b = Math.abs(Math.sin(t * 5)) * 6;
+      ctx.fillStyle = '#f5b82e'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ax, ay - b); ctx.lineTo(ax - 12, ay - 18 - b); ctx.lineTo(ax + 12, ay - 18 - b); ctx.closePath(); ctx.stroke(); ctx.fill();
+    }
+  }
+}
+
+// ============================================================
+//  Bubbles, banners, messages, HUD
+// ============================================================
+function bubbleAnchor(who) {
+  if (who === 'jesus') { const L = frameLayout(); return { x: L.jx + 6, y: L.gy - 4 - 76 * L.s * 1.1 }; }
+  if (scene === 'feast') {
+    const p = who === 'father' ? father : who === 'son' ? son : null;
+    if (p) return { x: p.x, y: p.y - 76 * p.s };
+    return null;
+  }
+  if (who === 'son') return { x: son.x - cam.x, y: groundY(son.x) - (son.bulb > 0 ? 130 : 78) * CH };
+  if (who === 'father') return { x: father.x - cam.x, y: groundY(father.x) - 80 * CH };
+  if (who === 'lure' && lure) { const p = lure.folk[0]; return { x: p.x, y: p.y - 76 * p.s }; }
+  return null;
+}
+
+function drawSpeech(text, ax, ay, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const maxW = Math.min(W - 44, 420);
+  const lines = wrapText(text, maxW - 26);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 26, h = lines.length * 21 + 16;
+  const bx = clamp(ax - w * 0.35, 10, W - 10 - w);
+  const by = Math.max(230, ay - 22 - h);
+  const tx = clamp(ax, bx + 20, bx + w - 20);
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(tx - 10, by + h - 1.5); ctx.lineTo(ax, Math.max(ay, by + h + 12)); ctx.lineTo(tx + 10, by + h - 1.5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(tx - 10, by + h); ctx.lineTo(ax, Math.max(ay, by + h + 12)); ctx.lineTo(tx + 10, by + h); ctx.stroke();
+  ctx.fillStyle = '#fffbe8'; ctx.fillRect(tx - 9, by + h - 5, 18, 4);
+  ctx.fillStyle = '#8a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 13, by + 8 + 10.5 + i * 21));
+  ctx.restore();
+}
+
+function drawBubbles() {
+  for (const [who, b] of Object.entries(bubbles)) {
+    if (b.t <= 0) continue;
+    const a = bubbleAnchor(who);
+    if (!a) continue;
+    drawSpeech(b.text, a.x, a.y, clamp(b.t / 0.3, 0, 1));
+  }
+}
+
+function drawBanner() {
+  if (!banner || banner.t <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(banner.t / 0.4, 0, 1) * clamp(banner.age / 0.3, 0, 1);
+  const maxW = Math.min(W - 40, 700);
+  ctx.font = 'italic 600 19px Fredoka, sans-serif';
+  const lines = wrapText(banner.text, maxW - 36);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = Math.min(maxW, tw + 36), h = lines.length * 24 + (banner.cite ? 34 : 18);
+  const bx = W / 2 - w / 2, by = 116;
+  ctx.fillStyle = 'rgba(255,246,220,0.95)'; ctx.strokeStyle = '#c9a15a'; ctx.lineWidth = 2.5;
+  roundRect(bx, by, w, h, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#6a4a14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 9 + 12 + i * 24));
+  if (banner.cite) {
+    ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillStyle = '#9a7a40';
+    ctx.fillText(banner.cite, W / 2, by + h - 13);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  const y = scene === 'feast' ? H * 0.5 : H * 0.36;
+  ctx.strokeText(message.text, W / 2, y);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, y);
+  ctx.restore();
+}
+
+function drawHint() {
+  if (!hint || hint.t <= 0 || state !== 'play') return;
+  ctx.save();
+  ctx.globalAlpha = clamp(hint.t / 0.4, 0, 1) * (0.8 + 0.2 * Math.sin(t * 4));
+  ctx.font = `700 ${W < 560 ? 17 : 20}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center';
+  const lines = wrapText(hint.text, W - 40);
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#5a3a00';
+  lines.forEach((l, i) => {
+    const y = H - 30 - (lines.length - 1 - i) * 22;
+    ctx.strokeText(l, W / 2, y); ctx.fillText(l, W / 2, y);
+  });
+  ctx.restore();
+}
+
+// A rhythm ring for the walk: red while it's too soon to tap again, green when ready
+function drawBeat() {
+  if (scene !== 'walk' || state !== 'play' || lure || son.sitting || son.stumble > 0) return;
+  const x = W / 2, y = H - 92;
+  const f = clamp((t - son.lastTap) / cfg.minGap, 0, 1);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(x, y, 24, 0, TAU); ctx.fill();
+  ctx.strokeStyle = f < 1 ? '#e8590c' : '#2b8a3e'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, 24, -Math.PI / 2, -Math.PI / 2 + f * TAU); ctx.stroke();
+  ctx.fillStyle = f < 1 ? '#e8590c' : '#2b8a3e';
+  ctx.beginPath(); ctx.ellipse(x - 6, y + 3, 4.5, 8, -0.2, 0, TAU); ctx.ellipse(x + 6, y - 5, 4.5, 8, 0.2, 0, TAU); ctx.fill();
+  if (son.streak >= 3) {
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'left';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(`Steady ×${son.streak}`, x + 34, y + 6);
+    ctx.fillStyle = '#2b8a3e'; ctx.fillText(`Steady ×${son.streak}`, x + 34, y + 6);
+  }
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  const dark = scene === 'feast' ? '#fff3d6' : '#5a4210';
+  if (scene === 'feast') ctx.shadowColor = 'rgba(40,20,60,0.8)';
+
+  // Left: level + hope (or joy at the feast)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = dark;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Prodigal Son' : `Level ${level} · ${cfg.name}`, 12, 26);
+  const joy = scene === 'feast';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText(joy ? 'JOY' : 'HOPE', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(64, 38, 124, 13, 6.5); ctx.fill();
+  const gl = joy ? clamp(stats.items / 6, 0, 1) : clamp(hope / 100, 0, 1);
+  const gg = ctx.createLinearGradient(64, 0, 188, 0);
+  if (joy) { gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8'); }
+  else { gg.addColorStop(0, '#ff6b8a'); gg.addColorStop(1, '#ffc2d1'); }
+  ctx.fillStyle = !joy && gl < 0.25 && Math.sin(t * 10) > 0 ? '#c92a2a' : gg;
+  if (gl > 0) { roundRect(64, 38, 124 * gl, 13, 6.5); ctx.fill(); }
+  if (!joy) { ctx.fillStyle = '#e63950'; heartPath(56, 45, 5); ctx.fill(); }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: the road from the far country to home, and the score
+  const mx1 = viewW - 36, mx0 = mx1 - 130, my = 26;
+  ctx.strokeStyle = 'rgba(90,66,16,0.35)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(mx0, my); ctx.lineTo(mx1, my); ctx.stroke();
+  ctx.fillStyle = '#f6a9b8'; ctx.beginPath(); ctx.arc(mx0 - 8, my, 6, 0, TAU); ctx.fill();          // the pigs
+  ctx.fillStyle = '#ecdcb8'; ctx.fillRect(mx1 + 4, my - 4, 14, 10);                                  // home
+  ctx.fillStyle = '#b8583a'; ctx.beginPath(); ctx.moveTo(mx1 + 2, my - 3); ctx.lineTo(mx1 + 11, my - 11); ctx.lineTo(mx1 + 20, my - 3); ctx.fill();
+  if (son && cfg) {
+    const span = cfg.homeX + 130 - 300;
+    const pos = (x) => mx0 + clamp((x - 300) / span, 0, 1) * (mx1 - mx0);
+    const home = scene === 'feast';
+    ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.arc(home ? mx1 : pos(son.x), my, 5.5, 0, TAU); ctx.fill();
+    if (scene === 'see' || scene === 'run' || scene === 'hug') { ctx.fillStyle = '#2f5fa8'; ctx.beginPath(); ctx.arc(pos(father.x), my, 5.5, 0, TAU); ctx.fill(); }
+  }
+  ctx.shadowBlur = 4;
+  ctx.textAlign = 'right'; ctx.fillStyle = dark;
+  ctx.font = '700 15px Fredoka, sans-serif';
+  ctx.fillText(`Score ${totalScore}`, viewW - 12, 54);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  const world = scene !== 'frame' && scene !== 'feast';
+  if (scene === 'frame') drawFrameScene();
+  else if (scene === 'feast') drawFeastScene();
+  else drawWorldScene();
+  drawParticles(world ? cam.x : 0);
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  if (state !== 'title') {
+    drawBubbles();
+    drawBanner();
+    drawBeat();
+    drawMessage();
+    drawHint();
+  }
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (fade) {
+    const a = fade.t < FADE ? fade.t / FADE : 1 - (fade.t - FADE) / FADE;
+    ctx.fillStyle = `rgba(255,246,220,${clamp(a, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  if (fade) {
+    fade.t += dt;
+    if (fade.t >= FADE && !fade.done) { fade.done = true; setScene(fade.next); }
+    if (fade.t >= FADE * 2) fade = null;
+  }
+  if (state === 'play') {
+    sceneT += dt;
+    switch (scene) {
+      case 'pigs': updatePigs(dt); break;
+      case 'walk': updateWalk(dt); break;
+      case 'see': updateSee(dt); break;
+      case 'run': updateRun(dt); break;
+      case 'hug': updateHug(dt); break;
+      case 'feast': updateFeast(dt); break;
+    }
+  } else if (state === 'win' && scene === 'feast') {
+    updateFeast(dt);
+  } else if (state === 'title') {
+    sceneT += dt;
+  }
+  for (const b of Object.values(bubbles)) b.t -= dt;
+  if (banner) { banner.t -= dt; banner.age += dt; }
+  if (hint) hint.t -= dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
