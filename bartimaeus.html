@@ -257,15 +257,15 @@ const LEVEL_NAMES = [
 function makeConfig(n) {
   return {
     name: LEVEL_NAMES[n - 1] || `Jericho Road ${n}`,
-    walkT: Math.max(34 - (n - 1) * 4, 17),            // seconds for the procession to cross
-    gain: Math.max(9.5 - (n - 1) * 0.7, 6.5),          // voice per shout
-    decay: 5 + (n - 1) * 1.6,                          // voice fades per second
-    noiseAmp: Math.min(0.3 + (n - 1) * 0.15, 0.95),    // how loud the crowd gets
+    walkT: Math.max(34 - (n - 1) * 3.2, 20),            // seconds for the procession to cross
+    gain: Math.max(9.5 - (n - 1) * 0.5, 7),          // voice per shout
+    decay: Math.min(5 + (n - 1) * 0.8, 10),            // voice fades per second
+    noiseAmp: Math.min(0.3 + (n - 1) * 0.12, 0.85),    // how loud the crowd gets
     noiseDecay: 11,                                    // extra fade at full crowd noise
-    hushGap: [Math.max(4.5 - (n - 1) * 0.6, 1.8), Math.max(7.5 - (n - 1) * 0.9, 3.2)],
+    hushGap: [Math.max(4.5 - (n - 1) * 0.5, 2.2), Math.max(7.5 - (n - 1) * 0.7, 3.8)],
     hushWarn: Math.max(1.2 - (n - 1) * 0.15, 0.55),    // time a husher spends turning round
-    hushDur: Math.min(1.3 + (n - 1) * 0.15, 2),
-    hushHit: Math.min(16 + (n - 1) * 4, 32),
+    hushDur: Math.min(1.2 + (n - 1) * 0.1, 1.7),
+    hushHit: Math.min(15 + (n - 1) * 2.5, 25),
     maxHush: n >= 4 ? 2 : 1,
     rows: Math.min(2 + n, 6),
     spacing: Math.max(52 - (n - 1), 48),               // < 56 so a full row can't be slipped through
@@ -343,17 +343,20 @@ function makePerson(x, y, s) {
 
 function rowY(k) { return cfg.rows > 1 ? lerp(ROW_NEAR, ROW_FAR, k / (cfg.rows - 1)) : ROW_NEAR; }
 function rowScale(y) { return lerp(0.78, 1.0, (y - ROW_FAR) / (ROW_NEAR - ROW_FAR)); }
-function bartScale(y) { return lerp(0.82, 1.2, clamp((y - MEET_Y) / (BART_Y - MEET_Y), 0, 1)); }
+function bartScale(y) { return lerp(0.85, 1.5, clamp((y - MEET_Y) / (BART_Y - MEET_Y), 0, 1)); }
 
 // Rows of bystanders. Each row has one gap; in the walk phase the row sways and the
 // people beside the gap slowly step aside ("the crowd parts").
 function makeRows() {
   const list = [];
+  const firstDir = Math.random() < 0.5 ? -1 : 1;   // neighbouring rows sway in opposite directions
   for (let k = 0; k < cfg.rows; k++) {
     const y = rowY(k), s = rowScale(y);
     const slots = cfg.gapSlots === -1 ? (k % 2 ? 1 : 2) : cfg.gapSlots;
-    // gaps wander from side to side so the path zig-zags
-    const gapC = W / 2 + (k === 0 ? rand(-0.18, 0.18) : rand(-0.3, 0.3)) * W;
+    // gaps zig-zag a little from row to row, but never further than the rows sway,
+    // so the gap you stand in always lines up with the next one sooner or later
+    const gapC = k === 0 ? W / 2 + rand(-0.15, 0.15) * W
+      : clamp(list[k - 1].gapC + (Math.random() < 0.5 ? -1 : 1) * rand(0.35, 0.9) * cfg.amp, W * 0.2, W * 0.8);
     const sp = cfg.spacing;
     const people = [];
     const x0 = -offX - cfg.amp - 90, x1 = W + offX + cfg.amp + 90;
@@ -367,7 +370,7 @@ function makeRows() {
       p.partF = Math.sign(p.d) * Math.max(0, 1 - (Math.abs(p.d) - (slots / 2 + 0.5)) / 2);
       people.push(p);
     }
-    list.push({ k, y, s, gapC, slots, people, dir: Math.random() < 0.5 ? -1 : 1, omega: cfg.omega * rand(0.85, 1.15), shift: 0 });
+    list.push({ k, y, s, gapC, slots, people, dir: (k % 2 ? -1 : 1) * firstDir, omega: cfg.omega * rand(0.85, 1.15), shift: 0 });
   }
   return list;
 }
@@ -1110,7 +1113,7 @@ function wrapText(text, maxW) {
   return lines;
 }
 
-function drawBubble(sx, sy, text, maxW = 240, small = false, alpha = 1) {
+function drawBubble(sx, sy, text, maxW = 240, small = false, alpha = 1, cx = sx) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.font = small ? '600 13px Fredoka, sans-serif' : '600 15px Fredoka, sans-serif';
@@ -1119,7 +1122,7 @@ function drawBubble(sx, sy, text, maxW = 240, small = false, alpha = 1) {
   const lh = small ? 16 : 19, pad = small ? 7 : 10;
   const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2;
   const h = lines.length * lh + pad * 2 - 4;
-  const bx = clamp(sx - w / 2, -offX + 8, W + offX - w - 8);
+  const bx = clamp(cx - w / 2, -offX + 8, W + offX - w - 8);
   let by = sy - h - 14;
   if (by < 104 - offY) by = 104 - offY;
   ctx.fillStyle = 'rgba(255,253,244,0.96)'; ctx.strokeStyle = '#c9a13a'; ctx.lineWidth = 2;
@@ -1140,7 +1143,9 @@ function drawBubbles() {
   for (const b of bubbles) {
     const p = speakerPos(b.who);
     const text = b.key ? Bible.verse(VERSES[b.key]).text : b.text;
-    drawBubble(p.x, p.y, text, b.small ? 150 : 240, b.small, clamp(b.t / 0.3, 0, 1));
+    // his cry sits a little to the left so the Voice meter on his right stays clear
+    const cx = b.who === 'bart' && phase === 'cry' ? p.x - 80 : p.x;
+    drawBubble(p.x, p.y, text, b.small ? 150 : 240, b.small, clamp(b.t / 0.3, 0, 1), cx);
   }
 }
 
@@ -1190,7 +1195,7 @@ function shout() {
   tapCd = TAP_GAP;
   if (hushing()) {
     // shouting straight into a "Shh!" only gets you hushed more
-    voice = Math.max(0, voice - 4);
+    voice = Math.max(0, voice - 8);
     muffled++;
     shoutT = 0.25;
     if (message.t < 1.2) showMessage('Shh! Wait a moment...');
@@ -1258,6 +1263,7 @@ function heard() {
     patient: Math.max(0, 300 - muffled * 40),
   };
   for (const r of rows) for (const p of r.people) p.hush = null;
+  bubbles = bubbles.filter((b) => b.who !== 'bart');
   jesus.pose = 'call'; jesus.side = bart.x < jesus.x ? -1 : 1; jesus.bob = 0;
   showMessage('Jesus stops and turns!');
   sfx.chime();
@@ -1943,7 +1949,7 @@ function drawSharp() {
 }
 
 function drawVoiceMeter() {
-  const x = bart.x + 54, top = 758, h = 118, w = 18;
+  const x = bart.x + 70, top = 752, h = 124, w = 18;
   const full = voice / 100;
   const near = inEarshot();
   ctx.save();
@@ -1968,6 +1974,15 @@ function drawHUD() {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
   ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // soft panels so the HUD reads on the dim scene
+  ctx.shadowBlur = 0;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const nameW = ctx.measureText(state === 'title' ? 'Blind Bartimaeus' : `Level ${level} · ${cfg.name}`).width;
+  ctx.fillStyle = 'rgba(255,250,235,0.55)';
+  roundRect(4, 4, Math.max(196, nameW + 18), 54, 12); ctx.fill();
+  roundRect(viewW - 222, 4, 218, phase === 'cry' ? 70 : 44, 12); ctx.fill();
+  ctx.shadowBlur = 4;
 
   // Left: level + voice
   ctx.textAlign = 'left';
@@ -2073,7 +2088,7 @@ function render() {
   if (dim > 0.01) {
     ctx.save();
     ctx.globalCompositeOperation = 'saturation';
-    ctx.globalAlpha = 0.72 * dim;
+    ctx.globalAlpha = 0.62 * dim;
     ctx.fillStyle = '#808080';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'source-over';
