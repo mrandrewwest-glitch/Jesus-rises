@@ -1,0 +1,2104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#9fd4f2">
+<title>Let the Children Come</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Let the Children Come</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const ease = (f) => f * f * (3 - 2 * f);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', () => { const oldW = W; resize(); if (W !== oldW) relayout(oldW); });
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function mix(a, b, f) {
+  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+  const ch = (s) => Math.round(lerp((na >> s) & 255, (nb >> s) & 255, f));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+
+// ============================================================
+//  Tuning & layout
+// ============================================================
+const ROW_H = 78;          // height of one lane
+const LANES = 7;           // rows 1..7 sit between the children and Jesus
+const GOAL_ROW = 8;        // row 8 is the meadow at Jesus's feet
+const STEP_X = 60;         // a sideways step
+const HOP_TIME = 0.16;     // seconds for one little hop
+const BACK_TIME = 0.5;     // seconds for a gentle send-back
+const CROWD_HIT = 24;      // how close a grown-up must be to bump a child
+const DISCIPLE_HIT = 32;   // disciples hold their arms out, so a bit wider
+const JESUS_Y = 206;       // top of His rock (His feet)
+
+// Feet line of each row: row 0 is the start meadow at the bottom
+function rowY(r) { return 862 - r * ROW_H; }
+function colMax() { return Math.max(1, Math.floor((W / 2 - 34) / STEP_X)); }
+function callButton() { return { x: W - 58, y: 842, r: 36 }; }
+
+const LEVEL_NAMES = [
+  'The Village Square',
+  'Market Morning',
+  'Road to Judaea',
+  'By the Jordan',
+  'Festival Crowds',
+  'A Great Multitude',
+];
+
+function makeConfig(n) {
+  const lanes = Math.min(2 + n, LANES);
+  const rows = [];
+  for (let k = 0; k < lanes; k++) rows.push(1 + Math.round((k * (LANES - 1)) / (lanes - 1)));
+  const discCount = n === 1 ? 1 : n <= 3 ? 2 : 3;
+  const discRows = [];
+  for (let k = 0; k < discCount; k++) {
+    const idx = lanes - 1 - k * 2;
+    if (idx >= 0) discRows.push(rows[idx]);
+  }
+  const goal = Math.min(2 + n, 7);
+  return {
+    name: LEVEL_NAMES[n - 1] || `Blessing ${n}`,
+    rows, discRows, goal,
+    time: 60 + goal * 14,                        // seconds of daylight
+    speed: 34 + n * 10,                          // grown-ups' walking speed
+    discSpeed: 28 + n * 8,                       // disciples' patrol speed
+    minGap: Math.max(140, 225 - n * 16),         // space between grown-ups
+    backRows: n >= 3 ? 3 : 2,                    // how far a disciple sends you back
+    callTime: Math.max(4, 6.5 - n * 0.4),        // how long the disciples stand aside
+    flowers: Math.min(3 + n, 9),
+  };
+}
+
+// ============================================================
+//  People
+// ============================================================
+const ROBES = ['#3f6fb5', '#6b8e3a', '#b5503f', '#d9a13a', '#7a4fa0', '#3c8f86', '#a0673a', '#5a6475', '#c46b8c', '#4b7f4b', '#b08a2e', '#e07a5f', '#81b29a'];
+const SKINS = ['#f1c9a0', '#e3b184', '#d9a066', '#c98d56', '#b87a48', '#9a6238', '#7a4a2a'];
+const HAIRS = ['#2e1d10', '#4a2f1a', '#6b3f1d', '#8a8a8a', '#1f140c', '#a0522d'];
+const SCARVES = ['#e8dcc0', '#c9b27a', '#f2a7a7', '#a7c7e7', '#f4d58d', '#d0b3e8'];
+
+let personId = 0;
+function makeAdult() {
+  const woman = Math.random() < 0.5;
+  return {
+    robe: pick(ROBES), skin: pick(SKINS), hair: pick(HAIRS),
+    beard: !woman && Math.random() < 0.75,
+    scarf: woman || Math.random() < 0.3 ? pick(SCARVES) : null,
+    carry: Math.random() < 0.25 ? pick(['jar', 'basket']) : null,
+    i: personId++, mood: 'watch', switchT: 0, delay: rand(0.05, 0.4),
+    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), bumpT: 0,
+  };
+}
+
+// The disciples who meant well (Mark 10:13)
+const DISCIPLE_LOOKS = [
+  { name: 'Peter',  robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { name: 'John',   robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { name: 'Andrew', robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { name: 'James',  robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { name: 'Philip', robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55', scarf: '#e8dcc0' },
+  { name: 'Thomas', robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+];
+
+// The children, each with their own look
+const KIDS = [
+  { name: 'Miriam', skin: '#d9a066', hair: '#3a2716', style: 'pigtails', tunic: '#ff8fab', extra: 'lamb' },
+  { name: 'Eli',    skin: '#f1c9a0', hair: '#c47a2c', style: 'short',    tunic: '#4dabf7' },
+  { name: 'Hannah', skin: '#9a6238', hair: '#1f140c', style: 'curly',    tunic: '#ffd43b', extra: 'baby' },
+  { name: 'Reuben', skin: '#c98d56', hair: '#2e1d10', style: 'short',    tunic: '#69db7c', small: true },
+  { name: 'Leah',   skin: '#e3b184', hair: '#6b3f1d', style: 'long',     tunic: '#b197fc' },
+  { name: 'Tobias', skin: '#7a4a2a', hair: '#1a0f08', style: 'curly',    tunic: '#ff922b' },
+  { name: 'Ruth',   skin: '#f1c9a0', hair: '#d9a441', style: 'bun',      tunic: '#63e6be', small: true },
+  { name: 'Samuel', skin: '#b87a48', hair: '#3a2515', style: 'short',    tunic: '#ff6b6b' },
+].map((k, i) => ({ ...k, i, blink: 0, blinkT: rand(1, 4) }));
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('childrenBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let lanes = [];           // one entry per active row
+let flowers = [];
+let child = null;         // the child crossing right now
+let gathered = [];        // children already blessed, sitting with Jesus
+let kidOrder = [];
+let nextKid = 0;
+let nextChildT = 0;
+let blessed = 0;
+let timeLeft = 0;
+let callUsed = false, callT = 0, bubbleT = 0;
+let joyT = 0;
+let particles = [];
+let hearts = [];
+let message = { text: '', t: 0 };
+let endTimer = 0;
+let lastScore = null;
+let lv = { flowers: 0, perfect: 0, sendBacks: 0 };
+const moveQueue = [];
+const ripples = [];
+
+// ============================================================
+//  Lanes: the busy crowd and the gentle disciple guards
+// ============================================================
+function makeLanes() {
+  const list = [];
+  let dir = Math.random() < 0.5 ? -1 : 1;
+  let dIdx = 0;
+  for (const row of cfg.rows) {
+    dir = -dir;
+    if (cfg.discRows.includes(row)) {
+      const n = W > 900 || level >= 5 ? 2 : 1;
+      const people = [];
+      for (let k = 0; k < n; k++) {
+        const look = DISCIPLE_LOOKS[dIdx++ % DISCIPLE_LOOKS.length];
+        const d = { ...look, i: personId++, mood: 'shoo', switchT: 0, delay: rand(0.05, 0.3), blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), bumpT: 0 };
+        people.push({ d, px: lerp(70, W - 70, n === 1 ? rand(0.2, 0.8) : (k + 0.5) / n), dir: k % 2 ? -dir : dir, aside: 0, edgeX: 0, x: 0 });
+      }
+      list.push({ row, type: 'disciple', speed: cfg.discSpeed * rand(0.9, 1.1), people });
+    } else {
+      const speed = cfg.speed * rand(0.8, 1.2);
+      const people = [];
+      let sum = 0;
+      const gaps = [];
+      while (sum < W + 100) { const g = rand(cfg.minGap, cfg.minGap + 150); gaps.push(g); sum += g; }
+      let x = -50 + rand(0, gaps[0]);
+      for (const g of gaps) { people.push({ d: makeAdult(), px: x, x }); x += g; }
+      list.push({ row, type: 'crowd', dir, speed, loop: sum, people });
+    }
+  }
+  return list;
+}
+
+function laneAt(row) { return lanes.find((l) => l.row === row); }
+
+function updateLanes(dt) {
+  for (const lane of lanes) {
+    if (lane.type === 'crowd') {
+      for (const p of lane.people) {
+        p.px += lane.dir * lane.speed * dt;
+        if (p.px > W + 50) p.px -= lane.loop;
+        if (p.px < W + 50 - lane.loop) p.px += lane.loop;
+        p.x = p.px;
+      }
+    } else {
+      for (const p of lane.people) {
+        if (callT > 0) p.aside = Math.min(1, p.aside + dt * 2.5);
+        else p.aside = Math.max(0, p.aside - dt * 1.2);
+        if (p.aside === 0) {
+          p.px += p.dir * lane.speed * dt;
+          if (p.px < 40) { p.px = 40; p.dir = 1; }
+          if (p.px > W - 40) { p.px = W - 40; p.dir = -1; }
+        }
+        p.x = lerp(p.px, p.edgeX, ease(p.aside));
+      }
+    }
+  }
+}
+
+// Keep things on screen if the window changes width mid-game
+function relayout(oldW) {
+  const f = (x) => x * W / oldW;
+  for (const lane of lanes) {
+    for (const p of lane.people) { p.px = f(p.px); p.x = f(p.x); p.edgeX = f(p.edgeX); }
+    if (lane.type === 'crowd') lane.loop = Math.max(lane.loop, W + 100);
+  }
+  const snap = (x) => W / 2 + clamp(Math.round((x - oldW / 2) / STEP_X), -colMax(), colMax()) * STEP_X;
+  for (const fl of flowers) fl.x = snap(fl.x);
+  if (child) { child.x = snap(child.x); child.fromX = child.x; }
+  gathered.forEach((g, k) => Object.assign(g, gatherSpot(k)));
+}
+
+// ============================================================
+//  Flowers
+// ============================================================
+function makeFlowers() {
+  const list = [];
+  const cm = colMax();
+  const colours = ['#ff6b9a', '#ffd43b', '#ffffff', '#b197fc', '#ff922b'];
+  let tries = 0;
+  while (list.length < cfg.flowers && tries++ < 200) {
+    const row = 1 + Math.floor(Math.random() * LANES);
+    const k = Math.round(rand(-cm, cm));
+    const x = W / 2 + k * STEP_X;
+    if (list.some((f) => f.row === row && f.x === x)) continue;
+    if (k === 0 && row === 1) continue;
+    list.push({ row, x, taken: false, colour: pick(colours), phase: rand(0, TAU) });
+  }
+  return list;
+}
+
+// ============================================================
+//  The child crossing
+// ============================================================
+function spawnChild() {
+  const k = KIDS[kidOrder[nextKid % kidOrder.length]];
+  nextKid++;
+  child = {
+    k, x: W / 2, row: 0, fromX: W / 2, fromRow: 0,
+    hopT: 1, hopDur: HOP_TIME, back: false,
+    mood: 'smile', moodT: 0, inv: 0.6, sendBacks: 0,
+    phase: 'walk', phaseT: 0, wx: 0, wy: 0, idleT: 0,
+  };
+  sfx.hop(0);
+}
+
+function childPos(c) {
+  if (c.phase === 'toJesus') {
+    const f = ease(clamp(c.phaseT / 0.8, 0, 1));
+    return { x: lerp(c.wx, W / 2, f), y: lerp(c.wy, JESUS_Y + 30, f) - Math.abs(Math.sin(f * Math.PI * 3)) * 10, lift: 0 };
+  }
+  const e = clamp(c.hopT, 0, 1);
+  const f = c.back ? ease(e) : e;
+  const lift = Math.sin(Math.PI * e) * (c.back ? 26 : 16);
+  return { x: lerp(c.fromX, c.x, f), y: lerp(rowY(c.fromRow), rowY(c.row), f), lift };
+}
+
+function queueMove(dir) {
+  if (moveQueue.length < 2) moveQueue.push(dir);
+}
+
+function doMove(dir) {
+  const c = child;
+  const cm = colMax();
+  let nx = c.x, nr = c.row;
+  if (dir === 'up') nr = Math.min(GOAL_ROW, c.row + 1);
+  else if (dir === 'down') nr = Math.max(0, c.row - 1);
+  else if (dir === 'left') nx = Math.max(W / 2 - cm * STEP_X, c.x - STEP_X);
+  else if (dir === 'right') nx = Math.min(W / 2 + cm * STEP_X, c.x + STEP_X);
+  if (nx === c.x && nr === c.row) return;
+  c.fromX = c.x; c.fromRow = c.row;
+  c.x = nx; c.row = nr;
+  c.hopT = 0; c.hopDur = HOP_TIME; c.back = false;
+  sfx.hop(nr);
+}
+
+// A grown-up or a disciple gets in the way: back a little, with a pout
+function sendBack(rows, who, text) {
+  const c = child;
+  c.fromX = c.x; c.fromRow = c.row;
+  c.row = Math.max(0, c.row - rows);
+  c.hopT = 0; c.hopDur = BACK_TIME; c.back = true;
+  c.mood = 'pout'; c.moodT = 1.5;
+  c.inv = BACK_TIME + 1;
+  c.sendBacks++; lv.sendBacks++;
+  moveQueue.length = 0;
+  if (who) who.d.bumpT = 1.2;
+  showMessage(text);
+  sfx.pout();
+}
+
+function checkBumps() {
+  const c = child;
+  if (c.phase !== 'walk' || c.inv > 0 || c.hopT < 0.6) return;
+  const lane = laneAt(c.row);
+  if (!lane) return;
+  for (const p of lane.people) {
+    const dx = Math.abs(p.x - c.x);
+    if (lane.type === 'crowd' && dx < CROWD_HIT) {
+      sendBack(1, p, pick(['Oops! Excuse me!', 'Bump! Sorry!', 'Oh! Pardon me!']));
+      return;
+    }
+    if (lane.type === 'disciple' && p.aside < 0.3 && dx < DISCIPLE_HIT) {
+      sendBack(cfg.backRows, p, pick(['"Not now, little one!"', '"The Master is busy!"', '"Shoo, shoo!"']));
+      return;
+    }
+  }
+}
+
+function landed() {
+  const c = child;
+  // Flowers along the way
+  for (const f of flowers) {
+    if (!f.taken && f.row === c.row && Math.abs(f.x - c.x) < 5) {
+      f.taken = true; lv.flowers++;
+      for (let i = 0; i < 14; i++) {
+        const a = rand(0, TAU), sp = rand(30, 110);
+        spawn(f.x, rowY(f.row) - 12, Math.cos(a) * sp, Math.sin(a) * sp - 30, rand(0.5, 1), i % 2 ? f.colour : '#fff6d0', rand(2, 4), 80);
+      }
+      showMessage('A flower for Jesus! +50');
+      sfx.flower();
+    }
+  }
+  // Made it to the meadow at His feet
+  if (c.row === GOAL_ROW) {
+    const p = childPos(c);
+    c.phase = 'toJesus'; c.phaseT = 0; c.wx = p.x; c.wy = p.y;
+    c.mood = 'joy';
+    moveQueue.length = 0;
+  }
+}
+
+function gatherSpot(k) {
+  const side = k % 2 ? 1 : -1;
+  const n = Math.floor(k / 2);
+  const reach = Math.min(W / 2 - 30, 230);
+  const dx = 58 + n * 40;
+  return { x: W / 2 + side * Math.min(dx, reach - (n % 2) * 16), y: JESUS_Y + 32 + (n % 2 ? -12 : 0) };
+}
+
+function bless() {
+  const c = child;
+  blessed++;
+  const perfect = c.sendBacks === 0;
+  if (perfect) lv.perfect++;
+  joyT = 2.2;
+  showMessage(perfect ? `Jesus blesses ${c.k.name}! Perfect path!` : `Jesus blesses ${c.k.name}!`);
+  sfx.bless(blessed);
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, TAU), sp = rand(40, 150);
+    spawn(W / 2, JESUS_Y - 45, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.7, 1.5),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 30);
+  }
+  for (let i = 0; i < 4; i++) hearts.push({ x: W / 2 + rand(-40, 40), y: JESUS_Y - 105, vx: rand(-15, 15), life: 1.8 + i * 0.2, max: 1.8 + i * 0.2, s: rand(0.8, 1.3) });
+}
+
+function updateChild(dt) {
+  const c = child;
+  c.inv = Math.max(0, c.inv - dt);
+  if (c.moodT > 0) { c.moodT -= dt; if (c.moodT <= 0 && c.phase === 'walk') c.mood = 'smile'; }
+
+  if (c.phase === 'walk') {
+    c.idleT = c.hopT < 1 || moveQueue.length ? 0 : c.idleT + dt;
+    if (c.hopT < 1) {
+      c.hopT = Math.min(1, c.hopT + dt / c.hopDur);
+      if (c.hopT >= 1) { c.back = false; landed(); }
+    } else if (moveQueue.length) {
+      doMove(moveQueue.shift());
+    }
+    checkBumps();
+  } else if (c.phase === 'toJesus') {
+    c.phaseT += dt;
+    if (c.phaseT >= 0.8) { c.phase = 'held'; c.phaseT = 0; bless(); }
+  } else if (c.phase === 'held') {
+    c.phaseT += dt;
+    if (Math.random() < dt * 14) spawn(W / 2 + rand(-35, 35), JESUS_Y - rand(20, 80), 0, -25, 1, '#fff6d0', 3);
+    if (c.phaseT >= 1.9) {
+      gathered.push({ k: c.k, ...gatherSpot(gathered.length), phase: rand(0, TAU) });
+      child = null;
+      if (blessed >= cfg.goal) win();
+      else nextChildT = 0.5;
+    }
+  }
+}
+
+// ============================================================
+//  Jesus calls: "Suffer the little children to come unto me" (Mark 10:14)
+// ============================================================
+function callOut() {
+  if (state !== 'play' || callUsed) return;
+  callUsed = true;
+  callT = cfg.callTime;
+  bubbleT = 3;
+  for (const lane of lanes) {
+    if (lane.type !== 'disciple') continue;
+    for (const p of lane.people) {
+      const cx = child ? child.x : W / 2;
+      // step to whichever side is farther from the child
+      p.edgeX = p.px < cx ? 26 : W - 26;
+      if (Math.abs(p.edgeX - cx) < 90) p.edgeX = p.edgeX < W / 2 ? W - 26 : 26;
+    }
+  }
+  showMessage('The disciples step aside!');
+  sfx.call();
+}
+
+// ============================================================
+//  Moods: every face reacts
+// ============================================================
+function updateMoods(dt) {
+  const all = [];
+  for (const lane of lanes) for (const p of lane.people) all.push([lane, p]);
+  const cp = child ? childPos(child) : null;
+  for (const [lane, p] of all) {
+    const d = p.d;
+    let want;
+    if (state === 'win' || joyT > 0) want = 'joy';
+    else if (state === 'fail') want = 'worried';
+    else if (lane.type === 'disciple') want = callT > 0 ? (p.aside < 0.9 ? 'wow' : 'joy') : (d.bumpT > 0 ? 'doubt' : 'shoo');
+    else want = d.bumpT > 0 ? 'wow' : 'watch';
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.bumpT = Math.max(0, d.bumpT - dt);
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+    // Look toward the child if near, otherwise where they're walking
+    let lx = lane.type === 'crowd' ? lane.dir * 0.85 : p.dir * 0.85, ly = 0.3;
+    if (lane.type === 'disciple' && p.aside > 0.2) { lx = 0; ly = -1; }   // looking up to Jesus
+    else if (cp && (lane.type === 'disciple' || Math.hypot(cp.x - p.x, cp.y - rowY(lane.row)) < 170)) {
+      const dx = cp.x - p.x, dy = (cp.y - 30) - (rowY(lane.row) - 52);
+      const len = Math.hypot(dx, dy) || 1;
+      lx = dx / len; ly = dy / len;
+    }
+    p.lx = lx; p.ly = ly;
+  }
+  for (const k of KIDS) {
+    k.blinkT -= dt;
+    if (k.blinkT <= 0) { k.blink = 0.13; k.blinkT = rand(1.5, 5); }
+    if (k.blink > 0) k.blink -= dt;
+  }
+}
+
+// ============================================================
+//  Particles & hearts
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i];
+    h.life -= dt;
+    if (h.life <= 0) { hearts.splice(i, 1); continue; }
+    h.y -= 45 * dt; h.x += h.vx * dt + Math.sin(h.life * 5) * 0.4;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function heartPath(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.5, y - r * 0.2, x - r * 0.6, y - r * 1.3, x, y - r * 0.45);
+  ctx.bezierCurveTo(x + r * 0.6, y - r * 1.3, x + r * 1.5, y - r * 0.2, x, y + r * 0.9);
+  ctx.closePath();
+}
+
+function drawHearts() {
+  for (const h of hearts) {
+    ctx.globalAlpha = clamp(h.life / h.max * 1.6, 0, 1);
+    ctx.fillStyle = '#ff5c8a';
+    heartPath(h.x, h.y, 11 * h.s); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath(); ctx.arc(h.x - 4 * h.s, h.y - 4 * h.s, 2.5 * h.s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Drawing people (after the disciples of "Jesus Rises")
+// ============================================================
+function drawPerson(slot) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  const walkBob = slot.walking ? Math.abs(Math.sin(t * 7 + d.phase)) * 3 : 0;
+
+  ctx.save();
+  ctx.translate(x, slot.y - (jump + walkBob) * s);
+  ctx.scale(s, s);
+
+  // soft shadow
+  ctx.fillStyle = 'rgba(60,40,10,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, (jump + walkBob) + 1, 20, 5, 0, 0, TAU); ctx.fill();
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const lx = slot.lx || 0, ly = slot.ly || 0;
+
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 3 === 0) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Arms
+  if (mood === 'shoo') {
+    // arms out wide, one hand waving "shoo, shoo"
+    const wave = Math.sin(t * 8 + d.phase) * 6;
+    arm(-11, -32, -29, -40 + wave);
+    arm(11, -32, 29, -40 - wave);
+  } else if (d.carry === 'jar' && mood !== 'joy') {
+    arm(-11, -32, -9, -78); arm(11, -32, 15, -12);
+  } else if (d.carry === 'basket' && mood !== 'joy') {
+    arm(-11, -32, -20, -20); arm(11, -32, 15, -12);
+  } else if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+    if (mood === 'doubt') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); }   // folded arms
+    else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood === 'shoo' ? 'doubt' : mood, hy, lx, ly);
+
+  // Things carried
+  if (d.carry === 'jar' && mood !== 'joy') {
+    ctx.fillStyle = '#c8733c'; ctx.strokeStyle = '#8f4a22'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, hy - 27, 10, 11, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    roundRect(-5, hy - 44, 10, 8, 2); ctx.fill(); ctx.stroke();
+  } else if (d.carry === 'basket' && mood !== 'joy') {
+    ctx.fillStyle = '#d9a95b'; ctx.strokeStyle = '#9c6d2a'; ctx.lineWidth = 1.5;
+    roundRect(-30, -24, 20, 13, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e84a5f'; ctx.beginPath(); ctx.arc(-24, -25, 4, 0, TAU); ctx.arc(-17, -26, 4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#8bc34a'; ctx.beginPath(); ctx.arc(-20, -28, 3.5, 0, TAU); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const cheeks = (a) => {
+    ctx.fillStyle = `rgba(255,120,120,${a})`;
+    ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'smile':   // the children's everyday big happy face
+      eyes(3.6, 4.6, 2.2);
+      if (!blink) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(-ex + 1 + lx, ey - 1.5, 1, 0, TAU); ctx.arc(ex + 1 + lx, ey - 1.5, 1, 0, TAU); ctx.fill();
+      }
+      mouthFill(() => { ctx.moveTo(-5, mouthY - 3); ctx.arc(0, mouthY - 3, 5, 0, Math.PI); ctx.closePath(); });
+      cheeks(0.4);
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'pout':    // a little sulk, never tears
+      eyes(3.5, 4, 2);
+      brows(-9, -5, -9, -5);
+      ctx.fillStyle = '#c0504a';
+      ctx.beginPath(); ctx.ellipse(0, mouthY - 1, 4, 2.4, 0, 0, TAU); ctx.fill();
+      mouthLine(() => ctx.arc(0, mouthY + 1, 4, 1.15 * Math.PI, 1.85 * Math.PI));
+      cheeks(0.55);
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      cheeks(0.45);
+      break;
+  }
+}
+
+// ============================================================
+//  Drawing children
+// ============================================================
+function drawKid(k, x, y, s, mood, lx = 0, ly = 0, opts = {}) {
+  const sc = s * (k.small ? 0.86 : 1);
+  ctx.save();
+  ctx.translate(x, y);
+  if (!opts.noShadow) {
+    ctx.fillStyle = 'rgba(60,40,10,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 1, 14 * sc, 4 * sc, 0, 0, TAU); ctx.fill();
+  }
+  ctx.translate(0, -(opts.lift || 0));
+  ctx.scale(sc, sc);
+  if (opts.flip) ctx.scale(-1, 1);
+
+  const skinDark = shade(k.skin, -30);
+  const hy = -37;
+  const holding = !!k.extra && !opts.noExtra;
+
+  // Long hair sits behind the head and shoulders
+  if (k.style === 'long') {
+    ctx.fillStyle = k.hair;
+    roundRect(-13, hy - 6, 26, 26, 9); ctx.fill();
+  }
+
+  // Legs and sandals
+  if (!opts.sitting) {
+    ctx.strokeStyle = k.skin; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-4, -9); ctx.lineTo(-4.5, -2); ctx.moveTo(4, -9); ctx.lineTo(4.5, -2); ctx.stroke();
+    ctx.fillStyle = '#8a5a2b';
+    ctx.beginPath(); ctx.ellipse(-5, -1, 4, 2, 0, 0, TAU); ctx.ellipse(5, -1, 4, 2, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = k.skin;
+    ctx.beginPath(); ctx.ellipse(-9, -2, 4.5, 2.5, 0, 0, TAU); ctx.ellipse(9, -2, 4.5, 2.5, 0, 0, TAU); ctx.fill();
+  }
+
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = shade(k.tunic, -30); ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = k.skin; ctx.beginPath(); ctx.arc(x2, y2, 3, 0, TAU); ctx.fill();
+  };
+
+  const armsUp = mood === 'joy' && !holding;
+  if (armsUp) {
+    const wave = Math.sin(t * 10 + k.i) * 3;
+    arm(-7, -21, -15 + wave, -40);
+    arm(7, -21, 15 - wave, -40);
+  }
+
+  // Tunic
+  ctx.fillStyle = k.tunic; ctx.strokeStyle = shade(k.tunic, -45); ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  if (opts.sitting) {
+    ctx.moveTo(-15, -1);
+    ctx.quadraticCurveTo(-12, -20, -8, -24);
+  } else {
+    ctx.moveTo(-12, -7);
+    ctx.quadraticCurveTo(-11, -19, -8, -24);
+  }
+  ctx.quadraticCurveTo(0, -27, 8, -24);
+  if (opts.sitting) { ctx.quadraticCurveTo(12, -20, 15, -1); ctx.quadraticCurveTo(0, 2, -15, -1); }
+  else { ctx.quadraticCurveTo(11, -19, 12, -7); ctx.quadraticCurveTo(0, -4, -12, -7); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-10, -13); ctx.quadraticCurveTo(0, -11, 10, -13); ctx.stroke();
+
+  // A lamb or a baby held close, with arms around it
+  if (holding) {
+    if (k.extra === 'lamb') {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      for (const [px, py, r] of [[-6, -17, 6], [0, -19, 6.5], [6, -17, 6], [-2, -13, 6], [5, -13, 5.5]]) { ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU); }
+      ctx.fill();
+      ctx.fillStyle = '#4a3a30';
+      ctx.beginPath(); ctx.ellipse(12, -20, 4.5, 5.5, 0.3, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(14, -25, 2, 3.5, 1, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(13, -21, 1.1, 0, TAU); ctx.fill();
+    } else {
+      ctx.fillStyle = '#f3ead2'; ctx.strokeStyle = '#cdbd97'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(0, -16, 11, 6.5, -0.25, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = k.skin;
+      ctx.beginPath(); ctx.arc(9, -20, 5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(7.5, -20, 1.2, 0, Math.PI); ctx.moveTo(11.7, -20); ctx.arc(10.5, -20, 1.2, 0, Math.PI); ctx.stroke();
+      ctx.fillStyle = k.hair; ctx.beginPath(); ctx.arc(9, -24, 2.2, 0, TAU); ctx.fill();
+    }
+    arm(-7, -21, -3, -13);
+    arm(7, -21, 4, -12);
+  } else if (!armsUp) {
+    if (mood === 'pout') { arm(-7, -21, -2, -17); arm(7, -21, 2, -16); }   // arms folded, cross
+    else if (opts.sitting) { arm(-7, -21, -8, -8); arm(7, -21, 8, -8); }
+    else {
+      const sw = opts.walking ? Math.sin(t * 12 + k.i) * 3 : 0;
+      arm(-7, -21, -12 + sw, -10); arm(7, -21, 12 - sw, -10);
+    }
+  }
+
+  // Head
+  ctx.fillStyle = k.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = skinDark;
+  ctx.beginPath(); ctx.arc(-13, hy + 1, 2.6, 0, TAU); ctx.arc(13, hy + 1, 2.6, 0, TAU); ctx.fill();
+
+  // Hair styles
+  ctx.fillStyle = k.hair;
+  const cap = () => {
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 13.6, Math.PI * 0.97, Math.PI * 2.03);
+    ctx.quadraticCurveTo(5, hy - 9, 0, hy - 8);
+    ctx.quadraticCurveTo(-7, hy - 10, -13.5, hy + 1);
+    ctx.closePath(); ctx.fill();
+  };
+  if (k.style === 'curly') {
+    ctx.beginPath();
+    for (let a = 0; a <= 8; a++) {
+      const ang = Math.PI * (0.92 + a * 0.145);
+      const px = Math.cos(ang) * 12.5, py = hy - 1 + Math.sin(ang) * 12.5;
+      ctx.moveTo(px + 5, py); ctx.arc(px, py, 5, 0, TAU);
+    }
+    ctx.fill();
+  } else if (k.style === 'pigtails') {
+    cap();
+    ctx.beginPath(); ctx.arc(-15, hy + 2, 5.5, 0, TAU); ctx.arc(15, hy + 2, 5.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffd43b';
+    ctx.beginPath(); ctx.arc(-12, hy - 2, 2.2, 0, TAU); ctx.arc(12, hy - 2, 2.2, 0, TAU); ctx.fill();
+  } else if (k.style === 'bun') {
+    cap();
+    ctx.beginPath(); ctx.arc(0, hy - 15, 6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.arc(4, hy - 18, 2.2, 0, TAU); ctx.fill();
+  } else {
+    cap();
+    if (k.style === 'short') { ctx.beginPath(); ctx.arc(-3, hy - 12, 3, 0, TAU); ctx.fill(); }
+  }
+
+  drawFace({ hair: k.hair, blink: k.blink, i: k.i }, mood, hy, lx, ly);
+  ctx.restore();
+}
+
+// ============================================================
+//  Jesus, sitting on His rock with open arms
+// ============================================================
+function drawJesus(j) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(j.s, j.s);
+
+  if (j.pose !== 'open') {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 80);
+    g.addColorStop(0, 'rgba(255,235,150,0.6)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 80, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash; seated, so the lap spreads a little wider
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(14, -12);
+  ctx.quadraticCurveTo(20, -8, 18, 0);
+  ctx.quadraticCurveTo(0, 4, -18, 0);
+  ctx.quadraticCurveTo(-20, -8, -14, -12);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+  // lap fold and sandalled feet
+  ctx.strokeStyle = '#d8d1bd'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-14, -9); ctx.quadraticCurveTo(0, -5, 14, -9); ctx.stroke();
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(-7, 3, 4.5, 2.6, 0, 0, TAU); ctx.ellipse(7, 3, 4.5, 2.6, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-10, 2); ctx.lineTo(-4, 2); ctx.moveTo(4, 2); ctx.lineTo(10, 2); ctx.stroke();
+
+  // Arms: open wide in welcome, raised when He calls, or holding a child
+  let hands;
+  if (j.pose === 'up') hands = [[-21, -66], [21, -66]];
+  else if (j.pose === 'hold') hands = [[-11, -22], [11, -26]];
+  else {
+    const w = Math.sin(t * 2) * 2;
+    hands = [[-29, -35 - w], [29, -35 + w]];
+  }
+  const drawArms = () => {
+    for (const [hx, hy] of hands) {
+      const sx = hx < 0 ? -8 : 8;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (j.pose === 'up' ? 4 : 0)); ctx.stroke();
+      ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (j.pose === 'up' ? 4 : 0)); ctx.stroke();
+      ctx.fillStyle = '#e0a877';
+      ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+    }
+  };
+  if (j.pose !== 'hold') drawArms();
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (j.pose === 'up') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -46, 2, 1.8, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+
+  // The child taken up in His arms (Mark 10:16), then His hands upon them
+  if (j.pose === 'hold' && j.held) {
+    ctx.save();
+    ctx.scale(1 / j.s, 1 / j.s);
+    drawKid(j.held, 0, -5 * j.s, 0.8, 'joy', 0, -1, { noShadow: true, sitting: true, noExtra: false });
+    ctx.restore();
+    // one arm around the child, one hand of blessing on their head
+    const arms = [[-8, -38, -14, -14], [8, -38, 5, -47]];
+    for (const [x1, y1, x2, y2] of arms) {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(x1 + (x1 < 0 ? -4 : 4), y1 + 4); ctx.quadraticCurveTo(x1 * 2.6, (y1 + y2) / 2, x2, y2); ctx.stroke();
+      ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(x1 + (x1 < 0 ? -4 : 4), y1 + 4); ctx.quadraticCurveTo(x1 * 2.6, (y1 + y2) / 2, x2, y2); ctx.stroke();
+      ctx.fillStyle = '#e0a877';
+      ctx.beginPath(); ctx.arc(x2, y2, 3.4, 0, TAU); ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+function jesusState() {
+  const holding = child && child.phase === 'held';
+  let pose = 'open';
+  if (holding) pose = 'hold';
+  else if (bubbleT > 1.5 || state === 'win') pose = 'up';
+  return {
+    x: W / 2, y: JESUS_Y, s: 1.3, pose,
+    face: holding || state === 'win' || joyT > 0 ? 'joy' : 'calm',
+    held: holding ? child.k : null,
+  };
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function levelPoints() {
+  return {
+    kids: blessed * 200,
+    flowers: lv.flowers * 50,
+    perfect: lv.perfect * 100,
+  };
+}
+
+function win() {
+  state = 'win';
+  const p = levelPoints();
+  const levelBonus = level * 300;
+  const score = p.kids + p.flowers + p.perfect + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('childrenBest', best); } catch (e) {} }
+  lastScore = { ...p, levelBonus, score };
+  for (let i = 0; i < 80; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(W / 2, JESUS_Y - 40, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8', '#ff8fab'][i % 5], rand(2, 4.5), 30);
+  }
+  for (let i = 0; i < 8; i++) hearts.push({ x: W / 2 + rand(-80, 80), y: JESUS_Y - rand(30, 80), vx: rand(-20, 20), life: 2 + i * 0.15, max: 2 + i * 0.15, s: rand(0.8, 1.4) });
+  showMessage('All the children are blessed!');
+  sfx.win();
+  endTimer = 2.2;
+}
+
+function fail() {
+  state = 'fail';
+  moveQueue.length = 0;
+  if (child && child.phase === 'walk') { child.mood = 'pout'; child.moodT = 99; }
+  showMessage('The sun is setting...');
+  sfx.fail();
+  endTimer = 1.6;
+}
+
+function showMessage(text) { message = { text, t: 2.2 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  cfg = makeConfig(1);
+  lanes = makeLanes();
+  flowers = makeFlowers();
+  gathered = [];
+  kidOrder = [0, 2, 1, 3, 4, 5, 6, 7];
+  nextKid = 0;
+  timeLeft = cfg.time;
+  spawnChild();
+  showOverlay('Let the Children Come', 'Jesus blesses the children',
+    `<p class="verse">"Suffer the little children to come unto me, and forbid them not: for of such is the kingdom of God." &mdash; Mark 10:14</p>
+     <ul>
+       <li>Help each child cross the busy village to <b>Jesus</b>, who is waiting with open arms.</li>
+       <li><b>Touch:</b> <b>tap ahead</b> of the child to hop forward, <b>tap beside</b> them to step sideways.</li>
+       <li><b>Keyboard:</b> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to hop.</li>
+       <li>Wait for a gap in the crowd. The disciples may send you back a little way&hellip;</li>
+       <li>Tap <b>Call</b> (or <kbd>C</kbd>) once each level and the disciples will step aside!</li>
+       <li>Pick up <b>flowers</b> on the way. Bring all the children before <b>sunset</b>.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+    'Let Them Come!', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = makeConfig(level);
+  lanes = makeLanes();
+  flowers = makeFlowers();
+  gathered = [];
+  child = null;
+  blessed = 0;
+  timeLeft = cfg.time;
+  callUsed = false; callT = 0; bubbleT = 0; joyT = 0;
+  particles = []; hearts = [];
+  moveQueue.length = 0;
+  ripples.length = 0;
+  lv = { flowers: 0, perfect: 0, sendBacks: 0 };
+  const base = [0, 2, 1, 3, 4, 5, 6, 7];
+  const shift = ((level - 1) * 3) % base.length;
+  kidOrder = base.slice(shift).concat(base.slice(0, shift));
+  nextKid = 0;
+  nextChildT = 0;
+  endTimer = 0;
+  state = 'play';
+  hideOverlay();
+  spawnChild();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+  if (level === 1) setTimeout(() => {
+    if (state === 'play' && child && child.row === 0) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap above the child to hop!' : 'Press ↑ to hop forward!');
+  }, 2300);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Hallelujah!', `Level ${level} complete — ${cfg.name}`,
+      `<p class="verse">"And he took them up in his arms, put his hands upon them, and blessed them." &mdash; Mark 10:16</p>
+       <p class="score">Children blessed: <b>${s.kids}</b><br>Flowers: <b>${s.flowers}</b><br>No-bump paths: <b>${s.perfect}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+      'Next Level', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay("Let's try again!", `The sun went down — Level ${level}`,
+      `<p style="text-align:center">You brought <b>${blessed}</b> of <b>${cfg.goal}</b> children to Jesus. He is still waiting with open arms!</p>
+       <p class="verse">"Whosoever shall not receive the kingdom of God as a little child, he shall not enter therein." &mdash; Mark 10:15</p>
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const KEY_MOVES = {
+  ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
+};
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play') return;
+  if (e.code === 'KeyC') { callOut(); return; }
+  const mv = KEY_MOVES[e.code];
+  if (mv && child && child.phase === 'walk') queueMove(mv);
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+// Tap ahead of the child to hop forward, beside them to step sideways,
+// well below them to step back.
+function tapToMove(p) {
+  const cx = child.x, cy = rowY(child.row) - 22;
+  const dx = p.x - cx, dy = p.y - cy;
+  if (dy < -28 && Math.abs(dx) < -dy * 1.6 + 30) return 'up';
+  if (dy > 45 && Math.abs(dx) < dy) return 'down';
+  if (Math.abs(dx) > 16) return dx < 0 ? 'left' : 'right';
+  return 'up';
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  const cb = callButton();
+  if (Math.hypot(p.x - cb.x, p.y - cb.y) < cb.r + 8) { callOut(); return; }
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  if (child && child.phase === 'walk') queueMove(tapToMove(p));
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+};
+
+// A few small extra sounds for this game, made with the same helpers
+Object.assign(sfx, {
+  hop(row) { this.tone(440 + row * 45, 0.1, 'triangle', 0.12, 0, 660 + row * 55); },
+  flower() {
+    this.tone(1319, 0.12, 'triangle', 0.14);
+    this.tone(1760, 0.18, 'triangle', 0.12, 0.08);
+    this.tone(2093, 0.25, 'sine', 0.1, 0.16);
+  },
+  pout() { this.tone(392, 0.28, 'sine', 0.22, 0, 262); this.tone(330, 0.3, 'sine', 0.15, 0.14, 220); },
+  bless(n) {
+    if (!this.ctx) return;
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.02, clamp(0.3 + n * 0.1, 0, 1));
+    this.tone(1568, 0.3, 'sine', 0.08, 0.1);
+    this.tone(2093, 0.4, 'sine', 0.07, 0.22);
+  },
+  call() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+});
+
+// ============================================================
+//  Rendering
+// ============================================================
+const HORIZON = 176;
+const skyClouds = Array.from({ length: 5 }, (_, i) => ({ f: (i + Math.random() * 0.6) / 5, y: rand(20, 120), w: rand(70, 130), speed: rand(4, 9) }));
+
+function sunsetF() { return state === 'title' ? 0.05 : clamp(1 - timeLeft / cfg.time, 0, 1); }
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function drawSky() {
+  const f = sunsetF();
+  const g = ctx.createLinearGradient(0, -offY, 0, HORIZON + 10);
+  g.addColorStop(0, mix('#6fc0f0', '#e98a78', f));
+  g.addColorStop(0.6, mix('#b9e0f7', '#ffb98a', f));
+  g.addColorStop(1, mix('#eef9ff', '#ffe29a', f));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, HORIZON + 10 + offY);
+
+  // The sun sinks toward the hills as time runs out
+  const sx = lerp(W * 0.12, W * 0.88, f), sy = lerp(52, HORIZON + 6, f * f);
+  const sg = ctx.createRadialGradient(sx, sy, 8, sx, sy, 80);
+  sg.addColorStop(0, `rgba(255,240,170,${0.7})`);
+  sg.addColorStop(1, 'rgba(255,240,170,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(sx, sy, 80, 0, TAU); ctx.fill();
+  ctx.fillStyle = mix('#fff1a0', '#ff9a4a', f);
+  ctx.beginPath(); ctx.arc(sx, sy, 24, 0, TAU); ctx.fill();
+
+  for (const c of skyClouds) {
+    const x = -offX - 150 + c.f * (viewW + 300);
+    drawCloud(x, c.y, c.w, c.w * 0.3, 'rgba(255,255,255,0.85)', mix('#dcebf8', '#f7c6b0', f));
+  }
+}
+
+function drawHouse(x, w, h, col) {
+  const base = HORIZON + 8;
+  ctx.fillStyle = col; ctx.strokeStyle = shade(col, -40); ctx.lineWidth = 1.5;
+  roundRect(x - w / 2, base - h, w, h, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = shade(col, -18);
+  ctx.fillRect(x - w / 2 - 3, base - h - 4, w + 6, 6);
+  ctx.fillStyle = '#6b4a2b';
+  roundRect(x - 7, base - 22, 14, 22, [7, 7, 0, 0]); ctx.fill();
+  ctx.fillStyle = '#4a3a5a';
+  roundRect(x + w / 2 - 16, base - h + 12, 9, 9, 2); ctx.fill();
+  roundRect(x - w / 2 + 7, base - h + 12, 9, 9, 2); ctx.fill();
+  // a potted plant on the roof
+  ctx.fillStyle = '#c8733c'; ctx.fillRect(x - w / 2 + 6, base - h - 11, 8, 7);
+  ctx.fillStyle = '#5fae4a'; ctx.beginPath(); ctx.arc(x - w / 2 + 10, base - h - 13, 6, 0, TAU); ctx.fill();
+}
+
+function drawTree(x, y) {
+  ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 8, y - 60, x + 4, y - 120); ctx.stroke();
+  ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(x - 2, y - 80); ctx.lineTo(x - 30, y - 118); ctx.moveTo(x + 2, y - 95); ctx.lineTo(x + 30, y - 128); ctx.stroke();
+  const sway = Math.sin(t * 0.9) * 2;
+  for (const [fill, dy] of [['#4f9a3a', 6], ['#6cbf4a', 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [dx, ddy, r] of [[-36, -130, 30], [0, -155, 36], [36, -134, 30], [-18, -112, 26], [22, -110, 26], [0, -128, 30]]) {
+      ctx.moveTo(x + dx + sway + r, y + ddy + dy); ctx.arc(x + dx + sway, y + ddy + dy, r, 0, TAU);
+    }
+    ctx.fill();
+  }
+  // a few fruit
+  ctx.fillStyle = '#ff8a5c';
+  for (const [dx, dy] of [[-30, -120], [18, -146], [34, -118], [-8, -104]]) { ctx.beginPath(); ctx.arc(x + dx + sway, y + dy, 3.5, 0, TAU); ctx.fill(); }
+}
+
+function drawLand() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // distant hills
+  ctx.fillStyle = '#a7cf8a';
+  ctx.beginPath(); ctx.moveTo(x0, HORIZON + 20);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, HORIZON - 14 + Math.sin(x / 90) * 10 + Math.sin(x / 37) * 4);
+  ctx.lineTo(x1, HORIZON + 20); ctx.fill();
+
+  // village houses on either side
+  const cols = ['#f1dcb0', '#e8cf9e', '#f5e3c0', '#e4c79a'];
+  const spots = [0.06, 0.19, 0.81, 0.94];
+  spots.forEach((f, i) => {
+    const x = W * f;
+    if (Math.abs(x - W / 2) < 150) return;
+    drawHouse(x, 56 + (i % 2) * 10, 44 + ((i * 7) % 3) * 8, cols[i]);
+  });
+
+  // meadow
+  ctx.fillStyle = '#95cf68';
+  ctx.fillRect(x0, HORIZON, x1 - x0, H - HORIZON + 20);
+
+  // glow of welcome around Jesus
+  const gl = ctx.createRadialGradient(W / 2, JESUS_Y - 30, 10, W / 2, JESUS_Y - 30, 190);
+  gl.addColorStop(0, 'rgba(255,248,200,0.75)');
+  gl.addColorStop(1, 'rgba(255,248,200,0)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(W / 2 - 190, JESUS_Y - 220, 380, 330);
+
+  // lanes
+  for (let r = 1; r <= LANES; r++) {
+    const top = rowY(r) - 60, h = ROW_H;
+    const lane = laneAt(r);
+    if (lane) {
+      ctx.fillStyle = lane.type === 'disciple' ? '#f0dcae' : '#ead09a';
+      ctx.fillRect(x0, top, x1 - x0, h);
+      ctx.fillStyle = 'rgba(160,120,60,0.35)';
+      ctx.fillRect(x0, top, x1 - x0, 3);
+      ctx.fillRect(x0, top + h - 3, x1 - x0, 3);
+      // cobbles
+      ctx.fillStyle = 'rgba(180,140,80,0.28)';
+      ctx.beginPath();
+      for (let x = x0 + ((r * 37) % 50); x < x1; x += 46) {
+        for (let k = 0; k < 2; k++) {
+          const cx = x + k * 23, cy = top + 20 + k * 32 + ((x * 7) % 9);
+          ctx.moveTo(cx + 9, cy); ctx.ellipse(cx, cy, 9, 5, 0, 0, TAU);
+        }
+      }
+      ctx.fill();
+    } else {
+      ctx.fillStyle = r % 2 ? '#9dd46e' : '#a3d875';
+      ctx.fillRect(x0, top, x1 - x0, h);
+      // grass tufts
+      ctx.strokeStyle = '#7dba52'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let x = x0 + ((r * 53) % 70); x < x1; x += 70) {
+        const y = top + 30 + ((x * 13) % 30);
+        ctx.moveTo(x - 4, y); ctx.lineTo(x - 6, y - 7);
+        ctx.moveTo(x, y); ctx.lineTo(x, y - 9);
+        ctx.moveTo(x + 4, y); ctx.lineTo(x + 6, y - 7);
+      }
+      ctx.stroke();
+    }
+  }
+  // start meadow
+  ctx.fillStyle = '#b1e083';
+  ctx.fillRect(x0, rowY(0) - 60, x1 - x0, H - rowY(0) + 80);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  for (let x = x0 + 20; x < x1; x += 55) { const y = rowY(0) - 40 + ((x * 11) % 20); ctx.moveTo(x + 2.5, y); ctx.arc(x, y, 2.5, 0, TAU); }
+  ctx.fill();
+}
+
+function drawFlower(f) {
+  const x = f.x, y = rowY(f.row) - 14;
+  const bob = Math.sin(t * 3 + f.phase) * 1.5;
+  ctx.strokeStyle = '#4f9a3a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y + 12); ctx.lineTo(x, y + bob); ctx.stroke();
+  ctx.fillStyle = '#6cbf4a';
+  ctx.beginPath(); ctx.ellipse(x + 5, y + 7, 5, 2.5, -0.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = f.colour;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = i * TAU / 5 + t * 0.5;
+    const px = x + Math.cos(a) * 6, py = y + bob - 2 + Math.sin(a) * 6;
+    ctx.moveTo(px + 4.5, py); ctx.arc(px, py, 4.5, 0, TAU);
+  }
+  ctx.fill();
+  ctx.fillStyle = '#ffb000';
+  ctx.beginPath(); ctx.arc(x, y + bob - 2, 3.5, 0, TAU); ctx.fill();
+}
+
+function drawRock() {
+  const x = W / 2, y = JESUS_Y;
+  ctx.fillStyle = 'rgba(60,40,10,0.18)';
+  ctx.beginPath(); ctx.ellipse(x, y + 32, 50, 8, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#a89f92'; ctx.strokeStyle = '#7d7568'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - 44, y + 32);
+  ctx.quadraticCurveTo(x - 48, y + 4, x - 24, y - 2);
+  ctx.quadraticCurveTo(x, y - 6, x + 26, y - 1);
+  ctx.quadraticCurveTo(x + 50, y + 6, x + 44, y + 32);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath(); ctx.ellipse(x - 16, y + 6, 14, 4, -0.1, 0, TAU); ctx.fill();
+}
+
+function drawCallButton() {
+  if (state === 'title') return;
+  const b = callButton();
+  const ready = !callUsed;
+  const pulse = ready ? 1 + Math.sin(t * 4) * 0.04 : 1;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = 'rgba(60,40,10,0.2)';
+  ctx.beginPath(); ctx.arc(0, 4, b.r, 0, TAU); ctx.fill();
+  const g = ctx.createLinearGradient(0, -b.r, 0, b.r);
+  if (ready) { g.addColorStop(0, '#f7c948'); g.addColorStop(1, '#d9961c'); }
+  else { g.addColorStop(0, '#e6e1d6'); g.addColorStop(1, '#c4bcab'); }
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, b.r - 4, 0, TAU); ctx.stroke();
+  if (callT > 0) {
+    ctx.strokeStyle = '#fff6b0'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0, 0, b.r + 5, -Math.PI / 2, -Math.PI / 2 + TAU * (callT / cfg.callTime)); ctx.stroke();
+  }
+  // a little halo over the label
+  ctx.strokeStyle = ready ? '#fff6d0' : '#f4f0e6'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.ellipse(0, -15, 9, 3.5, 0, 0, TAU); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = ready ? '#fff' : '#8f8778';
+  ctx.font = '700 18px Fredoka, sans-serif';
+  ctx.fillText(ready ? 'Call' : 'Called', 0, 6);
+  ctx.font = '600 11px Fredoka, sans-serif';
+  ctx.fillText(ready ? 'Jesus (C)' : '✓', 0, 20);
+  ctx.restore();
+}
+
+function drawBubble() {
+  if (bubbleT <= 0) return;
+  const a = clamp(bubbleT / 0.4, 0, 1);
+  const x = W / 2, y = JESUS_Y - 128;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '700 15px Fredoka, sans-serif';
+  const l1 = '"Suffer the little children', l2 = 'to come unto me!"';
+  const w = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 28;
+  ctx.fillStyle = '#fffdf3'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 2.5;
+  roundRect(x - w / 2, y - 26, w, 50, 16); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 10, y + 23); ctx.lineTo(x + 2, y + 38); ctx.lineTo(x + 10, y + 23); ctx.fill();
+  ctx.fillStyle = '#7a5200'; ctx.textAlign = 'center';
+  ctx.fillText(l1, x, y - 5);
+  ctx.fillText(l2, x, y + 14);
+  ctx.restore();
+}
+
+function drawScene() {
+  // Everything that stands on the ground is drawn from the back row to the front
+  const items = [];
+  for (const f of flowers) if (!f.taken) items.push([rowY(f.row) - 40, () => drawFlower(f)]);
+  for (const lane of lanes) {
+    for (const p of lane.people) {
+      items.push([rowY(lane.row), () => drawPerson({
+        d: p.d, x: p.x, y: rowY(lane.row), s: 1, lx: p.lx, ly: p.ly,
+        walking: lane.type === 'crowd' || (p.aside === 0 && callT <= 0),
+      })]);
+    }
+  }
+  const j = jesusState();
+  items.push([JESUS_Y + 1, () => { drawRock(); drawJesus(j); }]);
+  const celebrate = state === 'win' || joyT > 0;
+  for (const g of gathered) {
+    items.push([g.y, () => drawKid(g.k, g.x, g.y - (celebrate ? Math.abs(Math.sin(t * 6 + g.phase)) * 6 : 0), 0.95,
+      celebrate ? 'joy' : 'smile', (W / 2 - g.x) / 80, -0.6, { sitting: !celebrate })]);
+  }
+  if (child && child.phase !== 'held') {
+    const p = childPos(child);
+    items.push([p.y + 0.5, () => {
+      if (child.phase === 'walk') {
+        // a soft golden ring shows which child you are helping
+        const pr = 1 + Math.sin(t * 5) * 0.08;
+        ctx.strokeStyle = 'rgba(255,215,80,0.85)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, 22 * pr, 7 * pr, 0, 0, TAU); ctx.stroke();
+      }
+      if (child.inv > 0 && child.phase === 'walk' && child.hopT >= 1 && Math.sin(t * 30) > 0.6) ctx.globalAlpha = 0.6;
+      drawKid(child.k, p.x, p.y, 1.1, child.mood, 0, -1, { lift: p.lift, walking: child.phase === 'toJesus' });
+      ctx.globalAlpha = 1;
+      // waiting a while? a bouncing arrow shows the way
+      if (child.phase === 'walk' && child.idleT > 3 && state === 'play') {
+        const by = p.y - 78 - Math.abs(Math.sin(t * 5)) * 8;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(p.x, by - 14); ctx.lineTo(p.x + 13, by); ctx.lineTo(p.x + 5, by); ctx.lineTo(p.x + 5, by + 10);
+        ctx.lineTo(p.x - 5, by + 10); ctx.lineTo(p.x - 5, by); ctx.lineTo(p.x - 13, by); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }]);
+  }
+  // children still waiting their turn at the bottom
+  if (state === 'play' || state === 'pause' || state === 'fail') {
+    const waiting = Math.max(0, cfg.goal - blessed - (child ? 1 : 0));
+    for (let i = 0; i < waiting; i++) {
+      const k = KIDS[kidOrder[(nextKid + i) % kidOrder.length]];
+      const x = 24 + i * 32;
+      items.push([896, () => drawKid(k, x, 896, 0.72, state === 'fail' ? 'worried' : 'smile', 1, -0.5, { noExtra: false })]);
+    }
+  }
+  items.sort((a, b) => a[0] - b[0]);
+  for (const [, fn] of items) fn();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + children blessed
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Let the Children Come' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('BLESSED', 12, 50);
+  const hx0 = 12 + ctx.measureText('BLESSED').width + 16;
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < cfg.goal; i++) {
+    const hx = hx0 + i * 19, hy = 45;
+    heartPath(hx, hy, 7.5);
+    if (i < blessed) { ctx.fillStyle = '#ff5c8a'; ctx.fill(); }
+    else { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill(); ctx.strokeStyle = 'rgba(200,80,110,0.6)'; ctx.lineWidth = 1.5; ctx.stroke(); }
+  }
+
+  // HUD buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score, daylight left, flowers
+  const rx = viewW - 12;
+  const p = levelPoints();
+  const shown = totalScore + (state === 'win' || state === 'title' ? 0 : p.kids + p.flowers + p.perfect);
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SCORE', rx, 20);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(`${shown}`, rx, 40);
+  ctx.shadowBlur = 0;
+
+  const bw = 96, bx = rx - bw, by = 50;
+  const day = state === 'title' ? 1 : clamp(timeLeft / cfg.time, 0, 1);
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(bx, by, bw, 11, 5.5); ctx.fill();
+  const dg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+  dg.addColorStop(0, '#ff9a4a'); dg.addColorStop(1, '#ffe27a');
+  ctx.fillStyle = day < 0.2 && Math.sin(t * 6) > 0 ? '#ffb38a' : dg;
+  if (day > 0) { roundRect(bx, by, bw * day, 11, 5.5); ctx.fill(); }
+  // sun icon
+  ctx.fillStyle = '#f5b82e'; ctx.strokeStyle = '#f5b82e'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(bx - 13, by + 5.5, 5, 0, TAU); ctx.fill();
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = i * TAU / 8;
+    ctx.moveTo(bx - 13 + Math.cos(a) * 7.5, by + 5.5 + Math.sin(a) * 7.5);
+    ctx.lineTo(bx - 13 + Math.cos(a) * 10, by + 5.5 + Math.sin(a) * 10);
+  }
+  ctx.stroke();
+
+  // flowers picked
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 15px Fredoka, sans-serif';
+  ctx.fillText(`${lv.flowers}`, rx, 84);
+  ctx.shadowBlur = 0;
+  const fx = rx - ctx.measureText(`${lv.flowers}`).width - 14, fy = 79;
+  ctx.fillStyle = '#ff6b9a';
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) { const a = i * TAU / 5; ctx.moveTo(fx + Math.cos(a) * 5 + 3.5, fy + Math.sin(a) * 5); ctx.arc(fx + Math.cos(a) * 5, fy + Math.sin(a) * 5, 3.5, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = '#ffb000'; ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  const y = rowY(4) - 30;
+  ctx.strokeText(message.text, W / 2, y);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, y);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+
+  drawSky();
+  drawLand();
+  drawTree(W / 2 + 86, JESUS_Y + 24);
+  drawScene();
+  drawParticles();
+  drawHearts();
+  drawBubble();
+  drawCallButton();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 60, 0, TAU); ctx.stroke();
+  }
+
+  drawMessage();
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updatePlay(dt) {
+  if (callT > 0) callT = Math.max(0, callT - dt);
+  // the sun waits while Jesus is blessing a child
+  const blessing = child && child.phase !== 'walk';
+  if (!blessing) {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; fail(); return; }
+  }
+  if (child) updateChild(dt);
+  else if (nextChildT > 0) {
+    nextChildT -= dt;
+    if (nextChildT <= 0 && state === 'play') spawnChild();
+  }
+}
+
+function update(dt) {
+  t += dt;
+  for (const c of skyClouds) { c.f += c.speed * dt / (viewW + 300); if (c.f > 1) c.f -= 1; }
+  updateParticles(dt);
+  updateLanes(dt);
+  updateMoods(dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win' && Math.random() < dt * 12) {
+    spawn(W / 2 + rand(-60, 60), JESUS_Y - rand(0, 90), 0, -20, 1, '#fff6d0', 3);
+  }
+  joyT = Math.max(0, joyT - dt);
+  bubbleT = Math.max(0, bubbleT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
