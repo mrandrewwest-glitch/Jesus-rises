@@ -37,7 +37,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 | **Lazarus, Come Forth!** | The resurrection and the life · John 11:43 | Roll away the stone, then swipe fast to unwrap Lazarus! | `raising-lazarus.html` |
 | **Let the Children Come** | Jesus blesses the children · Mark 10:14 | Help the children weave through the crowd to reach Jesus. Great for little ones! | `blesses-children.html` |
 | **Zacchaeus Climbs** | Up the sycamore · Luke 19:4 | Help Zacchaeus climb the tree to see Jesus over the crowd. | `zacchaeus.html` |
-| **Palm Sunday** | Hosanna! · Matthew 21:9 | Ride into Jerusalem on the donkey. Slide between lanes, hop the rocks and collect palm branches. | `palm-sunday.html` |
+| **Palm Sunday** | Hosanna! · Matthew 21:9 | Endless 3D runner (Temple Run style) riding the donkey down the Mount of Olives: swipe left/right to switch lanes and turn corners, up to jump, down to duck; collect palm branches, cloak magnets and a child's palm shield as it speeds up. | `palm-sunday.html` |
 | **Cleansing the Temple** | My Father's house · John 2:16 | Clear the market stalls from the temple courts, but don't disturb the people praying. | `cleansing-temple.html` |
 | **Washing Feet** | Love one another · John 13:5 | Scrub off the mud, pop out the pebbles and clean under every toenail. So satisfying! | `washing-feet.html` |
 | **He Is Risen** | The empty tomb · Matthew 28:6 | Tap in time with the music to roll away the stone on Easter morning. | `empty-tomb.html` |
