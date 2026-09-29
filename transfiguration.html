@@ -1,0 +1,2316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>On the Mountain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">On the Mountain</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script>
+'use strict';
+
+// Scripture shown in this game (Matthew 17:1-8).
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  mountain: { ref: 'Matthew 17:1',
+    KJV: 'After six days Jesus taketh Peter, James, and John his brother, and bringeth them up into an high mountain apart',
+    NKJV: 'Now after six days Jesus took Peter, James, and John his brother, led them up on a high mountain by themselves',
+    NIV: 'After six days Jesus took with him Peter, James and John the brother of James, and led them up a high mountain by themselves',
+    NLT: 'Six days later Jesus took Peter and the two brothers, James and John, and led them up a high mountain to be alone' },
+  shine: { ref: 'Matthew 17:2',
+    KJV: 'His face did shine as the sun, and his raiment was white as the light.',
+    NKJV: 'His face shone like the sun, and His clothes became as white as the light.',
+    NIV: 'His face shone like the sun, and his clothes became as white as the light.',
+    NLT: 'His face shone like the sun, and his clothes became as white as light.' },
+  tents: { ref: 'Matthew 17:4',
+    KJV: 'Lord, it is good for us to be here: if thou wilt, let us make here three tabernacles; one for thee, and one for Moses, and one for Elias.',
+    NKJV: 'Lord, it is good for us to be here; if You wish, let us make here three tabernacles: one for You, one for Moses, and one for Elijah.',
+    NIV: 'Lord, it is good for us to be here. If you wish, I will put up three shelters—one for you, one for Moses and one for Elijah.',
+    NLT: 'Lord, it’s wonderful for us to be here! If you want, I’ll make three shelters as memorials—one for you, one for Moses, and one for Elijah.' },
+  voice: { ref: 'Matthew 17:5',
+    KJV: 'This is my beloved Son, in whom I am well pleased; hear ye him.',
+    NKJV: 'This is My beloved Son, in whom I am well pleased. Hear Him!',
+    NIV: 'This is my Son, whom I love; with him I am well pleased. Listen to him!',
+    NLT: 'This is my dearly loved Son, who brings me great joy. Listen to him.' },
+  afraid: { ref: 'Matthew 17:6',
+    KJV: 'And when the disciples heard it, they fell on their face, and were sore afraid.',
+    NKJV: 'And when the disciples heard it, they fell on their faces and were greatly afraid.',
+    NIV: 'When the disciples heard this, they fell facedown to the ground, terrified.',
+    NLT: 'The disciples were terrified and fell face down on the ground.' },
+  arise: { ref: 'Matthew 17:7',
+    KJV: 'Arise, and be not afraid.',
+    NKJV: 'Arise, and do not be afraid.',
+    NIV: 'Get up... Don’t be afraid.',
+    NLT: 'Get up... Don’t be afraid.' },
+  jesusOnly: { ref: 'Matthew 17:8',
+    KJV: 'They saw no man, save Jesus only.',
+    NKJV: 'They saw no one but Jesus only.',
+    NIV: 'They saw no one except Jesus.',
+    NLT: 'They saw only Jesus.' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+// Mix two #rrggbb colours (f = 0 gives a, 1 gives b)
+function mix(a, b, f) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const A = p(a), B = p(b);
+  return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], f))).join(',')})`;
+}
+
+// Wrap text into lines no wider than maxW (uses the current ctx.font)
+function wrap(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const ROW_H = 120;        // height between ledges
+const GROUND_SY = H - 140;// screen y of the bottom ledge when the camera is at 0
+const HOP_T = 0.24;       // seconds per hop
+const MAX_HEARTS = 3;
+
+const LEVEL_NAMES = [
+  'The Foothills',
+  'The Goat Path',
+  'Rocky Switchbacks',
+  'The High Ridge',
+  'Above the Clouds',
+  'Near the Summit of Hermon',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `High Mountain ${n}`,
+    rows: Math.min(16 + (n - 1) * 6, 46),
+    gap: n === 1 ? 0.12 : Math.min(0.12 + (n - 1) * 0.06, 0.4),
+    restEvery: Math.min(4 + n, 9),
+    goats: n === 1 ? 2 : Math.min(2 + (n - 1) * 2, 12),
+    goatMove: n === 1 ? 0 : Math.min(0.35 + (n - 2) * 0.15, 0.9),
+    rockEvery: n === 1 ? 3.4 : Math.max(1.0, 3.4 - (n - 1) * 0.5),
+    rockSpeed: 210 + (n - 1) * 35,
+    warn: Math.max(0.55, 1.0 - (n - 1) * 0.08),
+    hopCost: Math.min(10 + (n - 1) * 2, 20),
+    regen: Math.max(8, 16 - (n - 1) * 1.5),
+    tentPieces: 4 + Math.floor((n - 1) / 2),
+    tentTime: Math.max(5, 9 - (n - 1) * 0.8),
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let phase = 'climb';      // climb | glory | tents | cloud | fallen | done (while state is play)
+let phaseT = 0;
+let level = 1;
+let totalScore = 0;
+let levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('transfigBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let rows = [];            // rows[i] = { ledges: [left, right] } (null = no ledge)
+let goats = [];
+let rocks = [];
+let particles = [];
+let peter, hist = [], cam = 0, camTarget = 0;
+let jesusClimb;           // Jesus leading the way up the centre of the path
+let hearts = MAX_HEARTS, breath = 100, idleT = 0;
+let climbT = 0, maxRow = 0, restsVisited = 0;
+let rockTimer = 2;
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0, endTimer = 0;
+let lastScore = null;
+let failReason = '';
+// Summit scene
+let js;                   // Jesus on the summit
+let tents = [], tentSub = 'peter', tentLeft = 0, tentBonus = 0;
+let spiritsA = 0, cloudF = 0, touched = 0, walking = null, banner = null, bubble = null;
+
+// ============================================================
+//  Disciples: Peter, James and John
+// ============================================================
+const DISCIPLES = [
+  { name: 'Peter', robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066', i: 0 },
+  { name: 'James', robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070', i: 1 },
+  { name: 'John',  robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184', i: 3 },
+].map((d) => ({
+  ...d,
+  mood: 'watch', want: 'watch', switchT: 0,
+  delay: d.name === 'Peter' ? 0 : rand(0.1, 0.4),
+  blinkT: rand(1, 4), blink: 0,
+  phase: rand(0, TAU),
+  prone: 0, rise: 0,
+  x: 0, y: 0,
+}));
+const PETER = DISCIPLES[0];
+
+function updateDisciples(dt) {
+  for (const d of DISCIPLES) {
+    if (d.want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = d.want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+}
+function allWant(m) { for (const d of DISCIPLES) d.want = m; }
+
+// slot: { d, x, y, s, look: {x, y} }
+function drawDisciple(slot) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(x, slot.y - jump * s);
+  ctx.scale(s, s);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  // Look toward whatever matters (Jesus, a rock, the cloud)
+  let lx = 0, ly = -1;
+  if (slot.look) {
+    const wx = x, wy = slot.y - 52 * s;
+    const dx = slot.look.x - wx, dy = slot.look.y - wy;
+    const len = Math.hypot(dx, dy) || 1;
+    lx = dx / len; ly = dy / len;
+  }
+
+  // Arms raised for joy / pointing up in wonder
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 3 === 0) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Resting arms
+  if (mood === 'watch' || (mood === 'wow' && d.i % 3 !== 0)) {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+  ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+  ctx.closePath(); ctx.fill();
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+// A disciple fallen on his face: lying flat, head down, arms stretched out.
+// A little tremble shows he is "sore afraid".
+function drawProne(d, x, y, s) {
+  const shiver = Math.sin(t * 40 + d.phase) * 0.8;
+  ctx.save();
+  ctx.translate(x + shiver, y);
+  ctx.scale(s, s);
+  // arms reaching forward past the head
+  ctx.strokeStyle = shade(d.robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-18, -12); ctx.lineTo(-50, -6); ctx.moveTo(-18, -8); ctx.lineTo(-48, 0); ctx.stroke();
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(-51, -6, 4, 0, TAU); ctx.arc(-49, 0, 4, 0, TAU); ctx.fill();
+  // body
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(8, -10, 34, 12, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(0, -21); ctx.quadraticCurveTo(3, -10, 0, 1); ctx.stroke();
+  // feet
+  ctx.fillStyle = '#8a5a3a';
+  ctx.beginPath(); ctx.ellipse(44, -4, 5, 3, 0, 0, TAU); ctx.fill();
+  // head, face down: we see the back of the head
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(-30, -12, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath(); ctx.arc(-31, -15, 12.5, Math.PI * 0.9, Math.PI * 2.15); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Scenery helpers
+// ============================================================
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+const bgClouds = Array.from({ length: 6 }, (_, i) => ({ f: Math.random(), y: i * 420 + rand(0, 200), w: rand(90, 170), sp: rand(0.006, 0.014) }));
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Jesus (drawn like the other games: white robe, red sash, halo)
+// ============================================================
+// j: { x, y, face, pose: open|up|beckon|touch, dir, shine 0..1, walk }
+function drawJesus(j, s = 1) {
+  ctx.save();
+  ctx.translate(j.x, j.y);
+  ctx.scale(s, s);
+  const sh = j.shine || 0;
+
+  // Transfigured: rays and light behind Him
+  if (sh > 0) {
+    ctx.save();
+    ctx.translate(0, -40);
+    ctx.rotate(t * 0.15);
+    ctx.fillStyle = `rgba(255,248,200,${0.28 * sh})`;
+    for (let i = 0; i < 14; i++) {
+      ctx.rotate(TAU / 14);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -260); ctx.lineTo(18, -260); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    const g = ctx.createRadialGradient(0, -38, 5, 0, -38, 110);
+    g.addColorStop(0, `rgba(255,255,245,${0.95 * sh})`);
+    g.addColorStop(0.45, `rgba(255,240,170,${0.55 * sh})`);
+    g.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -38, 110, 0, TAU); ctx.fill();
+  }
+
+  const bob = j.walk ? Math.abs(Math.sin(t * 10)) * 2 : 0;
+  ctx.translate(0, -bob);
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3 + sh * 1.5;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10 + sh * 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15 + sh * 2, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash ("white as the light" when shining)
+  const robe = sh > 0 ? mix('#fdfcf6', '#ffffff', sh) : '#fdfcf6';
+  const edge = sh > 0 ? mix('#cfc8b4', '#fff1b8', sh) : '#cfc8b4';
+  ctx.fillStyle = robe; ctx.strokeStyle = edge; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = sh > 0 ? mix('#c0392b', '#f08070', sh * 0.6) : '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms
+  const pose = j.pose || 'open';
+  const dir = j.dir || 1;
+  let hands = [[-20, -22], [20, -22]];
+  if (pose === 'up') hands = [[-21, -66], [21, -66]];
+  else if (pose === 'beckon') hands = [[-20, -22], [22 + Math.sin(t * 6) * 3, -68]];
+  else if (pose === 'touch') hands = dir < 0 ? [[-30, -20], [20, -22]] : [[-20, -22], [30, -20]];
+  const skin = sh > 0 ? mix('#e0a877', '#ffe6b8', sh) : '#e0a877';
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    const raised = hy < -50;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = edge; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (raised ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = robe; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (raised ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head ("his face did shine as the sun")
+  if (sh > 0) { ctx.shadowColor = '#fff3b0'; ctx.shadowBlur = 18 * sh; }
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (j.face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// Moses (with the tablets) and Elijah (with his mantle): simple figures of light
+function drawSpirit(x, y, s, who, a) {
+  if (a <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(x, y + Math.sin(t * 1.6 + (who === 'moses' ? 0 : 2)) * 2);
+  ctx.scale(s, s);
+  const g = ctx.createRadialGradient(0, -38, 4, 0, -38, 70);
+  g.addColorStop(0, 'rgba(255,255,240,0.9)');
+  g.addColorStop(1, 'rgba(255,244,200,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, -38, 70, 0, TAU); ctx.fill();
+
+  const robe = who === 'moses' ? '#fff4dc' : '#fdf1e4';
+  ctx.fillStyle = robe; ctx.strokeStyle = '#e8cf8a'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-17, 0);
+  ctx.quadraticCurveTo(-16, -30, -10, -38);
+  ctx.quadraticCurveTo(0, -42, 10, -38);
+  ctx.quadraticCurveTo(16, -30, 17, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (who === 'elijah') {             // the mantle over his shoulders
+    ctx.fillStyle = '#f2d7a2';
+    ctx.beginPath();
+    ctx.moveTo(-13, -36); ctx.quadraticCurveTo(0, -42, 13, -36);
+    ctx.lineTo(18, -6); ctx.quadraticCurveTo(10, -14, 7, -26);
+    ctx.lineTo(-7, -26); ctx.quadraticCurveTo(-10, -14, -18, -6);
+    ctx.closePath(); ctx.fill();
+  }
+  // head, white hair and long beard
+  const hy = -51;
+  ctx.fillStyle = '#f6dcc0';
+  ctx.beginPath(); ctx.arc(0, hy, 11, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(0, hy - 2, 11.5, Math.PI * 0.95, Math.PI * 2.05); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-10, hy + 1); ctx.quadraticCurveTo(-9, hy + 24, 0, hy + 27);
+  ctx.quadraticCurveTo(9, hy + 24, 10, hy + 1); ctx.quadraticCurveTo(0, hy + 7, -10, hy + 1);
+  ctx.fill();
+  // gentle closed eyes
+  ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(-4, hy - 1, 2.2, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.moveTo(4 + 2.2 * Math.cos(Math.PI * 1.1), hy - 1 + 2.2 * Math.sin(Math.PI * 1.1));
+  ctx.arc(4, hy - 1, 2.2, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.stroke();
+  if (who === 'moses') {              // two tablets of stone
+    ctx.fillStyle = '#e9e4d8'; ctx.strokeStyle = '#b8ae98'; ctx.lineWidth = 1.2;
+    for (const dx of [-11, 1]) {
+      roundRect(dx, -30, 11, 16, [5, 5, 1, 1]); ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) { ctx.moveTo(dx + 2.5, -24 + k * 3.5); ctx.lineTo(dx + 8.5, -24 + k * 3.5); }
+      ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = '#f6dcc0';
+    ctx.beginPath(); ctx.arc(-8, -22, 3.3, 0, TAU); ctx.arc(8, -22, 3.3, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  The climb: building the mountain
+// ============================================================
+function laneOff() { return Math.min(165, W * 0.25); }
+function laneX(l) { return W / 2 + (l ? 1 : -1) * laneOff(); }
+function rowWY(i) { return i * ROW_H; }
+function sy(wy) { return GROUND_SY - (wy - cam); }
+function summitWY() { return rowWY(cfg.rows); }
+
+function buildMountain() {
+  rows = [];
+  const n = cfg.rows;
+  for (let i = 0; i <= n; i++) {
+    const r = { ledges: [{ rest: false }, { rest: false }], summit: i === n };
+    if (i > 1 && i < n && Math.random() < cfg.gap) r.ledges[Math.random() < 0.5 ? 0 : 1] = null;
+    rows.push(r);
+  }
+  // Rest spots: a green ledge every few rows
+  for (let i = cfg.restEvery; i < n - 1; i += cfg.restEvery) {
+    const r = rows[i];
+    const lane = r.ledges[0] && r.ledges[1] ? (Math.random() < 0.5 ? 0 : 1) : (r.ledges[0] ? 0 : 1);
+    r.ledges[lane].rest = true;
+    r.rest = true;
+  }
+  // Goats stand on rows where the other ledge is free, never two goat rows in a row
+  goats = [];
+  const candidates = [];
+  for (let i = 3; i < n - 1; i++) if (rows[i].ledges[0] && rows[i].ledges[1] && !rows[i].rest) candidates.push(i);
+  for (let k = candidates.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [candidates[k], candidates[j]] = [candidates[j], candidates[k]]; }
+  const used = new Set();
+  for (const i of candidates) {
+    if (goats.length >= cfg.goats) break;
+    if (used.has(i - 1) || used.has(i + 1)) continue;
+    used.add(i);
+    goats.push({
+      row: i, lane: Math.random() < 0.5 ? 0 : 1, x: 0, from: 0, hopT: 0,
+      moving: Math.random() < cfg.goatMove, timer: rand(1.5, 3.5), face: Math.random() < 0.5 ? -1 : 1,
+      chew: rand(0, TAU), baa: 0,
+    });
+  }
+  for (const g of goats) g.x = laneX(g.lane);
+}
+
+function newPeter() {
+  return { row: 0, lane: 0, x: laneX(0), wy: 0, hop: null, queued: null, invuln: 0, stumble: 0, fx: 0 };
+}
+
+// ============================================================
+//  Climbing logic
+// ============================================================
+function goatAt(row, lane) { return goats.find((g) => g.row === row && g.lane === lane); }
+
+function hop(lane) {
+  const p = peter;
+  if (phase !== 'climb' || state !== 'play') return;
+  if (p.hop || p.stumble > 0) { p.queued = lane; return; }
+  if (breath < cfg.hopCost) {
+    if (message.t < 1) showMessage('Catch your breath...');
+    PETER.want = 'worried';
+    return;
+  }
+  const next = p.row + 1;
+  const r = rows[next];
+  if (!r) return;
+  const toX = laneX(lane) - 12, toY = rowWY(next);
+  if (!r.ledges[lane]) {
+    // No ledge on that side: a wobble on the spot
+    p.stumble = 0.35; p.fx = lane ? 1 : -1;
+    showMessage('No ledge there!');
+    PETER.want = 'worried';
+    sfx.bounce();
+    return;
+  }
+  breath -= cfg.hopCost;
+  idleT = 0;
+  const g = goatAt(next, lane);
+  if (g) {
+    // A goat is standing there: a hop up and a bump back down
+    p.hop = { kind: 'butt', fromX: p.x, fromY: p.wy, toX, toY: toY - 40, t: 0, dur: 0.42, goat: g };
+    return;
+  }
+  p.hop = { kind: 'up', fromX: p.x, fromY: p.wy, toX, toY, t: 0, dur: HOP_T, row: next, lane };
+  sfx.tap(next / cfg.rows);
+}
+
+function knockDown(reason) {
+  const p = peter;
+  hearts--;
+  p.invuln = 1.5;
+  shakeT = 0.3;
+  PETER.want = 'shock';
+  PETER.shockT = 1;
+  const down = Math.max(0, p.row - 1);
+  const lane = rows[down].ledges[p.lane] ? p.lane : 1 - p.lane;
+  p.hop = { kind: 'fall', fromX: p.x, fromY: p.wy, toX: laneX(lane) - 12, toY: rowWY(down), t: 0, dur: 0.35, row: down, lane };
+  p.queued = null;
+  for (let i = 0; i < 14; i++) spawn(p.x + rand(-20, 20), sy(p.wy) - rand(10, 50), rand(-80, 80), rand(-120, -20), 0.7, '#c9b89c', rand(2, 4), 300);
+  showMessage(reason === 'goat' ? 'Baa! Butted by a goat!' : 'Oof! A loose rock!');
+  if (hearts <= 0) fail('bumps');
+}
+
+function landHop() {
+  const p = peter, h = p.hop;
+  p.hop = null;
+  if (h.kind === 'butt') {
+    p.x = h.fromX; p.wy = h.fromY;
+    h.goat.baa = 1;
+    sfx.baa();
+    knockDownInPlace();
+    return;
+  }
+  p.x = h.toX; p.wy = h.toY; p.row = h.row; p.lane = h.lane;
+  hist.push({ row: p.row, lane: p.lane });
+  if (hist.length > 6) hist.shift();
+  if (h.kind === 'fall') return;
+  if (p.row > maxRow) { maxRow = p.row; levelScore += 10; }
+  const ledge = rows[p.row].ledges[p.lane];
+  if (ledge && ledge.rest) {
+    breath = 100;
+    if (!ledge.visited) {
+      ledge.visited = true; restsVisited++; levelScore += 25;
+      showMessage('A rest spot! Breath restored');
+      sfx.chime();
+      for (let i = 0; i < 12; i++) spawn(p.x + rand(-30, 30), sy(p.wy) - rand(10, 60), rand(-20, 20), rand(-60, -20), 0.9, '#bff0a0', rand(2, 4));
+    }
+    PETER.want = 'joy'; PETER.joyT = 0.8;
+  }
+  if (p.row >= cfg.rows) reachSummit();
+  else if (p.queued !== null) { const q = p.queued; p.queued = null; hop(q); }
+}
+
+// A goat bump costs a heart but leaves Peter on his own ledge
+function knockDownInPlace() {
+  const p = peter;
+  hearts--;
+  p.invuln = 1.2;
+  shakeT = 0.25;
+  PETER.want = 'shock'; PETER.shockT = 1;
+  p.queued = null;
+  showMessage('Baa! That ledge is taken!');
+  if (hearts <= 0) fail('bumps');
+}
+
+function updatePeter(dt) {
+  const p = peter;
+  p.invuln = Math.max(0, p.invuln - dt);
+  if (p.stumble > 0) {
+    p.stumble -= dt;
+    if (p.stumble <= 0 && p.queued !== null) { const q = p.queued; p.queued = null; hop(q); }
+  }
+  if (p.hop) {
+    const h = p.hop;
+    h.t += dt;
+    const f = clamp(h.t / h.dur, 0, 1);
+    if (h.kind === 'butt') {
+      const k = Math.sin(f * Math.PI) * 0.6;
+      p.x = lerp(h.fromX, h.toX, k);
+      p.wy = lerp(h.fromY, h.toY, k) + Math.sin(f * Math.PI) * 30;
+    } else {
+      p.x = lerp(h.fromX, h.toX, ease(f));
+      p.wy = lerp(h.fromY, h.toY, f) + (h.kind === 'up' ? Math.sin(f * Math.PI) * 38 : 0);
+    }
+    if (f >= 1) landHop();
+  } else {
+    idleT += dt;
+    if (idleT > 0.4) breath = Math.min(100, breath + cfg.regen * dt);
+  }
+
+  // Peter's face: worried when a rock is coming down his side
+  if (PETER.shockT > 0) PETER.shockT -= dt;
+  else if (PETER.joyT > 0) PETER.joyT -= dt;
+  else {
+    const side = p.x < W / 2 ? 0 : 1;
+    const danger = rocks.some((r) => r.lane === side && (r.warnT > 0 || (r.wy > p.wy && r.wy - p.wy < 520)));
+    PETER.want = danger ? 'worried' : breath < cfg.hopCost * 1.5 ? 'worried' : p.hop ? 'wow' : 'watch';
+  }
+}
+
+function updateFollowers(dt) {
+  // James and John climb up the ledges Peter used one and two hops ago
+  const spots = [hist[hist.length - 2] || hist[0], hist[hist.length - 3] || hist[0]];
+  [DISCIPLES[1], DISCIPLES[2]].forEach((d, k) => {
+    const s = spots[k] || { row: 0, lane: 0 };
+    const tx = laneX(s.lane) + (k ? 22 : 10), ty = rowWY(s.row);
+    const f = Math.min(1, dt * 6);
+    d.x = lerp(d.x, tx, f);
+    d.y = lerp(d.y, ty, f);
+    const dx = Math.abs(d.x - tx) + Math.abs(d.y - ty);
+    d.hopping = dx > 6;
+    d.want = peter.invuln > 0.6 ? 'shock' : PETER.want === 'worried' ? 'worried' : d.hopping ? 'wow' : 'watch';
+  });
+}
+
+function updateGoats(dt) {
+  for (const g of goats) {
+    g.chew += dt * 6;
+    g.baa = Math.max(0, g.baa - dt);
+    if (g.hopT > 0) {
+      g.hopT -= dt;
+      const f = 1 - clamp(g.hopT / 0.4, 0, 1);
+      g.x = lerp(laneX(g.from), laneX(g.lane), ease(f));
+      continue;
+    }
+    g.x = laneX(g.lane);
+    if (!g.moving) continue;
+    g.timer -= dt;
+    if (g.timer <= 0) {
+      const other = 1 - g.lane;
+      const busy = (row, lane) => (peter.row === row && peter.lane === lane) ||
+        (peter.hop && peter.hop.row === row && peter.hop.lane === lane) ||
+        hist.slice(-3).some((h) => h.row === row && h.lane === lane);
+      if (rows[g.row].ledges[other] && !busy(g.row, other)) {
+        g.from = g.lane; g.lane = other; g.hopT = 0.4; g.face = other ? 1 : -1;
+      }
+      g.timer = rand(1.8, 3.6) / (0.8 + level * 0.1);
+    }
+  }
+}
+
+function updateRocks(dt) {
+  if (peter.row < cfg.rows - 1) {
+    rockTimer -= dt;
+    if (rockTimer <= 0 && peter.row >= 1) {
+      const aim = Math.random() < 0.6 ? (peter.x < W / 2 ? 0 : 1) : (Math.random() < 0.5 ? 0 : 1);
+      rocks.push({ lane: aim, warnT: cfg.warn, wy: 0, rot: 0, r: rand(15, 20) });
+      rockTimer = cfg.rockEvery * rand(0.75, 1.25);
+      sfx.rumble(0.18);
+    }
+  }
+  const p = peter;
+  for (let i = rocks.length - 1; i >= 0; i--) {
+    const r = rocks[i];
+    if (r.warnT > 0) {
+      r.warnT -= dt;
+      if (r.warnT <= 0) r.wy = cam + GROUND_SY + offY + 60;   // just above the top of the screen
+      continue;
+    }
+    r.wy -= cfg.rockSpeed * dt;
+    r.rot -= dt * 6 * (r.lane ? -1 : 1);
+    if (r.wy < cam - 300) { rocks.splice(i, 1); continue; }
+    // Hit Peter? (rest spots have an overhang: rocks bounce over)
+    const side = p.x < W / 2 ? 0 : 1;
+    const onRest = !p.hop && rows[p.row].ledges[p.lane] && rows[p.row].ledges[p.lane].rest;
+    if (state === 'play' && r.lane === side && p.invuln <= 0 && !onRest && Math.abs(r.wy - (p.wy + 34)) < 36) {
+      sfx.thunder();
+      knockDown('rock');
+    }
+  }
+}
+
+function updateClimb(dt) {
+  climbT += dt;
+  updatePeter(dt);
+  if (state !== 'play') return;
+  updateFollowers(dt);
+  updateGoats(dt);
+  updateRocks(dt);
+  // Jesus leads the way, three ledges ahead, up the middle path
+  const jt = rowWY(Math.min(maxRow + 3, cfg.rows));
+  jesusClimb.walk = Math.abs(jesusClimb.wy - jt) > 4;
+  jesusClimb.wy = lerp(jesusClimb.wy, jt, Math.min(1, dt * 2.2));
+  camTarget = Math.max(0, peter.wy - 260);
+  cam = lerp(cam, camTarget, Math.min(1, dt * 4));
+}
+
+// ============================================================
+//  The summit: glory, tents, the cloud and the voice
+// ============================================================
+function summitLayout() {
+  const sp = Math.min(185, W * 0.3);
+  return {
+    sp,
+    back: 432,                       // Moses, Jesus and Elijah stand here
+    tentY: 610,
+    tentX: [W / 2 - sp, W / 2, W / 2 + sp],
+    discY: 800,
+    discX: [W / 2 - sp * 0.95, W / 2, W / 2 + sp * 0.95],
+  };
+}
+
+function reachSummit() {
+  phase = 'glory'; phaseT = 0;
+  rocks = [];
+  flashT = 0.8;
+  const L = summitLayout();
+  js = { x: W / 2, y: L.back - 10, face: 'calm', pose: 'open', dir: 1, shine: 0, walk: false };
+  DISCIPLES.forEach((d, k) => { d.x = L.discX[k]; d.y = L.discY; d.prone = 0; d.rise = 0; });
+  tents = L.tentX.map((x, k) => ({ x, pieces: 0, wob: 0, who: ['Jesus', 'Moses', 'Elijah'][k] }));
+  spiritsA = 0; cloudF = 0; touched = 0; walking = null; banner = null; bubble = null;
+  tentBonus = 0;
+  // Summit reward: hearts left and a quick climb
+  const par = cfg.rows * 1.3;
+  lastScore = {
+    climb: maxRow * 10 + restsVisited * 25,
+    hearts: hearts * 100,
+    time: Math.max(0, Math.round((par - climbT) * 10)),
+  };
+  levelScore += lastScore.hearts + lastScore.time;
+  allWant('wow');
+  sfx.levelStart();
+  showMessage('The top of the mountain!');
+}
+
+function showBanner(key, who, dur = 99) {
+  const v = Bible.verse(VERSES[key]);
+  banner = { text: v.text, cite: v.cite, who, t: dur };
+}
+function say(key, whoX, whoY, dur) {
+  const v = Bible.verse(VERSES[key]);
+  bubble = { text: v.text, x: whoX, y: whoY, t: dur };
+}
+
+function setPhase(p) { phase = p; phaseT = 0; }
+
+function updateSummit(dt) {
+  phaseT += dt;
+  const L = summitLayout();
+  if (phase === 'glory') {
+    js.shine = clamp((phaseT - 0.4) / 1.6, 0, 1);
+    js.pose = js.shine > 0.5 ? 'up' : 'open';
+    spiritsA = clamp((phaseT - 1.6) / 1.2, 0, 1);
+    if (phaseT > 1.0 && !banner) showBanner('shine', '');
+    if (phaseT > 0.6 && Math.random() < dt * 20) spawn(W / 2 + rand(-60, 60), L.back - rand(0, 110), rand(-10, 10), rand(-40, -10), 1.2, '#fff6c8', rand(2, 4));
+    if (phaseT > 7) startTents();
+  } else if (phase === 'tents') {
+    if (tentSub === 'peter') {
+      if (phaseT > 7) beginBuilding();
+    } else if (tentSub === 'build') {
+      tentLeft -= dt;
+      const done = tents.every((tn) => tn.pieces >= cfg.tentPieces);
+      if (done && !tentBonus) {
+        tentBonus = 100; levelScore += 100;
+        showMessage('All three tents! Just in time...');
+        tentLeft = Math.min(tentLeft, 1.2);   // the cloud comes soon after
+      }
+      if (tentLeft <= 0) startCloud();
+    }
+    for (const tn of tents) tn.wob = Math.max(0, tn.wob - dt * 3);
+  } else if (phase === 'cloud') {
+    cloudF = clamp(phaseT / 1.6, 0, 1);
+    spiritsA = clamp(1 - phaseT / 2.0, 0, 1);
+    js.shine = clamp(1 - (phaseT - 1) / 2, 0, 1);
+    js.pose = 'open';
+    if (phaseT > 1.2 && !banner) { showBanner('voice', 'A voice out of the bright cloud'); sfx.voice(); }
+    if (phaseT > 2.6) {
+      for (const d of DISCIPLES) d.prone = Math.min(1, d.prone + dt * 4);
+      allWant('shock');
+    }
+    if (phaseT > 7.5) { setPhase('fallen'); banner = null; }
+  } else if (phase === 'fallen') {
+    cloudF = clamp(1 - phaseT / 1.5, 0, 1);
+    if (walking) {
+      walking.t += dt;
+      const f = clamp(walking.t / walking.dur, 0, 1);
+      js.x = lerp(walking.fx, walking.tx, ease(f));
+      js.y = lerp(walking.fy, walking.ty, ease(f));
+      js.walk = f < 1;
+      if (f >= 1 && !walking.done) {
+        walking.done = true;
+        const d = DISCIPLES[walking.k];
+        js.pose = 'touch'; js.dir = -1;
+        d.rise = 0.001; d.want = 'joy';
+        if (walking.k === 0) say('arise', js.x, js.y - 90, 4);
+        sfx.chime();
+        for (let i = 0; i < 14; i++) spawn(d.x + rand(-20, 20), d.y - rand(0, 60), rand(-40, 40), rand(-80, -20), 1, '#fff2b0', rand(2, 4));
+        touched++;
+        walking.hold = 0;
+      }
+      if (walking.done) {
+        walking.hold += dt;
+        if (walking.hold > 0.9) { walking = null; js.pose = 'open'; }
+      }
+    } else if (touched < 3 && phaseT > 1.6 + touched * 2.6 + 1.4) {
+      touchNext();       // Jesus goes on His own if nobody taps
+    }
+    if (touched >= 3 && !walking && !banner) {
+      showBanner('jesusOnly', '');
+      js.face = 'joy';
+      phaseT = 0; setPhase('done');
+    }
+  } else if (phase === 'done') {
+    if (phaseT > 2.8 && state === 'play') win();
+  }
+  for (const d of DISCIPLES) if (d.rise > 0) d.rise = Math.min(1, d.rise + dt * 3);
+  if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+}
+
+function startTents() {
+  setPhase('tents');
+  tentSub = 'peter';
+  showBanner('tents', 'Peter');
+  PETER.want = 'joy'; DISCIPLES[1].want = 'wow'; DISCIPLES[2].want = 'wow';
+}
+function beginBuilding() {
+  tentSub = 'build';
+  phaseT = 0;
+  tentLeft = cfg.tentTime;
+  banner = null;
+  showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap the tents to build them!' : 'Tap the tents (or ← ↓ →) to build!');
+}
+function buildTent(k) {
+  const tn = tents[k];
+  if (!tn || tn.pieces >= cfg.tentPieces) return;
+  tn.pieces++; tn.wob = 1;
+  levelScore += 20;
+  sfx.knock();
+  const L = summitLayout();
+  for (let i = 0; i < 6; i++) spawn(tn.x + rand(-30, 30), L.tentY - rand(0, 40), rand(-60, 60), rand(-90, -30), 0.5, '#d9c7a0', rand(2, 3.5), 250);
+  if (tn.pieces >= cfg.tentPieces) sfx.chime();
+}
+function startCloud() {
+  setPhase('cloud');
+  banner = null;
+  allWant('wow');
+  sfx.rumble(0.5);
+}
+function touchNext() {
+  if (walking || touched >= 3) return;
+  const d = DISCIPLES[touched];
+  walking = { k: touched, fx: js.x, fy: js.y, tx: d.x + 62, ty: d.y + 6, t: 0, dur: 0.9 };
+  js.face = 'calm';
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  const s = lastScore;
+  s.tents = tents.reduce((a, tn) => a + tn.pieces, 0) * 20 + tentBonus;
+  s.levelBonus = level * 300;
+  levelScore += s.levelBonus;
+  s.score = levelScore;
+  totalScore += levelScore;
+  levelScore = 0;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('transfigBest', best); } catch (e) {} }
+  allWant('joy');
+  for (let i = 0; i < 70; i++) {
+    const a = rand(0, TAU), sp = rand(40, 180);
+    spawn(js.x, js.y - 40, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 30);
+  }
+  sfx.win();
+  endTimer = 2.2;
+}
+
+function fail(reason) {
+  state = 'fail';
+  failReason = reason;
+  levelScore = 0;
+  allWant('dismay');
+  sfx.fail();
+  endTimer = 1.6;
+}
+
+function showMessage(text) { message = { text, t: 2.2 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildMountain();
+  peter = newPeter();
+  hist = [{ row: 0, lane: 0 }];
+  DISCIPLES[1].x = laneX(0) + 10; DISCIPLES[1].y = 0;
+  DISCIPLES[2].x = laneX(0) + 22; DISCIPLES[2].y = 0;
+  for (const d of DISCIPLES) { d.prone = 0; d.rise = 0; d.shockT = 0; d.joyT = 0; }
+  allWant('watch');
+  jesusClimb = { wy: rowWY(2), walk: false };
+  cam = camTarget = 0;
+  rocks = []; particles = [];
+  hearts = MAX_HEARTS; breath = 100; idleT = 0;
+  climbT = 0; maxRow = 0; restsVisited = 0; levelScore = 0;
+  rockTimer = 2.5;
+  phase = 'climb'; phaseT = 0;
+  banner = null; bubble = null; walking = null;
+  flashT = shakeT = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevel();
+  showOverlay('On the Mountain', 'The Transfiguration',
+    `${verseHTML('mountain')}
+     <ul>
+       <li>Climb the high mountain with <b>Peter, James and John</b>. Jesus leads the way!</li>
+       <li><b>Touch:</b> tap the <b>left</b> or <b>right</b> side of the screen to hop up to that ledge.</li>
+       <li><b>Keyboard:</b> <kbd>&larr;</kbd> / <kbd>&rarr;</kbd> (or <kbd>A</kbd> / <kbd>D</kbd>) to hop.</li>
+       <li>Dodge <b>loose rocks</b> (watch for the <b>!</b>) and don't hop onto a ledge with a <b>goat</b>. Three bumps and you slide home.</li>
+       <li>Each hop costs <b>breath</b>. Green <b>rest spots</b> refill it, and rocks bounce over you there.</li>
+       <li>At the top&hellip; something wonderful happens.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start the Climb', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  resetLevel();
+  state = 'play';
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+  if (level === 1) setTimeout(() => { if (state === 'play' && phase === 'climb' && peter.row === 0) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap left or right to hop up' : 'Press ← or → to hop up'); }, 2300);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Hear ye him!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('voice')}
+       <p class="score">Climb: <b>${s.climb}</b><br>Hearts kept: <b>${s.hearts}</b><br>Quick climb: <b>${s.time}</b><br>Tents: <b>${s.tents}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Climb Higher', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Tumbled down!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Too many bumps from rocks and goats. Peter, James and John dust themselves off for another go. Watch for the <b>!</b> and switch sides.</p>
+       ${verseHTML('afraid')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+// kind: left | mid | right | any, plus x for taps
+function gameInput(kind, x) {
+  if (state !== 'play') return;
+  if (phase === 'climb') {
+    if (kind === 'tap') hop(x < W / 2 ? 0 : 1);
+    else if (kind === 'left') hop(0);
+    else if (kind === 'right') hop(1);
+  } else if (phase === 'glory') {
+    if (phaseT > 3) startTents();
+  } else if (phase === 'tents') {
+    if (tentSub === 'peter') { if (phaseT > 2) beginBuilding(); return; }
+    if (tentSub !== 'build') return;
+    if (kind === 'tap') {
+      let k = 0, bestD = Infinity;
+      tents.forEach((tn, i) => { const dd = Math.abs(tn.x - x); if (dd < bestD) { bestD = dd; k = i; } });
+      buildTent(k);
+    } else if (kind === 'left') buildTent(0);
+    else if (kind === 'mid') buildTent(1);
+    else if (kind === 'right') buildTent(2);
+    else buildTent(tents.findIndex((tn) => tn.pieces < cfg.tentPieces));
+  } else if (phase === 'fallen') {
+    if (phaseT > 1.2) touchNext();
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (e.repeat) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'Digit1') gameInput('left');
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'Digit3') gameInput('right');
+  else if (e.code === 'ArrowDown' || e.code === 'ArrowUp' || e.code === 'KeyS' || e.code === 'KeyW' || e.code === 'Digit2') gameInput('mid');
+  else if (e.code === 'Space' || e.code === 'Enter') gameInput('any');
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  gameInput('tap', p.x);
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  // Each hop sings a note, higher the higher up the mountain
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.12);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+  // A low tumbling rumble when a rock breaks loose
+  rumble(vol = 0.25) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.8);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.9);
+  },
+  // A goat's "Baa!": a wobbly buzzy note
+  baa() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    const lfo = this.ctx.createOscillator(), depth = this.ctx.createGain();
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 1.5;
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(430, t0); o.frequency.linearRampToValueAtTime(360, t0 + 0.5);
+    lfo.frequency.value = 22; depth.gain.value = 25;
+    lfo.connect(depth); depth.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+    o.connect(bp); bp.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + 0.6); lfo.start(t0); lfo.stop(t0 + 0.6);
+  },
+  // Tent peg tap-tap
+  knock() { this.tone(520, 0.06, 'triangle', 0.3); this.tone(390, 0.07, 'triangle', 0.22, 0.07); },
+  chime() { this.tone(1175, 0.35, 'sine', 0.18); this.tone(1568, 0.45, 'sine', 0.14, 0.08); },
+  // The voice from the cloud: the choir's "Ahh" over a deep organ
+  voice() {
+    if (!this.ctx) return;
+    playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start');
+    organ(this.ctx, this.master, this.ctx.currentTime + 0.05, 1.2, [['a', 2, 'D2', 'A2', 'D3']], 0.06);
+  },
+};
+
+// ============================================================
+//  Rendering: the climb
+// ============================================================
+function drawSkyClimb() {
+  const hf = clamp(cam / Math.max(1, summitWY()), 0, 1);
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, mix('#9fd3f5', '#fff1c9', hf * 0.8));
+  g.addColorStop(0.6, mix('#c6e7fa', '#fff8e4', hf * 0.6));
+  g.addColorStop(1, '#e6f4fc');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+}
+
+// Distant hills of Galilee, sliding by slowly as we climb
+function drawFarHills() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  const base = GROUND_SY + 60 + cam * 0.25;
+  ctx.fillStyle = '#b7d3e6';
+  ctx.beginPath(); ctx.moveTo(x0, H + offY);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, base - 170 + Math.sin(x / 120) * 40 + Math.sin(x / 47) * 12);
+  ctx.lineTo(x1, H + 200); ctx.fill();
+  ctx.fillStyle = '#a3cf86';
+  ctx.beginPath(); ctx.moveTo(x0, H + 200);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, base - 60 + Math.sin(x / 90 + 1) * 20);
+  ctx.lineTo(x1, H + 200); ctx.fill();
+  // drifting clouds at different heights
+  for (const c of bgClouds) {
+    const y = sy(c.y) + (cam * 0.6) - 200;
+    const yy = ((y % 2600) + 2600) % 2600 - 400;
+    if (yy < -offY - 80 || yy > H + 60) continue;
+    drawCloud(-offX - 150 + c.f * (viewW + 300), yy, c.w, c.w * 0.32, 'rgba(255,255,255,0.85)', 'rgba(220,235,250,0.7)');
+  }
+}
+
+function mountainHalf(wy) {
+  const sw = summitWY();
+  const base = laneOff() + 110;
+  let h = base + 50 * (1 - clamp(wy / sw, 0, 1)) + Math.sin(wy / 57) * 10 + Math.sin(wy / 23 + 1) * 5;
+  if (wy > sw + 30) h *= Math.max(0, 1 - (wy - sw - 30) / 130);
+  return h;
+}
+
+function drawMountain() {
+  const top = cam + GROUND_SY + offY + 40, bottom = cam - (H - GROUND_SY) - 40;
+  const sw = summitWY();
+  const from = Math.max(bottom, -200), to = Math.min(top, sw + 170);
+  const g = ctx.createLinearGradient(W / 2 - 300, 0, W / 2 + 300, 0);
+  g.addColorStop(0, '#8e7a63'); g.addColorStop(0.5, '#b39c7e'); g.addColorStop(1, '#8a755d');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - mountainHalf(from), sy(from));
+  for (let wy = from; wy <= to; wy += 20) ctx.lineTo(W / 2 - mountainHalf(wy), sy(wy));
+  for (let wy = to; wy >= from; wy -= 20) ctx.lineTo(W / 2 + mountainHalf(wy), sy(wy));
+  ctx.closePath(); ctx.fill();
+  // cracks and strata
+  ctx.strokeStyle = 'rgba(90,70,50,0.25)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = Math.floor(from / 60); i * 60 <= to; i++) {
+    const wy = i * 60 + 25;
+    const hw = mountainHalf(wy) * 0.8;
+    const x = W / 2 + Math.sin(i * 12.9) * hw;
+    ctx.moveTo(x - 14, sy(wy)); ctx.quadraticCurveTo(x, sy(wy) - 6, x + 16, sy(wy) + 2);
+  }
+  ctx.stroke();
+  // a few tufts of grass on the lower slopes
+  ctx.fillStyle = '#8fb86a';
+  for (let i = Math.floor(from / 90); i * 90 <= Math.min(to, sw * 0.6); i++) {
+    const wy = i * 90 + 40;
+    const side = i % 2 ? 1 : -1;
+    const x = W / 2 + side * (mountainHalf(wy) - 18);
+    ctx.beginPath(); ctx.ellipse(x, sy(wy), 12, 5, 0, 0, TAU); ctx.fill();
+  }
+  // The foot of the mountain: a green meadow
+  if (sy(0) < H + offY) {
+    ctx.fillStyle = '#86b95d';
+    ctx.fillRect(-offX - 10, sy(0) + 24, viewW + 20, H + 400);
+    ctx.fillStyle = '#6f9e4a';
+    ctx.fillRect(-offX - 10, sy(0) + 24, viewW + 20, 6);
+  }
+  // The centre path Jesus walks up
+  ctx.strokeStyle = 'rgba(240,225,190,0.55)'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+  ctx.setLineDash([4, 18]);
+  ctx.beginPath();
+  for (let wy = Math.max(from, 0); wy <= Math.min(to, sw); wy += 20) {
+    const x = W / 2 + Math.sin(wy / 80) * 14;
+    wy === Math.max(from, 0) ? ctx.moveTo(x, sy(wy)) : ctx.lineTo(x, sy(wy));
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawLedge(x, y, ledge) {
+  const w = Math.min(130, laneOff() * 0.95 + 20);
+  // underside
+  ctx.fillStyle = '#7d6a54';
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2 + 6, y + 8);
+  ctx.quadraticCurveTo(x - w / 4, y + 34, x, y + 30);
+  ctx.quadraticCurveTo(x + w / 4, y + 36, x + w / 2 - 6, y + 8);
+  ctx.closePath(); ctx.fill();
+  // slab
+  ctx.fillStyle = ledge.rest ? '#7fae5a' : '#a8937a';
+  roundRect(x - w / 2, y - 6, w, 20, 10); ctx.fill();
+  ctx.fillStyle = ledge.rest ? '#a6d67c' : '#cdb99c';
+  roundRect(x - w / 2 + 3, y - 7, w - 6, 8, 4); ctx.fill();
+  if (ledge.rest) {
+    // a little spring and a bush under an overhang
+    ctx.fillStyle = '#6fc3f0';
+    ctx.beginPath(); ctx.ellipse(x + w / 2 - 26, y - 2, 14, 4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5f9a45';
+    ctx.beginPath(); ctx.arc(x - w / 2 + 16, y - 12, 10, 0, TAU); ctx.arc(x - w / 2 + 28, y - 16, 9, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#8e7a63';
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 - 4, y - 78); ctx.quadraticCurveTo(x, y - 100, x + w / 2 + 4, y - 78);
+    ctx.quadraticCurveTo(x, y - 88, x - w / 2 - 4, y - 78);
+    ctx.fill();
+    if (ledge.visited) return;
+    ctx.fillStyle = `rgba(255,255,255,${0.6 + 0.4 * Math.sin(t * 4)})`;
+    ctx.beginPath(); ctx.arc(x + w / 2 - 20, y - 14, 2.5, 0, TAU); ctx.fill();
+  }
+}
+
+function drawSummitTop() {
+  const y = sy(summitWY());
+  const w = laneOff() * 2 + 140;
+  ctx.fillStyle = '#7d6a54';
+  ctx.beginPath(); ctx.ellipse(W / 2, y + 12, w / 2, 26, 0, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#8fbf62';
+  roundRect(W / 2 - w / 2, y - 8, w, 22, 11); ctx.fill();
+  ctx.fillStyle = '#b3dc84';
+  roundRect(W / 2 - w / 2 + 4, y - 9, w - 8, 8, 4); ctx.fill();
+  // glow waiting at the top
+  const g = ctx.createRadialGradient(W / 2, y - 60, 5, W / 2, y - 60, 160);
+  g.addColorStop(0, `rgba(255,248,200,${0.5 + 0.2 * Math.sin(t * 2)})`);
+  g.addColorStop(1, 'rgba(255,248,200,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(W / 2, y - 60, 160, 0, TAU); ctx.fill();
+}
+
+function drawGoat(g) {
+  const y = sy(rowWY(g.row)) - 6 - (g.hopT > 0 ? Math.sin((1 - g.hopT / 0.4) * Math.PI) * 26 : 0);
+  const crouch = g.moving && g.timer < 0.6 && g.hopT <= 0 ? 3 : 0;
+  ctx.save();
+  ctx.translate(g.x + 14 * (g.lane ? -1 : 1) * 0, y + crouch);
+  ctx.scale(g.face, 1);
+  // legs
+  ctx.strokeStyle = '#6b5a48'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const lx of [-14, -7, 9, 16]) { ctx.moveTo(lx, -14); ctx.lineTo(lx, -1 + crouch * 0); }
+  ctx.stroke();
+  // body
+  ctx.fillStyle = '#f4efe4'; ctx.strokeStyle = '#c9bca4'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(0, -22, 23, 13, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  // tail
+  ctx.fillStyle = '#f4efe4';
+  ctx.beginPath(); ctx.ellipse(-23, -30, 4, 6, -0.5, 0, TAU); ctx.fill();
+  // head
+  const hx = 22, hy = -36 + Math.sin(g.chew) * 0.8;
+  ctx.fillStyle = '#f4efe4';
+  ctx.beginPath(); ctx.ellipse(hx, hy, 9, 11, 0.35, 0, TAU); ctx.fill(); ctx.stroke();
+  // horns
+  ctx.strokeStyle = '#a58a62'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(hx - 3, hy - 9); ctx.quadraticCurveTo(hx - 12, hy - 22, hx - 16, hy - 12); ctx.stroke();
+  // ear
+  ctx.fillStyle = '#e2d6c0';
+  ctx.beginPath(); ctx.ellipse(hx - 7, hy - 3, 6, 3, 0.4, 0, TAU); ctx.fill();
+  // eye, nose, beard
+  ctx.fillStyle = '#2b1d12';
+  ctx.beginPath(); ctx.arc(hx + 2, hy - 3, 1.8, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8a0a0';
+  ctx.beginPath(); ctx.arc(hx + 7, hy + 5, 1.8, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ddd2bd';
+  ctx.beginPath(); ctx.moveTo(hx + 1, hy + 8); ctx.lineTo(hx + 5, hy + 18); ctx.lineTo(hx + 7, hy + 8); ctx.fill();
+  ctx.restore();
+  if (g.baa > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(g.baa * 2, 0, 1);
+    ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round';
+    ctx.strokeText('Baa!', g.x, y - 58); ctx.fillStyle = '#7a5200'; ctx.fillText('Baa!', g.x, y - 58);
+    ctx.restore();
+  }
+}
+
+function drawRock(r) {
+  const x = laneX(r.lane) + Math.sin(r.wy / 30) * 6;
+  const bounce = Math.abs(Math.sin((r.wy / ROW_H) * Math.PI)) * 22;
+  const y = sy(r.wy) - bounce - 20;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(r.rot);
+  ctx.fillStyle = '#8b8378'; ctx.strokeStyle = '#5e574d'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * TAU, rr = r.r * (0.85 + 0.15 * Math.sin(k * 2.3));
+    k ? ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#aaa296';
+  ctx.beginPath(); ctx.arc(-r.r * 0.3, -r.r * 0.3, r.r * 0.35, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(2, -4); ctx.lineTo(7, 3); ctx.lineTo(4, 8); ctx.stroke();
+  ctx.restore();
+  // dust puffs behind it
+  if (Math.random() < 0.3) spawn(x + rand(-8, 8), y + 12, rand(-20, 20), rand(-10, 10), 0.4, 'rgba(200,185,160,0.8)', rand(3, 6));
+}
+
+function drawRockWarning(r) {
+  const x = laneX(r.lane);
+  const y = -offY + 128;
+  const a = 0.6 + 0.4 * Math.sin(t * 20);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ff8c2e'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y - 20); ctx.lineTo(x + 20, y + 14); ctx.lineTo(x - 20, y + 14); ctx.closePath();
+  ctx.stroke(); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('!', x, y + 10);
+  ctx.restore();
+  if (Math.random() < 0.25) spawn(x + rand(-20, 20), y + 20, 0, rand(60, 120), 0.5, '#b8a488', rand(1.5, 3), 200);
+}
+
+function drawClimb() {
+  drawSkyClimb();
+  drawFarHills();
+  drawMountain();
+  const top = cam + GROUND_SY + offY + 60, bottom = cam - (H - GROUND_SY) - 60;
+  // ledges and gaps
+  for (let i = 0; i < cfg.rows; i++) {
+    const wy = rowWY(i);
+    if (wy < bottom || wy > top) continue;
+    const r = rows[i];
+    r.ledges.forEach((l, lane) => {
+      const x = laneX(lane), y = sy(wy);
+      if (l) drawLedge(x, y, l);
+      else {
+        ctx.fillStyle = '#9a866d';
+        ctx.beginPath(); ctx.arc(x - 30, y + 4, 7, 0, TAU); ctx.arc(x + 24, y + 8, 5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(70,50,30,0.45)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - 20, y - 4); ctx.lineTo(x - 6, y + 6); ctx.lineTo(x + 6, y - 2); ctx.lineTo(x + 18, y + 8); ctx.stroke();
+      }
+    });
+  }
+  if (summitWY() < top + 200) drawSummitTop();
+  for (const g of goats) if (rowWY(g.row) > bottom && rowWY(g.row) < top) drawGoat(g);
+
+  // Jesus leads the way up the centre path, beckoning
+  const jy = sy(jesusClimb.wy) - 4;
+  drawJesus({ x: W / 2 + Math.sin(jesusClimb.wy / 80) * 14, y: jy, face: 'calm', pose: jesusClimb.wy >= summitWY() - 1 || !jesusClimb.walk ? 'beckon' : 'open', walk: jesusClimb.walk }, 0.95);
+
+  // James and John follow, then Peter (the player)
+  const look = { x: W / 2, y: jy - 50 };
+  for (const d of [DISCIPLES[2], DISCIPLES[1]]) {
+    const hopY = d.hopping ? Math.sin(t * 16) * 4 : 0;
+    drawDisciple({ d, x: d.x, y: sy(d.y) - 4 - Math.abs(hopY), s: 0.72, look });
+  }
+  const p = peter;
+  const wob = p.stumble > 0 ? Math.sin(p.stumble * 40) * 5 * p.fx : 0;
+  if (!(p.invuln > 0 && Math.floor(t * 12) % 2 === 0)) {
+    const danger = rocks.find((r) => r.warnT <= 0 && r.lane === (p.x < W / 2 ? 0 : 1) && r.wy > p.wy);
+    drawDisciple({ d: PETER, x: p.x + wob, y: sy(p.wy) - 4, s: 0.84, look: danger ? { x: laneX(danger.lane), y: sy(danger.wy) } : look });
+  }
+  // Peter's name tag so he's easy to find
+  ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  roundRect(p.x - 22, sy(p.wy) + 16, 44, 17, 8); ctx.fill();
+  ctx.fillStyle = '#3f6fb5';
+  ctx.fillText('Peter', p.x, sy(p.wy) + 29);
+
+  for (const r of rocks) if (r.warnT <= 0) drawRock(r);
+  drawParticles();
+  for (const r of rocks) if (r.warnT > 0) drawRockWarning(r);
+}
+
+// ============================================================
+//  Rendering: the summit
+// ============================================================
+function drawSummitScene() {
+  const L = summitLayout();
+  const glow = Math.max(js.shine, cloudF);
+  // sky
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, mix('#a9dcf7', '#fff6d8', glow));
+  g.addColorStop(0.55, mix('#d5eefb', '#fffbea', glow));
+  g.addColorStop(1, '#eef7fc');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // sea of clouds far below
+  for (let i = 0; i < 7; i++) {
+    const x = -offX + ((i * 260 + t * 8) % (viewW + 300)) - 150;
+    drawCloud(x, 520 + (i % 3) * 30, 220, 60, 'rgba(255,255,255,0.95)', 'rgba(215,230,245,0.9)');
+  }
+  // the summit rock
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  ctx.fillStyle = '#a8937a';
+  ctx.beginPath(); ctx.moveTo(x0, H + 20);
+  ctx.lineTo(x0, 600);
+  ctx.quadraticCurveTo(W / 2 - L.sp * 1.6, 470, W / 2 - L.sp * 1.3, 452);
+  ctx.quadraticCurveTo(W / 2, 400, W / 2 + L.sp * 1.3, 452);
+  ctx.quadraticCurveTo(W / 2 + L.sp * 1.6, 470, x1, 600);
+  ctx.lineTo(x1, H + 20); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8fbf62';
+  ctx.beginPath(); ctx.moveTo(x0, H + 20);
+  ctx.lineTo(x0, 690);
+  ctx.quadraticCurveTo(W / 2, 520, x1, 690);
+  ctx.lineTo(x1, H + 20); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a6d17a';
+  for (let i = 0; i < 12; i++) {
+    const x = (i / 11) * W, y = 760 + Math.sin(i * 3.1) * 50;
+    ctx.beginPath(); ctx.ellipse(x, y, 14, 5, 0, 0, TAU); ctx.fill();
+  }
+
+  // Moses, Jesus and Elijah
+  drawSpirit(L.tentX[0], L.back, 1.2, 'moses', spiritsA);
+  drawSpirit(L.tentX[2], L.back, 1.2, 'elijah', spiritsA);
+  if (spiritsA > 0.3) {
+    ctx.save();
+    ctx.globalAlpha = spiritsA;
+    ctx.font = '700 14px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#8a6a2a';
+    ctx.fillText('Moses', L.tentX[0], L.back + 18);
+    ctx.fillText('Elijah', L.tentX[2], L.back + 18);
+    ctx.restore();
+  }
+  const front = js.y > L.tentY - 40;
+  if (!front) drawJesus(js, 1.3);
+
+  // Peter's tents
+  if (phase !== 'glory') tents.forEach((tn, k) => drawTent(tn, L.tentY, k));
+
+  // Disciples
+  const look = { x: js.x, y: js.y - 60 };
+  DISCIPLES.forEach((d) => {
+    if (d.prone > 0 && d.rise < 0.5) drawProne(d, d.x, d.y, 1.05);
+    else {
+      const pop = d.rise > 0 ? Math.sin(d.rise * Math.PI) * 10 : 0;
+      drawDisciple({ d, x: d.x, y: d.y - pop, s: 1.1, look: cloudF > 0.5 ? { x: d.x, y: 0 } : look });
+    }
+  });
+  if (front) drawJesus(js, 1.3);
+
+  // The bright cloud overshadows them
+  if (cloudF > 0) {
+    ctx.save();
+    ctx.globalAlpha = cloudF * 0.55;
+    ctx.fillStyle = '#fffdf2';
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+    ctx.globalAlpha = cloudF;
+    const cy = lerp(-offY - 160, 250, cloudF);
+    const rg = ctx.createRadialGradient(W / 2, cy, 20, W / 2, cy, 420);
+    rg.addColorStop(0, 'rgba(255,250,215,0.9)'); rg.addColorStop(1, 'rgba(255,250,215,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(W / 2, cy, 420, 0, TAU); ctx.fill();
+    drawCloud(W / 2, cy, viewW + 200, 170, '#ffffff', '#fff3cf', 11);
+    drawCloud(W / 2 - W * 0.3, cy + 70, W * 0.7, 110, '#ffffff', '#fff6dc', 7);
+    drawCloud(W / 2 + W * 0.32, cy + 60, W * 0.7, 100, '#ffffff', '#fff6dc', 7);
+    ctx.restore();
+  }
+  drawParticles();
+
+  // Tent timer
+  if (phase === 'tents' && tentSub === 'build') {
+    const f = clamp(tentLeft / cfg.tentTime, 0, 1);
+    const bw = Math.min(300, W - 60), bx = W / 2 - bw / 2, by = -offY + 118;
+    ctx.fillStyle = 'rgba(90,66,16,0.25)';
+    roundRect(bx, by, bw, 14, 7); ctx.fill();
+    ctx.fillStyle = f < 0.3 ? '#ff8c5a' : '#f7c948';
+    if (f > 0) { roundRect(bx, by, bw * f, 14, 7); ctx.fill(); }
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#5a4210';
+    ctx.fillText('Build three tabernacles!', W / 2, by + 34);
+  }
+  if (phase === 'fallen' && touched < 3 && phaseT > 1.2 && !walking) {
+    ctx.font = '700 17px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+    const txt = 'Tap: Jesus comes and touches them';
+    ctx.strokeText(txt, W / 2, 660); ctx.fillStyle = '#7a5200'; ctx.fillText(txt, W / 2, 660);
+  }
+}
+
+// A tent goes up in stages: pole, one side, the other side, then door and flag
+function drawTent(tn, y, k) {
+  const stage = Math.floor((tn.pieces / cfg.tentPieces) * 4 + 1e-6);
+  const w = Math.min(104, W * 0.2), h = 84;
+  const colours = [['#fffaf0', '#e8c55a'], ['#e9d3a8', '#b8905a'], ['#e7b08a', '#b86a45']][k];
+  const wob = Math.sin(tn.wob * 20) * tn.wob * 0.08;
+  ctx.save();
+  ctx.translate(tn.x, y);
+  ctx.rotate(wob);
+  // spot marker
+  ctx.fillStyle = 'rgba(90,70,40,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, w * 0.6, 9, 0, 0, TAU); ctx.fill();
+  if (tn.pieces === 0 && phase === 'tents' && tentSub === 'build') {
+    ctx.strokeStyle = `rgba(160,110,20,${0.5 + 0.4 * Math.sin(t * 6)})`; ctx.setLineDash([6, 6]); ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(0, -h); ctx.lineTo(w / 2, 0); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (stage >= 1) {
+    ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -h - 10); ctx.stroke();
+  }
+  if (stage >= 2) {
+    ctx.fillStyle = colours[0]; ctx.strokeStyle = colours[1]; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(-w / 2, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (stage >= 3) {
+    ctx.fillStyle = shade(colours[0].length === 7 ? colours[0] : '#ffffff', -18);
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(w / 2, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = colours[1]; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-w * 0.25, -h * 0.5); ctx.lineTo(w * 0.25, -h * 0.5); ctx.stroke();
+  }
+  if (stage >= 4) {
+    ctx.fillStyle = '#5a3d22';
+    ctx.beginPath(); ctx.moveTo(0, -h * 0.45); ctx.lineTo(-12, 0); ctx.lineTo(12, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = k === 0 ? '#e0a526' : k === 1 ? '#4dabf7' : '#e8590c';
+    ctx.beginPath(); ctx.moveTo(0, -h - 10); ctx.lineTo(18, -h - 4 + Math.sin(t * 5) * 2); ctx.lineTo(0, -h + 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(-w / 2 - 8, 4); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2 + 8, 4); ctx.stroke();
+  }
+  ctx.restore();
+  if (phase === 'tents') {
+    ctx.font = '600 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#6a5a3c';
+    ctx.fillText(tn.who, tn.x, y + 22);
+  }
+}
+
+// ============================================================
+//  Rendering: HUD, messages, banners
+// ============================================================
+function drawHeart(x, y, r, full) {
+  ctx.fillStyle = full ? '#e8445a' : 'rgba(90,66,16,0.22)';
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.8, y - r * 1.3, x, y - r * 0.45);
+  ctx.bezierCurveTo(x + r * 0.8, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9);
+  ctx.fill();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'On the Mountain' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < MAX_HEARTS; i++) drawHeart(20 + i * 22, 45, 8, i < hearts);
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 11px Fredoka, sans-serif';
+  ctx.fillText('BREATH', 84, 50);
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(132, 40, 90, 12, 6); ctx.fill();
+  const bf = breath / 100;
+  ctx.fillStyle = breath < cfg.hopCost && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#7fc8f0';
+  if (bf > 0) { roundRect(132, 40, 90 * bf, 12, 6); ctx.fill(); }
+
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score and height climbed
+  const rx = viewW - 12;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SCORE', rx, 20);
+  ctx.font = '700 18px Fredoka, sans-serif';
+  ctx.fillText(`${totalScore + levelScore}`, rx, 41);
+  ctx.font = '600 13px Fredoka, sans-serif';
+  const prog = phase === 'climb' ? `Ledge ${peter ? peter.row : 0} / ${cfg.rows}` : 'The summit';
+  ctx.fillText(prog, rx, 61);
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const y = phase === 'climb' ? -offY + 190 : 690;
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, W / 2, y);
+  ctx.fillStyle = '#7a5200';
+  ctx.fillText(message.text, W / 2, y);
+  ctx.restore();
+}
+
+// Scripture banner near the top of the screen
+function drawBanner() {
+  if (!banner) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(banner.t / 0.4, 0, 1);
+  const maxW = Math.min(W - 36, 560);
+  ctx.font = '600 19px Fredoka, sans-serif';
+  const lines = wrap(banner.text, maxW - 32);
+  const lh = 25;
+  const hasWho = !!banner.who;
+  const h = 22 + (hasWho ? 20 : 0) + lines.length * lh + 22;
+  const x = W / 2 - maxW / 2, y = -offY + 108;
+  ctx.fillStyle = 'rgba(255,252,240,0.94)';
+  ctx.shadowColor = 'rgba(60,40,0,0.25)'; ctx.shadowBlur = 14;
+  roundRect(x, y, maxW, h, 18); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(224,165,38,0.7)'; ctx.lineWidth = 3;
+  roundRect(x, y, maxW, h, 18); ctx.stroke();
+  ctx.textAlign = 'center';
+  let yy = y + 26;
+  if (hasWho) {
+    ctx.font = '700 14px Fredoka, sans-serif'; ctx.fillStyle = '#a8741a';
+    ctx.fillText(banner.who, W / 2, yy - 4); yy += 20;
+  }
+  ctx.font = '600 19px Fredoka, sans-serif'; ctx.fillStyle = '#3b2f1e';
+  lines.forEach((ln, i) => ctx.fillText(i === 0 ? '“' + ln + (lines.length === 1 ? '”' : '') : ln + (i === lines.length - 1 ? '”' : ''), W / 2, yy + i * lh));
+  ctx.font = 'italic 600 13px Fredoka, sans-serif'; ctx.fillStyle = '#7a6640';
+  ctx.fillText(banner.cite, W / 2, yy + lines.length * lh + 2);
+  ctx.restore();
+}
+
+// Speech bubble above a speaker
+function drawBubble() {
+  if (!bubble) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.font = '700 18px Fredoka, sans-serif';
+  const lines = wrap(bubble.text, Math.min(260, W - 60));
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
+  const h = lines.length * 23 + 18;
+  const bx = clamp(bubble.x - w / 2, 10, W - w - 10), by = bubble.y - h - 14;
+  ctx.fillStyle = '#fffdf5'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 2.5;
+  roundRect(bx, by, w, h, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  const tx = clamp(bubble.x, bx + 16, bx + w - 16);
+  ctx.moveTo(tx - 9, by + h - 1); ctx.lineTo(tx, by + h + 12); ctx.lineTo(tx + 9, by + h - 1);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fffdf5'; ctx.fillRect(tx - 8, by + h - 3, 16, 3);
+  ctx.fillStyle = '#3b2f1e'; ctx.textAlign = 'center';
+  lines.forEach((ln, i) => ctx.fillText(ln, bx + w / 2, by + 27 + i * 23));
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy2 = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy2 = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy2) * scale);
+
+  if (phase === 'climb' || !js) drawClimb();
+  else drawSummitScene();
+
+  drawBubble();
+  drawBanner();
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,240,${clamp(flashT * 1.4, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  for (const c of bgClouds) { c.f += c.sp * dt; if (c.f > 1) c.f -= 1; }
+  updateParticles(dt);
+  updateDisciples(dt);
+  if (state === 'play') {
+    if (phase === 'climb') updateClimb(dt);
+    else updateSummit(dt);
+  } else if (state === 'win' && js && Math.random() < dt * 12) {
+    spawn(js.x + rand(-40, 40), js.y - rand(0, 90), 0, -20, 1, '#fff6d0', 3);
+  }
+  if (state === 'win' || state === 'fail') {
+    if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
+    if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
