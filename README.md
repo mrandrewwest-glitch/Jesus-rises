@@ -14,6 +14,7 @@ To share it, turn on **GitHub Pages** for this repo (Settings → Pages → depl
 | Rise | Hold `↑`, `W` or `Space` | **Tap** above Jesus: each tap is one push |
 | Steer | Hold `←` `→` or `A` `D` | **Tap** to His left / right |
 | Pause | `P` / `Esc` | ⏸ button |
+| Restart level | `R` while paused | ↻ Restart Level in the pause menu |
 | Mute | `M` | 🔊 button |
 
 ## Rules
