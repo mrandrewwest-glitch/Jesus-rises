@@ -167,8 +167,12 @@
 </div>
 
 <script src="bible.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
+
+// Sound: the shared music engine (music.js) with this game's tune, instruments and ambience
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
 
 // Scripture shown in this game (Luke 17:11-19).
 // Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
@@ -1126,6 +1130,7 @@ function updatePart1(dt) {
 function startPart2() {
   part = 2;
   state = 'play';
+  syncAmbience();
   hideOverlay();
   camX = ROAD;
   villagers = makeVillagers(cfg.villagers);
@@ -1218,6 +1223,7 @@ function tapPart2(px, py) {
 
 function found() {
   state = 'win';
+  syncAmbience();
   const s = samaritan;
   s.free = true; s.tellT = 0;
   const p2 = { found: 500, quick: Math.round(clamp(chooseLeft / cfg.chooseTime, 0, 1) * 300), first: triesUsed === 0 ? 200 : 0 };
@@ -1277,6 +1283,7 @@ function hitMan(px, py) {
 // ============================================================
 function fail(reason) {
   state = 'fail';
+  syncAmbience();
   failReason = reason;
   round = null;
   if (reason === 'lost') {
@@ -1327,6 +1334,7 @@ function resetScene() {
 
 function titleScreen() {
   state = 'title';
+  syncAmbience();
   cfg = makeConfig(1);
   resetScene();
   showOverlay('The Ten Lepers', 'Luke 17 — the one who came back',
@@ -1347,6 +1355,7 @@ function startLevel() {
   resetScene();
   p1Result = null;
   state = 'play';
+  syncAmbience();
   phase = 'intro'; phaseT = 0;
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
@@ -1395,11 +1404,13 @@ function endScreens(dt) {
 function togglePause() {
   if (state === 'play') {
     state = 'pause';
+    syncAmbience();
     showOverlay('Paused', `Level ${level} — ${cfg.name}`,
       '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
       'Resume', togglePause, '↻ Restart Level', startLevel);
   } else if (state === 'pause') {
     state = 'play';
+    syncAmbience();
     hideOverlay();
   }
 }
@@ -1478,19 +1489,6 @@ function noteFreq(n) {
   return 440 * Math.pow(2, semis / 12);
 }
 
-// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
-const SCORE_WIN = [
-  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
-  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
-  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
-  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
-  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
-  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
-];
-const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
-const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
-const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
-
 // One choir part sung legato: a few detuned voices through vowel formant filters
 function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
   const total = score.reduce((s, n) => s + n[1], 0) * beat;
@@ -1564,23 +1562,6 @@ function organ(ac, out, t0, beat, score, vol) {
   }
 }
 
-// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
-function playHeaven(ac, out, t0, piece) {
-  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
-  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
-  const opts = { swell: piece === 'win', droop: piece === 'fail' };
-  const vols = [0.2, 0.14, 0.13, 0.16];
-  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
-  organ(ac, out, t0, beat, score, 0.045);
-}
-
-// A single sung note for each tap, pitched higher the higher Jesus is
-function playTapNote(ac, out, t0, height) {
-  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
-  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
-  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
-}
-
 // Each of the ten calls on his own note, rising from left to right
 const CALL_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5', 'B5'];
 function playCallNote(ac, out, t0, idx, vol = 0.12) {
@@ -1588,6 +1569,11 @@ function playCallNote(ac, out, t0, idx, vol = 0.12) {
   singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, vol);
   organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
 }
+
+// The theme's ambient bed plays only during active play, with sound on and the page in view
+function syncAmbience() { Music.ambience(state === 'play' && !sfx.muted && !document.hidden); }
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
 
 const sfx = {
   ctx: null, master: null, noise: null, muted: false,
@@ -1600,6 +1586,7 @@ const sfx = {
       this.master.gain.value = this.muted ? 0 : 0.5;
       const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
       this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);   // the shared music plays through the same mute
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -1609,6 +1596,7 @@ const sfx = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
   },
   tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
     if (!this.ctx) return;
@@ -1622,12 +1610,12 @@ const sfx = {
     o.connect(g); g.connect(this.master);
     o.start(t0); o.stop(t0 + dur + 0.05);
   },
-  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
-  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  win() { Music.win(); },
+  levelStart() { Music.start(); },
   tap(height) {
     if (!this.ctx) return;
     this.puff(0.15);
-    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+    Music.tap(height);
   },
   call(idx) { if (this.ctx) playCallNote(this.ctx, this.master, this.ctx.currentTime + 0.01, idx); },
   heal(idx) {
@@ -1651,7 +1639,7 @@ const sfx = {
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
-  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  fail() { Music.fail(); },
 };
 
 // ============================================================
@@ -1984,6 +1972,7 @@ function frame(now) {
   last = now;
   if (state !== 'pause') { update(dt / 2); update(dt / 2); }
   render();
+  syncAmbience();
   requestAnimationFrame(frame);
 }
 

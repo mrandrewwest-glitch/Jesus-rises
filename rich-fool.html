@@ -297,7 +297,7 @@ function makeConfig(n) {
     villagers: Math.min(4 + (n - 1) * 2, 13),      // hungry neighbours who will come by
     sackW: Math.max(104 - (n - 1) * 7, 72),
     speed: Math.min(1.45 + (n - 1) * 0.35, 3.3),   // how fast the hoist swings
-    carry: n === 1 ? 0 : Math.min(0.2 + (n - 2) * 0.12, 0.6), // dropped sacks keep some of its swing
+    carry: n === 1 ? 0 : Math.min(0.1 + (n - 2) * 0.07, 0.35), // dropped sacks keep some of its swing
     cap: 5,                                        // sacks the first barn holds
     night: Math.max(15 - (n - 1) * 1.5, 8),        // seconds of night to share before the reckoning
     perfect: n === 1 ? 10 : 7,
@@ -346,12 +346,12 @@ let hinted = { share: false, build: false };
 function layout() {
   const inner = cfg.sackW * 1.8;
   const outer = inner + WALL * 2;
-  const barnX = Math.max(290, Math.min(W * 0.56, W - outer / 2 - 90));
+  const barnX = Math.max(278, Math.min(W * 0.56, W - outer / 2 - 90));
   const wallH = barn.cap * SH + 14;
   return {
     inner, outer, barnX, wallH,
     left: barnX - inner / 2, right: barnX + inner / 2,
-    farmerX: Math.min(barnX + outer / 2 + 44, W - 30),
+    farmerX: Math.min(barnX + outer / 2 + 44, W - 42),
     amp: inner / 2 + 30,
     hookY: GROUND - wallH - 96,
   };
@@ -1133,6 +1133,20 @@ function updateTumblers(dt) {
       if (b.fade && b.rest > (b.kind === 'sack' ? 2.5 : 0.9)) tumblers.splice(i, 1);
       continue;
     }
+    if (b.pivot) {
+      b.va += Math.sign(b.va) * 6 * dt;
+      b.ang += b.va * dt;
+      if (Math.abs(b.ang) >= Math.PI / 2) {
+        b.ang = Math.sign(b.ang) * Math.PI / 2;
+        b.rest = 0.001;
+        for (let k = 0; k < 12; k++) spawn(b.px + Math.sign(b.ang) * rand(0, b.len), GROUND, rand(-40, 40), rand(-90, -20), 0.7, '#e8d3aa', rand(3, 5), 120);
+        sfx.bump();
+      }
+      b.rot = b.ang;
+      b.x = b.px + Math.sin(b.ang) * b.len / 2;
+      b.y = GROUND - Math.cos(b.ang) * b.len / 2 - Math.abs(Math.sin(b.ang)) * WALL / 2;
+      continue;
+    }
     b.vy += GRAV * 0.8 * dt;
     b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vr * dt;
     if (b.y >= b.gy) {
@@ -1157,8 +1171,10 @@ function startBuild() {
   stage = 'build';
   builds++;
   // Down come the old walls and roof
-  tumblers.push({ kind: 'wall', len: L.wallH, x: L.left - WALL / 2, y: GROUND - L.wallH / 2, vx: -110, vy: -120, rot: 0, vr: -1.6, gy: GROUND + 10, rest: 0, fade: true });
-  tumblers.push({ kind: 'wall', len: L.wallH, x: L.right + WALL / 2, y: GROUND - L.wallH / 2, vx: 110, vy: -120, rot: 0, vr: 1.6, gy: GROUND + 10, rest: 0, fade: true });
+  // each wall tips over outward like a felled tree
+  for (const [px, dir] of [[L.left - WALL / 2, -1], [L.right + WALL / 2, 1]]) {
+    tumblers.push({ kind: 'wall', pivot: true, px, len: L.wallH, ang: 0, va: dir * 0.6, x: px, y: GROUND - L.wallH / 2, rot: 0, rest: 0, fade: true });
+  }
   tumblers.push({ kind: 'roof', w: L.outer + 36, x: L.barnX, y: GROUND - L.wallH - 26, vx: rand(-40, 40), vy: -380, rot: 0, vr: rand(-3, 3), gy: GROUND + 20, rest: 0, fade: true });
   barn.up = false; barn.show = 0;
   barn.cap += 4;
@@ -1848,8 +1864,8 @@ function drawFarmSky() {
     ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, 90, 0, TAU); ctx.fill();
     ctx.fillStyle = '#fff6d6';
     ctx.beginPath(); ctx.arc(mx, my, 28, 0, TAU); ctx.fill();
-    ctx.fillStyle = mix('#3a3f78', '#1d2552', 0.5);
-    ctx.beginPath(); ctx.arc(mx + 12, my - 6, 24, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ebe0b8';
+    ctx.beginPath(); ctx.arc(mx - 9, my - 6, 6, 0, TAU); ctx.arc(mx + 8, my + 7, 8, 0, TAU); ctx.arc(mx + 10, my - 11, 4, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
   }
   const cloudTop = mix('#ffffff', '#6a6f9c', n), cloudUnder = mix('#e6eef6', '#4a4f7c', n);
