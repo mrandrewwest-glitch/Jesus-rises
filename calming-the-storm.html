@@ -88,6 +88,12 @@
     font-size: 0.92rem;
     margin: 10px 0 4px;
   }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
   .card .score {
     text-align: center;
     font-size: 1.1rem;
@@ -160,8 +166,34 @@
   </div>
 </div>
 
+<script src="bible.js"></script>
 <script>
 'use strict';
+
+// Scripture shown in this game. KJV is filled in; other versions are added later.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  // Overlay cards
+  rebuked:    { ref: 'Mark 4:39',    KJV: 'And he arose, and rebuked the wind, and said unto the sea, Peace, be still. And the wind ceased, and there was a great calm.', NKJV: null, NIV: null, NLT: null },
+  obey:       { ref: 'Mark 4:41',    KJV: 'What manner of man is this, that even the wind and the sea obey him?', NKJV: null, NIV: null, NLT: null },
+  awakeHim:   { ref: 'Mark 4:38',    KJV: 'And they awake him, and say unto him, Master, carest thou not that we perish?', NKJV: null, NIV: null, NLT: null },
+  greatStorm: { ref: 'Mark 4:37',    KJV: 'And there arose a great storm of wind, and the waves beat into the ship, so that it was now full.', NKJV: null, NIV: null, NLT: null },
+  // Speech bubbles and on-screen messages
+  carestCry:  { ref: 'Mark 4:38',    KJV: 'Master, carest thou not that we perish?', NKJV: null, NIV: null, NLT: null },
+  peace:      { ref: 'Mark 4:39',    KJV: 'Peace, be still.', NKJV: null, NIV: null, NLT: null },
+  greatCalm:  { ref: 'Mark 4:39',    KJV: 'And there was a great calm.', NKJV: null, NIV: null, NLT: null },
+  whatManner: { ref: 'Mark 4:41',    KJV: 'What manner of man is this?', NKJV: null, NIV: null, NLT: null },
+  saveUs:     { ref: 'Matthew 8:25', KJV: 'Lord, save us!', NKJV: null, NIV: null, NLT: null },
+  perish:     { ref: 'Matthew 8:25', KJV: 'We perish!', NKJV: null, NIV: null, NLT: null },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
 
 // ============================================================
 //  Setup & helpers
@@ -576,8 +608,9 @@ function crewSlots() {
 }
 
 const CRIES = [
-  'Master!', 'We perish!', 'Bail, bail!', 'Hold on!', 'Is He still asleep?!',
-  'Lord, save us!', 'My sandals are soaked!', 'Andrew, stop splashing me!',
+  // { verse: key } entries are scripture, looked up in the chosen version when spoken
+  'Master!', { verse: 'perish' }, 'Bail, bail!', 'Hold on!', 'Is He still asleep?!',
+  { verse: 'saveUs' }, 'My sandals are soaked!', 'Andrew, stop splashing me!',
   'Peter, you’re the fisherman!', 'Hang on to the mast!', 'How can He sleep?!',
 ];
 
@@ -1014,7 +1047,10 @@ function updateCries(dt) {
     cryTimer = rand(4, 7);
     const n = crewSlots().length;
     if (wake >= 1) say(Math.floor(rand(0, n)), 'Master, wake up!');
-    else say(Math.floor(rand(0, n)), CRIES[Math.floor(Math.random() * CRIES.length)]);
+    else {
+      const cry = CRIES[Math.floor(Math.random() * CRIES.length)];
+      say(Math.floor(rand(0, n)), typeof cry === 'string' ? cry : verseText(cry.verse));
+    }
   }
 }
 
@@ -1025,7 +1061,7 @@ function updateWake(dt) {
   if (wake >= 1) return;
   wake = Math.min(1, wake + dt / cfg.dur);
   if (wake >= 1) {
-    say(0, 'Master, carest thou not that we perish?', 3.2);
+    say(0, verseText('carestCry'), 3.2);
     showMessage(isTouch() ? 'Tap Jesus to wake Him!' : 'Press W or Enter to wake Jesus!');
     sfx.chime();
   }
@@ -1138,14 +1174,15 @@ function titleScreen() {
   resetScene();
   const touch = isTouch();
   showOverlay('Calming the Storm', 'Peace, be still',
-    `<p class="verse">"And he arose, and rebuked the wind, and said unto the sea, Peace, be still. And the wind ceased, and there was a great calm." &mdash; Mark 4:39</p>
+    `${verseHTML('rebuked')}
      <ul>
        <li>A great storm on the Sea of Galilee &mdash; and Jesus is <b>fast asleep</b> on a pillow in the back of the boat!</li>
        <li><b>Bail:</b> ${touch ? '<b>tap</b> the water that splashes in' : 'press <kbd>Space</kbd>, or click the water'}. Too much water and the boat is swamped.</li>
        <li><b>Balance:</b> ${touch ? '<b>tap the high side</b>' : 'hold <kbd>&larr;</kbd> / <kbd>&rarr;</kbd> toward the high side'} so the disciples lean against the tilt. Watch out for <b>big waves</b>!</li>
        <li>When the <b>Wake the Master</b> meter is full, ${touch ? '<b>tap Jesus</b>' : 'press <kbd>W</kbd> or <kbd>Enter</kbd>'} to wake Him.</li>
      </ul>
-     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
     'Set sail', () => { level = 1; totalScore = 0; startLevel(); });
 }
 
@@ -1165,9 +1202,10 @@ function endScreens(dt) {
   if (state === 'win') {
     const s = lastScore;
     showOverlay('A great calm!', `Level ${level} complete — ${cfg.name}`,
-      `<p class="verse">"What manner of man is this, that even the wind and the sea obey him?" &mdash; Mark 4:41</p>
+      `${verseHTML('obey')}
        <p class="score">Time in the storm: <b>${s.time}</b><br>Water bailed: <b>${s.bailed}</b><br>Kept dry: <b>${s.dry}</b><br>Kept steady: <b>${s.steady}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
-       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
       'Next Crossing', () => { level++; startLevel(); });
   } else if (state === 'fail') {
     const capsize = failReason === 'capsize';
@@ -1176,9 +1214,7 @@ function endScreens(dt) {
         ? 'A wave tipped the boat too far. Lean toward the <b>high side</b> to keep her steady!'
         : 'The boat filled right up with water. Keep bailing, one scoop at a time!'}
        Everyone is soggy but safe &mdash; the Master is in the boat.</p>
-       <p class="verse">${capsize
-        ? '"And they awake him, and say unto him, Master, carest thou not that we perish?" &mdash; Mark 4:38'
-        : '"And there arose a great storm of wind, and the waves beat into the ship, so that it was now full." &mdash; Mark 4:37'}</p>
+       ${verseHTML(capsize ? 'awakeHim' : 'greatStorm')}
        <p class="score">Score so far: <b>${totalScore}</b></p>`,
       'Try Again', () => startLevel());
   }
@@ -2170,7 +2206,7 @@ function updateWin(dt) {
   if (!spoke && winT >= 1.0) {
     // "Peace, be still."
     spoke = true;
-    say('jesus', 'Peace, be still.', 3);
+    say('jesus', verseText('peace'), 3);
     flashT = 0.35;
     sfx.win();
     const h = toWorld(jesusFeetU() + 24 * JESUS_S, JESUS_FEET.v - 76 * JESUS_S);
@@ -2180,10 +2216,10 @@ function updateWin(dt) {
     }
   }
   if (winT > 1.0) calm = Math.max(0, calm - dt / 2.2);
-  if (winT > 3.2 && winT - dt <= 3.2) showMessage('And there was a great calm.');
+  if (winT > 3.2 && winT - dt <= 3.2) showMessage(verseText('greatCalm'));
   if (!marvelled && winT >= 3.8) {
     marvelled = true;
-    say(1, 'What manner of man is this?', 2.8);
+    say(1, verseText('whatManner'), 2.8);
   }
   if (Math.random() < dt * 12) {
     const c = toWorld(jesusFeetU(), JESUS_FEET.v - 40);

@@ -88,6 +88,12 @@
     font-size: 0.92rem;
     margin: 10px 0 4px;
   }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin: 8px 0 0;
+    line-height: 1.3;
+  }
   .card .score {
     text-align: center;
     font-size: 1.1rem;
@@ -160,8 +166,28 @@
   </div>
 </div>
 
+<script src="bible.js"></script>
 <script>
 'use strict';
+
+// Scripture shown in this game. KJV is filled in; other versions are added later.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  climbed: { ref: 'Luke 19:3\u20134', KJV: '...he could not for the press, because he was little of stature. And he ran before, and climbed up into a sycomore tree to see him.', NKJV: null, NIV: null, NLT: null },
+  abide: { ref: 'Luke 19:5', KJV: 'Zacchaeus, make haste, and come down; for to day I must abide at thy house.', NKJV: null, NIV: null, NLT: null },
+  halfGoods: { ref: 'Luke 19:8', KJV: 'Behold, Lord, the half of my goods I give to the poor', NKJV: null, NIV: null, NLT: null },
+  seekSave: { ref: 'Luke 19:10', KJV: 'For the Son of man is come to seek and to save that which was lost.', NKJV: null, NIV: null, NLT: null },
+  makeHaste: { ref: 'Luke 19:5', KJV: 'Zacchaeus, make haste, and come down!', NKJV: null, NIV: null, NLT: null },   // speech bubble
+  joyfully: { ref: 'Luke 19:6', KJV: 'He received Him joyfully!', NKJV: null, NIV: null, NLT: null },               // on-screen message
+};
+
+// Card markup for a verse and the translation credit, looked up in the current version.
+function verseHTML(entry) {
+  const v = Bible.verse(entry);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() { return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`; }
+
 
 // ============================================================
 //  Setup & helpers
@@ -1210,7 +1236,7 @@ function titleScreen() {
   cfg = makeConfig(1);
   setupScene();
   showOverlay('Zacchaeus Climbs', 'Up the sycomore tree',
-    `<p class="verse">"...he could not for the press, because he was little of stature. And he ran before, and climbed up into a sycomore tree to see him." &mdash; Luke 19:3&ndash;4</p>
+    `${verseHTML(VERSES.climbed)}
      <ul>
        <li>Jesus is walking through Jericho, but little Zacchaeus can't see over the crowd! Help him <b>climb to the top</b> before Jesus passes by.</li>
        <li><b>Touch:</b> tap the <b>left</b> or <b>right</b> half of the screen to hop to the next branch on that side.</li>
@@ -1218,7 +1244,8 @@ function titleScreen() {
        <li>Hop off <b>cracked branches</b> quickly, dodge <b>falling figs</b> and <b>birds</b>, and gather <b>coins</b> on the way.</li>
        <li>The whole town is watching&hellip;</li>
      </ul>
-     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
     'Start Climbing', () => { level = 1; totalScore = 0; startLevel(); });
 }
 
@@ -1242,15 +1269,16 @@ function endScreens(dt) {
   if (state === 'win') {
     const s = lastScore;
     showOverlay('Make haste!', `Level ${level} complete — ${cfg.name}`,
-      `<p class="verse">"Zacchaeus, make haste, and come down; for to day I must abide at thy house." &mdash; Luke 19:5</p>
+      `${verseHTML(VERSES.abide)}
        <p class="score">Time to spare: <b>${s.timeBonus}</b><br>Coins gathered (${coins}): <b>${s.coinPts}</b><br>Half given to the poor (${s.given}): <b>${s.generosity}</b><br>${s.noSlip ? `No slips: <b>${s.noSlip}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
-       <p class="verse">"Behold, Lord, the half of my goods I give to the poor" &mdash; Luke 19:8</p>
-       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+       ${verseHTML(VERSES.halfGoods)}
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
       'Next Tree', () => { level++; startLevel(); });
   } else if (state === 'fail') {
     showOverlay('Oh\u2026 He passed by!', `Level ${level} — ${cfg.name}`,
       `<p style="text-align:center">Jesus walked on before Zacchaeus reached the top. Climb quickly and carefully &mdash; watch which side the next branch is on!</p>
-       <p class="verse">"For the Son of man is come to seek and to save that which was lost." &mdash; Luke 19:10</p>
+       ${verseHTML(VERSES.seekSave)}
        <p class="score">Score so far: <b>${totalScore}</b></p>`,
       'Try Again', () => startLevel());
   }
@@ -1890,12 +1918,26 @@ function warnBadge(x, y, pulse) {
   ctx.textBaseline = 'alphabetic';
 }
 
+// Greedy word wrap using the current ctx.font
+function wrapLines(text, maxW) {
+  const lines = [];
+  let line = '';
+  for (const w of text.split(' ')) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  lines.push(line);
+  return lines;
+}
+
 // "Zacchaeus, make haste, and come down!"
 function drawBubble() {
   if (state !== 'win' || winT < 1.3) return;
   const a = clamp((winT - 1.3) / 0.3, 0, 1);
   const hx = jesus.x, hy = jesus.y - 90 - cam;
-  const bw = 270, bh = 62;
+  ctx.font = '700 18px Fredoka, sans-serif';
+  const lines = wrapLines(`"${Bible.verse(VERSES.makeHaste).text}"`, 246);
+  const bw = 270, bh = lines.length * 23 + 16;
   const bx = clamp(hx - 40, -offX + 10 + bw / 2, W + offX - 10 - bw / 2);
   const by = hy - 60;
   ctx.save();
@@ -1911,8 +1953,7 @@ function drawBubble() {
   ctx.fillRect(clamp(hx, bx - bw / 2 + 24, bx + bw / 2 - 24) - 8, by + bh / 2 - 4, 16, 5);
   ctx.fillStyle = '#5a4210';
   ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('"Zacchaeus, make haste,', bx, by - 5);
-  ctx.fillText('and come down!"', bx, by + 18);
+  lines.forEach((l, k) => ctx.fillText(l, bx, by + 6.5 - (lines.length - 1) * 11.5 + k * 23));
   ctx.restore();
 }
 
@@ -2084,7 +2125,7 @@ function updateWinScene(dt) {
       if (i % 3 === 0) sfx.tap(i / topIdx());
       if (b.ground) {
         for (let k = 0; k < 24; k++) spawn(z.x, z.y - 40, rand(-120, 120), rand(-200, -40), 1.2, ['#ffd43b', '#fff3bf', '#ffe27a'][k % 3], rand(2, 4), 300);
-        showMessage('He received Him joyfully!');
+        showMessage(Bible.verse(VERSES.joyfully).text);
       }
     }
   }
