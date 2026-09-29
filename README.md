@@ -1,6 +1,6 @@
 # Stories of Jesus ✨
 
-48 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
+47 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
 Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files, libraries or build step.
 
@@ -18,7 +18,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 - **Bible version:** pick **KJV, NKJV, NIV or NLT** on the menu. Every verse in every game is quoted word for word in the chosen version and credited to its publisher. The shared code is in `bible.js`, and each game keeps its own `VERSES` table.
 - **Sound:** the shared engine in `music.js` uses a harp and a shepherd's pipe. Each game has its own public-domain hymn tune (Amazing Grace, Jesus Loves Me, Joy to the World, O Come All Ye Faithful, Ode to Joy, the Doxology or the Hallelujah) and a soft background sound (sea, birdsong, crowd, wind, night, campfire or market). The background sound only plays during play.
 
-## The Life of Jesus (31 games, in story order)
+## The Life of Jesus (30 games, in story order)
 
 | Game | Story | What you do | File |
 |---|---|---|---|
@@ -26,7 +26,6 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 | **Follow the Star** | The wise men · Matthew 2:9 | Guide the wise men's camels across the desert by starlight to find young Jesus. | `follow-the-star.html` |
 | **Where Is Jesus?** | The boy Jesus in the temple · Luke 2:46 | Help Mary and Joseph search the busy crowds of Jerusalem for twelve-year-old Jesus. | `boy-jesus-temple.html` |
 | **Jesus Is Baptised** | My beloved Son · Matthew 3:17 | Help the crowd to John at the Jordan, then guide the dove down from heaven. | `baptism.html` |
-| **Jesus in the Wilderness** | It is written · Matthew 4:4 | Answer each temptation with the words Jesus spoke from Scripture. | `wilderness.html` |
 | **Water into Wine** | The wedding at Cana · John 2:9 | Hold to turn the water into the best wine, but let go in time or it turns to vinegar! | `water-into-wine.html` |
 | **The Woman at the Well** | Living water · John 4:14 | Draw water from the deep well, then run to invite the whole town to meet Jesus. | `woman-at-well.html` |
 | **Fishers of Men** | The great catch · Luke 5:6 | Cast the net at just the right moment and call for help before it breaks. | `fishers-of-men.html` |
