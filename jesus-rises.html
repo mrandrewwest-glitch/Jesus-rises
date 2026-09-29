@@ -128,6 +128,22 @@
     touch-action: manipulation;
   }
   #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
 </style>
 </head>
 <body>
@@ -138,7 +154,8 @@
     <h1 id="ovTitle">Jesus Rises</h1>
     <p class="sub" id="ovSub"></p>
     <div class="body" id="ovBody"></div>
-    <button id="ovBtn">Begin</button><br>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
     <a id="ovHome" href="index.html">&larr; All games</a>
   </div>
 </div>
@@ -945,7 +962,7 @@ function applyTaps(j) {
       spawn(j.x + rand(-20, 20), j.y + 14, -ix * 60 + rand(-20, 20), -iy * 70 + rand(0, 30), 0.6,
         Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', rand(2, 4));
     }
-    sfx.puff();
+    sfx.tap(1 - (j.y - PAD_Y) / (groundY(j.x) - PAD_Y));
   }
 }
 
@@ -1052,18 +1069,24 @@ const ovTitle = document.getElementById('ovTitle');
 const ovSub = document.getElementById('ovSub');
 const ovBody = document.getElementById('ovBody');
 const ovBtn = document.getElementById('ovBtn');
-let ovAction = null;
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
 
-function showOverlay(title, sub, body, btn, action) {
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
   ovTitle.textContent = title;
   ovSub.textContent = sub;
   ovBody.innerHTML = body;
   ovBtn.textContent = btn;
   ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
   overlay.classList.remove('hidden');
 }
-function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; }
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
 ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
 
 function titleScreen() {
   state = 'title';
@@ -1095,6 +1118,7 @@ function startLevel() {
   state = 'play';
   hideOverlay();
   showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
   if (level === 1) setTimeout(() => { if (state === 'play' && !jesus.launched) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap above Him to rise' : 'Hold ↑ / Space (or click) to rise'); }, 2300);
 }
 
@@ -1125,7 +1149,9 @@ function togglePause() {
   if (state === 'play') {
     state = 'pause';
     sfx.thrust(0);
-    showOverlay('Paused', `Level ${level} — ${cfg.name}`, '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> or tap below to carry on.</p>', 'Resume', togglePause);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '\u21bb Restart Level', startLevel);
   } else if (state === 'pause') {
     state = 'play';
     hideOverlay();
@@ -1145,6 +1171,7 @@ window.addEventListener('keydown', (e) => {
   if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
   keys.add(e.code);
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -1192,8 +1219,165 @@ function hudButtons() {
 // ============================================================
 //  Sound (tiny WebAudio synth)
 // ============================================================
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Retro 8-bit: square-wave melody, square harmony, triangle bass
+function chiptune(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      notes.forEach((n, part) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = part === 3 ? 'triangle' : 'square';
+        o.frequency.value = noteFreq(n) * (part === 3 ? 1 : 1);
+        const v = vol * [0.5, 0.22, 0.18, 0.9][part];
+        g.gain.setValueAtTime(v, t);
+        g.gain.setValueAtTime(v, t + Math.max(0.03, d - 0.05));
+        g.gain.linearRampToValueAtTime(0.0001, t + d - 0.01);
+        o.connect(g); g.connect(out);
+        o.start(t); o.stop(t + d);
+      });
+    }
+    t += d;
+  }
+}
+
+const HEAVEN_STYLES = ['choir', 'organ', 'chip'];
+
+// Plays one piece ('win' | 'start' | 'fail') in the chosen style
+function playHeaven(ac, out, t0, piece, style) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  if (style === 'chip') {
+    if (piece === 'start') {   // a quick rising arpeggio instead of a held chord
+      ['D4', 'F#4', 'A4', 'D5', 'F#5', 'A5'].forEach((n, i) =>
+        chiptune(ac, out, t0 + i * 0.09, 0.09, [['a', 1, n, n, n, n]], 0.35));
+      chiptune(ac, out, t0 + 0.54, 0.6, SCORE_START.map((s) => [s[0], 1, ...s.slice(2)]), 0.35);
+      return;
+    }
+    chiptune(ac, out, t0, beat, score, 0.35);
+    return;
+  }
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  if (style === 'organ') organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height, style) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  const score = [['a', 1, n, n, n, n]];
+  if (style === 'chip') { chiptune(ac, out, t0, 0.12, [['a', 1, n, n, n, n]], 0.25); return; }
+  singPart(ac, out, t0, 0.22, score, 0, 0.12);
+  if (style === 'organ') organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
 const sfx = {
   ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  style: 'choir',
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     try {
@@ -1201,7 +1385,8 @@ const sfx = {
       this.ctx = new AC();
       this.master = this.ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 0.5;
-      this.master.connect(this.ctx.destination);
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
       const len = this.ctx.sampleRate * 2;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -1236,23 +1421,25 @@ const sfx = {
     o.connect(g); g.connect(this.master);
     o.start(t0); o.stop(t0 + dur + 0.05);
   },
-  win() {
-    // A little "hallelujah" arpeggio and a held chord
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, i * 0.13));
-    [523.25, 659.25, 783.99].forEach((f) => { this.tone(f, 1.8, 'sine', 0.12, 0.55); this.tone(f * 1.005, 1.8, 'sine', 0.08, 0.55); });
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win', this.style); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start', this.style); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height, this.style);
   },
-  puff() {
+  puff(vol = 0.35) {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this.noise;
     const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.35, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
     src.connect(bp); bp.connect(g); g.connect(this.master);
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
-  fail() { [392, 349.2, 293.7].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.2, i * 0.18)); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail', this.style); },
   thunder() {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;

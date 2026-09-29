@@ -27,6 +27,7 @@ A cartoon take on the classic *Lunar Lander*, played in reverse. Instead of land
 | Rise | Hold `↑`, `W` or `Space` | **Tap** above Jesus: each tap is one push |
 | Steer | Hold `←` `→` or `A` `D` | **Tap** to His left / right |
 | Pause | `P` / `Esc` | ⏸ button |
+| Restart level | `R` while paused | ↻ Restart Level in the pause menu |
 | Mute | `M` | 🔊 button |
 
 ### Rules
