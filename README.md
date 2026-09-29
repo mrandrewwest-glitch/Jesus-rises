@@ -18,6 +18,7 @@ Small cartoon games based on stories of Jesus from the Gospels. Open `index.html
 | **The Wise Builder** 🧱 | Built on the rock (Matthew 7:24–27) | `wise-builders.html` |
 | **He Is Risen** 🌅 | The empty tomb (Matthew 28:1–10) | `empty-tomb.html` |
 | **Legion** 🐖 | Into the swine (Mark 5:1–20) | `legion.html` |
+| **Through the Roof** 🏠 | Four faithful friends (Mark 2:1–12) | `through-the-roof.html` |
 
 Every game has the same pause menu (Resume / ↻ Restart Level / All games), keyboard shortcuts (`P`/`Esc` pause, `R` restart while paused, `M` mute), choir-and-organ music, and saves your best score in your browser.
 
@@ -94,4 +95,5 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **The Wise Builder** | Pick a block, tap the grid; "Let the storm come!" | `1`–`7` blocks, arrows + `Space`, `Enter` storm | Build a house that meets the goal card and still stands after the storm |
 | **He Is Risen** | Tap in time with the notes (hold the blue ones) | `Space`/↑ | Roll away the stone in rhythm before sunrise, then meet the risen Jesus |
 | **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
+| **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
 
