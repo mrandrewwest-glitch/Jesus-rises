@@ -1,0 +1,2451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1d2452">
+<title>Keep Your Lamp Burning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1d2452;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 20, 50, 0.3);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Keep Your Lamp Burning</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script>
+'use strict';
+
+// Scripture shown in this game (Matthew 25:1-13), in every version on the menu.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  // Cards
+  wise:     { ref: 'Matthew 25:4',  KJV: 'But the wise took oil in their vessels with their lamps.', NKJV: 'But the wise took oil in their vessels with their lamps.', NIV: 'The wise ones, however, took oil in jars along with their lamps.', NLT: 'But the other five were wise enough to take along extra oil.' },
+  ready:    { ref: 'Matthew 25:10', KJV: 'They that were ready went in with him to the marriage.', NKJV: 'Those who were ready went in with him to the wedding.', NIV: 'The virgins who were ready went in with him to the wedding banquet.', NLT: 'Those who were ready went in with him to the marriage feast.' },
+  watch:    { ref: 'Matthew 25:13', KJV: 'Watch therefore, for ye know neither the day nor the hour.', NKJV: 'Watch therefore, for you know neither the day nor the hour.', NIV: 'Therefore keep watch, because you do not know the day or the hour.', NLT: 'So you, too, must keep watch! For you do not know the day or hour.' },
+  giveOil:  { ref: 'Matthew 25:8',  KJV: 'Give us of your oil; for our lamps are gone out.', NKJV: 'Give us some of your oil, for our lamps are going out.', NIV: 'Give us some of your oil; our lamps are going out.', NLT: 'Please give us some of your oil because our lamps are going out.' },
+  // Jesus telling the story (speech bubble)
+  kingdom:  { ref: 'Matthew 25:1',  KJV: 'Then shall the kingdom of heaven be likened unto ten virgins, which took their lamps, and went forth to meet the bridegroom.', NKJV: 'Then the kingdom of heaven shall be likened to ten virgins who took their lamps and went out to meet the bridegroom.', NIV: 'At that time the kingdom of heaven will be like ten virgins who took their lamps and went out to meet the bridegroom.', NLT: 'Then the Kingdom of Heaven will be like ten bridesmaids who took their lamps and went to meet the bridegroom.' },
+  // Banners during the night
+  tarried:  { ref: 'Matthew 25:5',  KJV: 'While the bridegroom tarried, they all slumbered and slept.', NKJV: 'But while the bridegroom was delayed, they all slumbered and slept.', NIV: 'The bridegroom was a long time in coming, and they all became drowsy and fell asleep.', NLT: 'When the bridegroom was delayed, they all became drowsy and fell asleep.' },
+  cry:      { ref: 'Matthew 25:6',  KJV: 'Behold, the bridegroom cometh; go ye out to meet him.', NKJV: 'Behold, the bridegroom is coming; go out to meet him!', NIV: 'Here’s the bridegroom! Come out to meet him!', NLT: 'Look, the bridegroom is coming! Come out and meet him!' },
+  trimmed:  { ref: 'Matthew 25:7',  KJV: 'Then all those virgins arose, and trimmed their lamps.', NKJV: 'Then all those virgins arose and trimmed their lamps.', NIV: 'Then all the virgins woke up and trimmed their lamps.', NLT: 'All the bridesmaids got up and prepared their lamps.' },
+  // Speech bubble: the wise answer the foolish
+  sell:     { ref: 'Matthew 25:9',  KJV: 'Go ye rather to them that sell, and buy for yourselves.', NKJV: 'Go rather to those who sell, and buy for yourselves.', NIV: 'Go to those who sell oil and buy some for yourselves.', NLT: 'Go to a shop and buy some for yourselves.' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  Layout & tuning
+// ============================================================
+const BACK_Y = 592;       // the far side of the street (house fronts, foolish bridesmaids)
+const PROC_Y = 634;       // the bridegroom's procession walks here
+const SERVANT_Y = 668;    // the helpful servant walks here
+const FRONT_Y = 796;      // your five wise bridesmaids stand here
+const SHIELD_TIME = 2.6;  // seconds a tapped lamp stays shielded from the wind
+const RELIGHT_TIME = 1.5; // seconds to strike a match and relight a lamp
+const LOW_OIL = 0.5;      // a tap refills the lamp when it is below this
+
+const LEVEL_NAMES = [
+  'The First Watch',
+  'The Long Evening',
+  'A Windy Night',
+  'The Bridegroom Tarries',
+  'Deep in the Night',
+  'Watch and Wait',
+];
+
+function makeConfig(n) {
+  const k = n - 1;
+  const minT = Math.min(38 + k * 6, 80);                 // earliest the bridegroom may come
+  const maxT = Math.min(50 + k * 12, 130);               // latest he may come
+  const oilLife = Math.max(36 - k * 2.5, 22);            // seconds a full lamp burns
+  // Flasks needed to keep five lamps burning through the longest night
+  const need = Math.max(1, 5 * ((maxT + 5) / oilLife - 0.88) / 0.75);
+  const supply = Math.ceil(need * Math.max(1.08, 1.45 - k * 0.09));
+  const flasks = Math.max(2, Math.round(supply * 0.6));
+  return {
+    name: LEVEL_NAMES[k] || `Night ${n}`,
+    minT, maxT, oilLife, flasks,
+    jars: Math.max(1, supply - flasks),                  // oil jars the servant brings
+    gustGap: [Math.max(4.5, 11 - k * 1.3), Math.max(7, 16 - k * 1.8)],
+    gustPower: Math.min(0.22 + k * 0.08, 0.6),           // flame lost per second in a gust
+    gustDur: Math.min(2.2 + k * 0.3, 3.6),
+    sleepStart: Math.max(12 - k * 1.5, 5),               // bridesmaids start to nod off
+    sleepLife: Math.max(26 - k * 3, 12),                 // seconds from wide awake to asleep
+    matches: n <= 2 ? 3 : 2,
+    cryDur: Math.max(4.5 - k * 0.4, 3),                  // time from the cry to the door
+    servantTime: Math.max(7 - k * 0.4, 5),               // seconds the servant takes to cross
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | cry | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('bridesmaidsBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let nightT = 0, arrivalT = 40;
+let introT = 0, introDur = 5, fadeIn = 0;
+let cryT = 0, endT = 0;
+let flasks = 0, matches = 0;
+let sel = 0, kbUsed = false;
+let procX = -140, doorF = 0;
+let servant = null, servantQueue = [];
+let gust = { next: 7, warn: 0, active: 0, dir: 1 }, gustNow = 0;
+let leaves = [], particles = [], popups = [];
+let message = { text: '', t: 0 };
+let banner = null;        // { key, t }
+let bubbles = [];         // { key, who, t, delay }
+let seen = new Set();
+let refills = [];         // oil left in the lamp at each refill (lower = thriftier)
+let endTimer = 0;
+let lastScore = null;
+let jesusBubble = null;
+
+// Your five wise bridesmaids
+const WISE = [
+  { robe: '#e8738e', veil: '#fbe3ea', hair: '#5a3418', skin: '#e3b184' },
+  { robe: '#5f9fdc', veil: '#e2f0fb', hair: '#2e1d10', skin: '#c98d56' },
+  { robe: '#eeb040', veil: '#fff3d4', hair: '#6b3f1d', skin: '#dca678' },
+  { robe: '#7cbf6c', veil: '#e8f6e1', hair: '#3a2716', skin: '#b87a48' },
+  { robe: '#ad84d6', veil: '#f1e6fb', hair: '#1f140c', skin: '#d9a066' },
+].map((d, i) => ({ ...d, i, blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), mood: 'watch' }));
+
+// The five foolish bridesmaids at the far end of the street
+const FOOLS = [
+  { robe: '#d9826b', veil: '#f7ddd2', hair: '#4a2f1a', skin: '#d7a070' },
+  { robe: '#6fb3b0', veil: '#dff2f0', hair: '#2d1b0f', skin: '#e0ae80' },
+  { robe: '#c9a3d8', veil: '#f3e8f8', hair: '#6b3f1d', skin: '#c58a55' },
+  { robe: '#e0c05a', veil: '#fbf1cc', hair: '#3a2515', skin: '#bf8150' },
+  { robe: '#8aa1d8', veil: '#e5ebf9', hair: '#1c120b', skin: '#dca678' },
+].map((d, i) => ({ ...d, i, blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), mood: 'watch' }));
+
+// The listening crowd on the Mount of Olives
+const LISTENERS = [
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55', scarf: '#e8dcc0' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: true,  skin: '#b87a48' },
+  { robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678', scarf: '#f3d9e3' },
+  { robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { robe: '#5b87c9', hair: '#6b3f1d', beard: false, skin: '#e0ae80' },
+].map((d, i) => ({ ...d, i, mood: 'watch', switchT: 0, delay: rand(0.05, 0.5), blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) }));
+
+function resetMaid(m, oil) {
+  m.oil = oil; m.flame = 1; m.lit = true; m.lighting = 0; m.shield = 0;
+  m.wake = 1; m.asleep = false; m.sleepMul = rand(0.75, 1.3);
+  m.everOut = false; m.everAsleep = false; m.nudged = 0;
+  m.enter = 0; m.bump = 0;
+}
+
+function resetFool(f) {
+  f.oil = rand(0.5, 0.75); f.lit = true; f.flame = 1;
+  f.asleep = false; f.napT = rand(0, 6); f.peekT = 0; f.runX = 0; f.bump = 0;
+}
+
+// ============================================================
+//  Positions
+// ============================================================
+function wiseSlots() {
+  const span = Math.min(W - 40, 1000);
+  const gap = span / 5;
+  const s = clamp(gap / 68, 1.1, 1.6);
+  return WISE.map((m, i) => ({ m, x: W / 2 + (i - 2) * gap, y: FRONT_Y, s, gap }));
+}
+
+function houseX() { return W * 0.28; }
+function houseW() { return Math.min(230, W * 0.42); }
+
+function foolSlots() {
+  const x0 = W * 0.56, x1 = W - 28;
+  const gap = Math.min(58, (x1 - x0) / 4);
+  const cx = (x0 + x1) / 2;
+  return FOOLS.map((f, i) => ({ f, x: cx + (i - 2) * gap + f.runX, y: BACK_Y + (i % 2) * 6, s: 0.72 }));
+}
+
+// Lamp centre in a figure's own units for each pose
+function lampOffset(pose) {
+  switch (pose) {
+    case 'raise': return [17, -72];
+    case 'point': return [-5, -20];
+    case 'run':   return [12, -24];
+    case 'sleep': return [2, -15];
+    default:      return [0, -20];
+  }
+}
+
+// ============================================================
+//  People: bridesmaids, listeners, procession, servant
+// ============================================================
+function updateBlink(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+// A bridesmaid in the disciple style: flared robe, veil, long hair, reacting face.
+function drawMaid(d, x, y, s, mood, pose, lx = 0, ly = 0.5, tilt = 0, alpha = 1) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (pose === 'run') jump = Math.abs(Math.sin(t * 14 + d.phase)) * 5;
+  jump += (d.bump || 0) * 8;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y - jump * s);
+  ctx.scale(s, s);
+  ctx.rotate(tilt);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const hy = -53;
+
+  // Long hair behind the shoulders
+  ctx.fillStyle = d.hair;
+  roundRect(-15, hy - 4, 30, 36, 12); ctx.fill();
+
+  // Arms raised behind the head come first
+  if (pose === 'raise') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -64);
+    arm(11, -32, 16, -66);
+  }
+
+  // Flared robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-21, 0);
+  ctx.quadraticCurveTo(-16, -28, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(16, -28, 21, 0);
+  ctx.quadraticCurveTo(0, 4, -21, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.veil; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-14, -22); ctx.quadraticCurveTo(0, -19, 14, -22); ctx.stroke();
+  ctx.strokeStyle = shade(d.robe, 35); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-19, -4); ctx.quadraticCurveTo(0, 0, 19, -4); ctx.stroke();
+
+  // Arms holding the lamp in front
+  const [lpx, lpy] = lampOffset(pose);
+  if (pose === 'hold' || pose === 'sleep') {
+    arm(-11, -32, lpx - 8, lpy + 2); arm(11, -32, lpx + 8, lpy + 2);
+  } else if (pose === 'point') {
+    arm(-11, -32, lpx - 6, lpy + 2);
+    arm(11, -32, 31, -44);                 // points the way to the oil sellers
+  } else if (pose === 'run') {
+    const sw = Math.sin(t * 14 + d.phase) * 8;
+    arm(-11, -32, -16 - sw, -18);
+    arm(11, -32, lpx + 4, lpy + 3);
+  } else if (pose === 'plead') {
+    arm(-11, -32, -3, -30); arm(11, -32, 3, -30);   // hands clasped, please!
+  }
+
+  // Head
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Fringe of hair under the veil
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.quadraticCurveTo(0, hy - 9, -15, hy - 6);
+  ctx.fill();
+  // Veil
+  ctx.fillStyle = d.veil;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 18.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(19, hy + 14); ctx.lineTo(14, hy + 6); ctx.lineTo(14, hy - 8);
+  ctx.quadraticCurveTo(0, hy - 15, -14, hy - 8); ctx.lineTo(-14, hy + 6); ctx.lineTo(-19, hy + 14);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.veil, -45); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 17.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  ctx.fillStyle = d.robe;
+  ctx.beginPath(); ctx.arc(0, hy - 19, 2.4, 0, TAU); ctx.fill();
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && pose !== 'hold' && pose !== 'sleep') {
+    arm(11, -32, 2, hy - 3);
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// A listener in the crowd, exactly in the disciple style
+function drawListener(slot) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+
+  ctx.save();
+  ctx.translate(x, slot.y - jump * s);
+  ctx.scale(s, s);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  // Look toward Jesus
+  const jx = W / 2, jy = introJesusY() - 70;
+  const dx = jx - x, dy = jy - (slot.y - 52 * s);
+  const len = Math.hypot(dx, dy) || 1;
+  const lx = dx / len, ly = dy / len;
+
+  if (mood === 'wow' && d.i % 3 === 0) arm(11, -32, 20 + lx * 6, -70);
+
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  if (mood === 'watch' || (mood === 'wow' && d.i % 3 !== 0)) { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        eyes(3.5, 4, 2);
+        brows(-9, -5, -9, -5);
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+    case 'sleepy': {
+      // Heavy eyelids and a big yawn now and then
+      eyes(3.5, 4.5, 2);
+      ctx.fillStyle = d.skin;
+      for (const sx of [-ex, ex]) { ctx.fillRect(sx - 4.5, ey - 6, 9, 6.2); }
+      ctx.strokeStyle = dark; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(-ex - 4, ey + 0.2); ctx.lineTo(-ex + 4, ey + 0.2); ctx.moveTo(ex - 4, ey + 0.2); ctx.lineTo(ex + 4, ey + 0.2); ctx.stroke();
+      const yawn = Math.sin(t * 1.4 + d.phase);
+      if (yawn > 0.55) mouthFill(() => ctx.ellipse(0, mouthY + 1, 3.5, 2 + (yawn - 0.55) * 9, 0, 0, TAU));
+      else mouthLine(() => { ctx.moveTo(-3, mouthY); ctx.lineTo(3, mouthY); });
+      break;
+    }
+    case 'asleep':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey - 1, 3.2, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.moveTo(ex + 3.2 * Math.cos(0.15 * Math.PI), ey - 1 + 3.2 * Math.sin(0.15 * Math.PI));
+      ctx.arc(ex, ey - 1, 3.2, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.2, 2.2 + Math.sin(t * 2.5 + d.phase), 0, 0, TAU));
+      ctx.fillStyle = 'rgba(255,120,120,0.35)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+// A little clay oil lamp; its flame shows the lamp's life
+function drawLamp(x, y, sz, flame, lean = 0, shield = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sz, sz);
+  // body
+  const g = ctx.createLinearGradient(0, -8, 0, 8);
+  g.addColorStop(0, '#d98b4e'); g.addColorStop(1, '#9c5a2c');
+  ctx.fillStyle = g; ctx.strokeStyle = '#6e3b18'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-19, -3);
+  ctx.quadraticCurveTo(-16, -6, -10, -5);
+  ctx.quadraticCurveTo(0, -9, 10, -5);
+  ctx.quadraticCurveTo(15, -4, 14, 1);
+  ctx.quadraticCurveTo(12, 7, 0, 7);
+  ctx.quadraticCurveTo(-10, 7, -14, 2);
+  ctx.quadraticCurveTo(-18, 1, -19, -3);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // handle
+  ctx.strokeStyle = '#9c5a2c'; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.arc(15, -1, 4, -1.4, 1.4); ctx.stroke();
+  // filling hole and a pattern
+  ctx.fillStyle = '#4a2610';
+  ctx.beginPath(); ctx.ellipse(0, -5, 3, 1.3, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,220,170,0.6)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, -3, 7, 0.2, Math.PI - 0.2); ctx.stroke();
+
+  // flame at the spout
+  if (flame > 0) {
+    const f = 0.35 + 0.65 * flame;
+    const flick = 1 + Math.sin(t * 23 + x) * 0.07 + Math.sin(t * 37 + y) * 0.05;
+    const fh = 17 * f * flick, fw = 5.5 * f;
+    const fx = -18, fy = -4;
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.transform(1, 0, lean * 0.9, 1, 0, 0);
+    const fg = ctx.createRadialGradient(0, -fh * 0.3, 1, 0, -fh * 0.3, fh);
+    fg.addColorStop(0, '#fffbe0'); fg.addColorStop(0.4, '#ffd54a'); fg.addColorStop(1, '#ff7b1c');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.moveTo(0, 1);
+    ctx.quadraticCurveTo(fw * 1.3, -fh * 0.35, 0, -fh);
+    ctx.quadraticCurveTo(-fw * 1.3, -fh * 0.35, 0, 1);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // A cupped hand shields the flame from the wind
+  if (shield > 0 && flame > 0) {
+    ctx.save();
+    ctx.translate(x - 18 * sz, y - 10 * sz);
+    ctx.globalAlpha = clamp(shield / 0.4, 0, 1);
+    ctx.strokeStyle = '#f0c48f'; ctx.lineWidth = 4.5 * sz; ctx.lineCap = 'round';
+    const side = -(gust.dir || 1);
+    ctx.beginPath(); ctx.arc(0, 0, 11 * sz, side > 0 ? -0.9 : Math.PI - 0.7, side > 0 ? 0.7 : Math.PI + 0.9); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,240,170,0.8)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.arc(0, -2 * sz, 16 * sz, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+// Warm light around a burning lamp
+function drawGlow(x, y, r, a) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+  g.addColorStop(0, `rgba(255,200,90,${0.45 * a})`);
+  g.addColorStop(1, 'rgba(255,170,60,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function flameLean() { return clamp(gust.dir * gustNow * 0.9 + Math.sin(t * 2) * 0.06, -1, 1); }
+
+function wiseMood(m) {
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return (m.lit ? 'dismay' : 'dismay');
+  if (state === 'title' || state === 'intro') return 'watch';
+  if (m.asleep) return 'asleep';
+  if (m.wake < 0.35) return 'sleepy';
+  if (m.bump > 0.3) return 'wow';
+  if (!m.lit && !m.lighting) return 'shock';
+  if (state === 'cry') return 'wow';
+  if (m.oil < 0.2 || (m.lit && m.flame < 0.3)) return 'worried';
+  return 'watch';
+}
+
+function drawWise() {
+  const slots = wiseSlots();
+  const lean = flameLean();
+  for (const sl of slots) {
+    const m = sl.m;
+    let x = sl.x, y = sl.y, s = sl.s, alpha = 1;
+    // Joining the procession into the wedding feast
+    if (m.enter > 0) {
+      const f = ease(clamp(m.enter, 0, 1));
+      x = lerp(sl.x, houseX(), f);
+      y = lerp(sl.y, BACK_Y + 4, f);
+      s = lerp(sl.s, 0.72, f);
+      alpha = 1 - clamp((m.enter - 1) / 0.35, 0, 1);
+      if (alpha <= 0) continue;
+    }
+    const mood = wiseMood(m);
+    let pose = 'hold', tilt = 0;
+    if (state === 'win') pose = 'raise';
+    else if (m.asleep) { pose = 'sleep'; tilt = 0.16 * Math.sin(m.i + 1) + 0.04 * Math.sin(t * 1.5 + m.phase); }
+    else if (m.wake < 0.35 && state === 'play') tilt = Math.max(0, Math.sin(t * 2.2 + m.phase)) * 0.12;
+    const speaking = bubbles.find((b) => b.who === 'wise' && b.delay <= 0);
+    if (speaking && m.i === 4 && state !== 'win') pose = 'point';
+    let lx = 0, ly = 0.7;
+    if (state === 'cry' || state === 'win' || state === 'fail') { lx = -0.8; ly = -0.3; }
+
+    // selection marker (keyboard)
+    if (kbUsed && m.enter <= 0 && (state === 'play' || state === 'cry') && m.i === sel) {
+      ctx.fillStyle = 'rgba(255,215,90,0.28)';
+      ctx.beginPath(); ctx.ellipse(x, y + 2, sl.gap * 0.42, 12, 0, 0, TAU); ctx.fill();
+    }
+    drawMaid(m, x, y, s, mood, pose, lx, ly, tilt, alpha);
+
+    // lamp (in world space so it can be big and readable)
+    const [ox, oy] = lampOffset(pose);
+    const c = Math.cos(tilt), sn = Math.sin(tilt);
+    const jump = (mood === 'joy' ? Math.abs(Math.sin(t * 7 + m.phase)) * 10 : 0) + (m.bump || 0) * 8;
+    const lxw = x + (ox * c - oy * sn) * s, lyw = y - jump * s + (ox * sn + oy * c) * s;
+    const flame = m.lit ? Math.min(m.flame, m.oil < 0.08 ? m.oil / 0.08 : 1) : 0;
+    ctx.globalAlpha = alpha;
+    drawLamp(lxw, lyw, s * 1.25, flame, lean, m.shield);
+    ctx.globalAlpha = 1;
+    m.lampX = lxw; m.lampY = lyw;
+    if (m.lighting > 0) {
+      // striking a match: a ring fills up
+      const f = 1 - m.lighting / RELIGHT_TIME;
+      ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(lxw - 20 * s, lyw - 12 * s, 16, -Math.PI / 2, -Math.PI / 2 + f * TAU); ctx.stroke();
+      if (Math.random() < 0.4) spawn(lxw - 22 * s, lyw - 10 * s, rand(-30, 30), rand(-60, -20), 0.4, '#ffe27a', 2);
+    }
+    if (flame > 0) drawGlow(lxw - 22 * s, lyw - 12 * s, (60 + 50 * flame) * s * alpha, flame * alpha);
+
+    if (m.enter > 0 || state === 'title' || state === 'intro') continue;
+    // oil gauge, number and warnings
+    const bw = Math.min(sl.gap * 0.62, 90), bx = sl.x - bw / 2, by = FRONT_Y + 16;
+    ctx.fillStyle = 'rgba(20,16,40,0.55)';
+    roundRect(bx - 2, by - 2, bw + 4, 14, 7); ctx.fill();
+    const low = m.oil < 0.3;
+    ctx.fillStyle = low && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#f7c948';
+    if (m.oil > 0.01) { roundRect(bx, by, bw * m.oil, 10, 5); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx + bw * LOW_OIL, by); ctx.lineTo(bx + bw * LOW_OIL, by + 10); ctx.stroke();
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = m.i === sel && kbUsed ? '#ffd54a' : 'rgba(255,245,220,0.75)';
+    ctx.fillText(String(m.i + 1), sl.x, by + 30);
+
+    // status icons above her head
+    const iy = FRONT_Y - 84 * sl.s - (m.bump || 0) * 8;
+    if (m.asleep || m.wake < 0.35) {
+      ctx.font = '700 20px Fredoka, sans-serif';
+      ctx.fillStyle = m.asleep ? '#ffffff' : 'rgba(255,255,255,0.8)';
+      const zb = Math.sin(t * 3 + m.phase) * 3;
+      ctx.fillText(m.asleep ? 'Zzz' : 'z', sl.x + 18 * sl.s, iy + zb);
+    } else if (!m.lit && !m.lighting) {
+      ctx.fillStyle = '#ff6b6b';
+      ctx.beginPath(); ctx.arc(sl.x, iy, 12, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '700 17px Fredoka, sans-serif';
+      ctx.fillText('!', sl.x, iy + 1);
+    } else if (m.oil < 0.3 && Math.sin(t * 8) > -0.3) {
+      drawDrop(sl.x, iy, 1);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+function drawDrop(x, y, s) {
+  ctx.fillStyle = '#f7c948'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 11 * s);
+  ctx.quadraticCurveTo(x + 9 * s, y + 1 * s, x, y + 8 * s);
+  ctx.quadraticCurveTo(x - 9 * s, y + 1 * s, x, y - 11 * s);
+  ctx.fill(); ctx.stroke();
+}
+
+function foolMood(f) {
+  if (state === 'title' || state === 'intro') return 'watch';
+  if (f.runX > 0) return 'worried';
+  if (state === 'cry' || state === 'win' || state === 'fail') {
+    const b = bubbles.find((q) => q.who === 'fools');
+    if (cryT < 0.5 && state === 'cry') return 'shock';
+    return b ? 'worried' : 'worried';
+  }
+  if (f.asleep) return f.peekT > 0 ? (f.lit ? 'sleepy' : 'worried') : 'asleep';
+  if (!f.lit) return 'worried';
+  return nightT > cfg.sleepStart ? 'sleepy' : 'watch';
+}
+
+function drawFools() {
+  const lean = flameLean();
+  for (const sl of foolSlots()) {
+    const f = sl.f;
+    if (sl.x > W + offX + 60) continue;
+    const mood = foolMood(f);
+    let pose = f.runX > 0 ? 'run' : 'hold';
+    if (mood === 'asleep') pose = 'sleep';
+    const pleading = bubbles.find((b) => b.who === 'fools' && b.delay <= 0);
+    if (pleading && !f.runX) pose = 'plead';
+    const tilt = pose === 'sleep' ? 0.14 * Math.sin(f.i * 2 + 1) : 0;
+    drawMaid(f, sl.x, sl.y, sl.s, mood, pose, -0.6, 0.2, tilt);
+    if (pose !== 'plead') {
+      const [ox, oy] = lampOffset(pose);
+      const lxw = sl.x + ox * sl.s, lyw = sl.y + oy * sl.s;
+      const flame = f.lit ? Math.min(1, f.oil / 0.1) : 0;
+      drawLamp(lxw, lyw, sl.s * 1.15, flame, lean);
+      if (flame > 0) drawGlow(lxw - 20 * sl.s, lyw - 10 * sl.s, 55 * flame, flame * 0.8);
+      else if (Math.random() < 0.03) spawn(lxw - 20 * sl.s, lyw - 8 * sl.s, rand(-5, 5), -18, 1.4, 'rgba(200,200,215,0.7)', 3);
+    }
+    if (mood === 'asleep' && state === 'play') {
+      ctx.font = '700 14px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText('z', sl.x + 14, sl.y - 62 + Math.sin(t * 3 + f.phase) * 3);
+    }
+  }
+}
+
+// A plain festive person for the procession and the servant
+function drawVillager(x, y, s, robe, skin, hair, opts = {}) {
+  ctx.save();
+  ctx.translate(x, y - Math.abs(Math.sin(t * 9 + x * 0.05)) * 3 * s);
+  ctx.scale(s, s);
+  ctx.globalAlpha *= opts.alpha ?? 1;
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  ctx.fillStyle = robe; ctx.strokeStyle = shade(robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-17, 0);
+  ctx.quadraticCurveTo(-16, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(16, -30, 17, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = opts.sash || '#c9b07a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-15, -17); ctx.quadraticCurveTo(0, -14, 15, -17); ctx.stroke();
+
+  const hy = -53;
+  if (opts.torch) arm(11, -32, 18, -58);
+  else if (opts.jar) arm(11, -32, 14, -62);
+  else if (opts.drum) { arm(-11, -32, -18, -52 + Math.sin(t * 12) * 4); arm(11, -32, 16, -30); }
+  else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  if (!opts.drum) arm(-11, -32, -15, -14);
+
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  ctx.fillStyle = hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 15.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(0, hy - 10, -15, hy + 1);
+  ctx.fill();
+  if (opts.beard) {
+    ctx.beginPath();
+    ctx.moveTo(-14, hy + 2);
+    ctx.quadraticCurveTo(-13, hy + 19, 0, hy + 20);
+    ctx.quadraticCurveTo(13, hy + 19, 14, hy + 2);
+    ctx.quadraticCurveTo(0, hy + 9, -14, hy + 2);
+    ctx.fill();
+  }
+  if (opts.crown) {
+    // a garland of flowers for the bridegroom
+    for (let k = 0; k < 7; k++) {
+      const a = Math.PI * (1.05 + k * 0.15);
+      ctx.fillStyle = ['#ff8fb1', '#fff27a', '#ffffff'][k % 3];
+      ctx.beginPath(); ctx.arc(Math.cos(a) * 15, hy - 3 + Math.sin(a) * 14, 3.2, 0, TAU); ctx.fill();
+    }
+  }
+  // happy face
+  const dark = '#2b1d12';
+  ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(-5.5, hy, 3, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.moveTo(5.5 + 3 * Math.cos(Math.PI * 1.1), hy + 3 * Math.sin(Math.PI * 1.1));
+  ctx.arc(5.5, hy, 3, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.stroke();
+  ctx.fillStyle = '#7a2e22';
+  ctx.beginPath(); ctx.moveTo(-5, hy + 6); ctx.arc(0, hy + 6, 5, 0, Math.PI); ctx.closePath(); ctx.fill();
+
+  if (opts.torch) {
+    ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(18, -48); ctx.lineTo(20, -84); ctx.stroke();
+    const fl = 1 + Math.sin(t * 20 + x) * 0.1;
+    const fg = ctx.createRadialGradient(20, -92, 1, 20, -92, 14 * fl);
+    fg.addColorStop(0, '#fffbe0'); fg.addColorStop(0.5, '#ffc53a'); fg.addColorStop(1, 'rgba(255,110,20,0)');
+    ctx.fillStyle = fg;
+    ctx.beginPath(); ctx.arc(20, -92, 14 * fl, 0, TAU); ctx.fill();
+  }
+  if (opts.drum) {
+    ctx.fillStyle = '#e8cf9a'; ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(-22, -56 + Math.sin(t * 12) * 4, 10, 10, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f5c542';
+    for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + 0.4; ctx.beginPath(); ctx.arc(-22 + Math.cos(a) * 10, -56 + Math.sin(t * 12) * 4 + Math.sin(a) * 10, 2, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+// The bridegroom and his friends, with torches and a tambourine
+const PROCESSION = [
+  { robe: '#e6c14f', skin: '#d7a070', hair: '#3a2515', opts: { torch: true, beard: true } },
+  { robe: '#fbf6e9', skin: '#c98d56', hair: '#2e1d10', opts: { crown: true, beard: true, sash: '#d4a017' } },
+  { robe: '#d36d52', skin: '#dca678', hair: '#4a2f1a', opts: { drum: true } },
+  { robe: '#4f8fc0', skin: '#bf8150', hair: '#1c120b', opts: { torch: true, beard: true } },
+];
+
+function drawProcession() {
+  if (procX < -130) return;
+  const dx = houseX();
+  PROCESSION.forEach((p, k) => {
+    const x = procX - k * 42;
+    if (x < -offX - 60) return;
+    const inside = clamp((x - dx) / 40, 0, 1);
+    if (inside >= 1) return;
+    const yy = lerp(PROC_Y, BACK_Y + 2, inside);
+    const s = lerp(0.9, 0.72, inside);
+    ctx.save();
+    ctx.globalAlpha = 1 - inside;
+    drawVillager(Math.min(x, dx + 10), yy, s, p.robe, p.skin, p.hair, p.opts);
+    if (p.opts.torch) drawGlow(Math.min(x, dx + 10) + 18 * s, yy - 90 * s, 90, 1 - inside);
+    ctx.restore();
+  });
+}
+
+function drawServant() {
+  if (!servant) return;
+  const s = 0.95;
+  drawVillager(servant.x, SERVANT_Y, s, '#8c7a5a', '#c58a55', '#2d1b0f', { jar: !!servant.jar, beard: true, sash: '#6f9e4a' });
+  if (servant.jar) {
+    const jx = servant.x + 14 * s, jy = SERVANT_Y - 76 * s;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+    ctx.strokeStyle = `rgba(255,225,120,${0.5 + pulse * 0.5})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(jx, jy, 24 + pulse * 3, 0, TAU); ctx.stroke();
+    drawJar(jx, jy, 1.1);
+    servant.jx = jx; servant.jy = jy;
+  }
+}
+
+function drawJar(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#c9773c'; ctx.strokeStyle = '#7a4219'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-4, -13);
+  ctx.lineTo(4, -13);
+  ctx.quadraticCurveTo(5, -9, 9, -5);
+  ctx.quadraticCurveTo(13, 4, 6, 12);
+  ctx.lineTo(-6, 12);
+  ctx.quadraticCurveTo(-13, 4, -9, -5);
+  ctx.quadraticCurveTo(-5, -9, -4, -13);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#7a4219';
+  roundRect(-5.5, -16, 11, 4, 2); ctx.fill();
+  ctx.fillStyle = '#f7c948';
+  ctx.beginPath(); ctx.ellipse(0, 2, 5, 3, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawMatch(x, y) {
+  ctx.strokeStyle = '#e8d2a0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 5, y + 7); ctx.lineTo(x + 3, y - 5); ctx.stroke();
+  ctx.fillStyle = '#e03e3e';
+  ctx.beginPath(); ctx.arc(x + 4, y - 6, 3.5, 0, TAU); ctx.fill();
+}
+
+// ============================================================
+//  Jesus (drawn exactly like the other games, standing to teach)
+// ============================================================
+function drawJesus(x, y, pose, face) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  const up = pose === 'joy';
+
+  if (up || pose === 'teach') {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 70);
+    g.addColorStop(0, 'rgba(255,235,150,0.45)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 70, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: both raised for joy, one raised while teaching, open otherwise
+  let hands = [[-20, -22], [20, -22]];
+  if (up) hands = [[-21, -66], [21, -66]];
+  else if (pose === 'teach') hands = [[-20, -22], [24, -58 + Math.sin(t * 3) * 3]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (hy < -40 ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (hy < -40 ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (face === 'talk') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -46, 1.8, 1 + Math.abs(Math.sin(t * 12)) * 1.4, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
+//  The framing scene: Jesus tells the story on the Mount of Olives
+// ============================================================
+const JESUS_S = 1.45;
+function introJesusY() { return 650; }
+
+function listenerSlots() {
+  const back = [0.1, 0.27, 0.73, 0.9];
+  const front = [0.06, 0.25, 0.5, 0.75, 0.94];
+  const slots = [];
+  back.forEach((f, k) => slots.push({ d: LISTENERS[k], x: W * f, y: 712, s: 0.95 }));
+  front.forEach((f, k) => slots.push({ d: LISTENERS[4 + k], x: W * f, y: 840, s: 1.15 }));
+  return slots;
+}
+
+function updateListeners(dt) {
+  const f = introT / introDur;
+  for (const d of LISTENERS) {
+    const want = f > 0.45 && d.i % 2 === 0 ? 'wow' : 'watch';
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    updateBlink(d, dt);
+  }
+}
+
+function renderIntro() {
+  // Evening sky over the Mount of Olives
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  g.addColorStop(0, '#3b3f8f');
+  g.addColorStop(0.35, '#b56a9a');
+  g.addColorStop(0.62, '#ffb46b');
+  g.addColorStop(1, '#ffd89a');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // setting sun
+  const sg = ctx.createRadialGradient(W * 0.78, 560, 10, W * 0.78, 560, 160);
+  sg.addColorStop(0, 'rgba(255,240,190,1)'); sg.addColorStop(0.25, 'rgba(255,220,140,0.9)'); sg.addColorStop(1, 'rgba(255,200,120,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.78, 560, 160, 0, TAU); ctx.fill();
+  for (const s of stars) if (s.y < 300) { ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.3 * Math.sin(t * 2 + s.p)})`; ctx.beginPath(); ctx.arc(-offX + s.f * viewW, s.y - offY * 0.5, s.r, 0, TAU); ctx.fill(); }
+  drawCloud(W * 0.2, 250, 150, 34, 'rgba(255,214,190,0.8)', 'rgba(220,150,160,0.7)');
+  drawCloud(W * 0.72, 190, 120, 28, 'rgba(255,214,190,0.7)', 'rgba(220,150,160,0.6)');
+
+  // Jerusalem far across the valley
+  ctx.fillStyle = '#b98a8a';
+  const x0 = -offX, x1 = W + offX;
+  ctx.beginPath(); ctx.moveTo(x0, 620);
+  for (let x = x0; x <= x1; x += 30) ctx.lineTo(x, 575 + Math.sin(x / 70) * 8);
+  ctx.lineTo(x1, 620); ctx.fill();
+  ctx.fillStyle = '#c99b8f';
+  for (let k = 0; k < 9; k++) {
+    const bx = W * (0.05 + k * 0.11), bw = 26 + (k % 3) * 10, bh = 20 + (k * 7) % 22;
+    ctx.fillRect(bx, 570 - bh, bw, bh + 10);
+  }
+  ctx.fillStyle = '#e8c07a';
+  ctx.fillRect(W * 0.46, 520, 60, 50);           // the temple, glowing in the evening sun
+  ctx.fillStyle = '#f4d58c';
+  ctx.fillRect(W * 0.46 + 8, 508, 44, 14);
+
+  // The hillside
+  ctx.fillStyle = '#7fae5a';
+  ctx.beginPath(); ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 10) {
+    const d = (x - W / 2) / (W * 0.3);
+    ctx.lineTo(x, 690 - 55 * Math.exp(-d * d));
+  }
+  ctx.lineTo(x1, H + 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#6f9e4a';
+  ctx.fillRect(x0, H - 60, x1 - x0, 70);
+  // olive trees
+  for (const f of [0.04, 0.96, 0.2, 0.82]) {
+    const x = W * f, y = 690 - 10;
+    const s = f === 0.2 || f === 0.82 ? 0.75 : 1;
+    ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 7 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 6 * s, y - 30 * s, x, y - 55 * s); ctx.stroke();
+    ctx.fillStyle = '#7d9460';
+    ctx.beginPath();
+    for (const [dx, dy, r] of [[-18, -60, 18], [0, -72, 20], [18, -60, 17], [-6, -52, 15], [10, -50, 14]]) {
+      ctx.moveTo(x + dx * s + r * s, y + dy * s); ctx.arc(x + dx * s, y + dy * s, r * s, 0, TAU);
+    }
+    ctx.fill();
+  }
+  // a rock for Jesus to stand on
+  ctx.fillStyle = '#b8a58a';
+  roundRect(W / 2 - 46, introJesusY() - 6, 92, 30, 14); ctx.fill();
+  ctx.fillStyle = '#d2c2a6';
+  roundRect(W / 2 - 40, introJesusY() - 6, 80, 10, 6); ctx.fill();
+
+  const slots = listenerSlots();
+  for (const s of slots.slice(0, 4)) drawListener(s);
+  ctx.save();
+  ctx.translate(W / 2, introJesusY());
+  ctx.scale(JESUS_S, JESUS_S);
+  drawJesus(0, 0, 'teach', jesusBubble ? 'talk' : 'calm');
+  ctx.restore();
+  for (const s of slots.slice(4)) drawListener(s);
+
+  if (jesusBubble) {
+    const mouthY = introJesusY() - 46 * JESUS_S;
+    drawSpeech(jesusBubble.text, W / 2 + 6, mouthY - 22, Math.min(W - 40, 480), clamp(jesusBubble.t / 0.3, 0, 1), 'top');
+  }
+  ctx.font = '600 15px Fredoka, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(matchMedia('(pointer: coarse)').matches ? 'Tap to begin the night' : 'Click or press Space to begin the night', W / 2, H - 18);
+
+  // fade into the night
+  const f = clamp((introT - (introDur - 0.6)) / 0.6, 0, 1);
+  if (f > 0) { ctx.fillStyle = `rgba(10,10,30,${f})`; ctx.fillRect(-offX, -offY, viewW, viewH); }
+}
+
+// ============================================================
+//  Night scenery
+// ============================================================
+const stars = Array.from({ length: 70 }, () => ({ f: Math.random(), y: rand(-200, 480), r: rand(0.8, 2.2), p: rand(0, TAU) }));
+const nightClouds = Array.from({ length: 4 }, () => ({ f: Math.random(), y: rand(160, 380), w: rand(90, 170), speed: rand(4, 9) }));
+const HOUSES = [
+  { f: -0.04, w: 120, h: 118 }, { f: 0.1, w: 96, h: 150 }, { f: 0.52, w: 110, h: 124 },
+  { f: 0.66, w: 128, h: 104 }, { f: 0.8, w: 104, h: 140 }, { f: 0.95, w: 124, h: 116 },
+];
+
+function drawNightSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, BACK_Y);
+  g.addColorStop(0, '#141a45');
+  g.addColorStop(0.55, '#2c3778');
+  g.addColorStop(1, '#5b4f94');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  for (const s of stars) {
+    ctx.fillStyle = `rgba(255,250,220,${0.5 + 0.45 * Math.sin(t * 2.2 + s.p)})`;
+    ctx.beginPath(); ctx.arc(-offX + s.f * viewW, s.y, s.r, 0, TAU); ctx.fill();
+  }
+  // The moon crosses the sky through the long night
+  const p = state === 'title' ? 0.2 : clamp(nightT / cfg.maxT, 0, 1);
+  const mx = lerp(40, W - 40, p), my = 280 - Math.sin(p * Math.PI) * 150;
+  const mg = ctx.createRadialGradient(mx, my, 10, mx, my, 110);
+  mg.addColorStop(0, 'rgba(255,248,210,0.55)'); mg.addColorStop(1, 'rgba(255,248,210,0)');
+  ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, 110, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff6d6';
+  ctx.beginPath(); ctx.arc(mx, my, 30, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(220,210,170,0.7)';
+  ctx.beginPath(); ctx.arc(mx - 9, my - 6, 6, 0, TAU); ctx.arc(mx + 8, my + 9, 4.5, 0, TAU); ctx.arc(mx + 10, my - 10, 3, 0, TAU); ctx.fill();
+  for (const c of nightClouds) drawCloud(-offX - 170 + c.f * (viewW + 340), c.y, c.w, c.w * 0.28, 'rgba(120,125,180,0.55)', 'rgba(80,80,140,0.5)');
+}
+
+function drawVillage() {
+  // Houses along the far side of the street
+  for (const hs of HOUSES) {
+    const x = -offX + hs.f * viewW;
+    const top = BACK_Y - hs.h;
+    ctx.fillStyle = '#4a4178';
+    ctx.fillRect(x - hs.w / 2, top, hs.w, hs.h + 4);
+    ctx.fillStyle = '#3d356a';
+    ctx.fillRect(x - hs.w / 2 - 4, top - 8, hs.w + 8, 10);
+    ctx.fillStyle = '#ffd77a';
+    ctx.fillRect(x - hs.w / 4 - 8, top + 30, 16, 20);
+    if (hs.w > 100) ctx.fillRect(x + hs.w / 4 - 8, top + 30, 16, 20);
+    ctx.fillStyle = '#2f2855';
+    roundRect(x - 12, BACK_Y - 44, 24, 44, [12, 12, 0, 0]); ctx.fill();
+  }
+  // A palm tree
+  const px = W * 0.47;
+  ctx.strokeStyle = '#3a2f52'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(px, BACK_Y); ctx.quadraticCurveTo(px - 10, BACK_Y - 80, px + 6, BACK_Y - 150); ctx.stroke();
+  ctx.strokeStyle = '#3f5a4a'; ctx.lineWidth = 6;
+  const sw = gustNow * gust.dir * 8;
+  for (let k = 0; k < 6; k++) {
+    const a = -Math.PI / 2 + (k - 2.5) * 0.55;
+    ctx.beginPath(); ctx.moveTo(px + 6, BACK_Y - 150);
+    ctx.quadraticCurveTo(px + 6 + Math.cos(a) * 40 + sw, BACK_Y - 170 + Math.sin(a) * 20, px + 6 + Math.cos(a) * 62 + sw * 1.5, BACK_Y - 140 + Math.sin(a) * 8 + 16);
+    ctx.stroke();
+  }
+
+  drawWeddingHouse();
+
+  // The street
+  const sg = ctx.createLinearGradient(0, BACK_Y, 0, H);
+  sg.addColorStop(0, '#5b4c6e'); sg.addColorStop(1, '#3a3050');
+  ctx.fillStyle = sg;
+  ctx.fillRect(-offX, BACK_Y, viewW, H - BACK_Y + 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  for (let k = 0; k < 40; k++) {
+    const x = -offX + ((k * 97) % 1000) / 1000 * viewW, y = BACK_Y + 20 + ((k * 53) % 290);
+    ctx.beginPath(); ctx.ellipse(x, y, 16, 5, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function drawWeddingHouse() {
+  const hx = houseX(), hw = houseW(), top = BACK_Y - 176;
+  // warm plaster walls
+  const wg = ctx.createLinearGradient(0, top, 0, BACK_Y);
+  wg.addColorStop(0, '#caa27a'); wg.addColorStop(1, '#a9825e');
+  ctx.fillStyle = wg;
+  ctx.fillRect(hx - hw / 2, top, hw, 180);
+  ctx.fillStyle = '#8e6a4a';
+  ctx.fillRect(hx - hw / 2 - 6, top - 10, hw + 12, 12);
+  // windows glowing with the feast inside
+  ctx.fillStyle = '#ffe08a';
+  roundRect(hx - hw / 2 + 18, top + 30, 26, 32, [13, 13, 2, 2]); ctx.fill();
+  roundRect(hx + hw / 2 - 44, top + 30, 26, 32, [13, 13, 2, 2]); ctx.fill();
+
+  // door: open lets out golden light
+  const dw = 60, dh = 98, dx = hx - dw / 2, dy = BACK_Y - dh;
+  ctx.fillStyle = '#6e4a2e';
+  roundRect(dx - 7, dy - 7, dw + 14, dh + 7, [36, 36, 0, 0]); ctx.fill();
+  const lg = ctx.createLinearGradient(0, dy, 0, BACK_Y);
+  lg.addColorStop(0, '#fff3b8'); lg.addColorStop(1, '#ffc94a');
+  ctx.fillStyle = lg;
+  roundRect(dx, dy, dw, dh, [30, 30, 0, 0]); ctx.fill();
+  if (doorF > 0.05) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const rg = ctx.createRadialGradient(hx, BACK_Y - 30, 10, hx, BACK_Y - 30, 160);
+    rg.addColorStop(0, `rgba(255,220,120,${0.5 * doorF})`); rg.addColorStop(1, 'rgba(255,200,90,0)');
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(hx, BACK_Y - 30, 160, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // two door leaves swing open
+  const leaf = (dw / 2) * (1 - doorF * 0.85);
+  ctx.save();
+  roundRect(dx, dy, dw, dh, [30, 30, 0, 0]); ctx.clip();
+  ctx.fillStyle = '#8b5a33'; ctx.strokeStyle = '#5e3a1c'; ctx.lineWidth = 2;
+  ctx.fillRect(dx, dy, leaf, dh); ctx.strokeRect(dx, dy, leaf, dh);
+  ctx.fillRect(dx + dw - leaf, dy, leaf, dh); ctx.strokeRect(dx + dw - leaf, dy, leaf, dh);
+  ctx.strokeStyle = '#6e4424'; ctx.lineWidth = 1.5;
+  for (const lx of [dx + leaf * 0.5, dx + dw - leaf * 0.5]) { ctx.beginPath(); ctx.moveTo(lx, dy + 10); ctx.lineTo(lx, BACK_Y - 6); ctx.stroke(); }
+  ctx.restore();
+
+  // garland of lanterns for the wedding
+  const n = 7;
+  ctx.strokeStyle = '#3a6b3a'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let k = 0; k <= 20; k++) {
+    const f = k / 20;
+    const x = hx - hw / 2 + f * hw, y = top + 14 + Math.sin(f * Math.PI) * 22;
+    k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  const bright = state === 'win' ? 1 : 0.75;
+  for (let k = 0; k < n; k++) {
+    const f = (k + 0.5) / n;
+    const x = hx - hw / 2 + f * hw, y = top + 18 + Math.sin(f * Math.PI) * 22;
+    const sw = Math.sin(t * 2 + k) * 2 + gustNow * gust.dir * 4;
+    const col = ['#ff6b6b', '#ffd54a', '#69db7c', '#4dabf7', '#ff8fb1'][k % 5];
+    drawGlow(x + sw, y + 8, 26, bright);
+    ctx.fillStyle = col;
+    roundRect(x - 6 + sw, y, 12, 16, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,230,0.7)';
+    ctx.fillRect(x - 2 + sw, y + 3, 4, 10);
+  }
+}
+
+// ============================================================
+//  Wind, leaves and particles
+// ============================================================
+function updateGust(dt) {
+  if (state === 'play') {
+    gust.next -= dt;
+    if (gust.next <= 0 && gust.warn <= 0 && gust.active <= 0) {
+      gust.dir = Math.random() < 0.5 ? -1 : 1;
+      gust.warn = 1.7;
+      gust.next = rand(cfg.gustGap[0], cfg.gustGap[1]) + gust.warn + cfg.gustDur;
+      if (firstTime('gust')) showMessage('Leaves! A gust is coming!');
+    }
+  }
+  if (gust.warn > 0) {
+    gust.warn -= dt;
+    if (Math.random() < dt * 10) spawnLeaf(0.65);
+    if (gust.warn <= 0) { gust.active = state === 'play' ? cfg.gustDur : 0; sfx.gustWhoosh(); }
+  } else if (gust.active > 0) {
+    gust.active -= dt;
+    if (Math.random() < dt * 22) spawnLeaf(1);
+  }
+  const target = gust.active > 0 ? 1 : 0;
+  gustNow += (target - gustNow) * Math.min(1, dt * 4);
+}
+
+function spawnLeaf(sp) {
+  if (leaves.length > 60) return;
+  const d = gust.dir;
+  leaves.push({
+    x: d > 0 ? -offX - 20 : W + offX + 20, y: rand(380, 860),
+    vx: d * rand(260, 420) * sp, ph: rand(0, TAU), rot: rand(0, TAU), spin: rand(-6, 6),
+    col: ['#8fbf4a', '#c9a13a', '#6f9e3a', '#d98b3a'][Math.floor(rand(0, 4))], s: rand(0.8, 1.3),
+  });
+}
+
+function updateLeaves(dt) {
+  for (let i = leaves.length - 1; i >= 0; i--) {
+    const l = leaves[i];
+    l.x += l.vx * dt;
+    l.y += Math.sin(t * 4 + l.ph) * 50 * dt;
+    l.rot += l.spin * dt;
+    if (l.x < -offX - 40 || l.x > W + offX + 40) leaves.splice(i, 1);
+  }
+}
+
+function drawLeaves() {
+  for (const l of leaves) {
+    ctx.save();
+    ctx.translate(l.x, l.y); ctx.rotate(l.rot); ctx.scale(l.s, l.s);
+    ctx.fillStyle = l.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, 9, 4, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,40,10,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.stroke();
+    ctx.restore();
+  }
+  // wind streaks
+  if (gustNow > 0.05) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.35 * gustNow})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < 14; k++) {
+      const y = 420 + ((k * 37) % 440);
+      const x = -offX + ((k * 131 + t * 700 * gust.dir) % (viewW + 200) + viewW + 200) % (viewW + 200) - 100;
+      ctx.moveTo(x, y); ctx.lineTo(x - gust.dir * 50, y);
+    }
+    ctx.stroke();
+  }
+}
+
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function popup(x, y, text, color = '#ffe8a3', size = 18) { popups.push({ x, y, text, color, size, t: 1.2 }); }
+
+function drawPopups() {
+  ctx.textAlign = 'center';
+  for (const p of popups) {
+    const a = clamp(p.t / 0.4, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(30,20,60,0.8)'; ctx.lineJoin = 'round';
+    const y = p.y - (1.2 - p.t) * 40;
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Lamps, oil and sleepy bridesmaids
+// ============================================================
+function firstTime(key) {
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+}
+
+function lampOut(m) {
+  m.lit = false; m.flame = 0; m.shield = 0;
+  m.everOut = true;
+  for (let i = 0; i < 6; i++) spawn((m.lampX || 0) - 22, (m.lampY || FRONT_Y) - 14, rand(-10, 10), rand(-40, -20), 1.4, 'rgba(210,210,225,0.8)', rand(3, 5));
+  sfx.out();
+  if (firstTime('out')) showMessage('A lamp went out! Tap to relight');
+}
+
+function updateMaid(m, dt) {
+  m.bump = Math.max(0, m.bump - dt * 3);
+  if (m.lighting > 0) {
+    m.lighting -= dt;
+    if (m.lighting <= 0) {
+      m.lighting = 0; m.lit = true; m.flame = 1; m.shield = SHIELD_TIME * 0.6;
+      popup(m.lampX || 0, (m.lampY || FRONT_Y) - 40, 'Lit!');
+      sfx.trim();
+    }
+  }
+  // Drowsiness (not after the cry: "then all those virgins arose")
+  if (state === 'play' && nightT > cfg.sleepStart && !m.asleep) {
+    m.wake -= dt / (cfg.sleepLife * m.sleepMul);
+    if (m.wake < 0.35) {
+      if (firstTime('tarried')) banner = { key: 'tarried', t: 4.5 };
+      else if (firstTime('drowsy')) showMessage('Nodding off! Tap her to wake');
+    }
+    if (m.wake <= 0) { m.wake = 0; m.asleep = true; m.everAsleep = true; sfx.snore(); }
+  }
+  if (!m.lit) return;
+  m.oil -= dt / cfg.oilLife;
+  m.shield = Math.max(0, m.shield - dt);
+  let drop = 0.006;                                   // the wick slowly chars
+  if (gustNow > 0.05 && m.shield <= 0) drop += cfg.gustPower * gustNow;
+  if (m.asleep) drop += 0.09;                         // nobody tends a sleeper's lamp
+  m.flame -= drop * dt;
+  if (m.oil < 0.3 && firstTime('lowoil') && state === 'play') showMessage('Low oil! Tap the lamp to refill');
+  if (m.oil <= 0) { m.oil = 0; lampOut(m); }
+  else if (m.flame <= 0) lampOut(m);
+}
+
+function updateFool(f, dt) {
+  f.bump = Math.max(0, f.bump - dt * 3);
+  if (f.lit && state !== 'title') {
+    f.oil -= dt / (cfg.oilLife * 0.85);
+    if (f.oil <= 0) {
+      f.oil = 0; f.lit = false;
+      const sl = foolSlots()[f.i];
+      for (let i = 0; i < 5; i++) spawn(sl.x - 16, sl.y - 22, rand(-8, 8), rand(-35, -15), 1.4, 'rgba(210,210,225,0.8)', rand(2.5, 4));
+    }
+  }
+  if (state !== 'play') { f.asleep = false; return; }
+  if (!f.asleep && nightT > cfg.sleepStart + f.napT) f.asleep = true;
+  if (f.asleep) {
+    // they snore, and now and then one peeks with a worried look at her lamp
+    f.peekT -= dt;
+    if (f.peekT < -rand(6, 40)) { f.peekT = 2.2; f.bump = 1; }
+  }
+}
+
+function tapMaid(m) {
+  if (m.asleep || m.wake < 0.4) { wakeMaid(m); return; }
+  tendLamp(m);
+}
+
+function wakeMaid(m) {
+  if (state !== 'play' && state !== 'cry') return;
+  if (!m.asleep && m.wake >= 0.55) return;
+  m.asleep = false;
+  m.wake = 1;
+  m.sleepMul = rand(0.75, 1.3);
+  m.nudged++;
+  m.bump = 1;
+  popup(m.lampX || 0, FRONT_Y - 110, 'Awake!', '#bfe8ff');
+  sfx.wake();
+}
+
+function refill(m) {
+  refills.push(m.oil);
+  m.oil = 1;
+  flasks--;
+  popup(m.lampX || 0, (m.lampY || FRONT_Y) - 40, '+ oil');
+  for (let i = 0; i < 6; i++) spawn((m.lampX || 0) + rand(-6, 6), (m.lampY || FRONT_Y) - 20, rand(-20, 20), rand(-50, -10), 0.6, '#f7c948', rand(2, 3.5), 120);
+  sfx.glug();
+}
+
+function tendLamp(m) {
+  if (state !== 'play' && state !== 'cry') return;
+  if (m.asleep) { showMessage('She is asleep! Wake her first'); return; }
+  if (m.lighting > 0) return;
+  if (!m.lit) {
+    if (m.oil < 0.05) {
+      if (flasks <= 0) { showMessage('No oil! Tap the servant’s jar'); sfx.bounce(); return; }
+      refill(m);
+    }
+    if (matches <= 0) { showMessage('No matches left…'); sfx.bounce(); return; }
+    matches--;
+    m.lighting = RELIGHT_TIME;
+    sfx.strike();
+    return;
+  }
+  if (m.flame < 0.55 || ((gust.warn > 0 || gustNow > 0.1) && m.oil >= LOW_OIL)) { trim(m); return; }
+  if (m.oil < LOW_OIL) {
+    if (flasks <= 0) { showMessage('No oil! Tap the servant’s jar'); sfx.bounce(); return; }
+    refill(m);
+    return;
+  }
+  trim(m);
+}
+
+function trim(m) {
+  m.flame = 1;
+  m.shield = SHIELD_TIME;
+  popup(m.lampX || 0, (m.lampY || FRONT_Y) - 40, gustNow > 0.1 || gust.warn > 0 ? 'Shielded!' : 'Trimmed!', '#fff6d0');
+  for (let i = 0; i < 5; i++) spawn((m.lampX || 0) - 22, (m.lampY || FRONT_Y) - 16, rand(-30, 30), rand(-60, -20), 0.5, '#ffe27a', 2);
+  sfx.trim();
+}
+
+// ============================================================
+//  The helpful servant with spare oil
+// ============================================================
+function scheduleServant() {
+  servantQueue = [];
+  const n = cfg.jars;
+  const span = Math.max(12, cfg.minT - 8);
+  for (let k = 0; k < n; k++) servantQueue.push(5 + (k + 0.5) * span / n + rand(-2, 2));
+  servantQueue.sort((a, b) => a - b);
+}
+
+function updateServant(dt) {
+  if (!servant && servantQueue.length && nightT >= servantQueue[0] && state === 'play') {
+    servantQueue.shift();
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    servant = { dir, x: dir > 0 ? -offX - 40 : W + offX + 40, jar: true, pause: 1.2 };
+    if (firstTime('servant')) showMessage('A servant brings oil. Tap the jar!');
+  }
+  if (!servant) return;
+  const speed = (W + 2 * offX + 80) / cfg.servantTime;
+  const mid = Math.abs(servant.x - W / 2) < 8;
+  if (mid && servant.pause > 0 && servant.jar) servant.pause -= dt;
+  else servant.x += servant.dir * speed * dt * (state === 'play' ? 1 : 2);
+  if (servant.x < -offX - 60 || servant.x > W + offX + 60) servant = null;
+}
+
+function takeJar() {
+  if (!servant || !servant.jar) return;
+  servant.jar = false;
+  flasks++;
+  popup(servant.jx, servant.jy - 20, '+1 flask', '#ffe08a', 20);
+  for (let i = 0; i < 14; i++) spawn(servant.jx, servant.jy, rand(-80, 80), rand(-90, 10), 0.8, '#ffe27a', rand(2, 3.5), 80);
+  sfx.jar();
+}
+
+// ============================================================
+//  The cry at midnight, win / fail
+// ============================================================
+function startCry() {
+  state = 'cry';
+  cryT = 0;
+  banner = { key: 'cry', t: cfg.cryDur * 0.55 + 0.3 };
+  for (const m of WISE) { if (m.asleep || m.wake < 1) { m.asleep = false; m.wake = 1; m.bump = 1; } }
+  for (const f of FOOLS) { f.asleep = false; f.bump = 1; }
+  gust.warn = 0; gust.active = 0;
+  if (servant) servant.jar = false;
+  procX = -130;
+  bubbles = [
+    { key: 'giveOil', who: 'fools', delay: 0.4, t: 2.3 },
+    { key: 'sell', who: 'wise', delay: 2.7, t: 2.5 },
+  ];
+  sfx.cry();
+}
+
+function updateCry(dt) {
+  cryT += dt;
+  procX = lerp(-130, houseX() - 20, ease(clamp(cryT / cfg.cryDur, 0, 1)));
+  if (banner && banner.key === 'cry' && banner.t <= 0.35) banner = { key: 'trimmed', t: cfg.cryDur * 0.45 + 0.3 };
+  if (cryT >= cfg.cryDur) {
+    const allLit = WISE.every((m) => m.lit && m.lighting <= 0);
+    if (allLit) win(); else fail();
+  }
+}
+
+function updateFoolsRun(dt) {
+  const running = cryT > 3.1 || (state !== 'cry' && endT > 3.1 - cfg.cryDur);
+  if (!running) return;
+  FOOLS.forEach((f, i) => {
+    if (cryT + endT > 3.1 + i * 0.08) f.runX += dt * 260;
+  });
+}
+
+function win() {
+  state = 'win';
+  endT = 0;
+  banner = null;
+  const effAvg = refills.length ? refills.reduce((s, o) => s + (1 - o), 0) / refills.length : 1;
+  const oil = Math.round(effAvg * 400) + flasks * 120;
+  const lamps = WISE.filter((m) => !m.everOut).length * 200;
+  const awake = WISE.filter((m) => !m.everAsleep).length * 150;
+  const levelBonus = level * 500;
+  const score = oil + lamps + awake + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('bridesmaidsBest', best); } catch (e) {} }
+  lastScore = { oil, lamps, awake, levelBonus, score, lampsN: lamps / 200, awakeN: awake / 150, flasksLeft: flasks };
+  for (let i = 0; i < 60; i++) {
+    const a = rand(0, TAU), sp = rand(40, 180);
+    spawn(houseX(), BACK_Y - 60, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8),
+      ['#ffe27a', '#fff6d0', '#ffffff', '#ffd1e8'][i % 4], rand(2, 4.5), 30);
+  }
+  showMessage('To the wedding feast!');
+  sfx.win();
+  endTimer = 4.4;
+}
+
+function fail() {
+  state = 'fail';
+  endT = 0;
+  banner = null;
+  sfx.fail();
+  endTimer = 4;
+}
+
+function updateEnd(dt) {
+  endT += dt;
+  procX += dt * 90;
+  if (state === 'win') {
+    doorF = Math.min(1, doorF + dt * 1.5);
+    WISE.forEach((m, i) => { if (endT > 1 + i * 0.3) m.enter += dt / 1.6; });
+    if (Math.random() < dt * 14) spawn(houseX() + rand(-80, 80), BACK_Y - rand(60, 200), rand(-10, 10), -30, 1.2, '#fff6d0', 3);
+  } else {
+    // the procession goes in, then the door is shut
+    if (endT < 1.8) doorF = Math.min(1, doorF + dt * 1.5);
+    else { const was = doorF; doorF = Math.max(0, doorF - dt * 1.6); if (was > 0 && doorF === 0) sfx.bounce(); }
+    for (const m of WISE) if (!m.lit && Math.random() < dt * 3) spawn(m.lampX - 22, m.lampY - 12, rand(-6, 6), -22, 1.6, 'rgba(210,210,225,0.8)', rand(3, 5));
+  }
+}
+
+function showMessage(text) { message = { text, t: 2.4 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetLevelState() {
+  cfg = makeConfig(level);
+  nightT = 0;
+  arrivalT = rand(cfg.minT, cfg.maxT);
+  const oils = [1, 0.84, 0.94, 0.76, 0.9].sort(() => Math.random() - 0.5);
+  WISE.forEach((m, i) => resetMaid(m, oils[i]));
+  FOOLS.forEach(resetFool);
+  flasks = cfg.flasks;
+  matches = cfg.matches;
+  servant = null;
+  scheduleServant();
+  gust = { next: level === 1 ? 7 : rand(4, 7), warn: 0, active: 0, dir: 1 };
+  gustNow = 0;
+  leaves = []; particles = []; popups = []; bubbles = [];
+  banner = null;
+  refills = [];
+  procX = -140; doorF = 0; cryT = 0; endT = 0;
+  seen = level === 1 ? new Set() : new Set(['gust', 'out', 'lowoil', 'drowsy', 'servant']);
+  endTimer = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevelState();
+  showOverlay('Keep Your Lamp Burning', 'The ten bridesmaids',
+    `${verseHTML('wise')}
+     <ul>
+       <li>Keep all <b>five lamps</b> of the wise bridesmaids burning through the long night, until the <b>bridegroom</b> comes.</li>
+       <li><b>Tap a lamp</b> to <b>refill</b> it when its oil is low, or to <b>shield and trim</b> it when leaves warn of a gust.</li>
+       <li><b>Tap a sleepy bridesmaid</b> to wake her before her lamp goes out. A lamp that goes out costs a <b>match</b> to relight.</li>
+       <li>Oil flasks are few: <b>tap the jar</b> when the servant brings more.</li>
+       <li><b>Keyboard:</b> <kbd>1</kbd>&ndash;<kbd>5</kbd> pick a lamp, <kbd>Space</kbd> tends it, <kbd>W</kbd> wakes her.</li>
+       <li>Nobody knows the hour he will come&hellip;</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Light the lamps', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  resetLevelState();
+  state = 'intro';
+  introT = 0;
+  introDur = level === 1 ? 6.2 : 4.4;
+  const key = ['kingdom', 'wise', 'watch'][(level - 1) % 3];
+  jesusBubble = { text: verseText(key), t: introDur - 0.5 };
+  for (const d of LISTENERS) d.mood = 'watch';
+  hideOverlay();
+  sfx.levelStart();
+}
+
+function beginPlay() {
+  state = 'play';
+  jesusBubble = null;
+  fadeIn = 0.7;
+  showMessage(`Level ${level}: ${cfg.name}`);
+  if (level === 1) setTimeout(() => { if (state === 'play' && message.t < 0.3) showMessage('Keep all five lamps burning!'); }, 2600);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Hallelujah!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('ready')}
+       <p style="text-align:center">Jesus told this story so that we would always be ready for Him:</p>
+       ${verseHTML('watch')}
+       <p class="score">Oil well used (${s.flasksLeft} flask${s.flasksLeft === 1 ? '' : 's'} left): <b>${s.oil}</b><br>Lamps never out (${s.lampsN}/5): <b>${s.lamps}</b><br>Kept awake (${s.awakeN}/5): <b>${s.awake}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next night', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh… no', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">A lamp had gone out when the bridegroom came, and the wedding door closed. Keep every lamp burning &mdash; he could come at any moment!</p>
+       ${verseHTML('giveOil')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'intro' || state === 'cry') {
+    pausedFrom = state;
+    state = 'pause';
+    sfx.wind(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const ripples = [];
+
+function skipIntro() { if (state === 'intro' && introT < introDur - 0.6) introT = introDur - 0.6; }
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'intro' && (e.code === 'Space' || e.code === 'Enter')) { skipIntro(); return; }
+  if (state !== 'play' && state !== 'cry') return;
+  const n = /^(?:Digit|Numpad)([1-5])$/.exec(e.code);
+  if (n) { sel = +n[1] - 1; kbUsed = true; return; }
+  if (e.code === 'ArrowLeft') { sel = (sel + 4) % 5; kbUsed = true; return; }
+  if (e.code === 'ArrowRight') { sel = (sel + 1) % 5; kbUsed = true; return; }
+  if (e.code === 'Space' && !e.repeat) { kbUsed = true; tendLamp(WISE[sel]); return; }
+  if (e.code === 'KeyW' && !e.repeat) { kbUsed = true; wakeMaid(WISE[sel]); return; }
+  if (e.code === 'KeyJ' || e.code === 'KeyO') takeJar();   // grab the servant's jar from the keyboard
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function tapAt(x, y) {
+  if (state === 'intro') { skipIntro(); return; }
+  if (state !== 'play' && state !== 'cry') return;
+  ripples.push({ x, y, t: 0 });
+  // The servant's jar first
+  if (servant && servant.jar && Math.hypot(x - servant.jx, y - servant.jy) < 44) { takeJar(); return; }
+  if (y < BACK_Y + 40) return;
+  const slots = wiseSlots();
+  let bestSl = null, bd = Infinity;
+  for (const sl of slots) {
+    const d = Math.abs(x - sl.x);
+    if (d < sl.gap / 2 && d < bd) { bd = d; bestSl = sl; }
+  }
+  if (!bestSl) return;
+  sel = bestSl.m.i;
+  tapMaid(bestSl.m);
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  tapAt(p.x, p.y);
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note, pitched by height (0..1)
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, windGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 0.7;
+      this.windGain = this.ctx.createGain();
+      this.windGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.windGain); this.windGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  wind(level) {
+    if (!this.windGain) return;
+    this.windGain.gain.setTargetAtTime(level * 0.2, this.ctx.currentTime, 0.1);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseHit(delay, freq, dur, vol, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 0.8;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.12);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) { this.noiseHit(0, 1100, 0.16, vol); },
+  bounce() { this.tone(220, 0.18, 'sine', 0.3, 0, 110); },
+  thunder() { this.noiseHit(0, 400, 1.2, 0.9, 'lowpass'); },
+  // small effects for this game
+  trim() { this.tap(0.7); },
+  glug() { for (let k = 0; k < 3; k++) this.tone(420 - k * 70, 0.12, 'sine', 0.25, k * 0.09, 260 - k * 40); },
+  strike() { this.noiseHit(0, 3000, 0.25, 0.5, 'highpass'); this.noiseHit(0.1, 800, 0.5, 0.25); },
+  wake() { this.tone(440, 0.16, 'triangle', 0.25, 0, 880); this.tap(0.5); },
+  jar() { this.tap(1); this.tone(1320, 0.3, 'sine', 0.12, 0.08); },
+  out() { this.puff(0.25); this.tone(300, 0.3, 'sine', 0.15, 0, 150); },
+  snore() { this.tone(110, 0.5, 'sawtooth', 0.05, 0, 90); },
+  gustWhoosh() { this.noiseHit(0, 500, 1.1, 0.35, 'lowpass'); },
+  cry() {
+    if (!this.ctx) return;
+    // a ram's-horn call, then tambourines and a dancing tune
+    this.tone(233, 0.45, 'sawtooth', 0.1, 0, 349);
+    this.tone(349, 0.5, 'sawtooth', 0.1, 0.45);
+    this.tone(466, 0.9, 'sawtooth', 0.1, 0.95);
+    const tune = ['D5', 'E5', 'F#5', 'G5', 'A5', 'G5', 'F#5', 'E5', 'D5', 'F#5', 'A5', 'D6'];
+    tune.forEach((n, k) => this.tone(noteFreq(n.replace('6', '5')) * (n.endsWith('6') ? 2 : 1), 0.22, 'triangle', 0.14, 1.9 + k * 0.22));
+    for (let k = 0; k < 16; k++) this.noiseHit(1.9 + k * 0.22, 7000, 0.08, k % 2 ? 0.12 : 0.22, 'highpass');
+  },
+};
+
+// ============================================================
+//  Rendering
+// ============================================================
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// A speech bubble above (ax, ay) with its tail pointing to it
+function drawSpeech(text, ax, ay, maxW, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const lines = wrapText(text, maxW - 26);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 26, h = lines.length * 21 + 16;
+  const bx = clamp(ax - w / 2, 8 - Math.min(offX, 0), W - 8 - w);
+  const by = ay - 18 - h;
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 14); ctx.fill(); ctx.stroke();
+  const tx = clamp(ax, bx + 18, bx + w - 18);
+  ctx.beginPath();
+  ctx.moveTo(tx - 10, by + h - 1.5); ctx.lineTo(ax, ay); ctx.lineTo(tx + 10, by + h - 1.5);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(tx - 10, by + h); ctx.lineTo(ax, ay); ctx.lineTo(tx + 10, by + h);
+  ctx.stroke();
+  ctx.fillStyle = '#8a5a00';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 8 + 10.5 + i * 21));
+  ctx.restore();
+}
+
+function drawBubbles() {
+  for (const b of bubbles) {
+    if (b.delay > 0) continue;
+    const a = clamp(b.t / 0.3, 0, 1) * clamp((b.age || 0) / 0.2, 0, 1);
+    if (b.who === 'fools') {
+      const sl = foolSlots();
+      const cx = (sl[0].x + sl[4].x) / 2;
+      drawSpeech(verseText(b.key), cx, BACK_Y - 64, Math.min(W * 0.62, 340), a);
+    } else {
+      const sl = wiseSlots()[4];
+      drawSpeech(verseText(b.key), sl.x - 6, FRONT_Y - 76 * sl.s, Math.min(W * 0.66, 380), a);
+    }
+  }
+}
+
+function drawBanner() {
+  if (!banner || banner.t <= 0) return;
+  const v = Bible.verse(VERSES[banner.key]);
+  const a = clamp(banner.t / 0.4, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const maxW = Math.min(W - 40, 640);
+  const lines = wrapText(v.text, maxW - 30);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width), 120);
+  const w = tw + 34, h = lines.length * 28 + 40;
+  const bx = W / 2 - w / 2, by = 120;
+  ctx.fillStyle = 'rgba(36,28,72,0.86)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffe8a3';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 20 + i * 28));
+  ctx.font = '600 13px Fredoka, sans-serif';
+  ctx.fillStyle = 'rgba(255,232,163,0.75)';
+  ctx.fillText(v.cite, W / 2, by + h - 13);
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, W - 30);
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(30,24,60,0.9)'; ctx.lineJoin = 'round';
+  lines.forEach((l, i) => {
+    const y = H * 0.44 + i * 28;
+    ctx.strokeText(l, W / 2, y);
+    ctx.fillStyle = '#ffe08a';
+    ctx.fillText(l, W / 2, y);
+  });
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,30,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level, flasks and matches
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe8a3';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Keep Your Lamp Burning' : state === 'intro' ? 'On the Mount of Olives' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title' && state !== 'intro') {
+    ctx.shadowBlur = 0;
+    drawJar(22, 46, 0.72);
+    ctx.shadowBlur = 4;
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillStyle = flasks === 0 && Math.sin(t * 8) > 0 ? '#ff8a8a' : '#ffe8a3';
+    ctx.fillText(`× ${flasks}`, 34, 52);
+    ctx.shadowBlur = 0;
+    drawMatch(84, 46);
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = matches === 0 ? '#ff8a8a' : '#ffe8a3';
+    ctx.fillText(`× ${matches}`, 96, 52);
+  }
+  ctx.shadowBlur = 0;
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score
+  if (state !== 'intro') {
+    const rx = viewW - 12;
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe8a3';
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('SCORE', rx, 20);
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`${totalScore}`, rx, 40);
+    if (state === 'play' && nightT > cfg.minT) {
+      ctx.font = '600 12px Fredoka, sans-serif';
+      ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ffe08a' : 'rgba(255,224,138,0.6)';
+      ctx.fillText('He may come any moment!', rx, 60);
+    }
+  }
+  ctx.restore();
+}
+
+function renderNight() {
+  drawNightSky();
+  drawVillage();
+  drawFools();
+  drawProcession();
+  drawServant();
+  drawWise();
+  drawLeaves();
+  drawParticles();
+  drawPopups();
+
+  // Tap ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,240,200,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 60, 0, TAU); ctx.stroke();
+  }
+  drawBanner();
+  drawBubbles();
+  drawMessage();
+  if (fadeIn > 0) { ctx.fillStyle = `rgba(10,10,30,${fadeIn / 0.7})`; ctx.fillRect(-offX, -offY, viewW, viewH); }
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  if (state === 'intro' || (state === 'pause' && pausedFrom === 'intro')) renderIntro();
+  else renderNight();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updateNight(dt) {
+  for (const c of nightClouds) {
+    c.f += (c.speed + gustNow * gust.dir * 60) * dt / (W + 340);
+    if (c.f > 1) c.f -= 1;
+    if (c.f < 0) c.f += 1;
+  }
+  for (const m of WISE) updateBlink(m, dt);
+  for (const f of FOOLS) updateBlink(f, dt);
+}
+
+function update(dt) {
+  t += dt;
+  updateNight(dt);
+  updateParticles(dt);
+  updateLeaves(dt);
+  updateGust(dt);
+  if (state === 'intro') {
+    introT += dt;
+    updateListeners(dt);
+    if (jesusBubble) { jesusBubble.t -= dt; if (jesusBubble.t <= 0) jesusBubble = null; }
+    if (introT >= introDur) beginPlay();
+  } else if (state === 'play') {
+    nightT += dt;
+    if (nightT > cfg.minT && firstTime('window')) showMessage('He could come at any moment…');
+    for (const m of WISE) updateMaid(m, dt);
+    for (const f of FOOLS) updateFool(f, dt);
+    updateServant(dt);
+    if (nightT >= arrivalT) startCry();
+  } else if (state === 'cry') {
+    for (const m of WISE) updateMaid(m, dt);
+    for (const f of FOOLS) updateFool(f, dt);
+    updateServant(dt);
+    updateCry(dt);
+    updateFoolsRun(dt);
+  } else if (state === 'win' || state === 'fail') {
+    for (const f of FOOLS) updateFool(f, dt);
+    updateEnd(dt);
+    updateFoolsRun(dt);
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    if (b.delay > 0) { b.delay -= dt; continue; }
+    b.age = (b.age || 0) + dt;
+    b.t -= dt;
+    if (b.t <= 0) bubbles.splice(i, 1);
+  }
+  if (banner) { banner.t -= dt; if (banner.t <= 0 && state !== 'cry') banner = null; }
+  fadeIn = Math.max(0, fadeIn - dt);
+  message.t -= dt;
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.wind(state === 'play' ? gustNow * 0.8 + (gust.warn > 0 ? 0.25 : 0) : 0);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
