@@ -179,7 +179,6 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, f) => a + (b - a) * f;
 const rand = (a, b) => a + Math.random() * (b - a);
 const ease = (f) => { f = clamp(f, 0, 1); return f * f * (3 - 2 * f); };
-const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -216,9 +215,6 @@ function mix(a, b, f) {
 const GY = 770;           // garden ground: where feet stand
 const TRACK_Y = 845;      // the rhythm track along the bottom
 const RING_X = 72;        // the target ring on the track
-const RUN_GY = 790;       // ground line in the run
-const JUMP_V = 830;       // jump launch speed (px/s)
-const RUN_G = 2500;       // gravity in the run
 const HOLD_UNITS = 0.8;   // stone push for a completed hold note
 
 const LEVEL_NAMES = [
@@ -235,13 +231,10 @@ function makeConfig(n) {
     name: LEVEL_NAMES[n - 1] || `Easter morning ${n}`,
     bpm: Math.min(80 + (n - 1) * 10, 140),
     approach: Math.max(2.1 - (n - 1) * 0.17, 1.15),   // seconds a note takes to cross the track
-    bars: 11 + n,                                      // bars of notes before the sun is up
+    bars: 13 + n,                                      // bars of notes before the sun is up
     offbeat: n >= 2, holds: n >= 2, doubles: n >= 3, sync: n >= 4,
-    needFrac: Math.min(0.5 + (n - 1) * 0.06, 0.8),   // share of a perfect run needed to roll the stone
+    needFrac: Math.min(0.5 + (n - 1) * 0.06, 0.8),   // share of a perfect performance needed to roll the stone
     win: n === 1 ? [0.085, 0.17] : [0.075, 0.15],      // perfect / good windows (s)
-    runLen: 2600 + (n - 1) * 700,
-    runSpeed: Math.min(300 + (n - 1) * 30, 480),
-    gapT: [Math.max(1.35 - (n - 1) * 0.1, 0.85), Math.max(2.2 - (n - 1) * 0.18, 1.3)],
   };
 }
 
@@ -249,7 +242,7 @@ function makeConfig(n) {
 //  Game state
 // ============================================================
 let state = 'title';      // title | play | win | fail | pause
-let phase = 'rhythm';     // rhythm | angel | run | finale
+let phase = 'rhythm';     // rhythm | angel | finale
 let level = 1;
 let totalScore = 0;
 let best = 0;
@@ -259,7 +252,6 @@ let cfg = makeConfig(1);
 let t = 0;
 let rh = null;            // rhythm phase
 let ang = null;           // angel cut-scene
-let run = null;           // run phase
 let fin = null;           // finale
 let stoneShow = 0;        // how far the stone has visibly rolled (0..1)
 let skyF = 0.08;          // dawn progress (0 = night blue, 1 = golden morning)
@@ -267,7 +259,7 @@ let particles = [];
 let pops = [];
 let ripples = [];
 let message = { text: '', t: 0 };
-let shockT = 0, flashT = 0, shakeT = 0, whiteA = 0, beatFx = 0;
+let shockT = 0, flashT = 0, shakeT = 0, beatFx = 0;
 let endTimer = 0;
 let lastScore = null;
 let frameWall = performance.now();
@@ -320,25 +312,17 @@ function newRhythm() {
 }
 
 // ============================================================
-//  People: the two Marys, the disciples, the guards
+//  People: the two Marys and the guards
 // ============================================================
 const WOMEN = [
   { name: 'Mary Magdalene', robe: '#8e5bb5', hair: '#4a2a14', skin: '#e0aa7a', scarf: '#6f95d1' },
   { name: 'the other Mary', robe: '#c9745a', hair: '#2e1d10', skin: '#cf9866', scarf: '#efe3c4' },
 ];
-const DISCIPLES = [
-  { name: 'Peter',  robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
-  { name: 'John',   robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
-  { name: 'James',  robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
-  { name: 'Andrew', robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
-  { name: 'Philip', robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55', scarf: '#e8dcc0' },
-];
 function makePerson(d, i) {
   return { ...d, i, x: 0, y: 0, s: 1, lx: 0, ly: 0, mood: 'watch', switchT: 0, delay: rand(0.05, 0.4),
-    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), run: false, runPh: rand(0, TAU), kneel: 0, lean: 0 };
+    blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU), kneel: 0 };
 }
 const marys = WOMEN.map(makePerson);
-const disciples = DISCIPLES.map((d, i) => makePerson(d, i + 2));
 const guards = [
   { flip: -1, s: 0.95, faint: 0, hop: 0, hopV: 0, z: 0 },
   { flip: 1, s: 0.95, faint: 0, hop: 0, hopV: 0, z: 1.3 },
@@ -358,8 +342,7 @@ function maryMood() {
   if (state === 'title') return 'watch';
   if (state === 'fail') return 'dismay';
   if (phase === 'angel') return ang.t < 1.3 ? 'shock' : 'joy';
-  if (phase === 'run') return run.stumbleT > 0 ? 'shock' : 'joy';
-  if (phase === 'finale') return fin.t < 0.9 ? 'wow' : 'joy';
+  if (phase === 'finale') return fin.t < 1.0 ? 'wow' : 'joy';
   if (shockT > 0) return 'shock';
   if (rh && rh.missStreak >= 2) return 'worried';
   if (rh && rh.combo >= 4) return 'wow';
@@ -369,36 +352,25 @@ function maryMood() {
 function updatePeople(dt) {
   const m = maryMood();
   for (const p of marys) updatePerson(p, m, dt);
-  for (let k = 0; k < disciples.length; k++) {
-    const p = disciples[k];
-    let want = 'watch';
-    if (fin) want = fin.t - 3 - k * 0.15 < 1.2 ? 'shock' : 'joy';
-    updatePerson(p, want, dt);
-  }
   // Guards doze, hop on a big combo, and faint when the angel comes
   for (const g of guards) {
     g.z += dt;
     g.hopV -= 900 * dt; g.hop = Math.max(0, g.hop + g.hopV * dt);
-    const target = phase === 'angel' || phase === 'run' || phase === 'finale' ? 1 : 0;
     if (phase === 'angel') g.faint = ease((ang.t - 0.45) / 0.6);
-    else g.faint = target;
+    else g.faint = phase === 'finale' ? 1 : 0;
   }
 }
 
 function drawPerson(p) {
   const d = p, s = p.s, mood = p.mood;
   let jump = 0;
-  if (mood === 'joy' && !p.run && p.kneel < 0.1) jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'joy' && p.kneel < 0.1) jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
   if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
   const K = p.kneel * 13;                 // kneeling lowers the body
-  let bob = 0, sw = 0;
-  if (p.run) { sw = Math.sin(p.runPh); bob = Math.abs(Math.cos(p.runPh)) * 4; }
 
   ctx.save();
-  ctx.translate(p.x, p.y - jump * s - bob * s);
+  ctx.translate(p.x, p.y - jump * s);
   ctx.scale(s, s);
-  if (p.lean) ctx.rotate(p.lean);
-  if (p.dim) ctx.filter = 'brightness(0.92)';
 
   const sleeve = shade(d.robe, -25);
   const arm = (x1, y1, x2, y2) => {
@@ -408,20 +380,11 @@ function drawPerson(p) {
   };
   const lx = p.lx, ly = p.ly;
 
-  // Running feet peek out under the robe
-  if (p.run) {
-    ctx.fillStyle = '#7a4a26';
-    ctx.beginPath();
-    ctx.ellipse(-5 + sw * 8, 1 - Math.max(0, sw) * 4, 6, 3.2, 0, 0, TAU);
-    ctx.ellipse(5 - sw * 8, 1 - Math.max(0, -sw) * 4, 6, 3.2, 0, 0, TAU);
-    ctx.fill();
-  }
-
   if (mood === 'joy' && p.kneel < 0.5) {
     const wave = Math.sin(t * 9 + d.phase) * 4;
     arm(-11, -32, -24 + wave, -66);
     arm(11, -32, 24 - wave, -66);
-  } else if (mood === 'wow' && !p.run && d.i % 2 === 0) {
+  } else if (mood === 'wow' && d.i % 2 === 0) {
     arm(11, -32, 22, -70);
   }
 
@@ -441,10 +404,7 @@ function drawPerson(p) {
   ctx.beginPath(); ctx.moveTo(-16, -17 + K * 0.6); ctx.quadraticCurveTo(0, -14 + K * 0.6, 16, -17 + K * 0.6); ctx.stroke();
 
   // Arms
-  if (p.run && !(mood === 'joy' && p.kneel < 0.5)) {
-    arm(-11, -32, -14 - sw * 9, -16 - Math.abs(sw) * 4);
-    arm(11, -32, 14 - sw * 9, -16 - Math.abs(sw) * 4);
-  } else if (p.kneel >= 0.5) {
+  if (p.kneel >= 0.5) {
     arm(-11, -32, -2, -30); arm(11, -32, 2, -30);            // hands together in worship
   } else if (mood === 'watch' || (mood === 'wow' && d.i % 2 !== 0)) {
     arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
@@ -1030,7 +990,7 @@ function onBeat(k) {
 }
 
 function inputDown() {
-  return ['Space', 'ArrowUp', 'KeyW', 'Enter'].some((k) => keys.has(k)) || pointers.size > 0;
+  return ACTION_KEYS.some((k) => keys.has(k)) || pointers.size > 0;
 }
 
 function songTime() {
@@ -1153,124 +1113,7 @@ function updateAngel(dt) {
   const a = ang.t;
   if (a > 1.2 && !ang.sang) { ang.sang = true; sfx.levelStart(); }
   if (a > 1.35 && a - dt <= 1.35) showMessage('"He is not here: for he is\nrisen, as he said."', 2.2);
-  if (a > 3.5 && a - dt <= 3.5) showMessage('Go quickly, and tell\nhis disciples!', 1.8);
-  if (a > 5.1) whiteA = clamp((a - 5.1) / 0.5, 0, 1);
-  if (a >= 5.6) startRun();
-}
-
-// ============================================================
-//  Phase 2: run and tell
-// ============================================================
-const OB = { root: [58, 22], rock: [44, 30], basket: [46, 40], puddle: [96, 0] };
-
-function womanX() { return clamp(W * 0.28, 120, 360); }
-
-function startRun() {
-  phase = 'run';
-  whiteA = 1;
-  const obs = [], lil = [];
-  const cityX = cfg.runLen * 0.45;
-  let x = 820;
-  while (x < cfg.runLen - 520) {
-    const city = x > cityX;
-    const types = city ? ['basket', 'puddle', 'basket'] : ['root', 'puddle', 'root', 'rock'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const [w, h] = OB[type];
-    obs.push({ type, x, w, h, hit: false, seed: Math.random() });
-    [-1, 0, 1].forEach((k) => lil.push({ x: x + w / 2 + k * 56, h: [72, 122, 72][k + 1], got: false }));
-    const gap = rand(cfg.gapT[0], cfg.gapT[1]) * cfg.runSpeed;
-    if (gap > 360) for (let k = 0; k < 3; k++) lil.push({ x: x + w + gap * 0.3 + k * 44, h: 34, got: false });
-    x += w + gap;
-  }
-  run = {
-    x: 0, h: 0, vy: 0, grounded: true, coyote: 0, buffer: 0, invuln: 0, slowT: 0, stumbleT: 0,
-    stumbles: 0, lilies: 0, dropped: 0, hist: [], obs, lil, cityX, spd: cfg.runSpeed, hinted: false,
-  };
-  particles = [];
-  for (const p of marys) { p.run = true; p.kneel = 0; }
-  showMessage('Run and tell\nthe disciples!', 1.8);
-}
-
-function updateRun(dt) {
-  const r = run;
-  whiteA = Math.max(0, whiteA - dt * 1.6);
-  r.slowT = Math.max(0, r.slowT - dt);
-  r.invuln = Math.max(0, r.invuln - dt);
-  r.stumbleT = Math.max(0, r.stumbleT - dt);
-  r.spd = cfg.runSpeed * (1 - 0.5 * clamp(r.slowT / 0.9, 0, 1));
-  r.x += r.spd * dt;
-  if (!r.hinted && r.x > 260) {
-    r.hinted = true;
-    if (level === 1) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap to jump!' : 'Tap, Space or ↑ to jump!', 2);
-  }
-
-  // Jumping: a short input buffer and "coyote time" keep it forgiving
-  r.buffer = Math.max(0, r.buffer - dt);
-  r.coyote = r.grounded ? 0.1 : Math.max(0, r.coyote - dt);
-  if (r.buffer > 0 && (r.grounded || r.coyote > 0)) {
-    r.vy = JUMP_V; r.grounded = false; r.coyote = 0; r.buffer = 0;
-    sfx.jump();
-  }
-  if (!r.grounded) {
-    r.vy -= RUN_G * dt;
-    r.h += r.vy * dt;
-    if (r.h <= 0) { r.h = 0; r.vy = 0; r.grounded = true; }
-  }
-  r.hist.push({ x: r.x, h: r.h });
-  while (r.hist.length > 2 && r.hist[1].x < r.x - 80) r.hist.shift();
-
-  for (const p of marys) p.runPh += dt * r.spd / 20;
-
-  // Obstacles
-  for (const o of r.obs) {
-    if (o.x > r.x + 30) break;
-    if (o.x + o.w < r.x - 20 || o.hit) continue;
-    let touch;
-    if (o.type === 'puddle') touch = r.h < 3 && r.x + 6 > o.x + 16 && r.x - 6 < o.x + o.w - 16;
-    else touch = r.h < o.h - 5 && r.x + 12 > o.x + 6 && r.x - 12 < o.x + o.w - 6;
-    if (touch && r.invuln <= 0) stumble(o);
-  }
-  // Lilies
-  for (const l of r.lil) {
-    if (l.got || Math.abs(l.x - r.x) > 40) continue;
-    if (Math.hypot(l.x - r.x, l.h - (r.h + 36)) < 40) {
-      l.got = true; r.lilies++;
-      sfx.pick(r.lilies);
-      const sx = womanX() + (l.x - r.x);
-      for (let i = 0; i < 8; i++) spawn(sx, RUN_GY - l.h, rand(-60, 60), rand(-80, 10), 0.5, i % 2 ? '#fffdf4' : '#ffe27a', rand(2, 3.5));
-    }
-  }
-  if (r.x >= cfg.runLen) startFinale();
-}
-
-function stumble(o) {
-  const r = run;
-  o.hit = true;
-  r.stumbles++; r.invuln = 1.3; r.slowT = 0.9; r.stumbleT = 0.6;
-  shakeT = 0.25;
-  sfx.bounce();
-  const sx = womanX();
-  if (o.type === 'puddle') {
-    for (let i = 0; i < 14; i++) spawn(sx + rand(-20, 20), RUN_GY, rand(-90, 90), rand(-200, -80), 0.6, '#8fd0f5', rand(2, 4), 500);
-  }
-  if (r.stumbles % 2 === 0 && r.lilies > 0) {
-    const drop = Math.min(3, r.lilies);
-    r.lilies -= drop; r.dropped += drop;
-    for (let i = 0; i < drop * 4; i++) spawn(sx + rand(-10, 10), RUN_GY - 50, rand(-140, 40), rand(-220, -80), 1, i % 4 ? '#fffdf4' : '#5da544', rand(3, 5), 600);
-    showMessage(`Oops! Dropped ${drop} ${drop === 1 ? 'lily' : 'lilies'}`, 1.4);
-  } else {
-    showMessage(o.type === 'puddle' ? 'Splash! Keep going!' : 'Stumble! Keep going!', 1.2);
-  }
-}
-
-// Height of the second Mary, who follows a step behind
-function followerH() {
-  const want = run.x - 46;
-  const hist = run.hist;
-  for (let i = hist.length - 1; i > 0; i--) {
-    if (hist[i - 1].x <= want) return hist[i - 1].h;
-  }
-  return hist.length ? hist[0].h : 0;
+  if (a >= 3.6) startFinale();
 }
 
 // ============================================================
@@ -1278,26 +1121,27 @@ function followerH() {
 // ============================================================
 function startFinale() {
   phase = 'finale';
-  run.x = cfg.runLen;
-  fin = { t: 0, wx: womanX(), sang: false };
+  fin = { t: 0, sang: false };
   flashT = 0.6;
-  showMessage('Behold, Jesus met them!', 1.4);
-  for (const p of disciples) { p.mood = 'shock'; p.run = true; }
+  showMessage('Behold, Jesus met them!', 1.3);
 }
+
+// Where the risen Lord stands: in the garden, between the women and the tomb
+function jesusX(L) { return L.mx[1] + clamp((L.gx[1] - L.mx[1]) * 0.45, 62, 200); }
 
 function updateFinale(dt) {
   fin.t += dt;
   const f = fin.t;
   if (f > 0.25 && !fin.sang) { fin.sang = true; sfx.win(); }
-  if (state !== 'play') return;
-  if (f > 1.4 && f - dt <= 1.4) showMessage('"All hail."', 1.3);
-  if (f > 2.7 && f - dt <= 2.7) showMessage('"Mary."  —  "Rabboni!"', 1.4);
-  if (f > 4.2 && f - dt <= 4.2) showMessage('The Lord is risen indeed!', 1.9);
+  for (const p of marys) p.kneel = ease((f - 2.4) / 0.6);
   if (Math.random() < dt * 10) {
-    const jx = W * 0.68;
-    spawn(jx + rand(-60, 60), RUN_GY - rand(0, 110), rand(-10, 10), -30, 1.2, Math.random() < 0.5 ? '#fff6d0' : '#ffe27a', rand(2, 3.5));
+    const jx = jesusX(gardenLayout());
+    spawn(jx + rand(-50, 50), GY - 46 - rand(0, 110), rand(-10, 10), -30, 1.2, Math.random() < 0.5 ? '#fff6d0' : '#ffe27a', rand(2, 3.5));
   }
-  if (f >= 6.2) win();
+  if (state !== 'play') return;
+  if (f > 1.3 && f - dt <= 1.3) showMessage('"All hail."', 1.2);
+  if (f > 2.5 && f - dt <= 2.5) showMessage('"Mary."  —  "Rabboni!"', 1.6);
+  if (f >= 4.6) win();
 }
 
 // ============================================================
@@ -1309,12 +1153,11 @@ function win() {
   const acc = judged ? Math.round((rh.perfect + rh.good * 0.5) / judged * 100) : 0;
   const rhythm = rh.pts;
   const combo = rh.bestCombo * 20;
-  const lilies = run.lilies * 25;
   const levelBonus = level * 500;
-  const score = rhythm + combo + lilies + levelBonus;
+  const score = rhythm + combo + levelBonus;
   totalScore += score;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('emptyTombBest', best); } catch (e) {} }
-  lastScore = { acc, rhythm, combo, bestCombo: rh.bestCombo, lilies, lilyCount: run.lilies, levelBonus, score };
+  lastScore = { acc, rhythm, combo, bestCombo: rh.bestCombo, levelBonus, score };
   endTimer = 1.0;
 }
 
@@ -1353,13 +1196,12 @@ ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); })
 ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
 
 function resetScene() {
-  rh = null; ang = null; run = null; fin = null;
+  rh = null; ang = null; fin = null;
   phase = 'rhythm';
   stoneShow = 0;
   particles = []; pops = []; ripples.length = 0;
-  shockT = flashT = shakeT = whiteA = 0;
-  for (const p of marys) { p.run = false; p.kneel = 0; p.lean = 0; }
-  for (const p of disciples) { p.run = false; }
+  shockT = flashT = shakeT = 0;
+  for (const p of marys) p.kneel = 0;
   for (const g of guards) { g.faint = 0; g.hop = 0; g.hopV = 0; }
 }
 
@@ -1372,7 +1214,7 @@ function titleScreen() {
      <ul>
        <li>Easter morning: help <b>roll back the great stone</b>! <b>Tap</b> (or press <kbd>Space</kbd>) as each glowing note reaches the ring. Blue notes: <b>hold</b>.</li>
        <li>Perfect taps push hardest. Big combos make the earth tremble! Finish before the <b>sun is fully up</b>.</li>
-       <li>Then <b>run and tell</b> the disciples: <b>tap</b> (or <kbd>&uarr;</kbd> / <kbd>Space</kbd>) to jump roots, baskets and puddles, and gather lilies.</li>
+       <li>Roll it away and see what the women found that first Easter morning&hellip;</li>
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
     'Begin', () => { level = 1; totalScore = 0; startLevel(); });
@@ -1397,7 +1239,7 @@ function endScreens(dt) {
     const s = lastScore;
     showOverlay('He Is Risen!', `Level ${level} complete — ${cfg.name}`,
       `<p class="verse">"The Lord is risen indeed." &mdash; Luke 24:34</p>
-       <p class="score">Rhythm (${s.acc}% accuracy): <b>${s.rhythm}</b><br>Best combo ${s.bestCombo}: <b>${s.combo}</b><br>Lilies ${s.lilyCount}: <b>${s.lilies}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score">Rhythm (${s.acc}% accuracy): <b>${s.rhythm}</b><br>Best combo ${s.bestCombo}: <b>${s.combo}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
       'Next Morning', () => { level++; startLevel(); });
   } else if (state === 'fail') {
@@ -1427,12 +1269,11 @@ function togglePause() {
 // ============================================================
 const keys = new Set();
 const pointers = new Set();
-const ACTION_KEYS = ['Space', 'ArrowUp', 'KeyW', 'Enter'];
+const ACTION_KEYS = ['Space', 'ArrowUp', 'Enter'];
 
 function press() {
   if (state !== 'play') return;
   if (phase === 'rhythm' && rh) judgeTap();
-  else if (phase === 'run') run.buffer = 0.13;
 }
 
 window.addEventListener('keydown', (e) => {
@@ -1720,18 +1561,11 @@ Object.assign(sfx, {
   },
   miss() { this.tone(150, 0.14, 'triangle', 0.12, 0, 110); },
   rumble() { this.noiseHit(180, 0.9, 0.7, 'lowpass'); this.tone(55, 0.8, 'sine', 0.4, 0, 38); },
-  pick(n) {
-    const f = noteFreq(TAP_SCALE[3 + (n % 5)]);
-    this.tone(f * 2, 0.14, 'sine', 0.18); this.tone(f * 3, 0.16, 'sine', 0.1, 0.05);
-  },
-  jump() { this.puff(0.1); this.tone(420, 0.12, 'sine', 0.1, 0, 640); },
 });
 
 // ============================================================
 //  Rendering
 // ============================================================
-const inGarden = () => phase === 'rhythm' || phase === 'angel';
-
 function drawGardenSky() {
   const f = skyF;
   const g = ctx.createLinearGradient(0, -offY, 0, GY);
@@ -1882,6 +1716,8 @@ function drawGardenScene() {
   drawGardenSky();
   drawGardenGround(L);
   drawTomb(L);
+  // the risen Lord appears in the garden (Matthew 28:9), a little behind the fainted guards
+  if (phase === 'finale') drawRisenJesus(jesusX(L), GY - 46, 1.25, ease(fin.t / 0.8), fin.t > 1.1 && fin.t < 2.4);
   // the Marys watching the stone
   const tgtX = L.stoneX, tgtY = GY - 60;
   L.mx.forEach((x, k) => {
@@ -1891,14 +1727,15 @@ function drawGardenScene() {
     const len = Math.hypot(dx, dy) || 1;
     p.lx = dx / len; p.ly = dy / len;
     if (phase === 'angel') { p.lx = 0.9; p.ly = -0.44; }
+    if (phase === 'finale') { p.lx = 0.95; p.ly = -0.3; }
     drawPerson(p);
   });
   guards.forEach((g, k) => drawGuard(g, L.gx[k], GY - g.hop));
   // the angel descends and sits upon the stone
-  if (phase === 'angel') {
-    const d = ease(ang.t / 1.2);
+  if (phase === 'angel' || phase === 'finale') {
+    const d = phase === 'finale' ? 1 : ease(ang.t / 1.2);
     const ax = L.doorX + L.roll, ay = lerp(-offY - 120, GY - 2 * L.R + 4, d);
-    drawAngel(ax, ay, 1.05, clamp(ang.t * 3, 0, 1));
+    drawAngel(ax, ay, 1.05, phase === 'finale' ? 1 : clamp(ang.t * 3, 0, 1));
   }
   // foreground lilies
   for (let k = 0; k < 9; k++) {
@@ -1989,206 +1826,11 @@ function drawNote(x, y, n, missed) {
   ctx.beginPath(); ctx.moveTo(x + 1, y + 4); ctx.lineTo(x + 1, y - 9); ctx.quadraticCurveTo(x + 6, y - 6, x + 7, y - 2); ctx.stroke();
 }
 
-// ---------- Run scene ----------
-function runCam() { return run ? run.x : 0; }
-
-function drawRunScene() {
-  const cam = runCam(), wx = womanX();
-  const cityAt = (worldX) => worldX > run.cityX;
-  // bright morning sky
-  const g = ctx.createLinearGradient(0, -offY, 0, RUN_GY);
-  g.addColorStop(0, '#7fc0ec'); g.addColorStop(0.7, '#cfeaf7'); g.addColorStop(1, '#fff0c0');
-  ctx.fillStyle = g; ctx.fillRect(-offX, -offY, viewW, viewH);
-  const sg = ctx.createRadialGradient(W * 0.12, 250, 10, W * 0.12, 250, 200);
-  sg.addColorStop(0, 'rgba(255,245,190,0.9)'); sg.addColorStop(1, 'rgba(255,245,190,0)');
-  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.12, 250, 200, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#fff6c8'; ctx.beginPath(); ctx.arc(W * 0.12, 250, 40, 0, TAU); ctx.fill();
-  for (const c of bgClouds) {
-    const x = -offX - 150 + ((c.f + (t * c.speed + cam * 0.05) / (viewW + 300)) % 1) * (viewW + 300);
-    drawCloud(viewW - x - offX * 2, c.y - 60, c.w, c.w * 0.3, 'rgba(255,255,255,0.9)', 'rgba(220,235,250,0.8)');
-  }
-  const x0 = -offX - 10, x1 = W + offX + 10;
-  // far hills (slow)
-  ctx.fillStyle = '#b5d69a';
-  ctx.beginPath(); ctx.moveTo(x0, RUN_GY);
-  for (let x = x0; x <= x1; x += 20) { const u = x + cam * 0.15; ctx.lineTo(x, RUN_GY - 120 + Math.sin(u / 110) * 20 + Math.sin(u / 43) * 7); }
-  ctx.lineTo(x1, RUN_GY); ctx.fill();
-
-  // middle layer: olive trees in the garden, houses in the city
-  const P = 0.55, sp = 150;
-  const u0 = Math.floor((cam * P + x0 - wx - 100) / sp) * sp;
-  for (let u = u0; u < cam * P + x1 - wx + 150; u += sp) {
-    const sx = u - cam * P + wx, h = hash(u);
-    const world = u / P;
-    if (cityAt(world)) drawHouse(sx, RUN_GY - 30, 90 + h * 50, 80 + hash(u + 1) * 70, h, true);
-    else drawOlive(sx, RUN_GY - 30, 0.75 + h * 0.3, Math.sin(t * 1.3 + u) * 2);
-  }
-  // path / street
-  const cityScreen = run.cityX - cam + wx;
-  ctx.fillStyle = '#86b95d';
-  ctx.fillRect(x0, RUN_GY - 34, Math.max(0, Math.min(cityScreen, x1) - x0), 34);
-  ctx.fillStyle = '#c9a877';
-  ctx.fillRect(x0, RUN_GY - 4, x1 - x0, H - RUN_GY + 10);
-  if (cityScreen < x1) {
-    ctx.fillStyle = '#d8c39a';
-    const cs = Math.max(cityScreen, x0);
-    ctx.fillRect(cs, RUN_GY - 34, x1 - cs, 34);
-    ctx.fillStyle = '#bfa679';
-    ctx.fillRect(cs, RUN_GY - 4, x1 - cs, H - RUN_GY + 10);
-    // cobbles
-    ctx.strokeStyle = 'rgba(120,95,60,0.35)'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let row = 0; row < 3; row++) {
-      const yy = RUN_GY + 14 + row * 26;
-      const off = (row % 2) * 20;
-      for (let x = Math.floor((cam + cs - wx) / 40) * 40 + off; x - cam + wx < x1; x += 40) {
-        const sx = x - cam + wx;
-        if (sx < cs) continue;
-        ctx.moveTo(sx + 16, yy); ctx.arc(sx, yy, 16, 0, Math.PI, true);
-      }
-    }
-    ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(90,70,40,0.25)';
-  ctx.fillRect(x0, RUN_GY - 4, x1 - x0, 4);
-  // roadside lilies in the garden
-  const lu0 = Math.floor((cam + x0 - wx) / 90) * 90;
-  for (let u = lu0; u < cam + x1 - wx + 90; u += 90) {
-    if (cityAt(u) || hash(u * 0.37) < 0.45) continue;
-    drawLily(u - cam + wx, RUN_GY - 18, 0.7);
-  }
-  // the city gate
-  const gx = cityScreen;
-  if (gx > x0 - 120 && gx < x1 + 120) drawGate(gx);
-
-  // obstacles and lilies
-  for (const o of run.obs) {
-    const sx = o.x - cam + wx;
-    if (sx < x0 - 120 || sx > x1 + 20) continue;
-    drawObstacle(o, sx);
-  }
-  for (const l of run.lil) {
-    if (l.got) continue;
-    const sx = l.x - cam + wx;
-    if (sx < x0 - 30 || sx > x1 + 30) continue;
-    drawLily(sx, RUN_GY - l.h + 18 + Math.sin(t * 3 + l.x) * 3, 0.9, true);
-  }
-
-  // finale: the risen Lord, and the disciples running to see
-  if (phase === 'finale') {
-    const jx = Math.max(W * 0.68, fin.wx + 120);
-    disciples.forEach((p, k) => {
-      const target = lerp(W * 0.5, W - 30, k / (disciples.length - 1));
-      const f = ease((fin.t - 3 - k * 0.15) / 1.3);
-      if (f <= 0) return;
-      p.x = lerp(x1 + 40 + k * 30, target, f); p.y = RUN_GY - 20; p.s = 0.85; p.dim = true;
-      p.run = f < 1; p.runPh += 0.25;
-      p.lx = jx < p.x ? -0.9 : 0.9; p.ly = 0.1;
-      drawPerson(p);
-    });
-    drawRisenJesus(jx, RUN_GY + 2, 1.35, ease(fin.t / 0.8), fin.t > 1.2 && fin.t < 2.6);
-  }
-
-  // the two Marys
-  const [m1, m2] = marys;
-  let lead = wx, h1 = run.h, h2 = followerH();
-  if (phase === 'finale') {
-    lead = lerp(wx, Math.max(W * 0.42, wx), ease(fin.t / 1.3));
-    h1 = h2 = 0;
-    const walking = fin.t < 1.3;
-    const k = ease((fin.t - 1.6) / 0.6);
-    for (const p of marys) { p.run = walking; p.kneel = k; p.lean = 0; if (walking) p.runPh += 0.2; }
-  } else {
-    const lean = run.stumbleT > 0 ? -0.18 : 0.1;
-    m1.lean = lean; m2.lean = 0.1;
-    m1.run = run.grounded; m2.run = h2 < 1;
-  }
-  for (const [p, x, h] of [[m2, lead - 46, h2], [m1, lead, h1]]) {
-    p.x = x; p.y = RUN_GY - h; p.s = 1.05; p.dim = false;
-    p.lx = 0.9; p.ly = -0.2;
-    if (run.invuln > 0 && p === m1 && phase === 'run' && Math.sin(t * 30) > 0.3) ctx.globalAlpha = 0.55;
-    drawPerson(p);
-    ctx.globalAlpha = 1;
-  }
-}
-
-function drawHouse(x, base, w, h, v, far) {
-  const wall = ['#f1e2c0', '#e8d2a6', '#f5e9d2', '#e2c79b'][Math.floor(v * 4)];
-  ctx.fillStyle = far ? wall : shade(wall.replace('#', '#'), -8);
-  roundRect(x - w / 2, base - h, w, h, 3); ctx.fill();
-  ctx.fillStyle = shade(wall, -30);
-  ctx.fillRect(x - w / 2 - 4, base - h - 6, w + 8, 7);
-  if (v > 0.7) {   // a little dome
-    ctx.fillStyle = wall;
-    ctx.beginPath(); ctx.arc(x, base - h - 6, w * 0.22, Math.PI, TAU); ctx.fill();
-  }
-  ctx.fillStyle = '#6b4a2b';
-  roundRect(x - 11, base - 38, 22, 38, [11, 11, 0, 0]); ctx.fill();
-  ctx.fillStyle = '#4a3a2a';
-  for (const dx of [-w * 0.3, w * 0.3]) { roundRect(x + dx - 7, base - h + 18, 14, 18, [7, 7, 0, 0]); ctx.fill(); }
-  if (v < 0.35) {  // a striped awning
-    const cols = ['#c0392b', '#f5e9d2'];
-    for (let k = 0; k < 5; k++) {
-      ctx.fillStyle = cols[k % 2];
-      ctx.fillRect(x - w * 0.4 + k * w * 0.16, base - 58, w * 0.16, 12);
-    }
-  }
-}
-
-function drawGate(x) {
-  ctx.fillStyle = '#d9c092'; ctx.strokeStyle = '#a88a5a'; ctx.lineWidth = 2;
-  roundRect(x - 90, RUN_GY - 200, 180, 30, 4); ctx.fill(); ctx.stroke();
-  for (let k = 0; k < 6; k++) { ctx.fillRect(x - 88 + k * 32, RUN_GY - 214, 18, 14); }
-  roundRect(x - 90, RUN_GY - 180, 40, 180, 3); ctx.fill(); ctx.stroke();
-  roundRect(x + 50, RUN_GY - 180, 40, 180, 3); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x - 50, RUN_GY - 120); ctx.quadraticCurveTo(x, RUN_GY - 190, x + 50, RUN_GY - 120);
-  ctx.lineTo(x + 50, RUN_GY - 170); ctx.lineTo(x - 50, RUN_GY - 170); ctx.closePath(); ctx.fill();
-  ctx.font = '700 14px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#7a5a2a';
-  ctx.fillText('Jerusalem', x, RUN_GY - 180);
-}
-
-function drawObstacle(o, x) {
-  const y = RUN_GY;
-  if (o.type === 'root') {
-    ctx.strokeStyle = '#6b4424'; ctx.lineWidth = 9; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + o.w * 0.3, y - o.h * 1.6, x + o.w * 0.6, y - 4);
-    ctx.quadraticCurveTo(x + o.w * 0.8, y - o.h, x + o.w, y); ctx.stroke();
-    ctx.strokeStyle = '#8a5a30'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(x + 6, y - 6); ctx.quadraticCurveTo(x + o.w * 0.3, y - o.h * 1.4, x + o.w * 0.55, y - 8); ctx.stroke();
-  } else if (o.type === 'rock') {
-    ctx.fillStyle = '#a39c90'; ctx.strokeStyle = '#6e685e'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 2, y - o.h, x + o.w * 0.5, y - o.h);
-    ctx.quadraticCurveTo(x + o.w, y - o.h, x + o.w, y); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.beginPath(); ctx.ellipse(x + o.w * 0.35, y - o.h * 0.7, 7, 4, -0.3, 0, TAU); ctx.fill();
-  } else if (o.type === 'basket') {
-    ctx.fillStyle = '#c98f45'; ctx.strokeStyle = '#8a5a22'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x, y - o.h + 8); ctx.lineTo(x + o.w, y - o.h + 8); ctx.lineTo(x + o.w - 5, y); ctx.lineTo(x + 5, y); ctx.closePath();
-    // fruit and bread peeking out
-    ctx.save();
-    ctx.fillStyle = '#e8a33a'; ctx.beginPath(); ctx.ellipse(x + o.w * 0.35, y - o.h + 6, 11, 7, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#d64a3a'; ctx.beginPath(); ctx.arc(x + o.w * 0.68, y - o.h + 5, 7, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#7a3fa0'; ctx.beginPath(); ctx.arc(x + o.w * 0.55, y - o.h + 2, 5, 0, TAU); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = '#c98f45';
-    ctx.beginPath(); ctx.moveTo(x, y - o.h + 8); ctx.lineTo(x + o.w, y - o.h + 8); ctx.lineTo(x + o.w - 5, y); ctx.lineTo(x + 5, y); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    for (let k = 1; k < 4; k++) { ctx.moveTo(x + 3, y - o.h + 8 + k * 8); ctx.lineTo(x + o.w - 3, y - o.h + 8 + k * 8); }
-    ctx.stroke();
-  } else if (o.type === 'puddle') {
-    ctx.fillStyle = '#7fc4ec';
-    ctx.beginPath(); ctx.ellipse(x + o.w / 2, y + 2, o.w / 2, 9, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(x + o.w / 2 - 8, y + 1, 16 + Math.sin(t * 3 + o.seed * 9) * 3, 3, 0, 0, TAU); ctx.stroke();
-  }
-}
-
 // ---------- HUD ----------
 function drawHUD() {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
-  const dark = inGarden() && skyF < 0.5;
+  const dark = skyF < 0.5;
   const ink = dark ? '#fff1c9' : '#5a4210';
   ctx.shadowColor = dark ? 'rgba(20,20,60,0.9)' : 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
 
@@ -2198,16 +1840,14 @@ function drawHUD() {
   ctx.font = '700 17px Fredoka, sans-serif';
   ctx.fillText(state === 'title' ? 'He Is Risen' : `Level ${level} · ${cfg.name}`, 12, 26);
   ctx.font = '600 12px Fredoka, sans-serif';
-  const isRun = phase === 'run' || phase === 'finale';
-  ctx.fillText(isRun ? 'TELL' : 'STONE', 12, 48);
+  ctx.fillText('STONE', 12, 48);
   ctx.shadowBlur = 0;
   ctx.fillStyle = dark ? 'rgba(255,241,201,0.25)' : 'rgba(90,66,16,0.25)';
   roundRect(58, 38, 130, 13, 6.5); ctx.fill();
-  const prog = isRun ? clamp(run.x / cfg.runLen, 0, 1) : stoneShow;
   const gg = ctx.createLinearGradient(58, 0, 188, 0);
   gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8');
   ctx.fillStyle = rh && rh.slow && phase === 'rhythm' && Math.sin(t * 10) > 0 ? '#ff9f6b' : gg;
-  if (prog > 0.01) { roundRect(58, 38, 130 * prog, 13, 6.5); ctx.fill(); }
+  if (stoneShow > 0.01) { roundRect(58, 38, 130 * stoneShow, 13, 6.5); ctx.fill(); }
 
   // Pause / mute buttons
   for (const b of hudButtons()) {
@@ -2229,35 +1869,26 @@ function drawHUD() {
     }
   }
 
-  // Right: sunrise timer, or lilies
+  // Right: sunrise timer
   const rx = viewW - 12;
   ctx.textAlign = 'right';
   ctx.shadowBlur = 4;
   ctx.fillStyle = ink;
-  if (isRun) {
-    ctx.font = '600 12px Fredoka, sans-serif';
-    ctx.fillText('LILIES', rx, 20);
-    ctx.font = '700 22px Fredoka, sans-serif';
-    ctx.fillText(`${run.lilies}`, rx, 44);
-    ctx.shadowBlur = 0;
-    drawLily(rx - 38, 50, 0.6);
-  } else {
-    ctx.font = '600 12px Fredoka, sans-serif';
-    ctx.fillText('SUNRISE', rx, 20);
-    ctx.shadowBlur = 0;
-    const sf = rh ? clamp((rh.T + 1.4) / (rh.sunEnd + 1.4), 0, 1) : 0;
-    ctx.fillStyle = dark ? 'rgba(255,241,201,0.25)' : 'rgba(90,66,16,0.25)';
-    roundRect(rx - 100, 28, 100, 11, 5.5); ctx.fill();
-    ctx.fillStyle = sf > 0.8 && phase === 'rhythm' && Math.sin(t * 8) > 0 ? '#ff7a4a' : '#ffb347';
-    if (sf > 0.01) { roundRect(rx - 100, 28, 100 * sf, 11, 5.5); ctx.fill(); }
-    ctx.fillStyle = '#ffe066';
-    ctx.beginPath(); ctx.arc(rx - 100 + 100 * sf, 33.5, 7, 0, TAU); ctx.fill();
-    if (rh && state !== 'title') {
-      ctx.shadowBlur = 4;
-      ctx.font = '700 15px Fredoka, sans-serif';
-      ctx.fillStyle = rh.slow ? '#ff9f6b' : dark ? '#c8f5b0' : '#2b8a3e';
-      ctx.fillText(rh.slow ? 'Slowing…' : `Combo ${rh.combo}`, rx, 62);
-    }
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SUNRISE', rx, 20);
+  ctx.shadowBlur = 0;
+  const sf = rh ? clamp((rh.T + 1.4) / (rh.sunEnd + 1.4), 0, 1) : 0;
+  ctx.fillStyle = dark ? 'rgba(255,241,201,0.25)' : 'rgba(90,66,16,0.25)';
+  roundRect(rx - 100, 28, 100, 11, 5.5); ctx.fill();
+  ctx.fillStyle = sf > 0.8 && phase === 'rhythm' && Math.sin(t * 8) > 0 ? '#ff7a4a' : '#ffb347';
+  if (sf > 0.01) { roundRect(rx - 100, 28, 100 * sf, 11, 5.5); ctx.fill(); }
+  ctx.fillStyle = '#ffe066';
+  ctx.beginPath(); ctx.arc(rx - 100 + 100 * sf, 33.5, 7, 0, TAU); ctx.fill();
+  if (rh && state !== 'title') {
+    ctx.shadowBlur = 4;
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillStyle = rh.slow ? '#ff9f6b' : dark ? '#c8f5b0' : '#2b8a3e';
+    ctx.fillText(rh.slow ? 'Slowing…' : `Combo ${rh.combo}`, rx, 62);
   }
   ctx.restore();
 }
@@ -2271,7 +1902,7 @@ function drawMessage() {
   ctx.textAlign = 'center';
   ctx.font = '700 24px Fredoka, sans-serif';
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
-  const y0 = (inGarden() ? H * 0.4 : H * 0.36) - (lines.length - 1) * 15;
+  const y0 = H * 0.4 - (lines.length - 1) * 15;
   lines.forEach((ln, i) => {
     ctx.strokeText(ln, W / 2, y0 + i * 30);
     ctx.fillStyle = '#7a5200';
@@ -2306,8 +1937,7 @@ function render() {
   if (shakeT > 0) { sx = rand(-5, 5) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
   ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
 
-  if (run && (phase === 'run' || phase === 'finale')) drawRunScene();
-  else drawGardenScene();
+  drawGardenScene();
   drawParticles();
 
   // Tap ripples
@@ -2321,10 +1951,6 @@ function render() {
 
   if (flashT > 0) {
     ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
-    ctx.fillRect(-offX, -offY, viewW, viewH);
-  }
-  if (whiteA > 0) {
-    ctx.fillStyle = `rgba(255,253,240,${whiteA})`;
     ctx.fillRect(-offX, -offY, viewW, viewH);
   }
 
@@ -2342,7 +1968,6 @@ function update(dt) {
   if (state === 'play') {
     if (phase === 'rhythm') updateRhythm(dt);
     else if (phase === 'angel') updateAngel(dt);
-    else if (phase === 'run') updateRun(dt);
     else if (phase === 'finale') updateFinale(dt);
   } else if (state === 'win' && fin) {
     updateFinale(dt);
@@ -2350,7 +1975,7 @@ function update(dt) {
   // the sky brightens as the morning goes on
   let sky = 0.08;
   if (rh && phase === 'rhythm') sky = 0.05 + 0.75 * clamp((rh.T + 1.4) / (rh.sunEnd + 1.4), 0, 1);
-  if (phase === 'angel' || state === 'fail') sky = 1;
+  if (phase === 'angel' || phase === 'finale' || state === 'fail') sky = 1;
   skyF += (sky - skyF) * Math.min(1, dt * 2.5);
   if (phase === 'rhythm' || phase === 'angel') {
     const want = rh ? Math.min(rh.stone, 1) : 0;
