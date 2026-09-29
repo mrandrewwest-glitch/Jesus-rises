@@ -255,7 +255,9 @@ function mix(a, b, f) {
   return `rgb(${r},${g},${bl})`;
 }
 // Darkens a colour toward a dusky blue (canvas filters are too slow)
-const dusk = (hex, f) => mix(hex, '#262a52', f);
+const dusk = (hex, f) => mix(hex, '#3a3466', f);
+// Three colours: afternoon, sunset, night
+const mix3 = (a, b, c, f) => (f < 0.5 ? mix(a, b, f * 2) : mix(b, c, (f - 0.5) * 2));
 
 function wrapText(text, maxW) {
   const words = text.split(' ');
@@ -874,7 +876,7 @@ function updateFade(dt) {
 // ---------- The hillside: Peter asks, Jesus answers ----------
 function crowdSlots() {
   const jx = W * 0.74;
-  const left = 36, right = jx - 70;
+  const left = 36, right = jx - 100;
   const slots = [];
   const backN = clamp(Math.floor((right - left) / 52), 3, 6);
   const frontN = clamp(Math.floor((right - left) / 72), 3, 5);
@@ -926,7 +928,8 @@ function countTap() {
   if (!c.started) { c.started = true; hint = null; }
   c.n = Math.min(c.goal, c.n + c.step);
   const f = c.n / c.goal;
-  floatText(W / 2 + rand(-120, 120), 360 + rand(-20, 20), `${c.n}`, '#b8860b', 20);
+  const side = Math.random() < 0.5 ? -1 : 1;
+  floatText(W / 2 + side * rand(80, Math.min(W / 2 - 50, 220)), 232 + rand(-24, 24), `+${c.step}`, '#b8860b', 20);
   spawn(W / 2 + rand(-60, 60), 300, rand(-60, 60), rand(-90, -30), 0.7, '#ffe27a', rand(2, 4));
   sfx.tap(f);
   setCrowd(f > 0.5 ? 'wow' : 'watch');
@@ -1309,11 +1312,10 @@ function titleScreen() {
     `${verseHTML('howOft')}
      ${verseHTML('seventy')}
      <ul>
-       <li>Jesus tells a story about a king who forgave his servant a <b>mountain of debt</b>&hellip;</li>
-       <li>First, help Peter <b>count to seventy times seven</b> &mdash; tap as fast as you can!</li>
-       <li>Then <b>you</b> are the forgiven servant. Neighbours come who owe you a little. <b>Tap the heart</b> under each one to forgive them and light up the town before night falls.</li>
-       <li>Puff away the grumpy thoughts. And will you <b>Demand</b> payment? Choose well&hellip;</li>
-       <li><b>Keyboard:</b> <kbd>Space</kbd> to count and continue; in town <kbd>1</kbd>&ndash;<kbd>5</kbd> forgive a person, <kbd>Space</kbd> the one waiting longest, <kbd>D</kbd> demand.</li>
+       <li>Jesus tells of a king who forgave his servant a <b>mountain of debt</b>. First, help Peter <b>count to seventy times seven</b> &mdash; tap fast!</li>
+       <li>Then <b>you</b> are the forgiven servant. <b>Tap the heart</b> under each neighbour to forgive their little debt and light up the town before night falls. Puff away grumpy thoughts.</li>
+       <li>Or will you <b>Demand</b> payment? Choose well&hellip;</li>
+       ${isTouch() ? '' : '<li><b>Keyboard:</b> <kbd>Space</kbd> to count and continue; in town <kbd>1</kbd>&ndash;<kbd>5</kbd> forgive a person, <kbd>Space</kbd> the one waiting longest, <kbd>D</kbd> demand.</li>'}
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
@@ -1766,10 +1768,16 @@ function drawTownScene() {
 
   // sky from sunset gold to deep evening blue
   const g = ctx.createLinearGradient(0, -offY, 0, 720);
-  g.addColorStop(0, mix('#ffcf8a', '#1d2150', night));
-  g.addColorStop(0.6, mix('#ffe2a8', '#3a3a78', night));
-  g.addColorStop(1, mix('#ffd9a0', '#5a4a80', night));
+  const skyTop = mix3('#8ec3ee', '#7a6fc0', '#1d2150', night);
+  g.addColorStop(0, skyTop);
+  g.addColorStop(0.55, mix3('#ffe0b0', '#f7a38c', '#3a3a78', night));
+  g.addColorStop(1, mix3('#ffc98a', '#ffb07a', '#5a4a80', night));
   ctx.fillStyle = g; ctx.fillRect(-offX, -offY, viewW, viewH);
+
+  // soft evening clouds, blushing pink as the sun goes down
+  for (const [f, y, w] of [[0.12, 250, 150], [0.5, 150, 120], [0.86, 280, 160], [0.3, -offY * 0.5 + 60, 130], [0.72, -offY * 0.7 + 90, 110]]) {
+    drawCloud(W * f + Math.sin(t * 0.08 + f * 9) * 24, y, w, w * 0.3, mix3('#ffffff', '#ffc4c9', '#5a5a90', night), mix3('#f3dfe6', '#e89aa8', '#44447a', night));
+  }
 
   // the setting sun, then the moon and stars
   const sunY = lerp(330, 640, night);
@@ -1783,7 +1791,7 @@ function drawTownScene() {
     }
     ctx.fillStyle = `rgba(255,250,220,${a})`;
     ctx.beginPath(); ctx.arc(W * 0.2, 190, 26, 0, TAU); ctx.fill();
-    ctx.fillStyle = mix('#ffcf8a', '#1d2150', night);
+    ctx.fillStyle = skyTop;
     ctx.beginPath(); ctx.arc(W * 0.2 + 11, 183, 22, 0, TAU); ctx.fill();
   }
 
@@ -1820,9 +1828,25 @@ function drawTownScene() {
       ctx.fillStyle = on ? mix('#5a4a3a', '#ffd76a', lightMul) : dusk('#5a4a3a', night * 0.5);
       roundRect(wx - 12, top + 34, 24, 30, [12, 12, 2, 2]); ctx.fill();
     }
-    // door
-    ctx.fillStyle = dusk('#8a5a32', night * 0.6);
-    roundRect(x + w * 0.5 - 13 + (nw === 1 ? 26 : 0), 730 - 46, 26, 48, [13, 13, 0, 0]); ctx.fill();
+    // door, with a striped market awning over some of them
+    const dx = x + w * 0.5 + (nw === 1 ? 26 : 0);
+    ctx.fillStyle = dusk(['#3f7fb5', '#8a5a32', '#3c8f86', '#b5503f'][Math.floor(hash(i + 70) * 4)], night * 0.6);
+    roundRect(dx - 13, 730 - 46, 26, 48, [13, 13, 0, 0]); ctx.fill();
+    if (hash(i + 20) < 0.6) {
+      const ac = ['#e8594a', '#3f8fd0', '#f0a53a', '#4bb37a', '#c46b8c'][Math.floor(hash(i + 30) * 5)];
+      for (let k = 0; k < 5; k++) {
+        ctx.fillStyle = dusk(k % 2 ? '#fff3dc' : ac, night * 0.6);
+        ctx.beginPath(); ctx.moveTo(dx - 30 + k * 12, 666); ctx.lineTo(dx - 18 + k * 12, 666); ctx.lineTo(dx - 16 + k * 12, 684); ctx.lineTo(dx - 32 + k * 12, 684); ctx.fill();
+      }
+      ctx.fillStyle = dusk(ac, night * 0.6);
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(dx - 24 + k * 12, 684, 6, 0, Math.PI); ctx.fill(); }
+    }
+    // a pot of greenery by some doors
+    if (hash(i + 40) < 0.45) {
+      ctx.fillStyle = dusk('#c97a4b', night * 0.6); roundRect(dx + 22, 712, 18, 18, 4); ctx.fill();
+      ctx.fillStyle = dusk('#5f9e48', night * 0.6);
+      ctx.beginPath(); ctx.arc(dx + 26, 706, 8, 0, TAU); ctx.arc(dx + 36, 704, 9, 0, TAU); ctx.arc(dx + 31, 697, 8, 0, TAU); ctx.fill();
+    }
     x += w + 8; i++;
   }
 
@@ -1993,6 +2017,7 @@ function drawSpeech(text, ax, ay, alpha) {
 function drawBubble() {
   if (!bubble || bubble.t <= 0) return;
   const h = bubble.who === jesus ? { x: jesus.x, y: jesus.y - 78 * jesus.s } : headOf(bubble.who);
+  if (scene === 'town' && debtors.some((d) => d.p === bubble.who)) h.y = Math.min(h.y, NOTE_Y - 16);   // above the debt tablets
   drawSpeech(bubble.text, h.x, h.y, clamp(bubble.t / 0.3, 0, 1));
 }
 
@@ -2070,8 +2095,9 @@ function drawHUD() {
   ctx.textBaseline = 'alphabetic';
   ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
   const nightHud = scene === 'town' || scene === 'demand' ? clamp(nightNow(), 0, 1) > 0.55 : false;
-  const ink = nightHud ? '#fff4d6' : '#5a4210';
-  if (nightHud) ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  const lightInk = nightHud || scene === 'king';
+  const ink = lightInk ? '#fff4d6' : '#5a4210';
+  if (lightInk) ctx.shadowColor = 'rgba(0,0,0,0.6)';
 
   // Left: level + progress
   ctx.textAlign = 'left';

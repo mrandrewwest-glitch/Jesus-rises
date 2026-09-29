@@ -1312,7 +1312,8 @@ function vineyardKey() {
 function payLayout() {
   const narrow = W < 700;
   const hx = clamp(W * 0.17, 72, 210);
-  return { narrow, hx, y: H - 196, fx: hx + (narrow ? 66 : 84), qy: H - 262, py: H - 70, s: narrow ? 1.02 : 1.25 };
+  // householder and the labourer being paid in front, the queue behind them, the paid crowd at the back
+  return { narrow, hx, y: H - 170, fx: hx + (narrow ? 66 : 90), qy: H - 260, py: H - 360, s: narrow ? 1.05 : 1.4 };
 }
 
 function startPayday() {
@@ -1336,13 +1337,13 @@ function payTargets() {
   const L = payLayout();
   const n = pay.wait.length;
   const sp = clamp((W - L.fx - 90) / Math.max(1, n), 26, 56);
-  pay.wait.forEach((p, j) => { p.gx = L.fx + 64 + j * sp; p.gy = L.qy; p.gs = L.s * 0.9; p.dim = true; });
+  pay.wait.forEach((p, j) => { p.gx = L.fx + 64 + j * sp; p.gy = L.qy; p.gs = L.s * 0.95; p.dim = false; });
   if (pay.front) { pay.front.gx = L.fx; pay.front.gy = L.y; pay.front.gs = L.s; pay.front.dim = false; }
   const m = pay.done.length;
   const x0 = L.narrow ? W * 0.3 : W * 0.36, x1 = W - 34;
   pay.done.forEach((p, j) => {
     p.gx = m === 1 ? (x0 + x1) / 2 : lerp(x0, x1, j / (m - 1));
-    p.gy = L.py - (j % 2) * 16; p.gs = L.s; p.dim = false;
+    p.gy = L.py + (j % 2) * 18; p.gs = L.s * 0.92; p.dim = false;
   });
 }
 
@@ -1387,7 +1388,7 @@ function payTap() {
   if (pay.t < 0.8) return;
   const g = pay.done.find((p) => p.hour === pay.minH);
   if (pay.phase === 'grumble') { pay.phase = 'reply'; pay.t = 0; say(boss, verseText('noWrong'), 99); }
-  else if (pay.phase === 'reply') { pay.phase = 'good'; pay.t = 0; say(boss, verseText('evil'), 99); }
+  else if (pay.phase === 'reply') { pay.phase = 'good'; pay.t = 0; bubbles = bubbles.filter((b) => b.p !== g); say(boss, verseText('evil'), 99); }
   else if (pay.phase === 'good') {
     pay.phase = 'end'; pay.t = 0; bubbles = [];
     setBanner('lastFirst', 99);
@@ -2251,7 +2252,7 @@ function drawPaydayScene() {
   drawRow(0, f);
   // the yard in front of the householder's house
   ctx.fillStyle = land('#e2c996', f);
-  ctx.beginPath(); ctx.ellipse(W / 2, H - 120, W * 0.62 + offX, 200, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(W / 2, H - 150, W * 0.66 + offX, 330, 0, 0, TAU); ctx.fill();
   const L = payLayout();
   // a little table with the pennies
   ctx.fillStyle = land('#9a6a38', f);
@@ -2261,10 +2262,10 @@ function drawPaydayScene() {
   for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.ellipse(L.hx - 44 + (k % 3) * 8, L.y - 53 - Math.floor(k / 3) * 3, 4.5, 2.2, 0, 0, TAU); ctx.fill(); }
 
   if (pay) {
-    for (const p of pay.wait.slice().reverse()) drawPerson(p);
-    drawPerson(boss);
-    if (pay.front) drawPerson(pay.front);
-    for (const p of pay.done.slice().sort((a, b) => a.y - b.y)) drawPerson(p);
+    // depth-sorted so walkers pass behind and in front properly
+    const all = [...pay.wait, ...pay.done, boss, ...(pay.front ? [pay.front] : [])];
+    all.sort((a, b) => a.y - b.y);
+    for (const p of all) drawPerson(p);
     // a penny flying from the householder's hand
     if (pay.coin) {
       const p = pay.coin.p, k = clamp(pay.coin.t / 0.5, 0, 1);
@@ -2385,7 +2386,7 @@ function drawHUD() {
   ctx.fillStyle = dark;
   ctx.font = '700 17px Fredoka, sans-serif';
   ctx.fillText(state === 'title' ? 'The Workers in the Vineyard' : `Level ${level} · ${cfg.name}`, 12, 26);
-  if (state !== 'title') {
+  if (state !== 'title' && scene !== 'frame') {
     ctx.font = '600 12px Fredoka, sans-serif';
     ctx.fillText('DAY', 12, 48);
     ctx.shadowBlur = 0;

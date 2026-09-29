@@ -251,8 +251,8 @@ function mixCol(c1, c2, f) {
 //  Tuning
 // ============================================================
 const GROUND = 740;       // where feet stand on the street
-const WALK = 150;         // the widow's walking speed (px/s)
-const DASH = 340;         // scurrying past a guard
+const WALK = 185;         // the widow's walking speed (px/s)
+const DASH = 380;         // scurrying past a guard
 const HUT_X = 78;         // the widow's little house
 const MAX_HOPE = 3;       // hearts per level
 const WIN_DELAY = 5.2;    // time to read the judge's words before the card
@@ -336,7 +336,7 @@ let lastScore = null;
 
 function makeWidow() {
   return {
-    x: HUT_X + 22, y: GROUND, s: 1.3,
+    x: HUT_X + 22, y: GROUND, s: 1.5,
     robe: '#6b4a7a', hair: '#9a9a9a', skin: '#d9a066', scarf: '#3f5a8a', beard: false,
     mood: 'determined', pose: 'walk', dir: 1, lx: 0.6, ly: 0, i: 1, phase: 0,
     walkT: 0, knockAnim: 0, hop: 0, kneel: false, blink: 0, blinkT: 2,
@@ -363,6 +363,10 @@ function buildWorld() {
   const keeperX = 350 + cfg.guards * 230 + (cfg.guards ? 30 : 10);
   obstacles.push(makeObstacle('keeper', keeperX, 9));
   doorX = keeperX + 160;
+  // On wide screens spread the street out (a little) so it fills the view
+  const extra = clamp(W - 200 - doorX, 0, 340);
+  obstacles.forEach((o, k) => { o.x += extra * (k + 1) / obstacles.length; });
+  doorX += extra;
   worldW = Math.max(W, doorX + 175);
 
   // Townsfolk watching from the pavement
@@ -381,7 +385,7 @@ function buildWorld() {
   for (let x = doorX + 215; x < worldW - 30; x += 125) spots.push(x);
   spots.forEach((x, k) => {
     const l = looks[k % looks.length];
-    crowd.push({ ...l, x: x + rand(-14, 14), y: GROUND - 58, s: l.small ? 0.72 : 0.9, dim: true, i: k, mood: 'watch',
+    crowd.push({ ...l, x: x + rand(-14, 14), y: GROUND - 58, s: l.small ? 0.8 : 1.0, dim: true, i: k, mood: 'watch',
       switchT: 0, delay: rand(0.05, 0.45), blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU), pose: 'rest', lx: 0, ly: 0.2 });
   });
 }
@@ -391,15 +395,15 @@ function makeObstacle(type, x, i) {
     type, x, i, passed: false, mode: 'watch', t: rand(0.6, 1.4), bubbleCd: 0,
     p: type === 'guard'
       ? { robe: ['#8a5a3a', '#6d6a45', '#7a4e5a'][i % 3], hair: '#2a1a0e', beard: i % 2 === 0, skin: ['#c98d56', '#d9a066', '#b87a48'][i % 3],
-          hat: 'helmet', mood: 'grumpy', pose: 'stop', i: i + 3, phase: rand(0, TAU), s: 1.3, blink: 0, blinkT: 2 }
+          hat: 'helmet', mood: 'grumpy', pose: 'stop', i: i + 3, phase: rand(0, TAU), s: 1.45, blink: 0, blinkT: 2 }
       : { robe: '#4b7f4b', hair: '#6b4a2b', beard: true, skin: '#c78f5c', hat: 'turban',
-          mood: 'sleep', pose: 'fold', i: 7, phase: 0, s: 1.25, blink: 0, blinkT: 3, sitting: true },
+          mood: 'sleep', pose: 'fold', i: 7, phase: 0, s: 1.4, blink: 0, blinkT: 3, sitting: true },
   };
   return o;
 }
 
-function waitSpot(o) { return o.x - (o.type === 'keeper' ? 78 : 86); }
-function knockSpot() { return doorX - 66; }
+function waitSpot(o) { return o.x - (o.type === 'keeper' ? 84 : 94); }
+function knockSpot() { return doorX - 72; }
 function currentObstacle() { return obstacles.find((o) => !o.passed) || null; }
 
 // Each guard or doorkeeper cycles: watching -> looking away (safe) -> turning back (warning) -> watching
@@ -432,7 +436,7 @@ function updateObstacle(o, dt) {
     p.pose = phase === 'caught' && o === currentObstacle() ? 'shoo' : 'fold';
     p.lx = -0.8; p.ly = 0.1;
     if (o.mode === 'safe' && Math.random() < dt * 1.6) {
-      spawn(o.x + 12, GROUND - 90, rand(8, 18), rand(-30, -20), 1.6, '#6a5a8a', 11, 0, 'z');
+      spawn(o.x + 14, GROUND - 96, rand(8, 18), rand(-30, -20), 1.8, '#6a5a8a', rand(15, 20), 0, 'z');
     }
   }
   blinkTick(p, dt);
@@ -636,6 +640,11 @@ function drawPerson(p) {
     arm(11, -32, 24 - wave, -66);
   }
   if (pose === 'staffBack') staff(-19);
+  if (p.sitting) {           // the doorkeeper's stool peeks out either side of his robe
+    ctx.fillStyle = C('#8a5a2b');
+    roundRect(-25, bottom - 24, 50, 7, 3); ctx.fill();
+    ctx.fillRect(-23, bottom - 18, 5, 18); ctx.fillRect(18, bottom - 18, 5, 18);
+  }
 
   // Robe
   ctx.fillStyle = robe;
@@ -653,11 +662,6 @@ function drawPerson(p) {
   if (p.hat === 'judge') {   // a fine gold-trimmed robe
     ctx.strokeStyle = C('#e0a526'); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, -39); ctx.lineTo(0, bottom); ctx.stroke();
-  }
-  if (p.sitting) {           // the doorkeeper's stool
-    ctx.fillStyle = C('#8a5a2b');
-    roundRect(-20, bottom - 2, 40, 6, 3); ctx.fill();
-    ctx.fillRect(-16, bottom + 3, 4, low - 3); ctx.fillRect(12, bottom + 3, 4, low - 3);
   }
 
   // Arms in front
@@ -1225,7 +1229,7 @@ function updatePlay(dt) {
     }
     case 'dash': {
       const o = currentObstacle();
-      const target = o.x + 58;
+      const target = o.x + 64;
       widow.x = Math.min(target, widow.x + DASH * dt);
       widow.walkT += dt * 1.6;
       widow.pose = 'walk';
@@ -1755,7 +1759,7 @@ function drawJudgeHouse(night) {
   ctx.fillStyle = '#2a1c12';
   roundRect(doorX - 44, dTop, 88, 150, [44, 44, 0, 0]); ctx.fill();
   if (judge && judge.atDoor) {
-    judge.x = doorX + 4; judge.y = base - 2;
+    judge.x = doorX + 4; judge.y = base - 2; judge.s = 1.4;
     drawPerson(judge);
   }
   const dw = lerp(88, 16, doorOpen);
@@ -1775,7 +1779,7 @@ function drawJudgeHouse(night) {
 
 // A little sign above whoever the widow must slip past
 function drawIndicator(o) {
-  const x = o.x, y = GROUND - (o.type === 'keeper' ? 150 : 175);
+  const x = o.x, y = GROUND - (o.type === 'keeper' ? 160 : 190);
   const col = o.mode === 'watch' ? '#e03131' : o.mode === 'warn' ? '#f59f00' : '#2f9e44';
   const pulse = o.mode === 'safe' ? 1 + Math.sin(t * 8) * 0.06 : 1;
   ctx.save();
@@ -2018,8 +2022,9 @@ function drawHeart(x, y, r, full) {
 function drawHUD() {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
-  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
-  const ink = '#5a4210';
+  const night = nightAmount();
+  ctx.shadowColor = night > 0.5 ? 'rgba(10,10,40,0.8)' : 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  const ink = mixCol('#5a4210', '#fff4d0', night);
 
   // Left: level + the judge's annoyance
   ctx.textAlign = 'left';
@@ -2087,12 +2092,13 @@ function drawMessage() {
   ctx.globalAlpha = a;
   ctx.textAlign = 'center';
   ctx.font = '700 24px Fredoka, sans-serif';
-  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  const night = nightAmount() > 0.4;   // light words on the night sky
+  ctx.lineWidth = 5; ctx.strokeStyle = night ? 'rgba(20,24,70,0.9)' : 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
   const lines = wrapText(message.text, W - 40);
   lines.forEach((l, k) => {
-    const y = H * 0.34 + k * 30;
+    const y = H * 0.29 + k * 30;
     ctx.strokeText(l, W / 2, y);
-    ctx.fillStyle = '#7a5200';
+    ctx.fillStyle = night ? '#ffe9a8' : '#7a5200';
     ctx.fillText(l, W / 2, y);
   });
   ctx.restore();
