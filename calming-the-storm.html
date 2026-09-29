@@ -226,18 +226,21 @@ const SEA_Y = 620;        // calm water line
 const HALF = 220;         // half the boat's length, in boat units
 const MAX_ROLL = 0.62;    // tip further than this and she capsizes (about 35 degrees)
 const DANGER_ROLL = 0.4;  // the tilt gauge turns red from here
-const K_ROLL = 7;         // how firmly the boat follows the slope of the sea
-const D_ROLL = 2.2;       // damping of the rocking
-const WAVE_GAIN = 1.5;    // how much the slope of the waves tips the boat
-const LEAN_EFF = 0.34;    // how far the disciples' weight can lean her (radians)
+const TIP_GRACE = 0.25;   // seconds she can hang past MAX_ROLL before going over
+const K_ROLL = 6;         // how firmly the boat follows the slope of the sea
+const D_ROLL = 4.5;       // damping of the rocking
+const WAVE_GAIN = 0.9;    // how much the slope of the swell tips the boat
+const ROGUE_GAIN = 2.4;   // how much a giant wave tips the boat
+const LEAN_EFF = 0.42;    // how far the disciples' weight can lean her (radians)
 const SLOSH = 0.55;       // water sloshing to the low side makes the rocking worse
-const LEAN_RATE = 4.5;    // how quickly the crew shifts their weight
-const TAP_LEAN_T = 1.1;   // how long one tap keeps them leaning
-const WATER_MAX = 12;     // scoops of water that swamp the boat
+const LEAN_RATE = 6;      // how quickly the crew shifts their weight
+const TAP_LEAN_T = 0.8;   // how long one tap keeps them leaning
+const WATER_MAX = 10;     // scoops of water that swamp the boat
 const PUDDLE_MAX = 3;     // scoops in one puddle
 const DECK_MIN = -92, DECK_MAX = 196;     // where water can collect on the floor
 const PUDDLE_V = -19;     // puddles sit at the front of the floor, where you can reach them
-const JESUS_FEET = { u: -104, v: -33 };   // He lies at the stern, feet toward the bow
+const JESUS_FEET = { u: -102, v: -33 };   // He lies at the stern, feet toward the bow
+const JESUS_S = 1.2;      // He is drawn a little larger than in the other games
 
 const LEVEL_NAMES = [
   'Evening on Galilee',
@@ -251,12 +254,12 @@ const LEVEL_NAMES = [
 function makeConfig(n) {
   return {
     name: LEVEL_NAMES[n - 1] || `Stormy Crossing ${n}`,
-    dur: Math.min(26 + 8 * (n - 1), 70),            // seconds until the disciples can wake Him
-    swell: Math.min(24 + 5 * (n - 1), 48),          // height of the rolling waves
+    dur: Math.min(26 + 7 * (n - 1), 60),            // seconds until the disciples can wake Him
+    swell: Math.min(22 + 3.5 * (n - 1), 36),          // height of the rolling waves
     splashGap: Math.max(0.75, 2.5 - 0.3 * (n - 1)), // seconds between waves splashing in
     splashBig: n >= 3 ? Math.min(0.15 + 0.08 * (n - 3), 0.5) : 0,
-    rogueGap: n === 1 ? 13 : Math.max(5.5, 11 - 1.3 * (n - 2)),
-    rogueH: Math.min(78 + 14 * n, 160),
+    rogueGap: n === 1 ? 13 : Math.max(7, 11 - 1 * (n - 2)),
+    rogueH: Math.min(70 + 10 * n, 120),
     rogueWater: n >= 3 ? 3 : 2,
     gust: Math.min(0.04 + 0.03 * (n - 1), 0.18),
     boltGap: Math.max(2.5, 7.5 - 0.8 * n),
@@ -296,7 +299,7 @@ let stats;
 let tut = { bail: false, lean: false };
 
 function newBoat() {
-  return { x: W / 2, y: SEA_Y, roll: 0, vr: 0, lean: 0, tapLean: 0, tapLeanT: 0, sink: 0 };
+  return { x: W / 2, y: SEA_Y, roll: 0, vr: 0, lean: 0, tapLean: 0, tapLeanT: 0, sink: 0, tipT: 0 };
 }
 
 // Boat size grows a little on wide screens
@@ -311,27 +314,35 @@ function toWorld(u, v) {
 // ============================================================
 //  Sea
 // ============================================================
-function surf(x) {
-  const s = calm;
-  let y = SEA_Y + s * (cfg.swell * Math.sin(x * 0.009 + t * 1.5) +
-                       7 * Math.sin(x * 0.027 - t * 2.6) +
-                       3.5 * Math.sin(x * 0.051 + t * 3.4));
+// The rolling swell (without the giant waves)
+function swell(x) {
+  return SEA_Y + calm * (cfg.swell * Math.sin(x * 0.009 + t * 1.5) +
+                         7 * Math.sin(x * 0.027 - t * 3.3) +
+                         3.5 * Math.sin(x * 0.051 + t * 4.1));
+}
+
+// How much the giant waves lift the sea at x
+function rogueLift(x) {
+  let y = 0;
   for (const w of rogues) {
     const d = (x - w.x) / w.w;
-    if (d > -3 && d < 3) y -= w.h * Math.exp(-d * d);
+    if (d > -3 && d < 3) y += w.h * Math.exp(-d * d);
   }
   return y;
 }
+
+// Water surface at a playfield x
+function surf(x) { return swell(x) - rogueLift(x); }
 
 function water() { let n = 0; for (const p of puddles) n += p.n; return n; }
 
 function spawnRogue() {
   const dir = Math.random() < 0.5 ? 1 : -1;   // 1 = rolling in from the left
-  const speed = 250 + level * 8;
+  const speed = 200 + Math.min(level, 8) * 6;
   const lead = 1.9;                            // seconds of warning
   rogues.push({
     x: boat.x - dir * (HALF * boatScale() + speed * lead),
-    dir, speed, h: cfg.rogueH * rand(0.9, 1.1), w: 105, hit: false,
+    dir, speed, h: cfg.rogueH * rand(0.9, 1.1), w: 140, hit: false,
   });
   warn = { dir, t: lead };
   sfx.warn();
@@ -381,15 +392,16 @@ function updateBoat(dt) {
   b.x = W / 2;
   const L = HALF * bs * 0.8;
   const yl = surf(b.x - L), yr = surf(b.x + L);
-  const wa = Math.atan2(yr - yl, 2 * L) * WAVE_GAIN;
+  const wa = Math.atan2(swell(b.x + L) - swell(b.x - L), 2 * L) * WAVE_GAIN +
+             Math.atan2(rogueLift(b.x - L) - rogueLift(b.x + L), 2 * L) * ROGUE_GAIN;
   const wf = water() / WATER_MAX;
 
   if (state === 'fail') {
     // Over she goes / down she settles
     if (failReason === 'capsize') {
-      const target = (Math.sign(b.roll) || 1) * 1.25;
+      const target = (Math.sign(b.roll) || 1) * 1.05;
       b.roll += (target - b.roll) * Math.min(1, dt * 3);
-      b.sink = Math.min(34 * bs, b.sink + 40 * dt);
+      b.sink = Math.min(48 * bs, b.sink + 45 * dt);
     } else {
       b.roll += (wa * 0.4 - b.roll) * Math.min(1, dt * 2);
       b.sink = Math.min(46 * bs, b.sink + 30 * dt);
@@ -423,7 +435,9 @@ function updateBoat(dt) {
       tut.lean = true;
       showMessage(isTouch() ? 'Tap the HIGH side to lean!' : 'Hold ← / → to lean against the tilt!');
     }
-    if (Math.abs(b.roll) > MAX_ROLL) fail('capsize');
+    // a moment past the limit is survivable; staying there is not
+    b.tipT = Math.abs(b.roll) > MAX_ROLL ? b.tipT + dt : Math.max(0, b.tipT - dt);
+    if (b.tipT > TIP_GRACE) fail('capsize');
   }
 }
 
@@ -912,19 +926,23 @@ function drawJesusFigure(pose, glow) {
 // 0 = lying asleep on the cushion, 1 = standing
 function jesusRise() { return state === 'win' ? ease(clamp(winT / 0.9, 0, 1)) : 0; }
 
+// When He stands He steps back toward the stern, clear of Peter
+function jesusFeetU() { return lerp(JESUS_FEET.u, -150, jesusRise()); }
+
 function jesusHead() {
   const a = lerp(-Math.PI / 2 + 0.12, 0, jesusRise());
-  return toWorld(JESUS_FEET.u + Math.sin(a) * 52, JESUS_FEET.v - Math.cos(a) * 52);
+  return toWorld(jesusFeetU() + Math.sin(a) * 52 * JESUS_S, JESUS_FEET.v - Math.cos(a) * 52 * JESUS_S);
 }
 
 function drawJesusInBoat() {
   const r = jesusRise();
   ctx.save();
-  ctx.translate(JESUS_FEET.u, JESUS_FEET.v + 2 * (1 - r));
+  ctx.translate(jesusFeetU(), JESUS_FEET.v + 2 * (1 - r));
   // He rises from the cushion and stands upright even as the boat rocks
   ctx.rotate(lerp(-Math.PI / 2 + 0.12, -boat.roll, r));
   const pose = r < 0.5 ? 'sleep' : state === 'win' && winT > 1.0 && winT < 3.6 ? 'command' : 'stand';
   const glow = state === 'win' ? r : 0;
+  ctx.scale(JESUS_S, JESUS_S);
   drawJesusFigure(pose, glow);
   ctx.restore();
 }
@@ -1044,6 +1062,7 @@ function win() {
   totalScore += s.total;
   if (totalScore > best) { best = totalScore; try { localStorage.setItem('calmingStormBest', best); } catch (e) {} }
   warn = null; incoming = []; bubble = null; shockT = 0;
+  message.t = 0;
   boat.tapLeanT = 0;
   sfx.chime();
   endTimer = 7;
@@ -1574,6 +1593,19 @@ function drawBolt() {
 function drawSea(front) {
   const x0 = -offX - 10, x1 = viewW - offX + 10;
   const c = 1 - calm;
+  const clipBoat = front && boat && state !== 'fail';
+  if (clipBoat) {
+    // The near water may hide the hull, but never the people or the water inside the boat
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-offX - 20, -offY - 20, viewW + 40, viewH + 40);
+    [[-236, -420], [252, -420], [252, -56], [196, -12], [-192, -12], [-236, -44]].forEach(([u, v], i) => {
+      const p = toWorld(u, v);
+      if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.clip('evenodd');
+  }
   ctx.beginPath();
   ctx.moveTo(x0, H + 10);
   for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x) + (front ? 16 : 0));
@@ -1603,6 +1635,7 @@ function drawSea(front) {
       }
       ctx.globalAlpha = 1;
     }
+    if (clipBoat) ctx.restore();
   } else {
     const g = ctx.createLinearGradient(0, SEA_Y - 80, 0, H);
     g.addColorStop(0, mix('#2f5f96', '#4a82c0', c));
@@ -1785,7 +1818,7 @@ function crewLook(s) {
   let dx, dy;
   if (s.d.bailT > 0) { dx = 0; dy = -1; }
   else if (state === 'win' || (state === 'play' && wake >= 1 && s.d.i % 2 === 0)) {
-    dx = JESUS_FEET.u - 40 - s.u; dy = 20;
+    dx = jesusFeetU() - 40 - s.u; dy = 20;
   } else if (warn) { dx = warn.dir > 0 ? -1 : 1; dy = -0.2; }
   else if (state === 'fail') { dx = 0; dy = 1; }
   else {
@@ -1853,7 +1886,7 @@ function drawWakePrompt() {
   ctx.save();
   ctx.textAlign = 'center';
   ctx.font = '700 20px Fredoka, sans-serif';
-  const tx = clamp(c.x, 100, W - 100), ty = c.y - 72 * bs - pulse * 4;
+  const tx = clamp(c.x, 100, W - 100), ty = c.y + 92 * bs + pulse * 4;
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineJoin = 'round';
   ctx.strokeText(label, tx, ty);
   ctx.fillStyle = '#ffe27a';
@@ -2074,8 +2107,8 @@ function render() {
   drawBolt();
   drawSea(false);
   drawBoat();
-  drawWakePrompt();
   drawSea(true);
+  drawWakePrompt();
   drawFoam();
   drawParticles();
   drawRain();
@@ -2140,7 +2173,7 @@ function updateWin(dt) {
     say('jesus', 'Peace, be still.', 3);
     flashT = 0.35;
     sfx.win();
-    const h = toWorld(JESUS_FEET.u + 24, JESUS_FEET.v - 76);
+    const h = toWorld(jesusFeetU() + 24 * JESUS_S, JESUS_FEET.v - 76 * JESUS_S);
     for (let i = 0; i < 60; i++) {
       const a = rand(0, TAU), sp = rand(40, 200);
       spawn(h.x, h.y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8), ['#ffe27a', '#fff6d0', '#ffffff'][i % 3], rand(2, 4.5), 20);
@@ -2153,7 +2186,7 @@ function updateWin(dt) {
     say(1, 'What manner of man is this?', 2.8);
   }
   if (Math.random() < dt * 12) {
-    const c = toWorld(JESUS_FEET.u, JESUS_FEET.v - 40);
+    const c = toWorld(jesusFeetU(), JESUS_FEET.v - 40);
     spawn(c.x + rand(-40, 40), c.y + rand(-40, 30), 0, -20, 1, '#fff6d0', 3);
   }
 }
