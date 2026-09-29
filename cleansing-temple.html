@@ -296,6 +296,7 @@ function buildSlots() {
 function layoutSlots() {
   for (const sl of slots) {
     sl.x = W * (sl.c + 0.5) / sl.cols + (sl.r === 1 ? 0 : (sl.c % 2 ? 6 : -6));
+    sl.s = ROW_S[sl.r] * clamp(W / sl.cols / 150, 1, 1.35);   // roomier courts get bigger stalls
     // Things are driven out toward the nearest side gate; Jesus stands on the other side
     sl.side = Math.abs(sl.c + 0.5 - sl.cols / 2) < 0.01 ? (sl.r % 2 ? 1 : -1) : Math.sign(sl.c + 0.5 - sl.cols / 2);
   }
@@ -366,7 +367,8 @@ function drawPerson(d, pose = 'stand', lx = 0, ly = 0) {
   } else if (mood === 'joy' || mood === 'sing') {
     const wave = Math.sin(t * 9 + d.phase) * 4;
     arm(-11, -32, -24 + wave, -66);
-    arm(11, -32, 24 - wave, -66);
+    if (pose === 'staff') arm(11, -32, 20, -40);
+    else arm(11, -32, 24 - wave, -66);
     armsDone = true;
   }
 
@@ -416,7 +418,7 @@ function drawPerson(d, pose = 'stand', lx = 0, ly = 0) {
 
   // Resting arms
   if (!armsDone) {
-    if (kneel || mood === 'pray') { arm(-11, -32, -2, -40); arm(11, -32, 2, -40); }          // hands together in prayer
+    if (kneel || mood === 'pray') { /* praying hands are drawn after the face */ }
     else if (pose === 'offer') {                                                         // two mites held out
       arm(-11, -32, -15, -12); arm(11, -32, 23, -28);
       ctx.fillStyle = '#c47a3a'; ctx.strokeStyle = '#8a4a1a'; ctx.lineWidth = 1;
@@ -463,6 +465,11 @@ function drawPerson(d, pose = 'stand', lx = 0, ly = 0) {
   }
 
   drawFace(d, mood, hy, lx, ly);
+
+  if (!armsDone && (kneel || mood === 'pray')) {                       // hands together in prayer
+    arm(-11, -32, -2.5, -27); arm(11, -32, 2.5, -27);
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.ellipse(0, -29, 3.5, 5, 0, 0, TAU); ctx.fill();
+  }
 
   // Hands over the face come last
   if (pose !== 'run') {
@@ -639,7 +646,7 @@ function drawMoneyTable(o, flip = 0, withCoins = true) {
     ctx.fillRect(-44, -26, 88, 3);
   }
   if (withCoins) {
-    for (const [x, n] of [[-28, 4], [-12, 6], [16, 3]]) {
+    for (const [x, n] of [[-28, 3], [-12, 4], [16, 2]]) {
       for (let k = 0; k < n; k++) {
         ctx.fillStyle = k === n - 1 ? '#ffe27a' : '#f5c542'; ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.ellipse(x, -43 - k * 3, 7, 2.6, 0, 0, TAU); ctx.fill(); ctx.stroke();
@@ -683,6 +690,9 @@ function drawDoveCage(o, open = 0) {
   roundRect(-30, -35, 60, 7, 3); ctx.fill();
   ctx.fillStyle = '#7a4f24';
   roundRect(-27, -42, 54, 7, 3); ctx.fill();
+  // shady cage interior
+  ctx.fillStyle = 'rgba(120,80,30,0.28)';
+  ctx.beginPath(); ctx.arc(0, -42, 25, Math.PI, TAU); ctx.fill();
   // doves inside
   if (!open) {
     drawDove(-10, -50, 1, Math.max(0, Math.sin(t * 5 + o.i)) * 0.4);
@@ -780,7 +790,7 @@ function drawOx(f, happy, run, confused, phase = 0) {
 // Draws whatever stands in a stall position. Origin is its feet; already scaled.
 function drawThing(o, extra = {}) {
   if (o.type === 'table') {
-    if (!extra.noPerson) drawPerson(o.person, 'stand', o.lookX || 0, -0.4);
+    if (!extra.noPerson) { ctx.save(); ctx.translate(0, -17); drawPerson(o.person, 'stand', o.lookX || 0, -0.4); ctx.restore(); }
     drawMoneyTable(o, extra.flip || 0, !extra.flip);
   } else if (o.type === 'doves') {
     drawDoveCage(o, extra.open || 0);
@@ -800,7 +810,7 @@ function drawThing(o, extra = {}) {
 }
 
 // How tall each thing is (for the two-tap pips) and where Jesus stands beside it
-const THING_TOP = { table: 82, doves: 78, sheep: 54, ox: 86, pray: 62, child: 58, widow: 76, pilgrim: 86 };
+const THING_TOP = { table: 94, doves: 78, sheep: 54, ox: 86, pray: 62, child: 58, widow: 76, pilgrim: 86 };
 const THING_GAP = { table: 60, doves: 44, sheep: 50, ox: 66, pray: 36, child: 30, widow: 38, pilgrim: 40 };
 
 let thingId = 0;
@@ -1228,7 +1238,9 @@ function actOn(i) {
     if (o.hitCd > 0) return;
     o.hitCd = 0.6;
     o.worryT = 1.6; o.wobT = 0.4;
+    o.person.mood = 'worried';
     jesus.oopsT = 1;
+    jesus.whipT = 0;              // the cords are lowered at once
     tappedWorshipper = true;
     combo = 0;
     levelPoints = Math.max(0, levelPoints - WORSHIP_PENALTY);
@@ -1538,12 +1550,12 @@ function startLevel() {
   sfx.levelStart();
   if (level === 1) {
     setTimeout(() => {
-      if (state === 'play' && cleared === 0) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap the stalls and animals!' : 'Click the stalls, or use arrows + Space');
+      if (state === 'play' && level === 1 && cleared === 0) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap the stalls and animals!' : 'Click the stalls, or use arrows + Space');
     }, 2400);
   }
-  if (level === 2) setTimeout(() => { if (state === 'play') showMessage('Oxen need two taps!'); }, 2400);
-  if (level === 3) setTimeout(() => { if (state === 'play') showMessage('Heavy tables need two taps!'); }, 2400);
-  if (level === 4) setTimeout(() => { if (state === 'play') showMessage('Sneaky sellers come back once!'); }, 2400);
+  if (level === 2) setTimeout(() => { if (state === 'play' && level === 2) showMessage('Oxen need two taps!'); }, 2400);
+  if (level === 3) setTimeout(() => { if (state === 'play' && level === 3) showMessage('Heavy tables need two taps!'); }, 2400);
+  if (level === 4) setTimeout(() => { if (state === 'play' && level === 4) showMessage('Sneaky sellers come back once!'); }, 2400);
 }
 
 function endScreens(dt) {
@@ -1904,7 +1916,7 @@ function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount =
 }
 
 const bgClouds = Array.from({ length: 6 }, () => ({
-  f: Math.random(), y: rand(40, 230), w: rand(80, 160), speed: rand(4, 10),
+  f: Math.random(), y: rand(115, 250), w: rand(80, 160), speed: rand(4, 10),
 }));
 
 function updateScenery(dt) {
