@@ -1249,6 +1249,7 @@ function buildScene() {
     !(s.y < o.y && Math.abs(s.x - o.x) < (o.ow + s.w) / 2 && s.y > o.y - o.oh));
   const farFromSpecials = (x, y, d) => sc.specials.every((q) => Math.hypot(q.x - x, (q.y - y) * 1.4) > d + (q.group ? 110 : 0));
   const placeSpecial = (w, h, d, extra) => spot(w, (x, y) => {
+    if (y > yMax - 30) return false;
     const probe = { x, y, w, h, oh: h, ow: w };
     return clearOfObjects(probe) && farFromSpecials(x, y, d) && (!extra || extra(x, y));
   }, 600);
@@ -1380,7 +1381,9 @@ function clampZoom() {
 function clampCam() {
   if (!scene) return;
   const vw = viewW / cam.z, vh = viewH / cam.z;
-  const mx = 40 / cam.z, mt = 120 / cam.z, mb = 120 / cam.z;
+  // a cut-scene may look past the edges so the family can be centred
+  const loose = state === 'found' || state === 'win';
+  const mx = (loose ? viewW * 0.4 : 40) / cam.z, mt = 120 / cam.z, mb = (loose ? viewH * 0.4 : 120) / cam.z;
   if (vw >= scene.WW + 2 * mx) cam.x = (scene.WW - vw) / 2;
   else cam.x = clamp(cam.x, -mx, scene.WW + mx - vw);
   if (vh >= scene.WH + mt + mb) cam.y = (scene.WH - vh) / 2;
@@ -1543,10 +1546,11 @@ function foundHim() {
   mag.on = false;
   hintT = 0;
   bubbles = [];
+  message.t = 0; msgQueue = []; caption = null;
   const kind = cfg.cousin ? 'cousin' : cfg.final ? 'final' : 'glimpse';
   cut = { kind, beat: 0, t: 0, total: 0, tx: tg.x, ty: tg.y, actors: [], flock: [], jesusA: 1 };
   // camera: zoom in on Him
-  cut.z = clamp(Math.min(viewW / 400, viewH / 360), 1.05, 2);
+  cut.z = clamp(Math.min(viewW / 340, viewH / 360), 1.05, 2);
   cut.cx = tg.x - (kind === 'glimpse' ? 0 : 50);
   cut.cy = tg.y - 70;
   // score for this level, frozen now
@@ -2281,7 +2285,9 @@ function drawWorld(cx, cy, z) {
   }
 
   // live people, sorted by depth
-  const list = [...sc.live, ...(cut ? cut.actors : [])].sort((a, b) => a.y - b.y);
+  // in a family cut-scene the boy, Mary and Joseph are drawn last, in front of any bystanders
+  const focal = (e) => (cut && cut.kind !== 'glimpse' && (e === sc.target || cut.actors.includes(e)) ? 1e5 : 0);
+  const list = [...sc.live, ...(cut ? cut.actors : [])].sort((a, b) => a.y + focal(a) - b.y - focal(b));
   for (const e of list) {
     if (!visible(e)) continue;
     if (e.type === 'item') {
@@ -2593,6 +2599,8 @@ function render() {
   }
 
   // Speech bubbles above whoever is talking
+  drawCaption();
+  drawMessage();
   for (const b of bubbles) {
     const e = b.who;
     const top = e.y - (e.h || 74) - 6 - (e.sit ? 6 : 0);
@@ -2602,9 +2610,6 @@ function render() {
     drawBubble(s.x, s.y, b.text, cut && cut.kind === 'final' ? 290 : 230);
     ctx.globalAlpha = 1;
   }
-
-  drawCaption();
-  drawMessage();
   drawHUD();
 }
 
