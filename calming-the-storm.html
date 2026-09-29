@@ -1,0 +1,2197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b2748">
+<title>Calming the Storm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1b2748;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(10, 16, 40, 0.35);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 10, 40, 0.45), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Calming the Storm</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function mix(a, b, f) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(pa >> 16, pb >> 16, f));
+  const g = Math.round(lerp((pa >> 8) & 255, (pb >> 8) & 255, f));
+  const bl = Math.round(lerp(pa & 255, pb & 255, f));
+  return `rgb(${r},${g},${bl})`;
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const SEA_Y = 620;        // calm water line
+const HALF = 220;         // half the boat's length, in boat units
+const MAX_ROLL = 0.62;    // tip further than this and she capsizes (about 35 degrees)
+const DANGER_ROLL = 0.4;  // the tilt gauge turns red from here
+const K_ROLL = 7;         // how firmly the boat follows the slope of the sea
+const D_ROLL = 2.2;       // damping of the rocking
+const WAVE_GAIN = 1.5;    // how much the slope of the waves tips the boat
+const LEAN_EFF = 0.34;    // how far the disciples' weight can lean her (radians)
+const SLOSH = 0.55;       // water sloshing to the low side makes the rocking worse
+const LEAN_RATE = 4.5;    // how quickly the crew shifts their weight
+const TAP_LEAN_T = 1.1;   // how long one tap keeps them leaning
+const WATER_MAX = 12;     // scoops of water that swamp the boat
+const PUDDLE_MAX = 3;     // scoops in one puddle
+const DECK_MIN = -92, DECK_MAX = 196;     // where water can collect on the floor
+const PUDDLE_V = -19;     // puddles sit at the front of the floor, where you can reach them
+const JESUS_FEET = { u: -104, v: -33 };   // He lies at the stern, feet toward the bow
+
+const LEVEL_NAMES = [
+  'Evening on Galilee',
+  'Let Us Pass Over',
+  'A Great Storm of Wind',
+  'Waves Beat into the Ship',
+  'The Ship Was Full',
+  'Master, Carest Thou Not?',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Stormy Crossing ${n}`,
+    dur: Math.min(26 + 8 * (n - 1), 70),            // seconds until the disciples can wake Him
+    swell: Math.min(24 + 5 * (n - 1), 48),          // height of the rolling waves
+    splashGap: Math.max(0.75, 2.5 - 0.3 * (n - 1)), // seconds between waves splashing in
+    splashBig: n >= 3 ? Math.min(0.15 + 0.08 * (n - 3), 0.5) : 0,
+    rogueGap: n === 1 ? 13 : Math.max(5.5, 11 - 1.3 * (n - 2)),
+    rogueH: Math.min(78 + 14 * n, 160),
+    rogueWater: n >= 3 ? 3 : 2,
+    gust: Math.min(0.04 + 0.03 * (n - 1), 0.18),
+    boltGap: Math.max(2.5, 7.5 - 0.8 * n),
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('calmingStormBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let boat;
+let puddles = [];
+let incoming = [];        // splashes still flying through the air into the boat
+let rogues = [];          // giant waves rolling across the sea
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;        // speech bubble { who, text, t }
+let warn = null;          // { dir, t } a giant wave is coming
+let bolt = null;
+let flashT = 0, shakeT = 0, shockT = 0;
+let endTimer = 0;
+let lastScore = null;
+let failReason = '';
+let calm = 1;             // 1 = full storm, 0 = "there was a great calm"
+let wake = 0;             // the Wake-the-Master meter, 0..1
+let winT = 0, spoke = false, marvelled = false;
+let gust = 0, gustTarget = 0, gustTimer = 0;
+let splashTimer = 0, rogueTimer = 0, boltTimer = 0, cryTimer = 0, nagCd = 0;
+let stats;
+let tut = { bail: false, lean: false };
+
+function newBoat() {
+  return { x: W / 2, y: SEA_Y, roll: 0, vr: 0, lean: 0, tapLean: 0, tapLeanT: 0, sink: 0 };
+}
+
+// Boat size grows a little on wide screens
+function boatScale() { return clamp((W * 0.45) / HALF, 0.98, 1.45); }
+
+// Boat coordinates (u along the boat, v down) to playfield coordinates
+function toWorld(u, v) {
+  const bs = boatScale(), c = Math.cos(boat.roll), s = Math.sin(boat.roll);
+  return { x: boat.x + (u * c - v * s) * bs, y: boat.y + (u * s + v * c) * bs };
+}
+
+// ============================================================
+//  Sea
+// ============================================================
+function surf(x) {
+  const s = calm;
+  let y = SEA_Y + s * (cfg.swell * Math.sin(x * 0.009 + t * 1.5) +
+                       7 * Math.sin(x * 0.027 - t * 2.6) +
+                       3.5 * Math.sin(x * 0.051 + t * 3.4));
+  for (const w of rogues) {
+    const d = (x - w.x) / w.w;
+    if (d > -3 && d < 3) y -= w.h * Math.exp(-d * d);
+  }
+  return y;
+}
+
+function water() { let n = 0; for (const p of puddles) n += p.n; return n; }
+
+function spawnRogue() {
+  const dir = Math.random() < 0.5 ? 1 : -1;   // 1 = rolling in from the left
+  const speed = 250 + level * 8;
+  const lead = 1.9;                            // seconds of warning
+  rogues.push({
+    x: boat.x - dir * (HALF * boatScale() + speed * lead),
+    dir, speed, h: cfg.rogueH * rand(0.9, 1.1), w: 105, hit: false,
+  });
+  warn = { dir, t: lead };
+  sfx.warn();
+  if (level === 1 && !tut.lean) {
+    showMessage(isTouch() ? 'Big wave! Tap the HIGH side to lean!' : 'Big wave! Hold ← / → to lean!');
+  }
+}
+
+function updateSea(dt) {
+  for (let i = rogues.length - 1; i >= 0; i--) {
+    const w = rogues[i];
+    w.x += w.dir * w.speed * dt;
+    if (calm < 1) w.h *= Math.max(0, 1 - dt * 2.5);
+    if (!w.hit && Math.abs(w.x - boat.x) < 40 && state === 'play') {
+      // The crest breaks right over the boat
+      w.hit = true;
+      shakeT = 0.35;
+      for (let k = 0; k < cfg.rogueWater; k++) splashIn(rand(DECK_MIN + 20, DECK_MAX - 20), 1, k * 0.12);
+    }
+    if (Math.random() < dt * 14 * calm) {
+      spawn(w.x + rand(-20, 20), surf(w.x) + 4, w.dir * rand(20, 80), rand(-160, -60), 0.7, 'rgba(235,245,255,0.9)', rand(2, 4), 500);
+    }
+    if (Math.abs(w.x - boat.x) > 1400 || w.h < 1) rogues.splice(i, 1);
+  }
+  if (warn) { warn.t -= dt; if (warn.t <= 0) warn = null; }
+  // spray off the crests
+  if (Math.random() < dt * 10 * calm) {
+    const x = rand(-offX, W + offX);
+    spawn(x, surf(x), rand(-60, 20), rand(-120, -50), 0.6, 'rgba(225,240,255,0.85)', rand(1.5, 3), 500);
+  }
+}
+
+function updateGust(dt) {
+  gustTimer -= dt;
+  if (gustTimer <= 0) {
+    gustTarget = rand(-1, 1) * cfg.gust;
+    gustTimer = rand(1.2, 3.5);
+  }
+  gust += (gustTarget - gust) * Math.min(1, dt * 1.5);
+}
+
+// ============================================================
+//  The boat
+// ============================================================
+function updateBoat(dt) {
+  const b = boat, bs = boatScale();
+  b.x = W / 2;
+  const L = HALF * bs * 0.8;
+  const yl = surf(b.x - L), yr = surf(b.x + L);
+  const wa = Math.atan2(yr - yl, 2 * L) * WAVE_GAIN;
+  const wf = water() / WATER_MAX;
+
+  if (state === 'fail') {
+    // Over she goes / down she settles
+    if (failReason === 'capsize') {
+      const target = (Math.sign(b.roll) || 1) * 1.25;
+      b.roll += (target - b.roll) * Math.min(1, dt * 3);
+      b.sink = Math.min(34 * bs, b.sink + 40 * dt);
+    } else {
+      b.roll += (wa * 0.4 - b.roll) * Math.min(1, dt * 2);
+      b.sink = Math.min(46 * bs, b.sink + 30 * dt);
+    }
+    b.y = (yl + yr) / 2 + 6 * bs + b.sink;
+    return;
+  }
+
+  // Which way are the disciples leaning?
+  let target = 0;
+  if (state === 'play') {
+    const kl = keys.has('ArrowLeft') || keys.has('KeyA');
+    const kr = keys.has('ArrowRight') || keys.has('KeyD');
+    if (kl && !kr) target = -1;
+    else if (kr && !kl) target = 1;
+    else if (b.tapLeanT > 0) target = b.tapLean;
+  }
+  b.tapLeanT = Math.max(0, b.tapLeanT - dt);
+  b.lean += clamp(target - b.lean, -LEAN_RATE * dt, LEAN_RATE * dt);
+
+  const acc = K_ROLL * (wa + gust * calm - b.roll) + K_ROLL * LEAN_EFF * b.lean +
+              K_ROLL * SLOSH * wf * b.roll - D_ROLL * b.vr;
+  b.vr += acc * dt;
+  b.roll += b.vr * dt;
+  b.y = (yl + yr) / 2 + 6 * bs + wf * 12 * bs;
+
+  if (state === 'play') {
+    if (Math.abs(b.roll) > 0.25 && level === 1 && !tut.lean && message.t <= 0) {
+      tut.lean = true;
+      showMessage(isTouch() ? 'Tap the HIGH side to lean!' : 'Hold ← / → to lean against the tilt!');
+    }
+    if (Math.abs(b.roll) > MAX_ROLL) fail('capsize');
+  }
+}
+
+// Which way should the crew lean right now? 0 = all fine
+function leanHint() {
+  if (state !== 'play') return 0;
+  const r = boat.roll + boat.vr * 0.25;
+  if (Math.abs(r) > 0.22) return r > 0 ? -1 : 1;   // lean toward the high side
+  if (warn) return warn.dir > 0 ? -1 : 1;           // lean toward the incoming wave
+  return 0;
+}
+
+// ============================================================
+//  Water in the boat
+// ============================================================
+function addWater(u, n) {
+  for (let k = 0; k < n; k++) {
+    let bestP = null, bd = 60;
+    for (const p of puddles) {
+      const d = Math.abs(p.u - u);
+      if (p.n < PUDDLE_MAX && d < bd) { bd = d; bestP = p; }
+    }
+    if (bestP) bestP.n++;
+    else {
+      // find a clear spot on the floor
+      let uu = u;
+      for (let tries = 0; tries < 8; tries++) {
+        if (puddles.every((p) => Math.abs(p.u - uu) > 44)) break;
+        uu = rand(DECK_MIN, DECK_MAX);
+      }
+      puddles.push({ u: clamp(uu, DECK_MIN, DECK_MAX), n: 1, size: 0, wob: rand(0, TAU) });
+    }
+  }
+  if (state === 'play' && water() >= WATER_MAX) fail('swamp');
+}
+
+// A wave slaps against the side and throws water into the boat
+function splashIn(u, n, delay = 0) {
+  incoming.push({ u, n, t: 0.55 + delay, started: false, delay });
+}
+
+function updateIncoming(dt) {
+  for (let i = incoming.length - 1; i >= 0; i--) {
+    const s = incoming[i];
+    s.t -= dt;
+    if (!s.started && s.t <= 0.55) {
+      s.started = true;
+      const bs = boatScale();
+      const tw = toWorld(s.u, PUDDLE_V);
+      const T = 0.55, g = 900;
+      for (let k = 0; k < 16; k++) {
+        const sx = tw.x + rand(-40, 40) * bs, sy = SEA_Y + rand(10, 30);
+        const tx = tw.x + rand(-14, 14), ty = tw.y + rand(-4, 4);
+        spawn(sx, sy, (tx - sx) / T, (ty - sy - 0.5 * g * T * T) / T, T + 0.05, k % 3 ? 'rgba(190,225,255,0.95)' : '#ffffff', rand(3, 5.5), g);
+      }
+      sfx.splash(0.5);
+    }
+    if (s.t <= 0) {
+      incoming.splice(i, 1);
+      if (state === 'play') {
+        addWater(s.u, s.n);
+        const tw = toWorld(s.u, PUDDLE_V);
+        for (let k = 0; k < 8; k++) spawn(tw.x, tw.y, rand(-90, 90), rand(-140, -40), 0.4, 'rgba(210,235,255,0.9)', rand(2, 3.5), 700);
+        if (level === 1 && !tut.bail && message.t <= 0.5) {
+          showMessage(isTouch() ? 'Tap the water to bail it out!' : 'Press Space to bail!');
+        }
+      }
+    }
+  }
+}
+
+function updatePuddles(dt) {
+  for (let i = puddles.length - 1; i >= 0; i--) {
+    const p = puddles[i];
+    // water slides a little toward the low side
+    if (state === 'play') p.u = clamp(p.u + Math.sin(boat.roll) * 55 * dt, DECK_MIN, DECK_MAX);
+    const target = state === 'win' && calm < 0.7 ? 0 : p.n;
+    p.size += (target - p.size) * Math.min(1, dt * (state === 'win' ? 1.5 : 8));
+    if (state === 'win' && p.size < 0.05) puddles.splice(i, 1);
+  }
+}
+
+function bail(p) {
+  if (!p || state !== 'play') return;
+  p.n--;
+  stats.bailed++;
+  tut.bail = true;
+  // The disciple nearest the puddle scoops it over the side
+  const slot = crewSlots().reduce((a, s) => (Math.abs(s.u - p.u) < Math.abs(a.u - p.u) ? s : a));
+  slot.d.bailT = 0.4;
+  slot.d.bailDir = boat.roll > 0 ? -1 : 1;
+  const bw = toWorld(slot.u, -120);
+  for (let k = 0; k < 14; k++) {
+    spawn(bw.x + rand(-6, 6), bw.y + rand(-4, 4), slot.d.bailDir * rand(40, 160), rand(-300, -170), rand(0.6, 0.9), k % 3 ? 'rgba(170,215,255,0.95)' : '#ffffff', rand(2.5, 4.5), 900);
+  }
+  const pw = toWorld(p.u, PUDDLE_V);
+  for (let k = 0; k < 6; k++) spawn(pw.x, pw.y, rand(-60, 60), rand(-110, -40), 0.35, 'rgba(210,235,255,0.9)', rand(2, 3), 600);
+  if (p.n <= 0) puddles.splice(puddles.indexOf(p), 1);
+  sfx.tap(1 - water() / WATER_MAX);
+}
+
+// Keyboard: bail the biggest puddle
+function bailBiggest() {
+  let bestP = null;
+  for (const p of puddles) if (!bestP || p.n > bestP.n || (p.n === bestP.n && Math.abs(p.u) < Math.abs(bestP.u))) bestP = p;
+  if (bestP) bail(bestP);
+}
+
+// ============================================================
+//  Disciples
+// ============================================================
+const DISCIPLES = [
+  { name: 'Peter',       robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { name: 'Andrew',      robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { name: 'James',       robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { name: 'John',        robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { name: 'Thomas',      robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { name: 'Matthew',     robe: '#5a6475', hair: '#2a1a0e', beard: true,  skin: '#c88e5a', scarf: '#c9b27a' },
+].map((d, i) => ({
+  ...d, i,
+  mood: 'worried', switchT: 0,
+  delay: d.name === 'Peter' ? 0 : rand(0.05, 0.5),
+  blinkT: rand(1, 4), blink: 0,
+  phase: rand(0, TAU),
+  bailT: 0, bailDir: 1,
+}));
+
+const CREW_U = [-64, -20, 56, 100, 146, 190];
+
+// Where each disciple stands in the boat (boat coordinates). They shift with the lean.
+function crewSlots() {
+  const n = W < 560 ? 5 : 6;
+  const sp = n === 5 ? [-62, -16, 60, 110, 162] : CREW_U;
+  const lean = boat ? boat.lean : 0;
+  return sp.map((u, k) => ({ d: DISCIPLES[k], u: u + lean * 12, v: -30, s: 0.95 }));
+}
+
+const CRIES = [
+  'Master!', 'We perish!', 'Bail, bail!', 'Hold on!', 'Is He still asleep?!',
+  'Lord, save us!', 'My sandals are soaked!', 'Andrew, stop splashing me!',
+  'Peter, you’re the fisherman!', 'Hang on to the mast!', 'How can He sleep?!',
+];
+
+function crowdMood() {
+  if (state === 'title') return 'worried';
+  if (state === 'fail') return 'dismay';
+  if (state === 'win') {
+    if (winT < 1.0) return 'wow';
+    if (winT < 3.3) return 'shock';      // "they feared exceedingly"
+    if (winT < 4.4) return 'wow';
+    return 'joy';
+  }
+  if (shockT > 0 || Math.abs(boat.roll) > DANGER_ROLL) return 'shock';
+  const wf = water() / WATER_MAX;
+  if (wf < 0.2 && Math.abs(boat.roll) < 0.18 && !warn) return 'watch';
+  return 'worried';
+}
+
+function updateDisciples(dt) {
+  const target = crowdMood();
+  for (const d of DISCIPLES) {
+    let want = target;
+    if (d.name === 'Thomas' && want === 'wow' && state === 'win' && winT > 3.3) want = 'doubt';
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+    d.bailT = Math.max(0, d.bailT - dt);
+  }
+}
+
+function drawDisciple(slot, lx, ly) {
+  const { d, u, v, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(u, v - jump * s);
+  // lean with the crew's weight, and try to stay upright as the boat rolls
+  ctx.rotate((boat.lean * 0.16 - boat.roll * 0.45) + Math.sin(t * 2 + d.phase) * 0.02);
+  ctx.scale(s, s);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const bailing = d.bailT > 0;
+  const hy = -53;
+
+  // Arms raised behind the head for joy / pointing in wonder
+  if (!bailing) {
+    if (mood === 'joy') {
+      const wave = Math.sin(t * 9 + d.phase) * 4;
+      arm(-11, -32, -24 + wave, -66);
+      arm(11, -32, 24 - wave, -66);
+    } else if (mood === 'wow' && d.i % 3 === 0) {
+      arm(11, -32, 20 + lx * 6, -70);
+    }
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Resting arms
+  if (!bailing) {
+    if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+      if (mood === 'doubt') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); } // folded arms
+      else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+    } else if (mood === 'worried') {
+      arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+    }
+  }
+
+  // Head
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Beard
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  if (bailing) {
+    // Heave-ho! A bucket of water goes over the side
+    const tip = d.bailDir * (1 - d.bailT / 0.4) * 0.9;
+    arm(-11, -32, -13, -80);
+    arm(11, -32, 13, -80);
+    ctx.save();
+    ctx.translate(0, -86);
+    ctx.rotate(tip);
+    ctx.fillStyle = '#8b5a2b'; ctx.strokeStyle = '#5e3b1c'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-12, -10); ctx.lineTo(12, -10); ctx.lineTo(9, 8); ctx.lineTo(-9, 8); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-11, -3); ctx.lineTo(11, -3); ctx.stroke();
+    ctx.restore();
+  } else if (mood === 'shock') {
+    // Hands over the face come last
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+// ============================================================
+//  Jesus
+// ============================================================
+// Drawn like the other games: white robe, red sash, brown hair and beard,
+// golden halo. Feet at the origin. pose: 'sleep' | 'stand' | 'command'
+function drawJesusFigure(pose, glow) {
+  if (glow > 0) {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 90);
+    g.addColorStop(0, `rgba(255,235,150,${0.6 * glow})`);
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 90, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Feet
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 4.5, 2.2, 0, 0, TAU); ctx.ellipse(6, 0, 4.5, 2.2, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: folded while asleep, one hand raised over the storm when He speaks
+  const hands = pose === 'sleep' ? [[-3, -25], [5, -28]]
+    : pose === 'command' ? [[-23, -30], [24, -76]]
+    : [[-20, -22], [20, -22]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    const ex = pose === 'sleep' ? hx : hx * 0.9, ey = pose === 'command' && hy < -50 ? hy + 4 : hy;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face: peacefully asleep, or calm and awake
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (pose === 'sleep') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(-4, -53.5, 2.3, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.moveTo(4 + 2.3 * Math.cos(0.15 * Math.PI), -53.5 + 2.3 * Math.sin(0.15 * Math.PI));
+    ctx.arc(4, -53.5, 2.3, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+}
+
+// 0 = lying asleep on the cushion, 1 = standing
+function jesusRise() { return state === 'win' ? ease(clamp(winT / 0.9, 0, 1)) : 0; }
+
+function jesusHead() {
+  const a = lerp(-Math.PI / 2 + 0.12, 0, jesusRise());
+  return toWorld(JESUS_FEET.u + Math.sin(a) * 52, JESUS_FEET.v - Math.cos(a) * 52);
+}
+
+function drawJesusInBoat() {
+  const r = jesusRise();
+  ctx.save();
+  ctx.translate(JESUS_FEET.u, JESUS_FEET.v + 2 * (1 - r));
+  // He rises from the cushion and stands upright even as the boat rocks
+  ctx.rotate(lerp(-Math.PI / 2 + 0.12, -boat.roll, r));
+  const pose = r < 0.5 ? 'sleep' : state === 'win' && winT > 1.0 && winT < 3.6 ? 'command' : 'stand';
+  const glow = state === 'win' ? r : 0;
+  drawJesusFigure(pose, glow);
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 450) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Lightning
+// ============================================================
+function updateBolt(dt) {
+  if (bolt) bolt.t -= dt;
+  if (state !== 'play' && state !== 'title') return;
+  boltTimer -= dt;
+  if (boltTimer <= 0) {
+    boltTimer = cfg.boltGap * rand(0.7, 1.4);
+    const x = Math.random() < 0.5 ? rand(-offX + 20, W * 0.3) : rand(W * 0.7, W + offX - 20);
+    const pts = [];
+    let bx = x, by = -offY;
+    while (by < SEA_Y) { pts.push([bx, by]); bx += rand(-30, 30); by += rand(40, 70); }
+    pts.push([bx, SEA_Y]);
+    bolt = { pts, t: 0.3 };
+    flashT = 0.22;
+    if (state === 'play') {
+      shakeT = 0.15;
+      shockT = 0.9;
+      gustTarget = (Math.random() < 0.5 ? -1 : 1) * cfg.gust * 1.6;   // a blast of wind follows
+      gustTimer = 1.2;
+    }
+    sfx.thunder();
+  }
+}
+
+// ============================================================
+//  Speech
+// ============================================================
+function say(who, text, dur = 2.2) { bubble = { who, text, t: dur }; }
+
+function updateCries(dt) {
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  if (state !== 'play') return;
+  cryTimer -= dt;
+  if (cryTimer <= 0 && !bubble) {
+    cryTimer = rand(4, 7);
+    const n = crewSlots().length;
+    if (wake >= 1) say(Math.floor(rand(0, n)), 'Master, wake up!');
+    else say(Math.floor(rand(0, n)), CRIES[Math.floor(Math.random() * CRIES.length)]);
+  }
+}
+
+// ============================================================
+//  Waking the Master
+// ============================================================
+function updateWake(dt) {
+  if (wake >= 1) return;
+  wake = Math.min(1, wake + dt / cfg.dur);
+  if (wake >= 1) {
+    say(0, 'Master, carest thou not that we perish?', 3.2);
+    showMessage(isTouch() ? 'Tap Jesus to wake Him!' : 'Press W or Enter to wake Jesus!');
+    sfx.chime();
+  }
+}
+
+function wakeJesus() {
+  if (state !== 'play') return;
+  if (wake < 1) {
+    if (nagCd <= 0) {
+      showMessage('Shh… He is sleeping. Keep the boat afloat!');
+      nagCd = 2.5;
+    }
+    return;
+  }
+  win();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  winT = 0; spoke = false; marvelled = false;
+  const T = Math.max(1, stats.time);
+  const s = {
+    time: Math.round(stats.time * 10),
+    bailed: stats.bailed * 15,
+    dry: Math.round((stats.dry / T) * 400),
+    steady: Math.round((stats.steady / T) * 400),
+    levelBonus: level * 300,
+  };
+  s.total = s.time + s.bailed + s.dry + s.steady + s.levelBonus;
+  lastScore = s;
+  totalScore += s.total;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('calmingStormBest', best); } catch (e) {} }
+  warn = null; incoming = []; bubble = null; shockT = 0;
+  boat.tapLeanT = 0;
+  sfx.chime();
+  endTimer = 7;
+}
+
+function fail(reason) {
+  if (state !== 'play') return;
+  state = 'fail';
+  failReason = reason;
+  warn = null; bubble = null; shockT = 0;
+  shakeT = 0.5;
+  const c = toWorld(0, 0);
+  for (let i = 0; i < 50; i++) {
+    const a = rand(Math.PI * 1.05, Math.PI * 1.95), sp = rand(120, 360);
+    spawn(c.x + rand(-160, 160), SEA_Y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.2), i % 3 ? 'rgba(200,228,255,0.95)' : '#ffffff', rand(3, 6), 700);
+  }
+  showMessage(reason === 'capsize' ? 'Whoa! Over she goes!' : 'Glub, glub… swamped!');
+  sfx.splash(1);
+  sfx.fail();
+  endTimer = 2.8;
+}
+
+function showMessage(text) { message = { text, t: 2.4 }; }
+function isTouch() { return matchMedia('(pointer: coarse)').matches; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetScene() {
+  cfg = makeConfig(level);
+  boat = newBoat();
+  puddles = []; incoming = []; rogues = []; particles = [];
+  ripples.length = 0;
+  bubble = null; warn = null; bolt = null;
+  flashT = shakeT = shockT = 0;
+  calm = 1; wake = 0; winT = 0; spoke = false; marvelled = false;
+  gust = gustTarget = 0; gustTimer = 0;
+  splashTimer = 2.2;
+  rogueTimer = level === 1 ? cfg.rogueGap : cfg.rogueGap * rand(0.6, 0.9);
+  boltTimer = rand(2, 4);
+  cryTimer = 3.5; nagCd = 0;
+  stats = { time: 0, bailed: 0, dry: 0, steady: 0 };
+  for (const d of DISCIPLES) d.bailT = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetScene();
+  const touch = isTouch();
+  showOverlay('Calming the Storm', 'Peace, be still',
+    `<p class="verse">"And he arose, and rebuked the wind, and said unto the sea, Peace, be still. And the wind ceased, and there was a great calm." &mdash; Mark 4:39</p>
+     <ul>
+       <li>A great storm on the Sea of Galilee &mdash; and Jesus is <b>fast asleep</b> on a pillow in the back of the boat!</li>
+       <li><b>Bail:</b> ${touch ? '<b>tap</b> the water that splashes in' : 'press <kbd>Space</kbd>, or click the water'}. Too much water and the boat is swamped.</li>
+       <li><b>Balance:</b> ${touch ? '<b>tap the high side</b>' : 'hold <kbd>&larr;</kbd> / <kbd>&rarr;</kbd> toward the high side'} so the disciples lean against the tilt. Watch out for <b>big waves</b>!</li>
+       <li>When the <b>Wake the Master</b> meter is full, ${touch ? '<b>tap Jesus</b>' : 'press <kbd>W</kbd> or <kbd>Enter</kbd>'} to wake Him.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+    'Set sail', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  resetScene();
+  state = 'play';
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+  if (level === 1) tut = { bail: false, lean: false };
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('A great calm!', `Level ${level} complete — ${cfg.name}`,
+      `<p class="verse">"What manner of man is this, that even the wind and the sea obey him?" &mdash; Mark 4:41</p>
+       <p class="score">Time in the storm: <b>${s.time}</b><br>Water bailed: <b>${s.bailed}</b><br>Kept dry: <b>${s.dry}</b><br>Kept steady: <b>${s.steady}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+      'Next Crossing', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const capsize = failReason === 'capsize';
+    showOverlay(capsize ? 'Over she goes!' : 'Swamped!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${capsize
+        ? 'A wave tipped the boat too far. Lean toward the <b>high side</b> to keep her steady!'
+        : 'The boat filled right up with water. Keep bailing, one scoop at a time!'}
+       Everyone is soggy but safe &mdash; the Master is in the boat.</p>
+       <p class="verse">${capsize
+        ? '"And they awake him, and say unto him, Master, carest thou not that we perish?" &mdash; Mark 4:38'
+        : '"And there arose a great storm of wind, and the waves beat into the ship, so that it was now full." &mdash; Mark 4:37'}</p>
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    sfx.storm(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+const ripples = [];
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  keys.add(e.code);
+  if (state !== 'play' || e.repeat) return;
+  if (e.code === 'KeyW' || e.code === 'Enter' || (e.code === 'Space' && wake >= 1)) { wakeJesus(); return; }
+  if (['Space', 'ArrowDown', 'KeyS', 'KeyB'].includes(e.code)) bailBiggest();
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  const bs = boatScale();
+  // Wake the Master once the meter is full
+  if (wake >= 1) {
+    const jc = toWorld(-128, -40);
+    if (Math.hypot(p.x - jc.x, p.y - jc.y) < 75 * bs) { wakeJesus(); return; }
+  }
+  // Tap a puddle to bail it
+  let hit = null, hd = Infinity;
+  for (const q of puddles) {
+    const w = toWorld(q.u, PUDDLE_V);
+    const d = Math.hypot(p.x - w.x, p.y - w.y);
+    if (d < (10 + 8 * q.n + 28) * bs && d < hd) { hd = d; hit = q; }
+  }
+  if (hit) { bail(hit); return; }
+  // Anywhere else: everyone lean toward that side
+  boat.tapLean = p.x < boat.x ? -1 : 1;
+  boat.tapLeanT = TAP_LEAN_T;
+  sfx.puff(0.12);
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap (here: each bucket bailed), pitched higher the drier the boat
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+
+const sfx = {
+  ctx: null, master: null, windGain: null, rainGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      // Storm ambience: a low rumbling wind and a hiss of rain
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 480;
+      this.windGain = this.ctx.createGain();
+      this.windGain.gain.value = 0;
+      src.connect(lp); lp.connect(this.windGain); this.windGain.connect(this.master);
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 3200;
+      this.rainGain = this.ctx.createGain();
+      this.rainGain.gain.value = 0;
+      src.connect(hp); hp.connect(this.rainGain); this.rainGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  storm(level) {
+    if (!this.windGain) return;
+    const w = level * (0.28 + 0.1 * Math.sin(t * 0.7));
+    this.windGain.gain.setTargetAtTime(w, this.ctx.currentTime, 0.3);
+    this.rainGain.gain.setTargetAtTime(level * 0.05, this.ctx.currentTime, 0.3);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  burst(freq, vol, dur, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  // A bucket of water over the side: a splash and a sung note, higher as the boat gets drier
+  tap(height) {
+    if (!this.ctx) return;
+    this.burst(1600, 0.25, 0.25);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  splash(v) { this.burst(1300, 0.5 * v, 0.4); },
+  chime() { this.tone(1046.5, 0.4, 'triangle', 0.18); this.tone(1568, 0.5, 'sine', 0.1, 0.07); },
+  warn() { this.tone(98, 0.7, 'sawtooth', 0.08, 0, 82); this.tone(147, 0.7, 'triangle', 0.1); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+};
+
+// ============================================================
+//  Rendering
+// ============================================================
+const skyClouds = Array.from({ length: 10 }, () => ({ f: Math.random(), y: rand(-80, 250), w: rand(180, 340), speed: rand(10, 26) }));
+const rain = Array.from({ length: 130 }, () => ({ f: Math.random(), y: rand(0, 1), len: rand(16, 28) }));
+const stars = Array.from({ length: 80 }, () => ({ f: Math.random(), y: Math.random(), r: rand(0.7, 2), tw: rand(0, TAU) }));
+
+function updateScenery(dt) {
+  for (const c of skyClouds) { c.f += (c.speed * (0.2 + calm) * dt) / (viewW + 400); if (c.f > 1) c.f -= 1; }
+  for (const r of rain) { r.y += dt * 1.4; if (r.y > 1) { r.y -= 1; r.f = Math.random(); } }
+}
+
+function drawCloud(cx, cy, w, h, top, under) {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function moonPos() { return { x: W * 0.78, y: 120 - offY * 0.3 }; }
+
+function drawSky() {
+  const c = 1 - calm;   // 0 in the storm, 1 once it is calm
+  const g = ctx.createLinearGradient(0, -offY, 0, SEA_Y);
+  g.addColorStop(0, mix('#0b1228', '#0d1b4a', c));
+  g.addColorStop(0.6, mix('#1b2748', '#22407f', c));
+  g.addColorStop(1, mix('#2a3a63', '#6a8cc8', c));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+
+  // Stars come out as the clouds part
+  if (c > 0.01) {
+    ctx.fillStyle = '#fffbe6';
+    for (const s of stars) {
+      ctx.globalAlpha = c * (0.55 + 0.45 * Math.sin(t * 2 + s.tw));
+      ctx.beginPath();
+      ctx.arc(-offX + s.f * viewW, -offY + s.y * (SEA_Y - 120 + offY), s.r, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // The moon, hidden behind the storm
+  const m = moonPos();
+  const mg = ctx.createRadialGradient(m.x, m.y, 10, m.x, m.y, 130);
+  mg.addColorStop(0, `rgba(255,250,220,${0.2 + 0.4 * c})`);
+  mg.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = mg;
+  ctx.beginPath(); ctx.arc(m.x, m.y, 130, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 0.35 + 0.65 * c;
+  ctx.fillStyle = '#f6f0d4';
+  ctx.beginPath(); ctx.arc(m.x, m.y, 34, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Rolling storm clouds, which part and blow away when He speaks
+  for (const cl of skyClouds) {
+    let x = -offX - 200 + (cl.f * (viewW + 400)) % (viewW + 400);
+    x += Math.sign(x - W / 2 || 1) * c * (W * 0.9);
+    ctx.globalAlpha = 0.3 + 0.65 * calm;
+    drawCloud(x, cl.y - c * 140, cl.w, cl.w * 0.34, '#4b5570', '#343c52');
+  }
+  ctx.globalAlpha = 1;
+  // a heavy lid of cloud over everything
+  if (calm > 0.01) {
+    const lid = ctx.createLinearGradient(0, -offY, 0, 260);
+    lid.addColorStop(0, `rgba(22,26,42,${0.85 * calm})`);
+    lid.addColorStop(1, 'rgba(22,26,42,0)');
+    ctx.fillStyle = lid;
+    ctx.fillRect(-offX, -offY, viewW, 260 + offY);
+  }
+}
+
+function drawBolt() {
+  if (!bolt || bolt.t <= 0) return;
+  ctx.save();
+  ctx.strokeStyle = '#fffbd0'; ctx.lineWidth = 4; ctx.shadowColor = '#fff59a'; ctx.shadowBlur = 16;
+  ctx.globalAlpha = clamp(bolt.t / 0.15, 0, 1);
+  ctx.beginPath();
+  ctx.moveTo(bolt.pts[0][0], bolt.pts[0][1]);
+  for (const [x, y] of bolt.pts) ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSea(front) {
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  const c = 1 - calm;
+  ctx.beginPath();
+  ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x) + (front ? 6 : 0));
+  ctx.lineTo(x1, H + 10);
+  ctx.closePath();
+  if (front) {
+    const g = ctx.createLinearGradient(0, SEA_Y - 60, 0, H);
+    g.addColorStop(0, 'rgba(40,86,140,0.5)');
+    g.addColorStop(0.15, mix('#183a68', '#23508a', c).replace('rgb', 'rgba').replace(')', ',0.9)'));
+    g.addColorStop(1, 'rgba(10,26,54,1)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    // foamy edge on the near water
+    ctx.strokeStyle = `rgba(215,235,255,${0.25 + 0.35 * calm})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, surf(x) + 6);
+    ctx.stroke();
+  } else {
+    const g = ctx.createLinearGradient(0, SEA_Y - 80, 0, H);
+    g.addColorStop(0, mix('#2f5f96', '#4a82c0', c));
+    g.addColorStop(1, '#0d2244');
+    ctx.fillStyle = g;
+    ctx.fill();
+    // Moonlight on the still water
+    if (c > 0.01) {
+      const m = moonPos();
+      ctx.fillStyle = '#fff6d0';
+      for (let i = 0; i < 9; i++) {
+        ctx.globalAlpha = c * (0.35 - i * 0.03) * (0.7 + 0.3 * Math.sin(t * 3 + i));
+        const w = 46 - i * 3 + Math.sin(t * 2 + i * 1.7) * 6;
+        ctx.beginPath(); ctx.ellipse(m.x, SEA_Y + 8 + i * 16, w, 2.5, 0, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function drawFoam() {
+  ctx.strokeStyle = 'rgba(235,245,255,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (const w of rogues) {
+    if (w.h < 10) continue;
+    const top = surf(w.x);
+    const d = -w.dir;
+    ctx.beginPath();
+    ctx.arc(w.x + d * w.w * 0.12, top + 9, 10, d > 0 ? Math.PI * 1.05 : Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w.x + d * w.w * 0.9, surf(w.x + d * w.w * 0.9) + 2);
+    ctx.quadraticCurveTo(w.x + d * w.w * 0.4, top - 2, w.x, top + 1);
+    ctx.stroke();
+  }
+}
+
+function drawRain() {
+  const s = calm;
+  if (s < 0.05) return;
+  ctx.strokeStyle = `rgba(200,215,240,${0.35 * s})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const slant = 0.35 + gust * 2;
+  for (const r of rain) {
+    const x = -offX + r.f * (viewW + 100);
+    const y = -offY + r.y * (viewH + 40) - 20;
+    ctx.moveTo(x, y); ctx.lineTo(x - r.len * slant, y + r.len);
+  }
+  ctx.stroke();
+}
+
+// The fishing boat, drawn in boat coordinates (half-length 220), rocking with the sea
+function drawBoat() {
+  const bs = boatScale();
+  ctx.save();
+  ctx.translate(boat.x, boat.y);
+  ctx.rotate(boat.roll);
+  ctx.scale(bs, bs);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // Rigging, mast and the furled sail
+  ctx.strokeStyle = 'rgba(60,40,20,0.9)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(18, -248); ctx.lineTo(-226, -44); ctx.moveTo(18, -248); ctx.lineTo(238, -52); ctx.stroke();
+  ctx.strokeStyle = '#5a3a1c'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(18, -30); ctx.lineTo(18, -252); ctx.stroke();
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-72, -216); ctx.lineTo(112, -232); ctx.stroke();
+  const flap = Math.sin(t * 8) * 12 * calm, flap2 = Math.sin(t * 11 + 1) * 8 * calm;
+  // loose corner of the sail flapping in the wind
+  ctx.fillStyle = '#e9dfc4';
+  ctx.beginPath();
+  ctx.moveTo(60, -226);
+  ctx.quadraticCurveTo(96 + flap, -196 + flap2, 128 + flap * 1.6, lerp(-208, -150, 1 - calm) + flap2);
+  ctx.lineTo(106, -231);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e9dfc4'; ctx.lineWidth = 13;
+  ctx.beginPath(); ctx.moveTo(-64, -212); ctx.lineTo(104, -227); ctx.stroke();
+  ctx.strokeStyle = '#b9a67c'; ctx.lineWidth = 2.5;
+  for (const u of [-40, 0, 40, 80]) { ctx.beginPath(); ctx.moveTo(u, -222 - u * 0.087 + 12); ctx.lineTo(u + 2, -222 - u * 0.087 - 3); ctx.stroke(); }
+  // pennant at the masthead
+  ctx.fillStyle = '#c0392b';
+  const pw = Math.sin(t * 12) * 5 * calm;
+  ctx.beginPath();
+  ctx.moveTo(18, -252); ctx.lineTo(18, -240);
+  ctx.lineTo(lerp(20, 50, calm) + pw, lerp(-222, -246, calm) + pw * 0.5);
+  ctx.closePath(); ctx.fill();
+
+  // Inside of the far side of the hull
+  const inner = new Path2D();
+  inner.moveTo(-232, -42);
+  inner.quadraticCurveTo(-205, -54, -150, -52);
+  inner.lineTo(150, -52);
+  inner.quadraticCurveTo(212, -56, 244, -52);
+  inner.lineTo(200, -12);
+  inner.lineTo(-196, -12);
+  inner.closePath();
+  ctx.fillStyle = '#5e3b1c';
+  ctx.fill(inner);
+  ctx.strokeStyle = '#a9743c'; ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-232, -42); ctx.quadraticCurveTo(-205, -54, -150, -52); ctx.lineTo(150, -52); ctx.quadraticCurveTo(212, -56, 244, -52);
+  ctx.stroke();
+  // floor boards
+  ctx.fillStyle = '#7a4e27';
+  roundRect(-205, -38, 410, 28, 12); ctx.fill();
+  ctx.strokeStyle = '#6a4220'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-200, -29); ctx.lineTo(200, -29); ctx.moveTo(-200, -20); ctx.lineTo(200, -20); ctx.stroke();
+  // ribs
+  ctx.strokeStyle = '#4e3117'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (const u of [-150, -80, 90, 160]) { ctx.moveTo(u, -50); ctx.lineTo(u * 0.95, -38); }
+  ctx.stroke();
+
+  // Stern seat and the pillow (Mark 4:38)
+  ctx.fillStyle = '#8b5a2b';
+  roundRect(-212, -36, 112, 9, 4); ctx.fill();
+  ctx.fillStyle = '#9b3b5a';
+  ctx.beginPath(); ctx.ellipse(-166, -37, 21, 9, -0.08, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#c96a8a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-182, -39); ctx.quadraticCurveTo(-166, -44, -150, -40); ctx.stroke();
+
+  // Water sloshing in the bottom of the boat (its surface stays level)
+  let wet = 0;
+  for (const p of puddles) wet += p.size;
+  const wf = clamp(wet / WATER_MAX, 0, 1);
+  if (wf > 0.01) {
+    ctx.save();
+    ctx.clip(inner);
+    const h0 = -11 - wf * 34, tn = Math.tan(boat.roll);
+    ctx.fillStyle = 'rgba(80,150,215,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(-250, h0 + 250 * tn); ctx.lineTo(250, h0 - 250 * tn); ctx.lineTo(250, 10); ctx.lineTo(-250, 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(220,240,255,0.75)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let u = -250; u <= 250; u += 10) {
+      const y = h0 - u * tn + Math.sin(u * 0.08 + t * 6) * 1.5;
+      (u === -250 ? ctx.moveTo : ctx.lineTo).call(ctx, u, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Jesus asleep on the pillow, and the disciples
+  drawJesusInBoat();
+  const slots = crewSlots();
+  slots.forEach((s) => {
+    const [lx, ly] = crewLook(s);
+    drawDisciple(s, lx, ly);
+  });
+
+  // Puddles, splashed in by the waves (tap to bail)
+  for (const p of puddles) drawPuddle(p);
+
+  // Near side of the hull
+  const hull = new Path2D();
+  hull.moveTo(-234, -44);
+  hull.quadraticCurveTo(-222, -16, -192, -12);
+  hull.lineTo(196, -12);
+  hull.quadraticCurveTo(228, -16, 246, -56);
+  hull.quadraticCurveTo(238, 6, 176, 34);
+  hull.lineTo(-160, 34);
+  hull.quadraticCurveTo(-220, 22, -234, -44);
+  hull.closePath();
+  const hg = ctx.createLinearGradient(0, -12, 0, 34);
+  hg.addColorStop(0, '#96622f'); hg.addColorStop(1, '#6b4220');
+  ctx.fillStyle = hg;
+  ctx.fill(hull);
+  ctx.save();
+  ctx.clip(hull);
+  ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (const y of [0, 12, 24]) { ctx.moveTo(-240, y); ctx.lineTo(250, y); }
+  ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = '#b07b40'; ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(-234, -44); ctx.quadraticCurveTo(-222, -16, -192, -12); ctx.lineTo(196, -12); ctx.quadraticCurveTo(228, -16, 246, -56);
+  ctx.stroke();
+  // a painted eye on the bow, like the old Galilee boats
+  ctx.fillStyle = '#f3ead2';
+  ctx.beginPath(); ctx.ellipse(204, 2, 9, 5, -0.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12';
+  ctx.beginPath(); ctx.arc(206, 2, 3, 0, TAU); ctx.fill();
+
+  ctx.restore();
+}
+
+// Where a disciple is looking
+function crewLook(s) {
+  let dx, dy;
+  if (s.d.bailT > 0) { dx = 0; dy = -1; }
+  else if (state === 'win' || (state === 'play' && wake >= 1 && s.d.i % 2 === 0)) {
+    dx = JESUS_FEET.u - 40 - s.u; dy = 20;
+  } else if (warn) { dx = warn.dir > 0 ? -1 : 1; dy = -0.2; }
+  else if (state === 'fail') { dx = 0; dy = 1; }
+  else {
+    // glancing between the waves and the sleeping Master
+    const ph = Math.sin(t * 0.8 + s.d.phase * 3);
+    dx = ph > 0.2 ? -1 : ph < -0.4 ? 1 : 0.2; dy = ph > 0.2 ? 0.25 : -0.5;
+  }
+  const l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function drawPuddle(p) {
+  const n = p.size;
+  if (n < 0.05) return;
+  const rx = 10 + 8 * n, ry = 3.5 + 1.8 * n;
+  const wob = Math.sin(t * 5 + p.wob) * 1.5;
+  ctx.fillStyle = 'rgba(105,180,240,0.95)';
+  ctx.beginPath(); ctx.ellipse(p.u, PUDDLE_V, rx + wob, ry, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,245,255,0.9)'; ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(225,244,255,0.95)';
+  ctx.beginPath(); ctx.ellipse(p.u - rx * 0.3, PUDDLE_V - ry * 0.25, rx * 0.32, ry * 0.3, 0, 0, TAU); ctx.fill();
+  // it keeps sloshing: little droplets jump up
+  ctx.fillStyle = 'rgba(200,232,255,0.95)';
+  for (let k = 0; k < Math.ceil(n); k++) {
+    const ph = (t * 1.6 + p.wob + k * 0.37) % 1;
+    const hx = p.u + (k - (Math.ceil(n) - 1) / 2) * rx * 0.55;
+    ctx.beginPath(); ctx.arc(hx, PUDDLE_V - 3 - Math.sin(ph * Math.PI) * (8 + 3 * n), 2.2, 0, TAU); ctx.fill();
+  }
+}
+
+function drawZzz() {
+  if (jesusRise() > 0 || state === 'win') return;
+  const h = jesusHead();
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.lineJoin = 'round';
+  for (let i = 0; i < 3; i++) {
+    const ph = (t * 0.45 + i / 3) % 1;
+    const x = h.x + 8 + ph * 30 + Math.sin(t * 2 + i * 2) * 4;
+    const y = h.y - 18 - ph * 56;
+    ctx.globalAlpha = Math.sin(ph * Math.PI);
+    ctx.font = `700 ${Math.round(12 + ph * 12)}px Fredoka, sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(15,22,48,0.8)';
+    ctx.strokeText(i % 2 ? 'z' : 'Z', x, y);
+    ctx.fillStyle = '#e8f0ff';
+    ctx.fillText(i % 2 ? 'z' : 'Z', x, y);
+  }
+  ctx.restore();
+}
+
+function drawWakePrompt() {
+  if (state !== 'play' || wake < 1) return;
+  const bs = boatScale();
+  const c = toWorld(-128, -40);
+  const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+  const g = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, 80 * bs);
+  g.addColorStop(0, `rgba(255,232,140,${0.3 + 0.25 * pulse})`);
+  g.addColorStop(1, 'rgba(255,232,140,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c.x, c.y, 80 * bs, 0, TAU); ctx.fill();
+  ctx.strokeStyle = `rgba(255,226,122,${0.6 + 0.4 * pulse})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(c.x, c.y, (48 + pulse * 8) * bs, 0, TAU); ctx.stroke();
+  const label = isTouch() ? 'Tap to wake Him!' : 'Press W to wake Him!';
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px Fredoka, sans-serif';
+  const tx = clamp(c.x, 100, W - 100), ty = c.y - 72 * bs - pulse * 4;
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(label, tx, ty);
+  ctx.fillStyle = '#ffe27a';
+  ctx.fillText(label, tx, ty);
+  ctx.restore();
+}
+
+// Chunky arrow telling the crew which way to lean
+function drawLeanHint() {
+  const dir = leanHint();
+  if (!dir) return;
+  const bs = boatScale();
+  const p = toWorld(dir * 170, -175);
+  const x = clamp(p.x, 70, W - 70), y = p.y;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 10);
+  ctx.save();
+  ctx.translate(x + dir * pulse * 6, y);
+  ctx.scale(dir * Math.min(1.2, bs), Math.min(1.2, bs));
+  ctx.beginPath();
+  ctx.moveTo(26, 0); ctx.lineTo(6, -18); ctx.lineTo(6, -8); ctx.lineTo(-22, -8);
+  ctx.lineTo(-22, 8); ctx.lineTo(6, 8); ctx.lineTo(6, 18); ctx.closePath();
+  ctx.fillStyle = Math.abs(boat.roll) > DANGER_ROLL ? '#ff8a6b' : '#ffe27a';
+  ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.stroke(); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '700 16px Fredoka, sans-serif';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText('LEAN', x, y - 26);
+  ctx.fillStyle = '#fff3cf';
+  ctx.fillText('LEAN', x, y - 26);
+  ctx.restore();
+}
+
+function drawWarn() {
+  if (!warn || state !== 'play') return;
+  const left = warn.dir > 0;
+  const x = left ? -offX + 16 : W + offX - 16;
+  const y = 200;
+  const pulse = Math.sin(t * 14) > 0;
+  ctx.save();
+  ctx.textAlign = left ? 'left' : 'right';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineJoin = 'round';
+  const txt = left ? 'BIG WAVE! →' : '← BIG WAVE!';
+  ctx.strokeText(txt, x, y);
+  ctx.fillStyle = pulse ? '#ffb86b' : '#fff3cf';
+  ctx.fillText(txt, x, y);
+  ctx.restore();
+}
+
+// "Tap!" pointer over the first puddle, for the first level
+function drawTutorial() {
+  if (state !== 'play' || level !== 1 || tut.bail || !puddles.length || !isTouch()) return;
+  const p = puddles[0];
+  const w = toWorld(p.u, PUDDLE_V);
+  const bob = Math.abs(Math.sin(t * 6)) * 8;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '700 16px Fredoka, sans-serif';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(15,22,48,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText('Tap!', w.x, w.y + 52 + bob);
+  ctx.fillStyle = '#fff3cf';
+  ctx.fillText('Tap!', w.x, w.y + 52 + bob);
+  ctx.beginPath();
+  ctx.moveTo(w.x, w.y + 14 + bob); ctx.lineTo(w.x - 8, w.y + 28 + bob); ctx.lineTo(w.x + 8, w.y + 28 + bob); ctx.closePath();
+  ctx.stroke(); ctx.fill();
+  ctx.restore();
+}
+
+function drawBubble() {
+  if (!bubble) return;
+  const bs = boatScale();
+  let anchor, big = false;
+  if (bubble.who === 'jesus') {
+    const h = jesusHead();
+    anchor = { x: h.x, y: h.y - 26 * bs };
+    big = true;
+  } else {
+    const slots = crewSlots();
+    const s = slots[clamp(bubble.who, 0, slots.length - 1)];
+    anchor = toWorld(s.u, -104);
+  }
+  ctx.save();
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.font = big ? '700 22px Fredoka, sans-serif' : '600 15px Fredoka, sans-serif';
+  const tw = ctx.measureText(bubble.text).width;
+  const w = tw + (big ? 28 : 20), h = big ? 40 : 30;
+  const bx = clamp(anchor.x - w / 2, -offX + 8, W + offX - w - 8);
+  const by = anchor.y - h - 14;
+  ctx.fillStyle = big ? '#fffbe8' : '#ffffff';
+  ctx.strokeStyle = big ? '#e0a526' : 'rgba(40,40,60,0.6)';
+  ctx.lineWidth = big ? 3 : 2;
+  roundRect(bx, by, w, h, 14);
+  ctx.fill(); ctx.stroke();
+  const tx = clamp(anchor.x, bx + 16, bx + w - 16);
+  ctx.beginPath();
+  ctx.moveTo(tx - 8, by + h - 1); ctx.lineTo(anchor.x, anchor.y - 2); ctx.lineTo(tx + 8, by + h - 1);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(tx - 8, by + h); ctx.lineTo(anchor.x, anchor.y - 2); ctx.lineTo(tx + 8, by + h);
+  ctx.stroke();
+  ctx.fillStyle = big ? '#8a5a00' : '#3b2f1e';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(bubble.text, bx + w / 2, by + h / 2 + 1);
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,20,0.8)'; ctx.shadowBlur = 4;
+
+  // Left: level + water in the boat
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff3cf';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Calming the Storm' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('WATER', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,243,207,0.25)';
+  roundRect(62, 38, 126, 13, 6.5); ctx.fill();
+  const wl = boat ? clamp(water() / WATER_MAX, 0, 1) : 0;
+  const wg = ctx.createLinearGradient(62, 0, 188, 0);
+  wg.addColorStop(0, '#7cc4f2'); wg.addColorStop(1, '#2f7fd0');
+  ctx.fillStyle = wl > 0.66 && Math.sin(t * 10) > 0 ? '#ff6b6b' : wg;
+  if (wl > 0) { roundRect(62, 38, 126 * wl, 13, 6.5); ctx.fill(); }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1b2748'; ctx.strokeStyle = '#1b2748'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: the Wake-the-Master meter
+  const rx = viewW - 14, bw = Math.min(150, viewW - 262), bx = rx - bw;
+  const ready = wake >= 1 && state === 'play';
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = ready ? '#ffe27a' : '#fff3cf';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText(ready ? 'WAKE HIM NOW!' : 'WAKE THE MASTER', rx, 20);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,243,207,0.25)';
+  roundRect(bx, 28, bw, 10, 5); ctx.fill();
+  const wg2 = ctx.createLinearGradient(bx, 0, rx, 0);
+  wg2.addColorStop(0, '#f7c948'); wg2.addColorStop(1, '#fff1a8');
+  ctx.fillStyle = ready && Math.sin(t * 8) > 0 ? '#ffffff' : wg2;
+  if (wake > 0) { roundRect(bx, 28, bw * (state === 'win' ? 1 : wake), 10, 5); ctx.fill(); }
+
+  // Tilt gauge: a little boat that tips with the real one
+  if (boat && state !== 'title') {
+    const gx = rx - 34, gy = 84, gr = 28, span = 1.1;
+    ctx.lineCap = 'butt'; ctx.lineWidth = 7;
+    const zone = (a0, a1, col) => { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(gx, gy, gr, -Math.PI / 2 + a0 * span, -Math.PI / 2 + a1 * span); ctx.stroke(); };
+    const dz = DANGER_ROLL / MAX_ROLL;
+    zone(-1, -dz, 'rgba(255,107,107,0.85)');
+    zone(-dz, dz, 'rgba(140,220,160,0.7)');
+    zone(dz, 1, 'rgba(255,107,107,0.85)');
+    const r = clamp(boat.roll / MAX_ROLL, -1, 1);
+    ctx.save();
+    ctx.translate(gx, gy);
+    ctx.rotate(r * span);
+    ctx.strokeStyle = '#fff3cf'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(0, -gr - 2); ctx.stroke();
+    ctx.fillStyle = '#b07b40';
+    ctx.beginPath(); ctx.moveTo(-15, -2); ctx.lineTo(15, -2); ctx.lineTo(10, 7); ctx.lineTo(-10, 7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#fff3cf';
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('TILT', gx - gr - 10, gy + 4);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 26px Fredoka, sans-serif';
+  const size = Math.min(26, (W - 24) / (ctx.measureText(message.text).width / 26));
+  ctx.font = `700 ${Math.floor(size)}px Fredoka, sans-serif`;
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(10,16,40,0.85)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, W / 2, H * 0.3);
+  ctx.fillStyle = '#ffe9a8';
+  ctx.fillText(message.text, W / 2, H * 0.3);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 3; sy = rand(-4, 4) * shakeT * 3; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  drawSky();
+  drawBolt();
+  drawSea(false);
+  drawBoat();
+  drawWakePrompt();
+  drawSea(true);
+  drawFoam();
+  drawParticles();
+  drawRain();
+  drawZzz();
+  drawLeanHint();
+  drawWarn();
+  drawTutorial();
+  drawBubble();
+
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(230,235,255,${flashT * 2.2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updatePlay(dt) {
+  const wf = water() / WATER_MAX;
+  stats.time += dt;
+  stats.dry += (1 - wf) * dt;
+  stats.steady += clamp(1 - Math.abs(boat.roll) / MAX_ROLL, 0, 1) * dt;
+  updateWake(dt);
+  if (state !== 'play') return;
+
+  // Waves splash over the side
+  splashTimer -= dt;
+  if (splashTimer <= 0) {
+    splashTimer = cfg.splashGap * rand(0.7, 1.3);
+    splashIn(rand(DECK_MIN, DECK_MAX), Math.random() < cfg.splashBig ? 2 : 1);
+  }
+  // Now and then a giant wave
+  rogueTimer -= dt;
+  if (rogueTimer <= 0) {
+    rogueTimer = cfg.rogueGap * rand(0.8, 1.25);
+    spawnRogue();
+  }
+  // Golden sparkles round the Master once the disciples can wake Him
+  if (wake >= 1 && Math.random() < dt * 10) {
+    const c = toWorld(-128, -40);
+    spawn(c.x + rand(-50, 50), c.y + rand(-30, 20), 0, -30, 0.9, Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', rand(2, 3.5));
+  }
+}
+
+function updateWin(dt) {
+  winT += dt;
+  if (!spoke && winT >= 1.0) {
+    // "Peace, be still."
+    spoke = true;
+    say('jesus', 'Peace, be still.', 3);
+    flashT = 0.35;
+    sfx.win();
+    const h = toWorld(JESUS_FEET.u + 24, JESUS_FEET.v - 76);
+    for (let i = 0; i < 60; i++) {
+      const a = rand(0, TAU), sp = rand(40, 200);
+      spawn(h.x, h.y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.8), ['#ffe27a', '#fff6d0', '#ffffff'][i % 3], rand(2, 4.5), 20);
+    }
+  }
+  if (winT > 1.0) calm = Math.max(0, calm - dt / 2.2);
+  if (winT > 3.2 && winT - dt <= 3.2) showMessage('And there was a great calm.');
+  if (!marvelled && winT >= 3.8) {
+    marvelled = true;
+    say(1, 'What manner of man is this?', 2.8);
+  }
+  if (Math.random() < dt * 12) {
+    const c = toWorld(JESUS_FEET.u, JESUS_FEET.v - 40);
+    spawn(c.x + rand(-40, 40), c.y + rand(-40, 30), 0, -20, 1, '#fff6d0', 3);
+  }
+}
+
+function update(dt) {
+  t += dt;
+  updateGust(dt);
+  updateScenery(dt);
+  updateSea(dt);
+  updateBoat(dt);
+  updateParticles(dt);
+  updateIncoming(dt);
+  updatePuddles(dt);
+  updateDisciples(dt);
+  updateBolt(dt);
+  updateCries(dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') updateWin(dt);
+
+  shockT = Math.max(0, shockT - dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  nagCd = Math.max(0, nagCd - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.storm(state === 'title' ? 0.6 : calm);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
