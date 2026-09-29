@@ -21,6 +21,7 @@ Small cartoon games based on stories of Jesus from the Gospels. Open `index.html
 | **Through the Roof** 🏠 | Four faithful friends (Mark 2:1–12) | `through-the-roof.html` |
 | **The Sower** 🌾 | Seed on good ground (Matthew 13:3–23) | `the-sower.html` |
 | **Follow the Star** ⭐ | The wise men (Matthew 2:1–12) | `follow-the-star.html` |
+| **Washing Feet** 🦶 | Love one another (John 13:1–17) | `washing-feet.html` |
 
 Every game has the same pause menu (Resume / ↻ Restart Level / All games), keyboard shortcuts (`P`/`Esc` pause, `R` restart while paused, `M` mute), choir-and-organ music, and saves your best score in your browser.
 
@@ -100,4 +101,5 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
 | **The Sower** | Tap ahead to throw seed; tap birds to shoo them | ←/→ aim, `Space` throw | Get the seed onto good ground for a big harvest |
 | **Follow the Star** | Tap left / right of the caravan to steer | ←/→ | Stay in the star's light all the way to Bethlehem |
+| **Washing Feet** | Press and drag to wash, tap the jug to refill, drag the towel to dry | Arrows + hold `Space` wash, `T` towel | Get every disciple's feet sparkling clean before supper |
 
