@@ -1309,62 +1309,25 @@ function organ(ac, out, t0, beat, score, vol) {
   }
 }
 
-// Retro 8-bit: square-wave melody, square harmony, triangle bass
-function chiptune(ac, out, t0, beat, score, vol) {
-  let t = t0;
-  for (const [vowel, beats, ...notes] of score) {
-    const d = beats * beat;
-    if (vowel) {
-      notes.forEach((n, part) => {
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.type = part === 3 ? 'triangle' : 'square';
-        o.frequency.value = noteFreq(n) * (part === 3 ? 1 : 1);
-        const v = vol * [0.5, 0.22, 0.18, 0.9][part];
-        g.gain.setValueAtTime(v, t);
-        g.gain.setValueAtTime(v, t + Math.max(0.03, d - 0.05));
-        g.gain.linearRampToValueAtTime(0.0001, t + d - 0.01);
-        o.connect(g); g.connect(out);
-        o.start(t); o.stop(t + d);
-      });
-    }
-    t += d;
-  }
-}
-
-const HEAVEN_STYLES = ['choir', 'organ', 'chip'];
-
-// Plays one piece ('win' | 'start' | 'fail') in the chosen style
-function playHeaven(ac, out, t0, piece, style) {
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
   const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
   const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
   const opts = { swell: piece === 'win', droop: piece === 'fail' };
-  if (style === 'chip') {
-    if (piece === 'start') {   // a quick rising arpeggio instead of a held chord
-      ['D4', 'F#4', 'A4', 'D5', 'F#5', 'A5'].forEach((n, i) =>
-        chiptune(ac, out, t0 + i * 0.09, 0.09, [['a', 1, n, n, n, n]], 0.35));
-      chiptune(ac, out, t0 + 0.54, 0.6, SCORE_START.map((s) => [s[0], 1, ...s.slice(2)]), 0.35);
-      return;
-    }
-    chiptune(ac, out, t0, beat, score, 0.35);
-    return;
-  }
   const vols = [0.2, 0.14, 0.13, 0.16];
   for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
-  if (style === 'organ') organ(ac, out, t0, beat, score, 0.045);
+  organ(ac, out, t0, beat, score, 0.045);
 }
 
 // A single sung note for each tap, pitched higher the higher Jesus is
-function playTapNote(ac, out, t0, height, style) {
+function playTapNote(ac, out, t0, height) {
   const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
-  const score = [['a', 1, n, n, n, n]];
-  if (style === 'chip') { chiptune(ac, out, t0, 0.12, [['a', 1, n, n, n, n]], 0.25); return; }
-  singPart(ac, out, t0, 0.22, score, 0, 0.12);
-  if (style === 'organ') organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
 }
 
 const sfx = {
   ctx: null, master: null, thrustGain: null, noise: null, muted: false,
-  style: 'choir',
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     try {
@@ -1408,12 +1371,12 @@ const sfx = {
     o.connect(g); g.connect(this.master);
     o.start(t0); o.stop(t0 + dur + 0.05);
   },
-  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win', this.style); },
-  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start', this.style); },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
   tap(height) {
     if (!this.ctx) return;
     this.puff(0.15);
-    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height, this.style);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
   },
   puff(vol = 0.35) {
     if (!this.ctx) return;
@@ -1426,7 +1389,7 @@ const sfx = {
     src.start(t0, Math.random()); src.stop(t0 + 0.2);
   },
   bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
-  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail', this.style); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
   thunder() {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
