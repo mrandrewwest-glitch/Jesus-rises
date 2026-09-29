@@ -19,6 +19,8 @@ Small cartoon games based on stories of Jesus from the Gospels. Open `index.html
 | **He Is Risen** 🌅 | The empty tomb (Matthew 28:1–10) | `empty-tomb.html` |
 | **Legion** 🐖 | Into the swine (Mark 5:1–20) | `legion.html` |
 | **Through the Roof** 🏠 | Four faithful friends (Mark 2:1–12) | `through-the-roof.html` |
+| **The Sower** 🌾 | Seed on good ground (Matthew 13:3–23) | `the-sower.html` |
+| **Follow the Star** ⭐ | The wise men (Matthew 2:1–12) | `follow-the-star.html` |
 
 Every game has the same pause menu (Resume / ↻ Restart Level / All games), keyboard shortcuts (`P`/`Esc` pause, `R` restart while paused, `M` mute), choir-and-organ music, and saves your best score in your browser.
 
@@ -96,4 +98,6 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **He Is Risen** | Tap in time with the notes (hold the blue ones) | `Space`/↑ | Roll away the stone in rhythm before sunrise, then meet the risen Jesus |
 | **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
 | **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
+| **The Sower** | Tap ahead to throw seed; tap birds to shoo them | ←/→ aim, `Space` throw | Get the seed onto good ground for a big harvest |
+| **Follow the Star** | Tap left / right of the caravan to steer | ←/→ | Stay in the star's light all the way to Bethlehem |
 
