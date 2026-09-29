@@ -371,12 +371,12 @@ function geom() {
   const n = cfg.stones;
   const jx = Math.min(W - 95, W / 2 + 330);
   const padX = jx - 50, padY = JOHN_Y + 6;
-  const start = { x: Math.max(60, padX - 90 - n * 95), y: 800 };
+  const start = { x: Math.max(60, padX - 90 - n * 95), y: 792 };
   const pts = [start];
   const dx = padX - start.x, dy = padY - start.y;
   for (let i = 1; i <= n; i++) {
     const f = i / (n + 1);
-    const zig = (i % 2 ? 1 : -1) * 12;
+    const zig = (i % 2 ? -1 : 1) * 12;
     pts.push({ x: start.x + dx * f, y: start.y + dy * f + zig });
   }
   pts.push({ x: padX, y: padY });
@@ -1303,6 +1303,7 @@ const STORY_STEPS = [
 
 function startStory() {
   phase = 'story';
+  caption = null;
   story = { step: 0, t: 0, hopT: 0, pos: 0 };
   jesusP = { x: -40, y: 820, face: 'calm', arms: 'open', dip: 0, tilt: 0, glow: 0, waterY: null };
   showMessage('Jesus comes from Galilee!');
@@ -1407,11 +1408,9 @@ function startDove(retry) {
       vx: (Math.random() < 0.5 ? -1 : 1) * rand(10, 22 + level * 3), w: 104, h: 42, phase: rand(0, TAU), hit: 0,
     });
   }
-  skyClouds = [];
-  for (let y = top + 120; y < 260; y += rand(140, 230)) {
-    skyClouds.push({ f: Math.random(), y, w: rand(80, 170), speed: rand(0.2, 0.5) });
-  }
+  makeSkyClouds();
   particles = [];
+  caption = null;
   if (!retry) showMessage('Guide the dove down to Jesus!');
   else { showMessage(`Level ${level}: the dove descends`); sfx.levelStart(); }
   if (level === 1) setTimeout(() => {
@@ -1605,6 +1604,14 @@ function resetScene() {
   sparkles = []; rainClouds = []; particles = [];
   bubble = null; banner = null; caption = null;
   john.pose = 'idle'; john.honeyT = rand(3, 6);
+  makeSkyClouds();
+}
+
+function makeSkyClouds() {
+  skyClouds = [];
+  for (let y = -cfg.skyLen + 120; y < 250; y += rand(140, 230)) {
+    skyClouds.push({ f: Math.random(), y, w: rand(80, 170), speed: rand(0.2, 0.5) });
+  }
 }
 
 function titleScreen() {
@@ -2083,12 +2090,24 @@ function drawRiver() {
   if (calmF < 1) {
     ctx.save();
     ctx.globalAlpha = 1 - calmF;
-    for (let x = x0; x <= x1; x += 10) {
-      const ph = riverPhase(x);
-      if (ph < cfg.upFrac - 0.02) continue;
-      const edge = Math.min(ph - (cfg.upFrac - 0.02), 1 - ph) * 12;
-      ctx.fillStyle = `rgba(235,248,255,${clamp(edge, 0, 1) * 0.28})`;
-      ctx.fillRect(x, RIVER_TOP + 12, 11, RIVER_BOT - RIVER_TOP - 12);
+    const L = g.waveLen, base = t / cfg.period;
+    const wav = (y, k) => Math.sin(y / 38 + t * 2 + k) * 9;
+    // each band covers riverPhase in [upFrac, 1): x = L * (base - q - k)
+    for (let k = Math.floor(base - 1 - x1 / L) - 1; k <= Math.ceil(base - x0 / L) + 1; k++) {
+      const xa = L * (base - 1 - k), xb = L * (base - cfg.upFrac - k);
+      if (xb < x0 - 20 || xa > x1 + 20) continue;
+      ctx.fillStyle = 'rgba(225,244,255,0.22)';
+      ctx.beginPath();
+      for (let y = RIVER_TOP + 10; y <= RIVER_BOT; y += 10) ctx.lineTo(xa + wav(y, 0), y);
+      for (let y = RIVER_BOT; y >= RIVER_TOP + 10; y -= 10) ctx.lineTo(xb + wav(y, 2), y);
+      ctx.closePath(); ctx.fill();
+      // foamy crest along the leading edge of the swell
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.setLineDash([10, 8]);
+      ctx.beginPath();
+      for (let y = RIVER_TOP + 10; y <= RIVER_BOT; y += 8) ctx.lineTo(xb + wav(y, 2), y);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
     ctx.restore();
   }
@@ -2108,7 +2127,7 @@ function drawRiver() {
   ctx.stroke();
 
   // the baptism spot: a sandy shallow by John
-  ctx.fillStyle = 'rgba(230,211,161,0.55)';
+  ctx.fillStyle = 'rgba(236,214,160,0.5)';
   ctx.beginPath(); ctx.ellipse(g.padX + 20, g.padY - 2, 90, 22, 0, 0, TAU); ctx.fill();
 
   // stepping stones
@@ -2120,10 +2139,12 @@ function drawRiver() {
     ctx.fillStyle = `rgba(40,90,130,${0.3})`;
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 6, 30, 10, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = 0.35 + h * 0.65;
-    ctx.fillStyle = '#8f8676';
-    ctx.beginPath(); ctx.ellipse(p.x + warn, p.y + 2 + sink, 27, 11, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = h > 0.5 ? '#b8ae9c' : '#7f98a8';
-    ctx.beginPath(); ctx.ellipse(p.x + warn - 2, p.y - 1 + sink, 23, 7.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#766c5f'; ctx.strokeStyle = '#564e44'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(p.x + warn, p.y + 3 + sink, 30, 13, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = h > 0.5 ? '#d8cdb5' : '#8fa6b4';
+    ctx.beginPath(); ctx.ellipse(p.x + warn - 2, p.y - 1 + sink, 25, 8.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.ellipse(p.x + warn - 8, p.y - 3 + sink, 9, 3, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
     if (h < 0.5) {   // water washing over
       ctx.fillStyle = 'rgba(200,235,255,0.55)';
