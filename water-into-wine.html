@@ -1,0 +1,2139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#27306b">
+<title>Water into Wine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #27306b;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Water into Wine</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k], a[i]];
+  }
+  return a;
+}
+
+const hexRgb = (hex) => { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+const rgbStr = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+// ============================================================
+//  Tuning
+// ============================================================
+const JARS = 6;           // "six waterpots of stone" (John 2:6)
+const NEED = 4;           // jars that must be Good or better to keep the feast happy
+const TASTE_TIME = 1.8;   // seconds the governor spends tasting each pour
+const ROW_Y = 700;        // feet of the six waterpots standing in a row
+const STAGE_Y = 886;      // feet of the jar brought forward to be drawn out
+const JAR_W = 50, JAR_H = 84;
+
+const LEVEL_NAMES = [
+  'The Third Day',
+  'Cana of Galilee',
+  "The Bridegroom's Table",
+  'Music and Dancing',
+  "The Governor's Test",
+  'A Houseful of Guests',
+  'Seven Days of Feasting',
+  'The Good Wine',
+];
+
+// Each pour is graded by how far the water has turned
+const GRADES = {
+  watery:  { name: 'Watery',    pts: 0,   good: false, color: '#3d8fc4' },
+  good:    { name: 'Good',      pts: 100, good: true,  color: '#d9486c' },
+  fine:    { name: 'Fine',      pts: 200, good: true,  color: '#b0173d' },
+  best:    { name: 'BEST WINE', pts: 400, good: true,  color: '#e0a526' },
+  vinegar: { name: 'Vinegar',   pts: 0,   good: false, color: '#6f7a2a' },
+};
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Wedding Feast ${n}`,
+    tBase: Math.max(1.25, 3.5 - 0.32 * (n - 1)),       // seconds of holding to reach the best wine
+    win: Math.max(0.15, 0.55 - 0.065 * (n - 1)),       // width of the perfect window (seconds)
+    pre: Math.max(0.55, 1 - 0.06 * (n - 1)),           // how forgiving the Good/Fine zones are
+    post: Math.max(0.55, 1 - 0.06 * (n - 1)),
+    speedups: n >= 3 ? Math.min(1 + Math.floor((n - 3) / 2), 3) : 0,
+    trickies: n >= 4 ? Math.min(1 + Math.floor((n - 4) / 2), 2) : 0,
+    doubles: n >= 7 ? 2 : n >= 5 ? 1 : 0,
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('waterWineBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let jars = [];
+let rounds = [];
+let roundIdx = 0;
+let phase = 'fill';       // fill | ready | hold | taste
+let phaseT = 0;
+let results = [];
+let combo = 0, bests = 0;
+let needRelease = false;  // a press must start after the jar is ready
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let react = { mood: 'watch', t: 0 };
+let shakeT = 0, flashT = 0, jesusJoyT = 0;
+let endTimer = 0;
+let lastScore = null;
+let hint = '';
+
+// ============================================================
+//  The six stone waterpots
+// ============================================================
+// Colour of the liquid as it turns: water, pink, rosé, ruby (best), then vinegar
+function makeJar(i, kind, tBest = cfg.tBase * rand(0.75, 1.3)) {
+  const c = 0.6, r = c / tBest;
+  const surge = kind === 'speedup' ? 1.7 : kind === 'tricky' ? 2.2 : 1;
+  const eff = 1 + (surge - 1) * 0.7;     // widen the zones a little for jars that rush
+  const hw = cfg.win * rand(0.7, 1.3) * r * eff / 2;
+  const b0 = c - hw, b1 = c + hw;
+  const good0 = Math.max(0.12, b0 - (0.28 + 0.5) * cfg.pre * r * eff);
+  const fine0 = Math.max(good0 + 0.04, b0 - 0.28 * cfg.pre * r * eff);
+  const fine1 = b1 + 0.2 * cfg.post * r * eff;
+  const good1 = fine1 + 0.16 * cfg.post * r * eff;
+  const pEnd = good1 + 0.24;
+  const stops = [
+    [0, '#cfe8f7'], [good0 * 0.55, '#ecd6e2'], [good0, '#f2a0b6'], [fine0, '#dd5a7a'],
+    [b0, '#b8173c'], [c, '#930c2e'], [b1, '#7e1029'], [fine1, '#661a27'], [good1, '#552a1e'],
+    [good1 + 0.08, '#6a5324'], [good1 + 0.17, '#737739'], [pEnd + 1, '#7a8040'],
+  ].map(([p, h]) => [p, hexRgb(h)]);
+  return {
+    i, kind, tBest, c, r, surge, hw, b0, b1, fine0, good0, fine1, good1, pEnd, stops,
+    changeAt: c * (kind === 'tricky' ? rand(0.35, 0.5) : rand(0.3, 0.5)),
+    pauseDur: rand(0.6, 1.2), pauseT: 0, mult: 1,
+    p: 0, fill: 0, done: false, grade: null, onStage: false, slot: 'single',
+    anim: 0, order: 0, inWin: false, lastP: 0,
+  };
+}
+
+function colorAt(j, p) {
+  const s = j.stops;
+  if (p <= s[0][0]) return s[0][1];
+  for (let k = 1; k < s.length; k++) {
+    if (p <= s[k][0]) {
+      const f = (p - s[k - 1][0]) / (s[k][0] - s[k - 1][0]);
+      const a = s[k - 1][1], b = s[k][1];
+      return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f)];
+    }
+  }
+  return s[s.length - 1][1];
+}
+
+function gradeOf(j) {
+  const p = j.p;
+  if (p < j.good0) return 'watery';
+  if (p < j.fine0) return 'good';
+  if (p < j.b0) return 'fine';
+  if (p <= j.b1) return 'best';
+  if (p <= j.fine1) return 'fine';
+  if (p <= j.good1) return 'good';
+  return 'vinegar';
+}
+
+function buildLevel() {
+  const pairs = cfg.doubles >= 2 ? [[1, 2], [4, 5]] : cfg.doubles === 1 ? [[3, 4]] : [];
+  const inPair = new Set(pairs.flat());
+  const free = shuffle([1, 2, 3, 4, 5].filter((i) => !inPair.has(i)));
+  const kinds = Array(JARS).fill('steady');
+  for (let k = 0; k < cfg.trickies && free.length; k++) kinds[free.pop()] = 'tricky';
+  for (let k = 0; k < cfg.speedups && free.length; k++) kinds[free.pop()] = 'speedup';
+  jars = kinds.map((kind, i) => makeJar(i, kind));
+  // Two at once: one press turns both; the first release pours jar 1, then hold again for jar 2
+  for (const [a, b] of pairs) {
+    jars[a] = makeJar(a, 'steady', cfg.tBase * rand(0.8, 1));
+    jars[b] = makeJar(b, 'steady', jars[a].tBest + rand(1.4, 1.9));
+    jars[a].order = 1; jars[b].order = 2;
+  }
+  rounds = [];
+  for (let i = 0; i < JARS;) {
+    const pr = pairs.find((q) => q[0] === i);
+    if (pr) { rounds.push(pr); i += 2; } else { rounds.push([i]); i++; }
+  }
+}
+
+// Row positions and the place in front where a jar is drawn out
+function rowX(i) {
+  const gap = clamp((W - 70 - JARS * JAR_W) / 5, 12, 44);
+  return W / 2 + (i - 2.5) * (JAR_W + gap);
+}
+function stageOf(j) {
+  if (j.slot === 'single') return { x: W / 2, y: STAGE_Y, s: 1.85 };
+  return { x: W / 2 + (j.slot === 'left' ? -74 : 74), y: STAGE_Y, s: 1.42 };
+}
+function jarPos(j) {
+  const st = stageOf(j), e = ease(j.anim);
+  return {
+    x: lerp(rowX(j.i), st.x, e),
+    y: lerp(ROW_Y, st.y, e) - Math.sin(e * Math.PI) * 40,
+    s: lerp(1, st.s, e),
+    tilt: lerp(1, 1.8, e),
+  };
+}
+const sideX = () => clamp(W * 0.33, 150, 280);
+const jesusX = () => W / 2 - sideX();
+const govX = () => W / 2 + sideX();
+const GOV_S = 1.75, JESUS_S = 1.9;
+
+function stageJars() { return jars.filter((j) => j.onStage); }
+function pourTarget() {
+  const live = jars.filter((j) => j.onStage && !j.done);
+  live.sort((a, b) => a.order - b.order);
+  return live[0];
+}
+
+// ============================================================
+//  People at the feast
+// ============================================================
+function person(d) {
+  return { ...d, mood: 'watch', switchT: 0, delay: rand(0.05, 0.5), blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) };
+}
+const GUESTS = [
+  { robe: '#3f6fb5', hair: '#4a2f1a', beard: true,  skin: '#d9a066' },
+  { robe: '#c46b8c', hair: '#2e1d10', beard: false, skin: '#e3b184', scarf: '#f2c14e' },
+  { robe: '#6b8e3a', hair: '#8a8a8a', beard: true,  skin: '#c98d56' },
+  { robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#dca678', scarf: '#e86f5a' },
+  { robe: '#7a4fa0', hair: '#3a2716', beard: true,  skin: '#c58a55' },
+  { robe: '#3c8f86', hair: '#1f140c', beard: false, skin: '#b87a48', scarf: '#9ad0c2' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070', scarf: '#e8dcc0' },
+  { robe: '#4b7f4b', hair: '#5c3a1c', beard: false, skin: '#e3b184', scarf: '#f5a3c7' },
+  { robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { robe: '#5a6475', hair: '#2a1a0e', beard: false, skin: '#c88e5a', scarf: '#c9b27a' },
+  { robe: '#c9406a', hair: '#1c120b', beard: true,  skin: '#c78f5c' },
+  { robe: '#2f7fa8', hair: '#4a2f1a', beard: false, skin: '#e0ac7c', scarf: '#ffd27a' },
+  { robe: '#8e6bbf', hair: '#6b6b6b', beard: true,  skin: '#d9a066', scarf: '#ddd2bb' },
+  { robe: '#e07b39', hair: '#2d1b0f', beard: false, skin: '#bf8150', scarf: '#7fb7e6' },
+].map((d, i) => person({ ...d, i }));
+const BRIDE = person({ i: 20, robe: '#fbf6ee', hair: '#4a2f1a', beard: false, skin: '#e3b184', scarf: '#ffffff', crown: 'flowers' });
+const GROOM = person({ i: 21, robe: '#7a3fa0', hair: '#2e1d10', beard: true, skin: '#d39a66', crown: 'leaves' });
+const MARY = person({ i: 22, robe: '#e9dfc9', hair: '#4a2f1a', beard: false, skin: '#dca678', scarf: '#3d6fb6' });
+const SERVANTS = [
+  person({ i: 23, robe: '#c8b48a', hair: '#3a2716', beard: false, skin: '#c58a55', band: '#8a5a2b' }),
+  person({ i: 24, robe: '#b7a07a', hair: '#1f140c', beard: true,  skin: '#b87a48', band: '#6b8e3a' }),
+];
+const GOV = person({ i: 25, robe: '#7d2f6e', hair: '#9a9a9a', beard: true, skin: '#d7a070', scarf: '#e8c45a', cup: true, trim: '#e8c45a' });
+GOV.delay = 0;
+const PEOPLE = [...GUESTS, BRIDE, GROOM, MARY, ...SERVANTS, GOV];
+const gov = { sipT: 0, pending: null, cupColor: null, bubble: { text: '', t: 0 } };
+const maryBubble = { text: '', t: 0 };
+const jesusBubble = { text: '', t: 0 };
+
+function guestSlots() {
+  const slots = [];
+  const m = clamp(Math.floor((W - 160) / 128), 2, 7);    // guests on each side of the couple
+  for (let k = 0; k < m; k++) {
+    const f = m === 1 ? 0.5 : k / (m - 1);
+    slots.push({ d: GUESTS[k * 2], x: lerp(34, W / 2 - 72, f), y: 560 + (k % 2) * 4 });
+    slots.push({ d: GUESTS[k * 2 + 1], x: lerp(W / 2 + 72, W - 34, 1 - f), y: 560 + (k % 2) * 4 });
+  }
+  slots.push({ d: BRIDE, x: W / 2 - 25, y: 560 });
+  slots.push({ d: GROOM, x: W / 2 + 25, y: 560 });
+  return slots;
+}
+
+function crowdMood() {
+  if (state === 'title') return 'watch';
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (react.t > 0) return react.mood;
+  if (phase === 'hold') {
+    const live = stageJars().filter((j) => !j.done);
+    if (live.some((j) => j.p > j.good1)) return 'worried';
+    if (live.some((j) => j.p >= j.fine0)) return 'wow';
+  }
+  return 'watch';
+}
+
+function updatePeople(dt) {
+  const target = crowdMood();
+  for (const d of PEOPLE) {
+    if (d !== GOV) {
+      let want = target;
+      if (d === MARY && want === 'shock') want = 'wow';
+      if (want !== d.mood) {
+        d.switchT += dt;
+        if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+      } else d.switchT = 0;
+    }
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+  // The governor of the feast sips, then reacts
+  if (gov.sipT > 0) {
+    gov.sipT -= dt;
+    if (gov.sipT <= 0 && gov.pending) tasteReaction(gov.pending);
+  }
+  gov.bubble.t -= dt;
+  maryBubble.t -= dt;
+  jesusBubble.t -= dt;
+  if (state === 'win') GOV.mood = 'joy';
+  else if (state === 'fail') GOV.mood = 'worried';
+  else if (gov.sipT <= 0 && gov.bubble.t <= 0 && GOV.mood !== 'watch') GOV.mood = 'watch';
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// A golden goblet held by its stem at (0,0)
+function drawGoblet(x, y, color, rot = 0) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot);
+  ctx.fillStyle = '#e7b53c'; ctx.strokeStyle = '#9a6a12'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.ellipse(0, 7, 5.5, 2, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillRect(-1.3, -4, 2.6, 11);
+  ctx.beginPath();
+  ctx.moveTo(-7.5, -15); ctx.quadraticCurveTo(-7.5, -3.5, 0, -3.5); ctx.quadraticCurveTo(7.5, -3.5, 7.5, -15);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (color) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(0, -14.5, 6.6, 2, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Where the governor holds his cup for each mood (x < 0 is toward the jars)
+function govArms(mood, hy) {
+  switch (mood) {
+    case 'sip':     return { cup: [-4, hy + 14], rot: 0.85, other: [15, -12] };
+    case 'joy':     return { cup: [-22, -72], rot: -0.2, other: [24, -68] };
+    case 'wow':     return { cup: [-18, -42], rot: 0, other: [22, -46] };
+    case 'sour':    return { cup: [-31, -30], rot: -0.5, other: [4, -22] };
+    case 'worried': return { cup: [-10, -30], rot: 0, other: [4, -28] };
+    default:        return { cup: [-14, -26], rot: 0, other: [15, -12] };
+  }
+}
+
+// A feast guest in the disciple style from Jesus Rises, looking toward (lookX, lookY)
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  const shiver = mood === 'sour' ? Math.sin(t * 45) * 1.3 : 0;
+
+  ctx.save();
+  ctx.translate(x + shiver * s, y - jump * s);
+  ctx.scale(s, s);
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  let lx = 0, ly = 0;
+  {
+    const dx = lookX - x, dy = lookY - (y - 52 * s);
+    const len = Math.hypot(dx, dy) || 1;
+    lx = dx / len; ly = dy / len;
+  }
+  const hy = -53;
+  const G = d.cup ? govArms(mood, hy) : null;
+
+  // Arms raised behind the head for joy / pointing in wonder
+  if (!d.cup) {
+    if (mood === 'joy') {
+      const wave = Math.sin(t * 9 + d.phase) * 4;
+      arm(-11, -32, -24 + wave, -66);
+      arm(11, -32, 24 - wave, -66);
+    } else if (mood === 'wow' && d.i % 3 === 0) {
+      arm(11, -32, 20 + lx * 6, -70);
+    }
+  } else if (mood === 'joy') {
+    arm(11, -32, G.other[0], G.other[1]);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.trim || '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  if (d.trim) {   // the governor's fine robe has a gold hem and collar
+    ctx.beginPath(); ctx.moveTo(-17.5, -3); ctx.quadraticCurveTo(0, 1, 17.5, -3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, -39); ctx.lineTo(0, -28); ctx.lineTo(6, -39); ctx.stroke();
+  }
+
+  // Resting arms
+  if (d.cup) {
+    if (mood !== 'joy') arm(11, -32, G.other[0], G.other[1]);
+    if (mood !== 'sip') { arm(-11, -32, G.cup[0], G.cup[1]); drawGoblet(G.cup[0], G.cup[1], gov.cupColor, G.rot); }
+  } else if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // Head
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    if (d.cup) {   // a jewel on the governor's turban
+      ctx.fillStyle = '#d6336c';
+      ctx.beginPath(); ctx.arc(0, hy - 13, 3, 0, TAU); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.band) {   // servant's headband
+    ctx.strokeStyle = d.band; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  }
+  if (d.crown) {  // wedding garland: flowers for the bride, leaves for the groom
+    for (let k = 0; k <= 6; k++) {
+      const a = Math.PI * (1.08 + k * 0.14);
+      const cx = Math.cos(a) * 17, cy = hy - 1 + Math.sin(a) * 17;
+      ctx.fillStyle = d.crown === 'flowers' ? (k % 2 ? '#ff8fb8' : '#ffe066') : (k % 2 ? '#5c9e3a' : '#7cc24e');
+      ctx.beginPath();
+      if (d.crown === 'flowers') ctx.arc(cx, cy, 3.4, 0, TAU);
+      else ctx.ellipse(cx, cy, 4.4, 2.4, a + Math.PI / 2, 0, TAU);
+      ctx.fill();
+    }
+  }
+  // Beard
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (d.cup) {
+    if (mood === 'sip') { arm(-11, -32, G.cup[0], G.cup[1]); drawGoblet(G.cup[0], G.cup[1], gov.cupColor, G.rot); }
+  } else if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay' || mood === 'sour') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+    case 'sour': {
+      // green around the gills, eyes screwed shut, lips puckered
+      ctx.fillStyle = 'rgba(130,190,70,0.5)';
+      ctx.beginPath(); ctx.ellipse(0, hy + 6, 14, 8, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-ex - 3.5, ey - 3); ctx.lineTo(-ex + 2.5, ey); ctx.lineTo(-ex - 3.5, ey + 3);
+      ctx.moveTo(ex + 3.5, ey - 3); ctx.lineTo(ex - 2.5, ey); ctx.lineTo(ex + 3.5, ey + 3);
+      ctx.stroke();
+      brows(-8, -12, -8, -12);
+      ctx.fillStyle = '#b5534a';
+      ctx.beginPath(); ctx.arc(0, mouthY + 1, 3.4, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#5a1f18';
+      ctx.beginPath(); ctx.arc(0, mouthY + 1, 1.4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(90,40,20,0.6)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-6, mouthY - 1); ctx.lineTo(-4.5, mouthY);
+      ctx.moveTo(6, mouthY - 1); ctx.lineTo(4.5, mouthY);
+      ctx.stroke();
+      break;
+    }
+    case 'sip':
+      // eyes closed, savouring
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey - 1, 3, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.moveTo(ex + 3 * Math.cos(0.15 * Math.PI), ey - 1 + 3 * Math.sin(0.15 * Math.PI));
+      ctx.arc(ex, ey - 1, 3, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      brows(-8, -9, -8, -9);
+      break;
+  }
+}
+
+// ============================================================
+//  Particles and pop-up words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, ring = false) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, ring });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) {
+    popups[i].t += dt;
+    if (popups[i].t > 1.6) popups.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    if (p.ring) {
+      ctx.strokeStyle = p.color; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.stroke();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Rounds: fill, hold, pour, taste
+// ============================================================
+function startRound(n) {
+  roundIdx = n;
+  const ids = rounds[n];
+  ids.forEach((id, k) => {
+    const j = jars[id];
+    j.onStage = true;
+    j.slot = ids.length === 1 ? 'single' : k === 0 ? 'left' : 'right';
+  });
+  phase = 'fill';
+  phaseT = 0;
+  const first = jars[ids[0]];
+  if (ids.length === 2) showMessage('Two jars at once!');
+  else if (first.kind === 'tricky') showMessage('A tricky jar... watch it closely!');
+  else if (first.kind === 'speedup') showMessage('This jar is in a hurry!');
+  if (level === 1 && n === 0) { jesusBubble.text = 'Fill the waterpots with water.'; jesusBubble.t = 2.6; }
+}
+
+function inputDown() {
+  return pointers.size > 0 || keys.has('Space') || keys.has('ArrowDown') || keys.has('KeyS');
+}
+
+function updateRound(dt) {
+  phaseT += dt;
+  const down = inputDown();
+  if (!down) needRelease = false;
+  const live = stageJars().filter((j) => !j.done);
+
+  if (phase === 'fill') {
+    // The servants carry the jar forward and fill it to the brim
+    let full = true;
+    for (const j of live) {
+      if (j.anim > 0.97) j.fill = Math.min(1, j.fill + dt * 1.8);
+      if (j.fill < 1) full = false;
+    }
+    if (full && phaseT > 0.5) { phase = 'ready'; phaseT = 0; }
+  } else if (phase === 'ready') {
+    if (down && !needRelease) {
+      phase = 'hold'; phaseT = 0;
+      sfx.puff(0.12);
+    }
+  } else if (phase === 'hold') {
+    if (down) {
+      for (const j of live) {
+        advanceJar(j, dt);
+        const inWin = j.p >= j.b0 && j.p <= j.b1;
+        if (inWin && !j.inWin) sfx.twinkle();
+        j.inWin = inWin;
+        const P = jarPos(j);
+        const my = P.y - 81 * P.s;
+        if (inWin && Math.random() < dt * 30) {
+          spawn(P.x + rand(-16, 16) * P.s, my + rand(-4, 4), rand(-12, 12), rand(-70, -30), rand(0.5, 0.9),
+            Math.random() < 0.6 ? '#ffd84a' : '#fff6c8', rand(2, 3.8));
+        }
+        if (j.p > j.good1 && Math.random() < dt * 14) {
+          spawn(P.x + rand(-14, 14) * P.s, my + rand(-3, 5), rand(-6, 6), rand(-40, -18), rand(0.5, 0.9),
+            Math.random() < 0.5 ? '#9aa04a' : '#c9c77a', rand(2, 4), 0, true);
+        }
+        if (j.p >= j.pEnd) { needRelease = true; pour(j); return; }
+      }
+    } else {
+      const j = pourTarget();
+      if (j) pour(j);
+    }
+  } else if (phase === 'taste') {
+    if (phaseT > TASTE_TIME) nextStep();
+  }
+}
+
+function advanceJar(j, dt) {
+  let target = 1;
+  if (j.kind === 'speedup' && j.p >= j.changeAt) target = j.surge;
+  if (j.kind === 'tricky' && j.p >= j.changeAt) {
+    if (j.pauseT < j.pauseDur) { j.pauseT += dt; target = 0.05; } else target = j.surge;
+  }
+  j.mult += (target - j.mult) * Math.min(1, dt * 9);
+  j.p += j.r * j.mult * dt;
+}
+
+function govCup() {
+  const gx = govX(), s = GOV_S;
+  return { x: gx - 14 * s, y: STAGE_Y - 40 * s };
+}
+
+function pour(j) {
+  const g = gradeOf(j), G = GRADES[g];
+  j.grade = g; j.done = true; j.inWin = false;
+  let pts = 0, bonus = 0, mult = 1;
+  if (G.good) {
+    combo++;
+    mult = Math.min(1 + 0.5 * (combo - 1), 4);
+    pts = Math.round(G.pts * mult);
+    if (g === 'best') { bonus = Math.round(200 * clamp(1 - Math.abs(j.p - j.c) / j.hw, 0, 1)); bests++; }
+  } else combo = 0;
+  levelScore += pts + bonus;
+  results.push(g);
+  const P = jarPos(j);
+  const col = colorAt(j, j.p);
+  let sub = pts ? `+${pts + bonus}` : '';
+  if (G.good && combo > 1) sub += `  ×${mult} combo`;
+  if (bonus >= 150) sub = 'Perfect! ' + sub;
+  popups.push({ text: G.name + '!', sub, x: P.x, y: P.y - JAR_H * P.s - 22, t: 0, color: G.color });
+  // "Draw out now, and bear unto the governor of the feast" (John 2:8)
+  const C = govCup();
+  for (let k = 0; k < 18; k++) {
+    const T = rand(0.45, 0.6);
+    const sx = P.x + rand(-8, 8), sy = P.y - 81 * P.s;
+    spawn(sx, sy, (C.x - sx) / T, (C.y - sy - 0.5 * 500 * T * T) / T, T, rgbStr(col), rand(2.5, 4), 500);
+  }
+  gov.cupColor = rgbStr(col);
+  gov.sipT = 0.6; gov.pending = g;
+  GOV.mood = 'sip';
+  gov.bubble.t = 0;
+  phase = 'taste'; phaseT = 0;
+  sfx.puff(0.2);
+}
+
+const GOV_LINES = {
+  best: ['Thou hast kept the good wine until now!', 'The best wine! Kept until now!'],
+  fine: ['Ah, a fine wine!', 'Fine wine indeed!'],
+  good: ['Good wine.', 'Mm, good.'],
+  watery: ['Hmm... this is still water.', 'Watery! Not yet...'],
+  vinegar: ['Blecch! Vinegar!', 'Ooh! Sour! Too long!'],
+};
+
+function tasteReaction(g) {
+  gov.pending = null;
+  GOV.mood = { best: 'joy', fine: 'wow', good: 'watch', watery: 'worried', vinegar: 'sour' }[g];
+  const lines = GOV_LINES[g];
+  gov.bubble.text = g === 'best' && bests === 1 ? lines[0] : lines[Math.floor(Math.random() * lines.length)];
+  gov.bubble.t = 2.3;
+  react = { mood: { best: 'joy', fine: 'joy', good: 'wow', watery: 'worried', vinegar: 'shock' }[g], t: 1.6 };
+  if (g === 'best' || g === 'fine') jesusJoyT = 1.5;
+  const C = govCup();
+  if (g === 'best') {
+    for (let i = 0; i < 40; i++) {
+      const a = rand(0, TAU), sp = rand(40, 170);
+      spawn(C.x, C.y - 20, Math.cos(a) * sp, Math.sin(a) * sp - 40, rand(0.7, 1.4),
+        ['#ffe27a', '#fff6d0', '#ff8fb8', '#ffffff'][i % 4], rand(2, 4.5), 60);
+    }
+    sfx.pourNote(1); sfx.cheer();
+  } else if (g === 'fine') { sfx.pourNote(0.7); sfx.cheer(); }
+  else if (g === 'good') sfx.pourNote(0.4);
+  else if (g === 'watery') { sfx.bounce(); for (let i = 0; i < 8; i++) spawn(C.x, C.y - 10, rand(-50, 50), rand(-60, -20), 0.6, '#9fd3f0', 3, 200); }
+  else { sfx.pucker(); shakeT = 0.25; for (let i = 0; i < 10; i++) spawn(C.x, C.y - 12, rand(-40, 40), rand(-50, -10), 0.9, '#9aa04a', rand(2, 4), 0, true); }
+}
+
+function nextStep() {
+  for (const j of jars) if (j.onStage && j.done) j.onStage = false;
+  const bad = results.filter((g) => !GRADES[g].good).length;
+  if (bad > JARS - NEED) { fail(); return; }
+  if (jars.some((j) => j.onStage && !j.done)) {
+    phase = 'ready'; phaseT = 0;
+    needRelease = true;
+    return;
+  }
+  if (roundIdx + 1 < rounds.length) startRound(roundIdx + 1);
+  else win();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  const goodCount = results.filter((g) => GRADES[g].good).length;
+  const levelBonus = level * 250;
+  const bestBonus = bests * 150;
+  const feastBonus = goodCount === JARS ? 500 : 0;
+  const score = levelScore + levelBonus + bestBonus + feastBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('waterWineBest', best); } catch (e) {} }
+  lastScore = { pours: levelScore, levelBonus, bestBonus, feastBonus, score, goodCount };
+  for (let i = 0; i < 80; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(W / 2, 520, Math.cos(a) * sp, Math.sin(a) * sp - 60, rand(0.9, 2),
+      ['#ffe27a', '#fff6d0', '#ff8fb8', '#b8173c'][i % 4], rand(2, 4.5), 40);
+  }
+  gov.bubble.text = 'Thou hast kept the good wine until now!';
+  gov.bubble.t = 3;
+  showMessage('The feast is full of joy!');
+  sfx.win();
+  endTimer = 2.4;
+}
+
+function fail() {
+  state = 'fail';
+  showMessage('They have no wine!');
+  maryBubble.text = 'They have no wine.';
+  maryBubble.t = 3;
+  sfx.fail();
+  endTimer = 2;
+}
+
+function showMessage(text) { message = { text, t: 2.2 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  cfg = makeConfig(1);
+  buildLevel();
+  showOverlay('Water into Wine', 'The Wedding at Cana',
+    `<p class="verse">"This beginning of miracles did Jesus in Cana of Galilee, and manifested forth his glory; and his disciples believed on him." &mdash; John 2:11</p>
+     <ul>
+       <li>The wine has run out! Six stone waterpots are <b>filled with water to the brim</b>.</li>
+       <li><b>Press and hold</b> anywhere (or hold <kbd>Space</kbd> / <kbd>&darr;</kbd>) and watch the water turn to wine.</li>
+       <li><b>Let go</b> when it glows <b>deep ruby with a golden sparkle</b> &mdash; the best wine! Hold too long and it sours into <b>vinegar</b>.</li>
+       <li>Every jar is different: <b>watch the colour</b>, don't count!</li>
+       <li>Keep the feast happy: at least <b>${NEED} of ${JARS}</b> jars Good or better.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+    'Begin the Feast', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = makeConfig(level);
+  buildLevel();
+  results = [];
+  combo = 0; bests = 0; levelScore = 0;
+  particles = [];
+  popups = [];
+  react = { mood: 'watch', t: 0 };
+  gov.sipT = 0; gov.pending = null; gov.cupColor = null; gov.bubble.t = 0;
+  GOV.mood = 'watch';
+  shakeT = flashT = jesusJoyT = 0;
+  endTimer = 0;
+  needRelease = true;
+  state = 'play';
+  hideOverlay();
+  startRound(0);
+  showMessage(`Level ${level}: ${cfg.name}`);
+  maryBubble.text = 'Whatsoever he saith unto you, do it.';
+  maryBubble.t = 3;
+  sfx.levelStart();
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  const tally = (g) => results.filter((r) => r === g).length;
+  const tallyLine = `Best wine: <b>${tally('best')}</b> &middot; Fine: <b>${tally('fine')}</b> &middot; Good: <b>${tally('good')}</b><br>Watery: <b>${tally('watery')}</b> &middot; Vinegar: <b>${tally('vinegar')}</b>`;
+  if (state === 'win') {
+    const s = lastScore;
+    const verse = level % 2
+      ? '"Every man at the beginning doth set forth good wine; and when men have well drunk, then that which is worse: but thou hast kept the good wine until now." &mdash; John 2:10'
+      : '"This beginning of miracles did Jesus in Cana of Galilee, and manifested forth his glory; and his disciples believed on him." &mdash; John 2:11';
+    showOverlay('The best wine!', `Level ${level} complete — ${cfg.name}`,
+      `<p class="verse">${verse}</p>
+       <p class="score" style="font-size:0.95rem">${tallyLine}</p>
+       <p class="score">Pours: <b>${s.pours}</b><br>Level bonus: <b>${s.levelBonus}</b><br>Best-wine bonus: <b>${s.bestBonus}</b>${s.feastBonus ? `<br>Full feast bonus: <b>${s.feastBonus}</b>` : ''}</p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+      'Next Feast', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('They have no wine!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Too many jars came out watery or sour, and the wine ran out. Watch for the deep ruby glow and the golden sparkle!</p>
+       <p class="score" style="font-size:0.95rem">${tallyLine}</p>
+       <p class="verse">"His mother saith unto the servants, Whatsoever he saith unto you, do it." &mdash; John 2:5</p>
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    sfx.thrust(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input: press and hold anywhere (this game is all about holding)
+// ============================================================
+const keys = new Set();
+const pointers = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => { keys.clear(); pointers.clear(); });
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  pointers.add(e.pointerId);
+});
+const release = (e) => pointers.delete(e.pointerId);
+window.addEventListener('pointerup', release);
+window.addEventListener('pointercancel', release);
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking the hold. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+};
+
+// Extra little sounds for the feast, built from the same tone / noise helpers
+Object.assign(sfx, {
+  twinkle() { this.tone(1568, 0.25, 'sine', 0.1); this.tone(2093, 0.3, 'sine', 0.07, 0.07); },
+  pourNote(height) {
+    if (!this.ctx) return;
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+    if (height >= 1) { this.tone(1760, 0.3, 'sine', 0.08, 0.12); this.tone(2349, 0.4, 'sine', 0.06, 0.2); }
+  },
+  pucker() { this.tone(330, 0.45, 'sawtooth', 0.1, 0, 110); this.tone(250, 0.3, 'square', 0.04, 0.12, 90); },
+  cheer() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.6;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 1);
+  },
+});
+
+// ============================================================
+//  Rendering: the wedding feast at Cana
+// ============================================================
+const STARS = Array.from({ length: 46 }, () => ({ f: Math.random(), y: rand(-300, 290), r: rand(0.6, 1.7), ph: rand(0, TAU) }));
+const LANTERN_COLORS = ['#ff8a3d', '#ffd24a', '#ff5e62', '#ffb347', '#ff7eb6'];
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -200, 0, 440);
+  g.addColorStop(0, '#27306b');
+  g.addColorStop(0.35, '#4b4a95');
+  g.addColorStop(0.62, '#a3669e');
+  g.addColorStop(0.82, '#f08d6e');
+  g.addColorStop(1, '#ffc27a');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // Stars
+  for (const s of STARS) {
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 2 + s.ph);
+    ctx.fillStyle = '#fff8e0';
+    ctx.beginPath(); ctx.arc(-offX + s.f * viewW, s.y, s.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Crescent moon
+  const mx = W * 0.64, my = 105;
+  ctx.fillStyle = 'rgba(255,248,220,0.25)';
+  ctx.beginPath(); ctx.arc(mx, my, 34, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff4c8';
+  ctx.beginPath(); ctx.arc(mx, my, 20, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#4e4b92';
+  ctx.beginPath(); ctx.arc(mx + 9, my - 5, 18, 0, TAU); ctx.fill();
+}
+
+function drawBackdrop() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  // Hills of Galilee and a little village
+  ctx.fillStyle = '#7a5a95';
+  ctx.beginPath(); ctx.moveTo(x0, 470);
+  for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, 380 + Math.sin(x / 110) * 16 + Math.sin(x / 41) * 6);
+  ctx.lineTo(x1, 470); ctx.fill();
+  ctx.fillStyle = '#6a4d86';
+  for (let k = 0; k < 7; k++) {
+    const hx = W * (0.08 + k * 0.14), hw = 26 + (k % 3) * 8, hh = 16 + (k % 2) * 8;
+    ctx.fillRect(hx - hw / 2, 400 - hh, hw, hh + 20);
+  }
+  ctx.fillStyle = 'rgba(255,214,120,0.8)';
+  for (let k = 0; k < 7; k++) ctx.fillRect(W * (0.08 + k * 0.14) - 3, 394 - (k % 2) * 6, 5, 5);
+
+  // Courtyard wall with lamp-lit arches
+  const wall = ctx.createLinearGradient(0, 410, 0, 575);
+  wall.addColorStop(0, '#edcf9e'); wall.addColorStop(1, '#cfa874');
+  ctx.fillStyle = wall;
+  ctx.fillRect(x0, 410, x1 - x0, 170);
+  ctx.fillStyle = '#d9b27c';
+  ctx.fillRect(x0, 406, x1 - x0, 10);
+  const archGap = 170;
+  const n = Math.ceil((x1 - x0) / archGap) + 1;
+  const start = W / 2 - Math.ceil(n / 2) * archGap + archGap / 2;
+  for (let k = 0; k <= n; k++) {
+    const ax = start + k * archGap;
+    const ag = ctx.createLinearGradient(0, 440, 0, 560);
+    ag.addColorStop(0, '#ffdc96'); ag.addColorStop(1, '#f39a55');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.moveTo(ax - 34, 575); ctx.lineTo(ax - 34, 478); ctx.arc(ax, 478, 34, Math.PI, TAU); ctx.lineTo(ax + 34, 575);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#b98c56'; ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  // Garland swags along the top of the wall
+  ctx.strokeStyle = '#4f8f3a'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let x = x0; x < x1; x += 90) {
+    ctx.moveTo(x, 414); ctx.quadraticCurveTo(x + 45, 446, x + 90, 414);
+  }
+  ctx.stroke();
+  for (let x = x0; x < x1; x += 90) {
+    for (const [dx, c] of [[0, '#ff8fb8'], [45, '#ffffff'], [22, '#ffe066'], [68, '#ffe066']]) {
+      const yy = dx === 0 ? 414 : dx === 45 ? 430 : 425;
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x + dx, yy, dx === 0 ? 6 : 4, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawFloor() {
+  const x0 = -offX - 10, x1 = W + offX + 10;
+  const g = ctx.createLinearGradient(0, 575, 0, H);
+  g.addColorStop(0, '#dcb07a'); g.addColorStop(1, '#c48f58');
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, 575, x1 - x0, H - 575 + 10);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x0, 575, x1 - x0, H - 575 + 10); ctx.clip();
+  ctx.strokeStyle = 'rgba(110,70,30,0.16)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const y of [612, 650, 698, 758, 830]) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+  for (let k = -12; k <= 12; k++) { ctx.moveTo(W / 2 + k * 28, 575); ctx.lineTo(W / 2 + k * 150, H + 10); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Flower garland arch over the bride and groom
+function drawCoupleArch() {
+  const cx = W / 2, cy = 566, r = 88;
+  ctx.strokeStyle = '#4f8f3a'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, TAU); ctx.stroke();
+  for (let k = 0; k <= 12; k++) {
+    const a = Math.PI + (k / 12) * Math.PI;
+    ctx.fillStyle = ['#ff8fb8', '#ffffff', '#ffe066'][k % 3];
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 5.5, 0, TAU); ctx.fill();
+  }
+}
+
+function drawTable() {
+  const x0 = 8, x1 = W - 8;
+  // table top
+  ctx.fillStyle = '#fffaf0';
+  roundRect(x0, 532, x1 - x0, 16, 6); ctx.fill();
+  // cloth front with a festive band and scalloped hem
+  ctx.fillStyle = '#f6ecd6';
+  ctx.fillRect(x0, 546, x1 - x0, 50);
+  ctx.fillStyle = '#c0392b'; ctx.fillRect(x0, 580, x1 - x0, 6);
+  ctx.fillStyle = '#e0a526'; ctx.fillRect(x0, 587, x1 - x0, 3);
+  ctx.fillStyle = '#f6ecd6';
+  ctx.beginPath();
+  for (let x = x0; x < x1; x += 24) { ctx.moveTo(x + 24, 596); ctx.arc(x + 12, 596, 12, 0, Math.PI); }
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150,110,60,0.25)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0, 547); ctx.lineTo(x1, 547); ctx.stroke();
+
+  // Food and cups along the table
+  let k = 0;
+  for (let x = 30; x < W - 20; x += 56, k++) {
+    if (Math.abs(x - W / 2) < 36) continue;   // leave room in front of the couple
+    const y = 540;
+    switch (k % 5) {
+      case 0: // bread loaf
+        ctx.fillStyle = '#c98a3e';
+        ctx.beginPath(); ctx.ellipse(x, y - 2, 13, 6.5, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#a0662a'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x - 5, y - 6); ctx.lineTo(x - 2, y + 1); ctx.moveTo(x + 2, y - 7); ctx.lineTo(x + 5, y); ctx.stroke();
+        break;
+      case 1: // bunch of grapes
+        ctx.fillStyle = '#7b3f8f';
+        for (const [dx, dy] of [[-4, -8], [0, -8], [4, -8], [-2, -4], [2, -4], [0, 0]]) {
+          ctx.beginPath(); ctx.arc(x + dx, y + dy, 2.9, 0, TAU); ctx.fill();
+        }
+        ctx.fillStyle = '#5c9e3a';
+        ctx.beginPath(); ctx.ellipse(x + 3, y - 12, 4, 2, -0.4, 0, TAU); ctx.fill();
+        break;
+      case 2: // cup
+      case 4:
+        drawGoblet(x, y - 5, null, 0);
+        break;
+      case 3: // bowl of fruit
+        ctx.fillStyle = '#f59f00';
+        ctx.beginPath(); ctx.arc(x - 5, y - 6, 4.5, 0, TAU); ctx.arc(x + 4, y - 7, 4.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#d6336c';
+        ctx.beginPath(); ctx.arc(x, y - 10, 4.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#b07a4a';
+        ctx.beginPath(); ctx.moveTo(x - 12, y - 5); ctx.quadraticCurveTo(x, y + 8, x + 12, y - 5); ctx.closePath(); ctx.fill();
+        break;
+    }
+  }
+}
+
+// Lantern strings across the courtyard
+function drawLanterns() {
+  const x0 = 14, x1 = W - 14;
+  ctx.fillStyle = '#7a5230';
+  ctx.fillRect(x0 - 4, 140, 8, 440);
+  ctx.fillRect(x1 - 4, 140, 8, 440);
+  const strings = [[150, 84], [228, 44]];
+  strings.forEach(([y0, sag], si) => {
+    const yAt = (x) => { const f = (x - x0) / (x1 - x0) * 2 - 1; return y0 + sag * (1 - f * f); };
+    ctx.strokeStyle = 'rgba(60,40,30,0.7)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 10) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, yAt(x));
+    ctx.stroke();
+    const n = Math.max(4, Math.round((x1 - x0) / 80));
+    for (let k = 1; k < n; k++) {
+      const x = lerp(x0, x1, (k + (si ? 0.5 : 0)) / n);
+      if (x > x1 - 10) continue;
+      const y = yAt(x);
+      const col = LANTERN_COLORS[(k + si * 2) % LANTERN_COLORS.length];
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(t * 1.4 + k * 1.7 + si) * 0.08);
+      const glow = ctx.createRadialGradient(0, 14, 2, 0, 14, 30);
+      glow.addColorStop(0, 'rgba(255,220,140,0.55)'); glow.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0, 14, 30, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(60,40,30,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 4); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.ellipse(0, 14, 8, 10, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,250,210,0.6)';
+      ctx.beginPath(); ctx.ellipse(-2, 12, 3, 5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#6b4a2b';
+      ctx.fillRect(-4, 3, 8, 3); ctx.fillRect(-3, 23, 6, 3);
+      ctx.restore();
+    }
+  });
+}
+
+// A stone waterpot of purification. (x, y) = its foot; tilt shows more of the mouth.
+function drawJar(j, x, y, s, tilt, active) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const col = colorAt(j, j.p);
+  const sh = active ? 1 : 0;
+
+  // shadow
+  ctx.fillStyle = 'rgba(80,50,20,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 24, 5, 0, 0, TAU); ctx.fill();
+
+  // body
+  const g = ctx.createLinearGradient(-26, 0, 26, 0);
+  g.addColorStop(0, '#94876f'); g.addColorStop(0.35, '#e6dcc6'); g.addColorStop(0.7, '#b8ab91'); g.addColorStop(1, '#85785f');
+  ctx.fillStyle = g; ctx.strokeStyle = '#6f624c'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-17, -80);
+  ctx.quadraticCurveTo(-14, -72, -21, -63);
+  ctx.bezierCurveTo(-28, -50, -27, -20, -20, -6);
+  ctx.lineTo(-16, 0); ctx.lineTo(16, 0); ctx.lineTo(20, -6);
+  ctx.bezierCurveTo(27, -20, 28, -50, 21, -63);
+  ctx.quadraticCurveTo(14, -72, 17, -80);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // chiselled bands and lug handles
+  ctx.strokeStyle = 'rgba(90,75,55,0.45)'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-24, -56); ctx.quadraticCurveTo(0, -52, 24, -56);
+  ctx.moveTo(-23, -18); ctx.quadraticCurveTo(0, -14, 23, -18);
+  ctx.stroke();
+  ctx.fillStyle = '#a89b80';
+  roundRect(-29, -52, 6, 12, 3); ctx.fill();
+  roundRect(23, -52, 6, 12, 3); ctx.fill();
+
+  // rim and mouth
+  const ry = 5.2 * tilt, iry = 4 * tilt;
+  if (active && j.fill > 0) {
+    const glow = ctx.createRadialGradient(0, -82, 4, 0, -82, 44);
+    glow.addColorStop(0, rgbStr(col, j.inWin ? 0.75 : 0.45)); glow.addColorStop(1, rgbStr(col, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, -82, 44, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#ddd2ba'; ctx.strokeStyle = '#6f624c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(0, -81, 20.5, ry + 1.5, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#3e3428';
+  ctx.beginPath(); ctx.ellipse(0, -81, 16, iry, 0, 0, TAU); ctx.fill();
+  if (j.fill > 0) {
+    // the water, then wine, "filled to the brim"
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(0, -81, 16, iry, 0, 0, TAU); ctx.clip();
+    const f = ease(j.fill);
+    ctx.fillStyle = rgbStr(col, j.p < 0.05 ? 0.85 : 1);
+    ctx.beginPath(); ctx.ellipse(0, -81 + (1 - f) * iry * 0.6, 16 * (0.6 + 0.4 * f), iry * (0.6 + 0.4 * f), 0, 0, TAU); ctx.fill();
+    // shimmer / swirl while it turns
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    const sw = active && phase === 'hold' && !j.done ? t * 3 : 0;
+    for (let k = 0; k < 2; k++) {
+      const a = sw + k * Math.PI;
+      ctx.ellipse(0, -81, 9 + k * 3, iry * (0.45 + k * 0.15), 0, a, a + 1.6);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.ellipse(-6, -81 - iry * 0.35, 4, iry * 0.18, -0.2, 0, TAU); ctx.fill();
+    ctx.restore();
+    // brimming over: drips down the front
+    if (sh && j.fill >= 1) {
+      ctx.fillStyle = rgbStr(col, 0.9);
+      for (const [dx, len] of [[-9, 9], [5, 13], [11, 6]]) {
+        ctx.beginPath();
+        ctx.moveTo(dx - 2, -81 + ry); ctx.lineTo(dx - 1.6, -81 + ry + len);
+        ctx.arc(dx, -81 + ry + len, 1.8, Math.PI, 0, true);
+        ctx.lineTo(dx + 2, -81 + ry); ctx.closePath(); ctx.fill();
+      }
+    }
+    // golden glow ring in the perfect window
+    if (j.inWin && active) {
+      ctx.strokeStyle = `rgba(255,215,80,${0.7 + 0.3 * Math.sin(t * 20)})`;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.ellipse(0, -81, 19, ry + 1, 0, 0, TAU); ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+  ctx.restore();
+}
+
+// A small badge over a finished jar in the row
+function drawBadge(x, y, g) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU); ctx.fill();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (g === 'best') {
+    ctx.fillStyle = '#e0a526';
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 3.4 : 8;
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.fill();
+  } else if (GRADES[g].good) {
+    ctx.strokeStyle = g === 'fine' ? '#b0173d' : '#d9486c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-1.5, 4); ctx.lineTo(5.5, -4.5); ctx.stroke();
+  } else {
+    ctx.strokeStyle = GRADES[g].color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-4.5, -4.5); ctx.lineTo(4.5, 4.5); ctx.moveTo(4.5, -4.5); ctx.lineTo(-4.5, 4.5); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// The quality gauge: the colours this jar will pass through, with a marker
+function drawGauge(j, P) {
+  const side = j.slot === 'right' ? -1 : 1;
+  const w = 9;
+  const gx = P.x + side * (27 * P.s + 8) - (side < 0 ? w : 0);
+  const top = P.y - 78 * P.s, bot = P.y - 10 * P.s;
+  const g = ctx.createLinearGradient(0, bot, 0, top);
+  for (let k = 0; k <= 12; k++) g.addColorStop(k / 12, rgbStr(colorAt(j, (k / 12) * j.pEnd)));
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  roundRect(gx - 2, top - 2, w + 4, bot - top + 4, 6); ctx.fill();
+  ctx.fillStyle = g;
+  roundRect(gx, top, w, bot - top, 4.5); ctx.fill();
+  const my = lerp(bot, top, clamp(j.p / j.pEnd, 0, 1));
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#3b2f1e';
+  ctx.beginPath();
+  if (side > 0) { ctx.moveTo(gx + w + 2, my); ctx.lineTo(gx + w + 9, my - 5); ctx.lineTo(gx + w + 9, my + 5); }
+  else { ctx.moveTo(gx - 2, my); ctx.lineTo(gx - 9, my - 5); ctx.lineTo(gx - 9, my + 5); }
+  ctx.fill();
+  ctx.fillRect(gx - 1, my - 1, w + 2, 2);
+  ctx.restore();
+}
+
+// A clay pitcher pouring water into the jar while it is filled
+function drawPitcher(P, j) {
+  const mx = P.x, my = P.y - 81 * P.s;
+  const px = mx - 34, py = my - 70;
+  ctx.strokeStyle = 'rgba(190,230,255,0.9)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(px + 18, py + 6); ctx.quadraticCurveTo(mx - 2, py + 10, mx, my); ctx.stroke();
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(0.9);
+  ctx.fillStyle = '#c0703e'; ctx.strokeStyle = '#8a4a24'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-6, -16); ctx.lineTo(6, -16); ctx.quadraticCurveTo(4, -10, 12, -2);
+  ctx.quadraticCurveTo(14, 14, 0, 16); ctx.quadraticCurveTo(-14, 14, -12, -2); ctx.quadraticCurveTo(-4, -10, -6, -16);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  if (Math.random() < 0.5) spawn(mx + rand(-6, 6), my, rand(-30, 30), rand(-50, -20), 0.35, '#d8f0ff', rand(1.5, 3), 200);
+}
+
+// Jesus, drawn as in Jesus Rises (no cloud); pose: open | bless | joy
+function drawJesus(x, y, s, face, pose) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const up = pose === 'joy';
+
+  if (pose !== 'open') {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 75);
+    g.addColorStop(0, 'rgba(255,235,150,0.55)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 75, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Sandalled feet
+  ctx.fillStyle = '#8a5a2b';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 5, 2.5, 0, 0, TAU); ctx.ellipse(6, 0, 5, 2.5, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: raised in joy, one hand toward the jar in blessing, or open and welcoming
+  const hands = up ? [[-21, -66], [21, -66]] : pose === 'bless' ? [[-20, -22], [27, -40]] : [[-20, -22], [20, -22]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (up ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+  if (pose === 'bless') {
+    const g = ctx.createRadialGradient(29, -40, 1, 29, -40, 12);
+    g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(29, -40, 12, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    const look = pose === 'bless' ? 1 : 0;
+    ctx.beginPath(); ctx.arc(-4 + look, -53, 1.5, 0, TAU); ctx.arc(4 + look, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// Word-wrapped speech bubble whose tail points at (ax, ay)
+function drawBubble(text, ax, ay, alpha) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.font = '600 15px Fredoka, sans-serif';
+  const maxW = Math.min(200, W - 24);
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW - 20 && line) { lines.push(line); line = w; } else line = test;
+  }
+  lines.push(line);
+  const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 22;
+  const bh = lines.length * 18 + 12;
+  const bx = clamp(ax - bw / 2, 8, W - bw - 8), by = ay - 14 - bh;
+  ctx.fillStyle = '#fffdf4'; ctx.strokeStyle = '#b98c56'; ctx.lineWidth = 2;
+  roundRect(bx, by, bw, bh, 12); ctx.fill(); ctx.stroke();
+  const tx = clamp(ax, bx + 14, bx + bw - 14);
+  ctx.beginPath(); ctx.moveTo(tx - 7, by + bh - 1); ctx.lineTo(ax, ay); ctx.lineTo(tx + 7, by + bh - 1); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillRect(tx - 6, by + bh - 3, 12, 3);
+  ctx.fillStyle = '#4a3418'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, k) => ctx.fillText(l, bx + bw / 2, by + 15 + k * 18));
+  ctx.restore();
+}
+
+function drawPopups() {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.lineJoin = 'round';
+  for (const p of popups) {
+    const a = clamp((1.6 - p.t) / 0.4, 0, 1);
+    const sc = p.t < 0.15 ? 0.6 + p.t / 0.15 * 0.4 : 1;
+    const y = p.y - p.t * 30;
+    ctx.globalAlpha = a;
+    ctx.font = `700 ${Math.round(28 * sc)}px Fredoka, sans-serif`;
+    ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, p.x, y);
+    if (p.sub) {
+      ctx.font = '700 16px Fredoka, sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeText(p.sub, p.x, y + 22);
+      ctx.fillStyle = '#7a5200';
+      ctx.fillText(p.sub, p.x, y + 22);
+    }
+  }
+  ctx.restore();
+}
+
+// A little goblet icon for the HUD joy meter
+function hudCup(x, y, color) {
+  ctx.fillStyle = color || 'rgba(255,255,255,0.35)';
+  ctx.strokeStyle = '#fff4d6'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x - 6, y - 7); ctx.quadraticCurveTo(x - 6, y + 2, x, y + 2); ctx.quadraticCurveTo(x + 6, y + 2, x + 6, y - 7); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y + 2); ctx.lineTo(x, y + 7); ctx.moveTo(x - 4, y + 7); ctx.lineTo(x + 4, y + 7); ctx.stroke();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(20,20,60,0.8)'; ctx.shadowBlur = 4;
+
+  // Left: level + the feast's joy (one cup per jar)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff4d6';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Water into Wine' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('JOY', 12, 52);
+  ctx.shadowBlur = 0;
+  for (let k = 0; k < JARS; k++) {
+    const g = results[k];
+    hudCup(52 + k * 20, 47, g ? (GRADES[g].good ? GRADES[g].color : '#6b6b80') : null);
+  }
+  const good = results.filter((g) => GRADES[g].good).length;
+  ctx.shadowBlur = 4;
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillStyle = good >= NEED ? '#b6f09c' : '#fff4d6';
+  ctx.fillText(`${good}/${NEED}`, 52 + JARS * 20 - 2, 52);
+  ctx.shadowBlur = 0;
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: score + combo
+  const rx = viewW - 12;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#fff4d6';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('SCORE', rx, 20);
+  ctx.font = '700 20px Fredoka, sans-serif';
+  ctx.fillText(`${totalScore + (state === 'win' ? 0 : levelScore)}`, rx, 42);
+  if (combo > 1 && state === 'play') {
+    ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillStyle = '#ffd84a';
+    ctx.fillText(`Combo ×${Math.min(1 + 0.5 * (combo - 1), 4)}`, rx, 62);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  let text = message.text, a = clamp(message.t / 0.5, 0, 1);
+  if (message.t <= 0) {
+    // gentle how-to hints on the first levels
+    if (!hint || state !== 'play') return;
+    text = hint; a = 0.75 + 0.25 * Math.sin(t * 5);
+  }
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineJoin = 'round';
+  ctx.strokeText(text, W / 2, H * 0.44);
+  ctx.fillStyle = '#7a3a10';
+  ctx.fillText(text, W / 2, H * 0.44);
+  ctx.restore();
+}
+
+function currentHint() {
+  if (state !== 'play' || level > 2) return '';
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const two = stageJars().filter((j) => !j.done).length === 2;
+  if (phase === 'ready') {
+    if (two) return 'Hold for both jars — let go for jar 1';
+    if (jars.some((j) => j.onStage && j.order === 2 && !j.done) ) return 'Now hold again for jar 2';
+    return coarse ? 'Press and hold to turn it into wine' : 'Hold Space / ↓ (or the mouse) to turn it';
+  }
+  if (phase === 'hold' && level === 1) return 'Let go at the golden sparkle!';
+  return '';
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  drawSky();
+  drawBackdrop();
+  drawFloor();
+  drawCoupleArch();
+
+  // Guests behind the long table look toward the jars
+  const lookX = W / 2, lookY = 780;
+  for (const s of guestSlots()) drawPerson(s.d, s.x, s.y, 0.9, lookX, lookY);
+  drawTable();
+  drawLanterns();
+
+  // Mary and the servants stand behind the six waterpots
+  const jx = jesusX();
+  drawPerson(MARY, (rowX(0) + rowX(1)) / 2, 668, 0.95, jx, 800);
+  drawPerson(SERVANTS[0], (rowX(3) + rowX(4)) / 2, 668, 0.95, lookX, lookY);
+  drawPerson(SERVANTS[1], (rowX(4) + rowX(5)) / 2, 668, 0.95, lookX, lookY);
+  for (const j of jars) {
+    if (j.anim > 0.001) continue;
+    drawJar(j, rowX(j.i), ROW_Y, 1, 1, false);
+    if (j.grade) drawBadge(rowX(j.i), ROW_Y - 40, j.grade);
+  }
+
+  // Jesus and the governor of the feast in front
+  const holding = state === 'play' && phase === 'hold';
+  const jFace = state === 'win' || jesusJoyT > 0 ? 'joy' : 'calm';
+  drawJesus(jx, STAGE_Y, JESUS_S, jFace, state === 'win' ? 'joy' : holding ? 'bless' : 'open');
+  drawPerson(GOV, govX(), STAGE_Y, GOV_S, W / 2, 800);
+
+  // Jars being drawn out
+  const moving = jars.filter((j) => j.anim > 0.001).sort((a, b) => a.anim - b.anim);
+  for (const j of moving) {
+    const P = jarPos(j);
+    drawJar(j, P.x, P.y, P.s, P.tilt, j.onStage);
+    if (j.onStage && j.anim > 0.97) {
+      if (j.fill < 1 && phase === 'fill') drawPitcher(P, j);
+      else if (!j.done) drawGauge(j, P);
+      if (j.order) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(P.x, P.y - 34 * P.s, 11, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#5a4210'; ctx.font = '700 15px Fredoka, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(j.order, P.x, P.y - 34 * P.s + 1);
+        ctx.textBaseline = 'alphabetic';
+      }
+    }
+    if (holding && j.onStage && !j.done) {
+      // a faint stream of blessing from His hand
+      if (Math.random() < 0.3) {
+        const hx = jx + 29 * JESUS_S, hy = STAGE_Y - 40 * JESUS_S;
+        const tx = P.x + rand(-10, 10), ty = P.y - 81 * P.s;
+        spawn(hx, hy, (tx - hx) / 0.8, (ty - hy) / 0.8, 0.8, 'rgba(255,240,170,0.8)', rand(1.5, 2.5));
+      }
+    }
+  }
+
+  drawParticles();
+  drawPopups();
+
+  // Speech bubbles
+  drawBubble(maryBubble.text, (rowX(0) + rowX(1)) / 2 + 6, 596, maryBubble.t / 0.4);
+  drawBubble(jesusBubble.text, jx + 4, STAGE_Y - 140, jesusBubble.t / 0.4);
+  drawBubble(gov.bubble.text, govX() - 6, STAGE_Y - 132, gov.bubble.t / 0.4);
+
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  // jars glide between the row and the front
+  for (const j of jars) {
+    const target = j.onStage ? 1 : 0;
+    j.anim = clamp(j.anim + Math.sign(target - j.anim) * dt * 2.4, 0, 1);
+  }
+  if (state === 'play') updateRound(dt);
+  else if (state === 'win' && Math.random() < dt * 14) {
+    spawn(rand(20, W - 20), rand(120, 300), rand(-10, 10), rand(20, 60), 1.4,
+      ['#ffe27a', '#ff8fb8', '#ffffff'][Math.floor(rand(0, 3))], rand(2, 3.5), 20);
+  }
+  react.t -= dt;
+  shakeT = Math.max(0, shakeT - dt);
+  flashT = Math.max(0, flashT - dt);
+  jesusJoyT = Math.max(0, jesusJoyT - dt);
+  message.t -= dt;
+  hint = currentHint();
+  endScreens(dt);
+  sfx.thrust(state === 'play' && phase === 'hold' ? 0.3 : 0);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
