@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b2748">
+<title>Walking on Water</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1b2748;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(10, 16, 40, 0.35);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 10, 40, 0.45), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Walking on Water</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button><br>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function mix(a, b, f) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(pa >> 16, pb >> 16, f));
+  const g = Math.round(lerp((pa >> 8) & 255, (pb >> 8) & 255, f));
+  const bl = Math.round(lerp(pa & 255, pb & 255, f));
+  return `rgb(${r},${g},${bl})`;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const SEA_Y = 610;        // calm water line
+const CS = 1.3;           // character scale
+const GRAV = 1250;        // gravity on a jump (px/s^2)
+const JUMP_V = 480;       // jump launch speed at full faith
+const WALK = 80;          // Peter's stride at full faith (px/s)
+const REGEN = 6;          // faith regained per second with eyes on Jesus
+const WAVE_HIT = 24;      // faith lost when a wave knocks him
+const KNOCK_T = 0.45;     // how long a wave pushes him back
+const PRAY_CD = 0.3;      // keyboard "look to Jesus" cooldown
+const START_X = 95;       // where Peter steps off the boat
+const EYE_Y = 53 * CS;    // eye height above the feet
+
+const LEVEL_NAMES = [
+  'The Fourth Watch',
+  'The Wind Was Contrary',
+  'Boisterous Wind',
+  'Tossed with Waves',
+  'In the Midst of the Sea',
+  'Storm on Galilee',
+];
+const FEAR_WORDS = ['Fear', 'Doubt', 'Worry', 'Panic', 'Dread', 'What if?'];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Night Crossing ${n}`,
+    dist: Math.min(900 + 220 * (n - 1), 2400),
+    waveGap: Math.max(1.05, 2.7 - 0.32 * (n - 1)),
+    waveH: [38, Math.min(92, 52 + 9 * n)],
+    waveSpeed: Math.min(260, 150 + 18 * n),
+    double: n >= 3 ? Math.min(0.2 + 0.06 * (n - 3), 0.45) : 0,
+    fearMax: Math.min(1 + Math.floor(n / 2), 4),
+    fearGap: Math.max(1.4, 5 - 0.7 * (n - 1)),
+    fearSpeed: 70 + 12 * n,
+    fearDrain: 20 + 2 * n,
+    boltFears: n >= 3,
+    wind: Math.min(30, 7 * (n - 1)),
+    storm: Math.min(0.7 + 0.1 * n, 1.3),
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('walkingOnWaterBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let peter;
+let jesusX = 1000;        // where Jesus stands
+let jesusDrawX = 1000;    // where He is drawn (He comes running if Peter sinks)
+let jesusReach = false;
+let cam = -180;
+let calm = 1;             // 1 = full storm, 0 = "the wind ceased"
+let waves = [];
+let fears = [];
+let particles = [];
+let ripples = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let bolt = null;
+let endTimer = 0;
+let lastScore = null;
+let waveTimer = 0, fearTimer = 0, boltTimer = 0;
+let jumpBuf = 0;
+let tutFear = false;
+
+function newPeter() {
+  return {
+    x: START_X, h: 0, vh: 0, faith: 100, sink: 0, knock: 0,
+    face: 'calm', walk: 0, time: 0, dispelled: 0, hits: 0,
+    blocked: null, prayCd: 0, look: { x: 1, y: 0 },
+  };
+}
+
+// ============================================================
+//  Sea
+// ============================================================
+const storm = () => cfg.storm * calm;
+
+function chop(wx) {
+  const s = storm();
+  return s * (5 * Math.sin(wx * 0.021 + t * 2.2) + 3.5 * Math.sin(wx * 0.047 - t * 3.1));
+}
+
+// Water surface at a screen x (playfield coords)
+function surf(sx) {
+  const wx = sx + cam;
+  let y = SEA_Y + chop(wx);
+  for (const w of waves) {
+    const d = (wx - w.x) / w.w;
+    if (d > -3 && d < 3) y -= w.h * Math.exp(-d * d);
+  }
+  return y;
+}
+
+function feetY(p) {
+  return SEA_Y + chop(p.x) * 0.5 + p.sink - p.h;
+}
+
+function spawnWave(extra = 0) {
+  waves.push({
+    x: cam + W + 120 + extra,
+    h: rand(cfg.waveH[0], cfg.waveH[1]),
+    w: rand(32, 44),
+    speed: cfg.waveSpeed * rand(0.9, 1.1),
+    hit: false,
+  });
+}
+
+function updateWaves(dt) {
+  if (state === 'play') {
+    waveTimer -= dt;
+    if (waveTimer <= 0) {
+      spawnWave();
+      if (Math.random() < cfg.double) spawnWave(rand(240, 300));
+      waveTimer = cfg.waveGap * rand(0.75, 1.3);
+    }
+  }
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i];
+    w.x -= w.speed * dt;
+    if (calm < 1) w.h *= Math.max(0, 1 - dt * 2);
+    if (Math.random() < dt * 6 * calm) {
+      spawn(w.x + rand(-6, 10), SEA_Y - w.h + 4, rand(-40, 30), rand(-90, -30), 0.6, 'rgba(235,245,255,0.9)', rand(2, 3.5), 300);
+    }
+    if (w.x < cam - 250 || w.h < 1) waves.splice(i, 1);
+  }
+}
+
+// ============================================================
+//  Fears: storm clouds that get between Peter and Jesus
+// ============================================================
+function beam() {
+  const p = peter;
+  const ex = p.x - cam + 2, ey = feetY(p) - EYE_Y;
+  let jx = jesusDrawX - cam, jy = SEA_Y - 55 * CS;
+  const off = jx > W - 24;
+  if (off) jx = W - 24;
+  return { x1: ex, y1: ey, x2: jx, y2: jy, off };
+}
+
+function distToSeg(px, py, b) {
+  const dx = b.x2 - b.x1, dy = b.y2 - b.y1;
+  const u = clamp(((px - b.x1) * dx + (py - b.y1) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+  return Math.hypot(px - (b.x1 + dx * u), py - (b.y1 + dy * u));
+}
+
+function spawnFear(x, y) {
+  if (fears.length >= cfg.fearMax + (x !== undefined ? 1 : 0)) return;
+  fears.push({
+    x: x ?? rand(W * 0.35, W + 30), y: y ?? -offY - 50,
+    u: rand(0.3, 0.8), r: 30, phase: rand(0, TAU),
+    word: FEAR_WORDS[Math.floor(Math.random() * FEAR_WORDS.length)],
+    speed: cfg.fearSpeed * rand(0.85, 1.15), age: 0,
+  });
+}
+
+function updateFears(dt, b) {
+  if (state === 'play') {
+    fearTimer -= dt;
+    if (fearTimer <= 0) { spawnFear(); fearTimer = cfg.fearGap * rand(0.8, 1.25); }
+  }
+  let blocked = null;
+  for (const f of fears) {
+    f.age += dt;
+    const tx = lerp(b.x1, b.x2, f.u);
+    const ty = lerp(b.y1, b.y2, f.u) + Math.sin(t * 2 + f.phase) * 8;
+    const dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy);
+    const step = Math.min(d, f.speed * dt);
+    if (d > 0.5) { f.x += (dx / d) * step; f.y += (dy / d) * step; }
+    if (distToSeg(f.x, f.y, b) < f.r * 0.85) blocked = f;
+  }
+  return blocked;
+}
+
+function dispel(f) {
+  const i = fears.indexOf(f);
+  if (i < 0) return;
+  fears.splice(i, 1);
+  peter.dispelled++;
+  sfx.chime();
+  for (let k = 0; k < 18; k++) {
+    const a = rand(0, TAU), s = rand(40, 160);
+    spawn(f.x + cam, f.y, Math.cos(a) * s, Math.sin(a) * s, rand(0.4, 0.8), k % 3 ? '#ffe27a' : '#ffffff', rand(2, 4));
+  }
+  if (!tutFear) tutFear = true;
+}
+
+function pray() {
+  if (state !== 'play' || peter.prayCd > 0 || !fears.length) return;
+  const b = beam();
+  let bestF = null, bestD = Infinity;
+  for (const f of fears) {
+    if (f.y < -offY) continue;
+    const d = distToSeg(f.x, f.y, b);
+    if (d < bestD) { bestD = d; bestF = f; }
+  }
+  if (bestF) { dispel(bestF); peter.prayCd = PRAY_CD; }
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x - cam, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function splash(wx, y, n = 16) {
+  for (let k = 0; k < n; k++) {
+    spawn(wx + rand(-12, 12), y, rand(-120, 120), rand(-260, -80), rand(0.5, 0.9), 'rgba(225,240,255,0.9)', rand(2, 4), 700);
+  }
+}
+
+// ============================================================
+//  Peter
+// ============================================================
+function jump() {
+  const p = peter;
+  if (p.h > 0.5 || p.knock > 0) return false;
+  p.vh = JUMP_V * (0.78 + 0.22 * p.faith / 100);
+  p.h = 0.01;
+  sfx.jump();
+  splash(p.x, SEA_Y, 6);
+  return true;
+}
+
+function updatePeter(dt, blocked) {
+  const p = peter;
+  p.time += dt;
+  p.prayCd = Math.max(0, p.prayCd - dt);
+  p.blocked = blocked;
+
+  // Faith: drains while a fear hides Jesus, returns while He is in view
+  if (blocked) p.faith -= cfg.fearDrain * dt;
+  else p.faith += REGEN * dt;
+  p.faith = clamp(p.faith, 0, 100);
+
+  // Walk toward Jesus, slower as faith falters and against the wind
+  let vx;
+  if (p.knock > 0) {
+    p.knock -= dt;
+    vx = -150 * (p.knock / KNOCK_T);
+  } else {
+    vx = Math.max(18, WALK * (0.4 + 0.6 * p.faith / 100) - cfg.wind * 0.5);
+  }
+  p.x = Math.max(START_X - 10, p.x + vx * dt);
+  if (p.h <= 0 && p.knock <= 0) p.walk += vx * dt / 11;
+
+  // Jump
+  if (jumpBuf > 0 && jump()) jumpBuf = 0;
+  if (p.h > 0) {
+    p.vh -= GRAV * dt;
+    p.h += p.vh * dt;
+    if (p.h <= 0) { p.h = 0; p.vh = 0; splash(p.x, SEA_Y, 8); sfx.splash(0.25); }
+  }
+
+  // Waves
+  for (const w of waves) {
+    if (w.hit) continue;
+    if (Math.abs(w.x - p.x) < w.w * 0.55 && p.h < w.h * 0.62) {
+      w.hit = true;
+      p.faith = Math.max(0, p.faith - WAVE_HIT);
+      p.knock = KNOCK_T;
+      p.hits++;
+      shakeT = 0.3;
+      splash(p.x, feetY(p) - 30, 26);
+      sfx.splash(0.8);
+    }
+  }
+
+  // Sink lower the weaker his faith
+  const target = (1 - p.faith / 100) * 40;
+  p.sink += (target - p.sink) * Math.min(1, dt * 3);
+
+  // Where is he looking?
+  const b = beam();
+  let lx = b.x2 - b.x1, ly = b.y2 - b.y1;
+  if (blocked) { lx = blocked.x - b.x1; ly = blocked.y - b.y1; }
+  const ll = Math.hypot(lx, ly) || 1;
+  p.look.x = lerp(p.look.x, lx / ll, Math.min(1, dt * 10));
+  p.look.y = lerp(p.look.y, ly / ll, Math.min(1, dt * 10));
+
+  p.face = p.knock > 0 ? 'ouch' : blocked || p.faith < 30 ? 'scared' : 'calm';
+
+  if (p.faith <= 0) fail();
+  else if (p.x >= jesusX - 48) win();
+}
+
+function drawPeter(p) {
+  const sx = p.x - cam, fy = feetY(p);
+  ctx.save();
+  ctx.translate(sx, fy);
+  ctx.scale(CS, CS);
+  const air = p.h > 0.5;
+  const skin = '#d9a066', hair = '#9a9a9a', tunic = '#3f6fb5';
+
+  // Legs
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = skin; ctx.lineWidth = 4.5;
+  const sw = air ? 0 : Math.sin(p.walk) * 6;
+  ctx.beginPath();
+  if (air) {
+    ctx.moveTo(-4, -20); ctx.lineTo(-7, -8); ctx.lineTo(-3, -3);
+    ctx.moveTo(4, -20); ctx.lineTo(8, -9); ctx.lineTo(5, -3);
+  } else {
+    ctx.moveTo(-4, -20); ctx.lineTo(-4 + sw, 0);
+    ctx.moveTo(4, -20); ctx.lineTo(4 - sw, 0);
+  }
+  ctx.stroke();
+
+  // Tunic and belt
+  ctx.fillStyle = tunic; ctx.strokeStyle = '#2c4f86'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(13, -16);
+  ctx.quadraticCurveTo(0, -13, -13, -16);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#7a4a22';
+  ctx.fillRect(-11, -30, 22, 4);
+
+  // Arms
+  let hands;
+  if (state === 'win' || p.face === 'joy') hands = [[-18, -64], [24, -56]];
+  else if (state === 'fail') hands = [[-14, -66], [22, -68]];
+  else if (air) hands = [[-19, -60], [19, -60]];
+  else if (p.face === 'scared') hands = [[-9, -47], [9, -47]];
+  else if (p.face === 'ouch') hands = [[-20, -42], [18, -48]];
+  else { const a = Math.sin(p.walk) * 5; hands = [[-14 - a, -22], [14 - a, -22]]; }
+  for (const [hx, hy] of hands) {
+    const shx = hx < 0 ? -8 : 8;
+    ctx.strokeStyle = '#2c4f86'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(shx, -38); ctx.lineTo(hx * 0.9, hy + 3); ctx.stroke();
+    ctx.strokeStyle = tunic; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(shx, -38); ctx.lineTo(hx * 0.9, hy + 3); ctx.stroke();
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // grey hair round the sides, a little thin on top
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.arc(-9, -54, 4.5, 0, TAU); ctx.arc(9, -54, 4.5, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -61.5, 7, 2.6, 0, 0, TAU); ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-11, -37, 0, -36);
+  ctx.quadraticCurveTo(11, -37, 10, -52);
+  ctx.quadraticCurveTo(6, -44.5, 0, -45);
+  ctx.quadraticCurveTo(-6, -44.5, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  const lx = p.look.x * 1.4, ly = p.look.y * 1.4;
+  ctx.lineCap = 'round';
+  if (p.face === 'joy' || state === 'win') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else if (p.face === 'ouch') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-6, -55); ctx.lineTo(-2.5, -53); ctx.lineTo(-6, -51);
+    ctx.moveTo(6, -55); ctx.lineTo(2.5, -53); ctx.lineTo(6, -51);
+    ctx.stroke();
+  } else if (p.face === 'scared' || state === 'fail') {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-4, -53, 3, 0, TAU); ctx.arc(4, -53, 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4 + lx, -53 + ly, 1.4, 0, TAU); ctx.arc(4 + lx, -53 + ly, 1.4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#6a6a6a'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-7, -58.5); ctx.lineTo(-2, -59.5); ctx.moveTo(7, -58.5); ctx.lineTo(2, -59.5); ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4 + lx * 0.7, -53 + ly * 0.7, 1.5, 0, TAU); ctx.arc(4 + lx * 0.7, -53 + ly * 0.7, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(0, -46.5, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (p.face === 'scared' || p.face === 'ouch' || state === 'fail') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -45.5, 2, 2.4, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Jesus
+// ============================================================
+function drawJesus() {
+  const sx = jesusDrawX - cam;
+  if (sx < -80 || sx > W + 80) return;
+  const fy = SEA_Y + chop(jesusDrawX) * 0.3;
+  const happy = state === 'win';
+
+  // Light on the water
+  const lg = ctx.createRadialGradient(sx, fy, 4, sx, fy, 70);
+  lg.addColorStop(0, 'rgba(255,240,170,0.7)');
+  lg.addColorStop(1, 'rgba(255,240,170,0)');
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.ellipse(sx, fy, 70, 14, 0, 0, TAU); ctx.fill();
+
+  ctx.save();
+  ctx.translate(sx, fy);
+  ctx.scale(CS, CS);
+
+  const g = ctx.createRadialGradient(0, -38, 5, 0, -38, 80);
+  g.addColorStop(0, 'rgba(255,235,150,0.5)');
+  g.addColorStop(1, 'rgba(255,235,150,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, -38, 80, 0, TAU); ctx.fill();
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Feet
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(-6, 0, 4.5, 2.2, 0, 0, TAU); ctx.ellipse(6, 0, 4.5, 2.2, 0, 0, TAU); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(14, -2);
+  ctx.quadraticCurveTo(0, 1, -14, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: open and welcoming, or reaching out to Peter on our left
+  const hands = jesusReach ? [[-30, -44], [20, -22]] : [[-22, -30], [22, -30]];
+  for (const [hx, hy] of hands) {
+    const shx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(shx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(shx, -38); ctx.lineTo(hx * 0.9, hy); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face: calm, looking toward Peter
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (happy) {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-5, -53, 1.5, 0, TAU); ctx.arc(3, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  Boat with the other disciples
+// ============================================================
+const CREW = [
+  { hair: '#4a2f1a', skin: '#c98d56', beard: true },   // Andrew
+  { hair: '#2e1d10', skin: '#d7a070', beard: true },   // James
+  { hair: '#6b3f1d', skin: '#e3b184', beard: false },  // John
+  { hair: '#1f140c', skin: '#b87a48', beard: true },   // Thomas
+];
+
+function drawBoat() {
+  const bx = -45 - cam;
+  if (bx < -260 || bx > W + 260) return;
+  const by = SEA_Y + chop(-45) * 0.8 + 6;
+  const tilt = Math.sin(t * 1.3) * 0.06 * (0.3 + storm());
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(tilt);
+
+  // Mast and torn sail
+  ctx.strokeStyle = '#5a3a1c'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(-10, -20); ctx.lineTo(-10, -190); ctx.stroke();
+  ctx.fillStyle = '#e9dfc4';
+  ctx.beginPath();
+  ctx.moveTo(-6, -182);
+  ctx.quadraticCurveTo(40 + Math.sin(t * 4) * 6 * calm, -140, 18, -70);
+  ctx.lineTo(0, -80); ctx.lineTo(10, -100); ctx.lineTo(-6, -95);
+  ctx.closePath(); ctx.fill();
+
+  // Disciples peering over the side
+  const worried = state === 'fail' || (peter && peter.faith < 40);
+  CREW.forEach((c, i) => {
+    const hx = -110 + i * 38, hy = -42 + Math.sin(t * 2 + i) * 2;
+    ctx.fillStyle = c.hair;
+    ctx.beginPath(); ctx.arc(hx, hy - 2, 12, 0, TAU); ctx.fill();
+    ctx.fillStyle = c.skin;
+    ctx.beginPath(); ctx.arc(hx, hy, 10, 0, TAU); ctx.fill();
+    ctx.fillStyle = c.hair;
+    ctx.beginPath(); ctx.arc(hx, hy - 3, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+    if (c.beard) {
+      ctx.beginPath(); ctx.moveTo(hx - 9, hy + 1); ctx.quadraticCurveTo(hx, hy + 16, hx + 9, hy + 1); ctx.quadraticCurveTo(hx, hy + 6, hx - 9, hy + 1); ctx.fill();
+    }
+    ctx.fillStyle = '#2b1d12';
+    if (state === 'win') {
+      ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(hx - 3.5, hy - 1, 2, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx + 3.5, hy - 1, 2, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    } else {
+      const r = worried ? 2 : 1.4;
+      ctx.fillStyle = '#fff';
+      if (worried) { ctx.beginPath(); ctx.arc(hx - 3.5, hy - 1, 2.8, 0, TAU); ctx.arc(hx + 3.5, hy - 1, 2.8, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#2b1d12';
+      ctx.beginPath(); ctx.arc(hx - 3 + 1, hy - 1, r * 0.7, 0, TAU); ctx.arc(hx + 4 + 1, hy - 1, r * 0.7, 0, TAU); ctx.fill();
+    }
+  });
+
+  // Hull
+  ctx.fillStyle = '#8b5a2b';
+  ctx.beginPath();
+  ctx.moveTo(-160, -32);
+  ctx.lineTo(95, -32);
+  ctx.quadraticCurveTo(80, 14, 40, 20);
+  ctx.lineTo(-120, 20);
+  ctx.quadraticCurveTo(-155, 10, -160, -32);
+  ctx.fill();
+  ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 3;
+  for (const y of [-18, -4, 10]) { ctx.beginPath(); ctx.moveTo(-150, y); ctx.lineTo(82, y); ctx.stroke(); }
+  ctx.fillStyle = '#a9743c';
+  ctx.fillRect(-162, -36, 260, 7);
+  ctx.restore();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  const p = peter;
+  state = 'win';
+  p.face = 'joy';
+  jesusReach = true;
+  const par = cfg.dist / 55;
+  const s = {
+    faith: Math.round(p.faith) * 5,
+    time: Math.max(0, Math.round((par - p.time) * 20)),
+    doubts: p.dispelled * 15,
+    levelBonus: level * 100,
+  };
+  s.total = s.faith + s.time + s.doubts + s.levelBonus;
+  lastScore = s;
+  totalScore += s.total;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('walkingOnWaterBest', best); } catch (e) {} }
+  for (const f of fears.slice()) dispel(f);
+  showMessage('The wind ceased!');
+  sfx.win();
+  endTimer = 3;
+}
+
+function fail() {
+  state = 'fail';
+  jesusReach = false;
+  showMessage('"Lord, save me!"');
+  sfx.fail();
+  endTimer = 3.2;
+}
+
+function showMessage(text) { message = { text, t: 2.4 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+let ovAction = null;
+
+function showOverlay(title, sub, body, btn, action) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+
+function resetScene() {
+  cfg = makeConfig(level);
+  peter = newPeter();
+  jesusX = jesusDrawX = cfg.dist + START_X;
+  jesusReach = false;
+  cam = -180;
+  calm = 1;
+  waves = []; fears = []; particles = []; ripples = [];
+  flashT = shakeT = 0; bolt = null;
+  waveTimer = 1.6; fearTimer = level === 1 ? 3.5 : 2.5; boltTimer = rand(3, 6);
+  jumpBuf = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetScene();
+  const touch = matchMedia('(pointer: coarse)').matches;
+  showOverlay('Walking on Water', 'Keep your eyes on Jesus',
+    `<p class="verse">"And he said, Come. And when Peter was come down out of the ship, he walked on the water, to go to Jesus." &mdash; Matthew 14:29</p>
+     <ul>
+       <li>Help Peter walk across the stormy sea to <b>Jesus</b>.</li>
+       <li><b>Jump the waves:</b> ${touch ? '<b>tap</b> the screen' : '<kbd>&uarr;</kbd> / <kbd>Space</kbd>, or click'}.</li>
+       <li><b>Fears</b> drift in to block his view of Jesus. ${touch ? '<b>Tap them</b>' : 'Click them or press <kbd>F</kbd>'} to chase them away.</li>
+       <li>While Peter can't see Jesus his <b>Faith</b> drains and he starts to sink. Keep your eyes on Jesus!</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}`,
+    'Step out of the boat', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  resetScene();
+  state = 'play';
+  hideOverlay();
+  showMessage(`Level ${level}: ${cfg.name}`);
+  if (level === 1) {
+    tutFear = false;
+    setTimeout(() => { if (state === 'play') showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap to jump the waves' : 'Press ↑ / Space to jump the waves'); }, 2400);
+  }
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Safe with Jesus!', `Level ${level} complete — ${cfg.name}`,
+      `<p class="verse">"And when they were come into the ship, the wind ceased. Then they that were in the ship came and worshipped him, saying, Of a truth thou art the Son of God." &mdash; Matthew 14:32&ndash;33</p>
+       <p class="score">Faith left: <b>${s.faith}</b><br>Quick steps: <b>${s.time}</b><br>Fears chased away: <b>${s.doubts}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`,
+      'Next Crossing', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Jesus caught him!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Peter looked at the storm and began to sink, but Jesus reached out His hand straight away.</p>
+       <p class="verse">"And immediately Jesus stretched forth his hand, and caught him, and said unto him, O thou of little faith, wherefore didst thou doubt?" &mdash; Matthew 14:31</p>
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`, '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> or tap below to carry on.</p>', 'Resume', togglePause);
+  } else if (state === 'pause') {
+    state = 'play';
+    hideOverlay();
+  }
+}
+
+function goHome() { location.href = 'index.html'; }
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (state !== 'play') return;
+  if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) jumpBuf = 0.15;
+  if (['KeyF', 'ArrowDown', 'KeyS', 'Enter'].includes(e.code) && !e.repeat) pray();
+});
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  // Tapping a fear chases it away; tapping anywhere else jumps
+  let hit = null, hd = Infinity;
+  for (const f of fears) {
+    const d = Math.hypot(p.x - f.x, p.y - f.y);
+    if (d < f.r + 26 && d < hd) { hd = d; hit = f; }
+  }
+  if (hit) dispel(hit);
+  else jumpBuf = 0.15;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+});
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, windGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      this.master.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      // Storm ambience: low rumbling wind and sea
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 500;
+      this.windGain = this.ctx.createGain();
+      this.windGain.gain.value = 0;
+      src.connect(lp); lp.connect(this.windGain); this.windGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  wind(level) {
+    if (!this.windGain) return;
+    this.windGain.gain.setTargetAtTime(level * 0.35, this.ctx.currentTime, 0.3);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  burst(freq, vol, dur, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  jump() { this.tone(330, 0.18, 'sine', 0.2, 0, 620); },
+  splash(v) { this.burst(1400, 0.5 * v, 0.35); },
+  chime() { this.tone(1046.5, 0.35, 'triangle', 0.18); this.tone(1568, 0.4, 'sine', 0.1, 0.06); },
+  thunder() { this.burst(300, 0.9, 1.3, 'lowpass'); },
+  win() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, i * 0.13));
+    [523.25, 659.25, 783.99].forEach((f) => { this.tone(f, 1.8, 'sine', 0.12, 0.55); this.tone(f * 1.005, 1.8, 'sine', 0.08, 0.55); });
+  },
+  fail() {
+    [392, 349.2, 293.7].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.2, i * 0.18));
+    [392, 493.9, 587.3].forEach((f) => this.tone(f, 1.4, 'sine', 0.1, 1.6));
+  },
+};
+
+// ============================================================
+//  Rendering
+// ============================================================
+const skyClouds = Array.from({ length: 8 }, () => ({ f: Math.random(), y: rand(-60, 260), w: rand(160, 320), speed: rand(8, 22) }));
+const rain = Array.from({ length: 110 }, () => ({ f: Math.random(), y: rand(0, 1), len: rand(14, 26) }));
+
+function progress() { return peter ? clamp((peter.x - START_X) / cfg.dist, 0, 1) : 0; }
+
+function drawSky() {
+  // Night slowly turns toward dawn as Peter nears Jesus, and brightens when the storm ends
+  const dawn = Math.max(progress() * 0.55, 1 - calm);
+  const g = ctx.createLinearGradient(0, -offY, 0, SEA_Y);
+  g.addColorStop(0, mix('#0b1228', '#3d5a99', dawn));
+  g.addColorStop(0.6, mix('#1b2748', '#8fa7d6', dawn));
+  g.addColorStop(1, mix('#2a3a63', '#f3c48e', dawn));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, SEA_Y + offY + 5);
+
+  // Moon behind the clouds
+  const mx = W * 0.7 - cam * 0.03, my = 120;
+  const mg = ctx.createRadialGradient(mx, my, 10, mx, my, 110);
+  mg.addColorStop(0, 'rgba(255,250,220,0.45)');
+  mg.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = mg;
+  ctx.beginPath(); ctx.arc(mx, my, 110, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#f6f0d4';
+  ctx.beginPath(); ctx.arc(mx, my, 34, 0, TAU); ctx.fill();
+
+  // Rolling storm clouds
+  const s = clamp(storm(), 0, 1.3);
+  for (const c of skyClouds) {
+    const x = -offX - 200 + ((c.f * (viewW + 400) - cam * 0.15) % (viewW + 400) + viewW + 400) % (viewW + 400);
+    ctx.globalAlpha = 0.35 + 0.5 * Math.min(1, s);
+    drawCloud(x, c.y, c.w, c.w * 0.32, '#4b5570', '#343c52');
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawCloud(cx, cy, w, h, top, under) {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function updateScenery(dt) {
+  for (const c of skyClouds) { c.f += (c.speed * (0.3 + calm) * dt) / (viewW + 400); if (c.f > 1) c.f -= 1; }
+  for (const r of rain) { r.y += dt * 1.3; if (r.y > 1) { r.y -= 1; r.f = Math.random(); } }
+}
+
+function drawSea(front) {
+  const x0 = -offX - 10, x1 = viewW - offX + 10;
+  ctx.beginPath();
+  ctx.moveTo(x0, H + 10);
+  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x) + (front ? 5 : 0));
+  ctx.lineTo(x1, H + 10);
+  ctx.closePath();
+  if (front) {
+    const g = ctx.createLinearGradient(0, SEA_Y - 60, 0, H);
+    g.addColorStop(0, 'rgba(40,86,140,0.55)');
+    g.addColorStop(0.15, 'rgba(24,58,104,0.92)');
+    g.addColorStop(1, 'rgba(10,26,54,1)');
+    ctx.fillStyle = g;
+    ctx.fill();
+  } else {
+    const dawn = Math.max(progress() * 0.5, 1 - calm);
+    const g = ctx.createLinearGradient(0, SEA_Y - 80, 0, H);
+    g.addColorStop(0, mix('#2f5f96', '#5f9fd0', dawn));
+    g.addColorStop(1, '#0d2244');
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+}
+
+function drawFoam() {
+  ctx.strokeStyle = 'rgba(235,245,255,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (const w of waves) {
+    const sx = w.x - cam;
+    if (sx < -80 || sx > W + 80 || w.h < 8) continue;
+    const top = surf(sx);
+    ctx.beginPath();
+    ctx.arc(sx - w.w * 0.15, top + 7, 8, Math.PI * 1.1, Math.PI * 1.95);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - w.w * 0.9, surf(sx - w.w * 0.9) + 2);
+    ctx.quadraticCurveTo(sx - w.w * 0.4, top - 2, sx, top + 1);
+    ctx.stroke();
+  }
+}
+
+function drawRain() {
+  const s = Math.min(1, storm());
+  if (s < 0.05) return;
+  ctx.strokeStyle = `rgba(200,215,240,${0.35 * s})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (const r of rain) {
+    const x = -offX + r.f * (viewW + 100);
+    const y = -offY + r.y * (viewH + 40) - 20;
+    ctx.moveTo(x, y); ctx.lineTo(x - r.len * 0.45, y + r.len);
+  }
+  ctx.stroke();
+}
+
+function drawBeam() {
+  const b = beam();
+  const blocked = peter.blocked;
+  ctx.save();
+  ctx.lineCap = 'round';
+  if (blocked) {
+    ctx.strokeStyle = 'rgba(160,170,190,0.25)';
+    ctx.setLineDash([4, 10]);
+    ctx.lineWidth = 3;
+  } else {
+    ctx.strokeStyle = `rgba(255,230,140,${0.28 + 0.1 * Math.sin(t * 4)})`;
+    ctx.lineWidth = 6;
+    ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 12;
+  }
+  ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+  ctx.restore();
+
+  // Jesus is still off to the right: show His light on the horizon
+  if (b.off) {
+    const g = ctx.createRadialGradient(b.x2, b.y2, 3, b.x2, b.y2, 60);
+    g.addColorStop(0, 'rgba(255,245,200,0.95)');
+    g.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(b.x2, b.y2, 60, 0, TAU); ctx.fill();
+  }
+}
+
+function drawFear(f) {
+  const blocking = peter && peter.blocked === f;
+  const wob = Math.sin(t * 3 + f.phase) * 2;
+  const x = f.x, y = f.y + wob;
+  if (blocking) {
+    const g = ctx.createRadialGradient(x, y, 10, x, y, 56);
+    g.addColorStop(0, 'rgba(120,20,40,0.35)');
+    g.addColorStop(1, 'rgba(120,20,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, 56, 0, TAU); ctx.fill();
+  }
+  drawCloud(x, y + 6, 76, 34, '#4a4f63', '#2c3040');
+  // eyes glaring at Peter
+  const px = peter ? peter.x - cam : 0;
+  const dir = Math.sign(px - x) || -1;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.ellipse(x - 9, y - 2, 5, 4, 0, 0, TAU); ctx.ellipse(x + 9, y - 2, 5, 4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1a1c26';
+  ctx.beginPath(); ctx.arc(x - 9 + dir * 2, y - 1, 2.2, 0, TAU); ctx.arc(x + 9 + dir * 2, y - 1, 2.2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#1a1c26'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 15, y - 10); ctx.lineTo(x - 4, y - 6); ctx.moveTo(x + 15, y - 10); ctx.lineTo(x + 4, y - 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 7, y + 10); ctx.quadraticCurveTo(x - 3, y + 6, x, y + 10); ctx.quadraticCurveTo(x + 3, y + 6, x + 7, y + 10); ctx.stroke();
+  // label
+  ctx.font = '700 14px Fredoka, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,20,40,0.85)'; ctx.lineJoin = 'round';
+  ctx.strokeText(f.word, x, y + 34);
+  ctx.fillStyle = '#ffd0d0';
+  ctx.fillText(f.word, x, y + 34);
+}
+
+function drawBolt() {
+  if (!bolt || bolt.t <= 0) return;
+  ctx.save();
+  ctx.strokeStyle = '#fffbd0'; ctx.lineWidth = 4; ctx.shadowColor = '#fff59a'; ctx.shadowBlur = 16;
+  ctx.globalAlpha = clamp(bolt.t / 0.15, 0, 1);
+  ctx.beginPath();
+  ctx.moveTo(bolt.pts[0][0], bolt.pts[0][1]);
+  for (const [x, y] of bolt.pts) ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function updateBolt(dt) {
+  if (bolt) bolt.t -= dt;
+  if (state !== 'play') return;
+  boltTimer -= dt;
+  if (boltTimer <= 0) {
+    boltTimer = rand(4, 9) / (0.6 + cfg.storm * 0.4);
+    const x = rand(W * 0.2, W * 0.95);
+    const pts = [];
+    let bx = x, by = -offY;
+    while (by < SEA_Y) { pts.push([bx, by]); bx += rand(-30, 30); by += rand(40, 70); }
+    pts.push([bx, SEA_Y]);
+    bolt = { pts, t: 0.3 };
+    flashT = 0.22;
+    shakeT = 0.15;
+    sfx.thunder();
+    if (cfg.boltFears) spawnFear(x, 200);
+  }
+}
+
+function drawHUD() {
+  const p = peter;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,20,0.8)'; ctx.shadowBlur = 4;
+
+  // Left: level + faith
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff3cf';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Walking on Water' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('FAITH', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,243,207,0.25)';
+  roundRect(58, 38, 130, 13, 6.5); ctx.fill();
+  const fl = p ? p.faith / 100 : 1;
+  const gg = ctx.createLinearGradient(58, 0, 188, 0);
+  gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8');
+  ctx.fillStyle = fl < 0.3 && Math.sin(t * 10) > 0 ? '#ff6b6b' : gg;
+  if (fl > 0) { roundRect(58, 38, 130 * fl, 13, 6.5); ctx.fill(); }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1b2748'; ctx.strokeStyle = '#1b2748'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: progress from the boat to Jesus
+  const rx = viewW - 14, bw = Math.min(150, viewW - 250), bx = rx - bw;
+  ctx.textAlign = 'right';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#fff3cf';
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('TO JESUS', rx, 20);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,243,207,0.25)';
+  roundRect(bx, 30, bw, 8, 4); ctx.fill();
+  const pr = progress();
+  ctx.fillStyle = '#9fc3ff';
+  roundRect(bx, 30, bw * pr, 8, 4); ctx.fill();
+  // halo at the end, Peter's dot on the way
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(rx, 34, 7, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#3f6fb5'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(bx + bw * pr, 34, 6, 0, TAU); ctx.fill(); ctx.stroke();
+
+  if (p && state !== 'title' && p.dispelled) {
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe27a';
+    ctx.font = '700 14px Fredoka, sans-serif';
+    ctx.fillText(`Fears chased: ${p.dispelled}`, rx, 62);
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 26px Fredoka, sans-serif';
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(10,16,40,0.85)'; ctx.lineJoin = 'round';
+  ctx.strokeText(message.text, W / 2, H * 0.3);
+  ctx.fillStyle = '#ffe9a8';
+  ctx.fillText(message.text, W / 2, H * 0.3);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 3; sy = rand(-4, 4) * shakeT * 3; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+
+  drawSky();
+  drawBolt();
+  drawSea(false);
+  drawBoat();
+  if (peter && state !== 'title') drawBeam();
+  drawJesus();
+  if (peter) drawPeter(peter);
+  drawSea(true);
+  drawFoam();
+  drawParticles();
+  drawRain();
+  for (const f of fears) drawFear(f);
+
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(230,235,255,${flashT * 2.2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updateCamera(dt) {
+  const maxCam = Math.max(-180, jesusX + 120 - W);
+  const target = clamp(peter.x - W * 0.3, -180, maxCam);
+  cam += (target - cam) * Math.min(1, dt * 3);
+}
+
+function update(dt) {
+  t += dt;
+  jumpBuf = Math.max(0, jumpBuf - dt);
+  updateScenery(dt);
+  updateParticles(dt);
+  updateWaves(dt);
+  updateBolt(dt);
+
+  if (state === 'play') {
+    const blocked = updateFears(dt, beam());
+    updatePeter(dt, blocked);
+    if (blocked && level === 1 && !tutFear) {
+      tutFear = true;
+      showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap the fear to chase it away!' : 'Click the fear or press F!');
+    }
+  } else if (state === 'win') {
+    calm = Math.max(0, calm - dt * 0.6);
+    if (Math.random() < dt * 14) spawn(jesusDrawX + rand(-50, 50), SEA_Y - rand(0, 110), 0, -25, 1, '#fff6d0', 3);
+    updateFears(dt, beam());
+  } else if (state === 'fail') {
+    // "Immediately Jesus stretched forth his hand": He comes to Peter
+    const p = peter;
+    const target = p.x + 50;
+    jesusDrawX = Math.max(target, jesusDrawX - 900 * dt);
+    if (jesusDrawX - target < 4) {
+      jesusReach = true;
+      p.sink += (0 - p.sink) * Math.min(1, dt * 2);
+      calm = Math.max(0.35, calm - dt * 0.5);
+    } else {
+      p.sink = Math.min(70, p.sink + 30 * dt);
+    }
+    p.face = 'scared';
+    updateFears(dt, beam());
+  }
+  if (peter && state !== 'pause') updateCamera(dt);
+
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.wind(clamp(storm(), 0, 1));
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
