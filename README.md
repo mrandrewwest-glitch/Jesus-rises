@@ -23,6 +23,12 @@ Small cartoon games based on stories of Jesus from the Gospels. Open `index.html
 | **Follow the Star** ⭐ | The wise men (Matthew 2:1–12) | `follow-the-star.html` |
 | **Washing Feet** 🦶 | Love one another (John 13:1–17) | `washing-feet.html` |
 | **Where Is Jesus?** 🔍 | The boy Jesus in the temple (Luke 2:41–52) | `boy-jesus-temple.html` |
+| **The Good Samaritan** 🫏 | Who is my neighbour? (Luke 10:25–37) | `good-samaritan.html` |
+| **The Prodigal Son** 🏃 | The father runs (Luke 15:11–32) | `prodigal-son.html` |
+| **The Lost Coin** 🪙 | Sweep the house (Luke 15:8–10) | `lost-coin.html` |
+| **The Mustard Seed** 🌱 | The smallest seed (Matthew 13:31–32) | `mustard-seed.html` |
+| **Keep Your Lamp Burning** 🪔 | The ten bridesmaids (Matthew 25:1–13) | `ten-bridesmaids.html` |
+| **The Talents** 💰 | Good and faithful servant (Matthew 25:14–30) | `talents.html` |
 
 Every game has the same pause menu (Resume / ↻ Restart Level / All games), keyboard shortcuts (`P`/`Esc` pause, `R` restart while paused, `M` mute), choir-and-organ music, and saves your best score in your browser.
 
