@@ -344,7 +344,7 @@ function updateSea(dt) {
   for (let i = rogues.length - 1; i >= 0; i--) {
     const w = rogues[i];
     w.x += w.dir * w.speed * dt;
-    if (calm < 1) w.h *= Math.max(0, 1 - dt * 2.5);
+    if (state === 'win') w.h *= Math.max(0, 1 - dt * 2.5);
     if (!w.hit && Math.abs(w.x - boat.x) < 40 && state === 'play') {
       // The crest breaks right over the boat
       w.hit = true;
@@ -394,7 +394,7 @@ function updateBoat(dt) {
       b.roll += (wa * 0.4 - b.roll) * Math.min(1, dt * 2);
       b.sink = Math.min(46 * bs, b.sink + 30 * dt);
     }
-    b.y = (yl + yr) / 2 + 6 * bs + b.sink;
+    b.y = (yl + yr) / 2 - 8 * bs + b.sink;
     return;
   }
 
@@ -410,11 +410,13 @@ function updateBoat(dt) {
   b.tapLeanT = Math.max(0, b.tapLeanT - dt);
   b.lean += clamp(target - b.lean, -LEAN_RATE * dt, LEAN_RATE * dt);
 
-  const acc = K_ROLL * (wa + gust * calm - b.roll) + K_ROLL * LEAN_EFF * b.lean +
-              K_ROLL * SLOSH * wf * b.roll - D_ROLL * b.vr;
+  // once He has spoken the boat settles quickly
+  const damp = state === 'win' ? D_ROLL * 3 : D_ROLL;
+  const acc = K_ROLL * (wa * (state === 'win' ? calm : 1) + gust * calm - b.roll) + K_ROLL * LEAN_EFF * b.lean +
+              K_ROLL * SLOSH * wf * b.roll - damp * b.vr;
   b.vr += acc * dt;
   b.roll += b.vr * dt;
-  b.y = (yl + yr) / 2 + 6 * bs + wf * 12 * bs;
+  b.y = (yl + yr) / 2 - 8 * bs + wf * 12 * bs;
 
   if (state === 'play') {
     if (Math.abs(b.roll) > 0.25 && level === 1 && !tut.lean && message.t <= 0) {
@@ -1574,7 +1576,7 @@ function drawSea(front) {
   const c = 1 - calm;
   ctx.beginPath();
   ctx.moveTo(x0, H + 10);
-  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x) + (front ? 6 : 0));
+  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, surf(x) + (front ? 16 : 0));
   ctx.lineTo(x1, H + 10);
   ctx.closePath();
   if (front) {
@@ -1588,14 +1590,8 @@ function drawSea(front) {
     ctx.strokeStyle = `rgba(215,235,255,${0.25 + 0.35 * calm})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, surf(x) + 6);
+    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, surf(x) + 16);
     ctx.stroke();
-  } else {
-    const g = ctx.createLinearGradient(0, SEA_Y - 80, 0, H);
-    g.addColorStop(0, mix('#2f5f96', '#4a82c0', c));
-    g.addColorStop(1, '#0d2244');
-    ctx.fillStyle = g;
-    ctx.fill();
     // Moonlight on the still water
     if (c > 0.01) {
       const m = moonPos();
@@ -1607,6 +1603,12 @@ function drawSea(front) {
       }
       ctx.globalAlpha = 1;
     }
+  } else {
+    const g = ctx.createLinearGradient(0, SEA_Y - 80, 0, H);
+    g.addColorStop(0, mix('#2f5f96', '#4a82c0', c));
+    g.addColorStop(1, '#0d2244');
+    ctx.fillStyle = g;
+    ctx.fill();
   }
 }
 
