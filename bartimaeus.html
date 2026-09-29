@@ -343,7 +343,7 @@ function makePerson(x, y, s) {
 
 function rowY(k) { return cfg.rows > 1 ? lerp(ROW_NEAR, ROW_FAR, k / (cfg.rows - 1)) : ROW_NEAR; }
 function rowScale(y) { return lerp(0.78, 1.0, (y - ROW_FAR) / (ROW_NEAR - ROW_FAR)); }
-function bartScale(y) { return lerp(0.85, 1.5, clamp((y - MEET_Y) / (BART_Y - MEET_Y), 0, 1)); }
+function bartScale(y) { return rowScale(y) * 1.12; }   // same perspective as the crowd
 
 // Rows of bystanders. Each row has one gap; in the walk phase the row sways and the
 // people beside the gap slowly step aside ("the crowd parts").
@@ -1862,18 +1862,24 @@ function drawWorld() {
   walkers.sort((a, b) => a.y - b.y).forEach((w) => w.draw());
   if (cloak && cloak.landed) drawCloak(cloak);
   // rows of bystanders, far to near, with Bartimaeus slotted in by depth
-  let bartDrawn = false;
+  // (while he sits at the front he is drawn clearly instead: see drawSharp)
+  let bartDrawn = bartIsClear();
   for (let k = rows.length - 1; k >= 0; k--) {
     const r = rows[k];
     if (!bartDrawn && bart.y < r.y - 1) { drawBart(bart); bartDrawn = true; }
     for (const p of r.people) if (p.x > -offX - 40 && p.x < W + offX + 40) drawPerson(p);
   }
   if (!bartDrawn) drawBart(bart);
-  if (cloak && !cloak.landed) drawCloak(cloak);
 }
+
+// Sitting at the very front, nothing hides him: draw him clearly so he always reads well
+function bartIsClear() { return bart.pose === 'sit' || (bart.row < 0 && !bart.back && state !== 'win'); }
 
 // Clear overlays: things the player must read, and the light of Jesus
 function drawSharp() {
+  if (bartIsClear()) drawBart(bart);
+  if (cloak && !cloak.landed) drawCloak(cloak);
+
   // the light of Jesus shines through his blindness
   if (clarity < 1) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 2.5);
