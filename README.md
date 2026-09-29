@@ -88,7 +88,7 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **The Lost Sheep** | Tap where to walk; tap the sheep to free it, tap a wolf to shoo it | Arrows/WASD, `Space` free / shoo | Follow the bleats, find the sheep and carry it home before nightfall |
 | **Water into Wine** | Press and hold, release to pour | Hold `Space`/↓ | Let go when the jar glows ruby for the best wine, before it turns to vinegar |
 | **Fishers of Men** | Tap a side of the boat to cast, tap HAUL to call the other boat | `Space` cast, ←/→ side, `B` haul | Land the catch before the net breaks and the sun climbs high |
-| **Palm Sunday** | Tap the top of the screen to hop (twice to double hop), the bottom to duck | ↑/`Space` hop, ↓ duck | Ride the donkey to Jerusalem's gate, collecting palms and cloaks |
+| **Palm Sunday** | Slide your finger up / down to change lanes, flick up to hop | ↑/↓ lanes, `Space` hop | Ride the donkey to Jerusalem's gate, dodging obstacles and collecting palms and cloaks |
 | **Cleansing the Temple** | Tap stalls, cages and animals | Arrows move the ring, `Space` acts | Clear the market before it fills, without disturbing the worshippers |
 | **Let the Children Come** | Tap ahead to hop, beside to step; the Call button once a level | Arrows, `C` call | Help each child through the crowd to be blessed by Jesus |
 | **The Wise Builder** | Pick a block, tap the grid; "Let the storm come!" | `1`–`7` blocks, arrows + `Space`, `Enter` storm | Build a house that meets the goal card and still stands after the storm |
