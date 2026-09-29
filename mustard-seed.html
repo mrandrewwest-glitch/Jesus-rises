@@ -1,0 +1,2949 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcaf0">
+<title>The Mustard Seed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #8fcaf0;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Mustard Seed</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script>
+'use strict';
+
+// Scripture shown in this game, in every version the menu offers.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  // Overlay cards
+  kingdom:   { ref: 'Matthew 13:31', KJV: 'The kingdom of heaven is like to a grain of mustard seed, which a man took, and sowed in his field', NKJV: 'The kingdom of heaven is like a mustard seed, which a man took and sowed in his field', NIV: 'The kingdom of heaven is like a mustard seed, which a man took and planted in his field', NLT: 'The Kingdom of Heaven is like a mustard seed planted in a field' },
+  greatest:  { ref: 'Matthew 13:32', KJV: 'But when it is grown, it is the greatest among herbs, and becometh a tree, so that the birds of the air come and lodge in the branches thereof.', NKJV: 'But when it is grown it is greater than the herbs and becomes a tree, so that the birds of the air come and nest in its branches.', NIV: 'Yet when it grows, it is the largest of garden plants and becomes a tree, so that the birds come and perch in its branches.', NLT: 'But it becomes the largest of garden plants; it grows into a tree, and birds come and make nests in its branches.' },
+  grew:      { ref: 'Luke 13:19',    KJV: 'It is like a grain of mustard seed, which a man took, and cast into his garden; and it grew, and waxed a great tree', NKJV: 'It is like a mustard seed, which a man took and put in his garden; and it grew and became a large tree', NIV: 'It is like a mustard seed, which a man took and planted in his garden. It grew and became a tree', NLT: 'It is like a tiny mustard seed that a man planted in a garden; it grows and becomes a tree' },
+  // Speech bubbles (Jesus telling the parable)
+  least:     { ref: 'Matthew 13:32', KJV: 'Which indeed is the least of all seeds', NKJV: 'Which indeed is the least of all the seeds', NIV: 'Though it is the smallest of all seeds', NLT: 'It is the smallest of all seeds' },
+  liken:     { ref: 'Mark 4:30',     KJV: 'Whereunto shall we liken the kingdom of God? or with what comparison shall we compare it?', NKJV: 'To what shall we liken the kingdom of God? Or with what parable shall we picture it?', NIV: 'What shall we say the kingdom of God is like, or what parable shall we use to describe it?', NLT: 'How can I describe the Kingdom of God? What story should I use to illustrate it?' },
+  resemble:  { ref: 'Luke 13:18',    KJV: 'Unto what is the kingdom of God like? and whereunto shall I resemble it?', NKJV: 'What is the kingdom of God like? And to what shall I compare it?', NIV: 'What is the kingdom of God like? What shall I compare it to?', NLT: 'What is the Kingdom of God like? How can I illustrate it?' },
+  branches:  { ref: 'Mark 4:32',     KJV: 'Shooteth out great branches', NKJV: 'Shoots out large branches', NIV: 'With such big branches', NLT: 'It grows long branches' },
+  lodge:     { ref: 'Matthew 13:32', KJV: 'The birds of the air come and lodge in the branches thereof', NKJV: 'The birds of the air come and nest in its branches', NIV: 'The birds come and perch in its branches', NLT: 'Birds come and make nests in its branches' },
+};
+function verseHTML(key) {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${v.text}" &mdash; ${v.cite}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => 1 - Math.pow(1 - clamp(f, 0, 1), 3);
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Blend two #rrggbb colours
+function mix(a, b, f) {
+  const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(lerp((x >> s) & 255, (y >> s) & 255, clamp(f, 0, 1)));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ============================================================
+//  Camera: the garden is a little world (ground at y = 0, up is
+//  negative). The camera eases back as the plant grows.
+// ============================================================
+const cam = { x: -110, z: 1.3, baseY: H - 190 };
+function wp(wx, wy) { return { x: W / 2 + (wx - cam.x) * cam.z, y: cam.baseY + wy * cam.z }; }
+function pw(px, py) { return { x: (px - W / 2) / cam.z + cam.x, y: (py - cam.baseY) / cam.z }; }
+// On-screen size for bugs, weeds, birds and nests: steady, whatever the zoom
+function es() { return clamp(Math.sqrt(cam.z / 0.85), 0.85, 1.45); }
+
+function camTarget() {
+  if (state === 'title' || state === 'intro') return { x: -110, z: 1.3, baseY: H - 190 };
+  if (state === 'win') return { x: -20, z: 0.6, baseY: H - 115 };
+  const z = plant.stage >= 4 ? 0.82 : clamp(560 / (plant.h + 170), 0.82, 3.4);
+  return { x: 0, z, baseY: H - 160 };
+}
+function updateCamera(dt) {
+  const c = camTarget();
+  const k = Math.min(1, dt * (state === 'win' ? 0.9 : 1.6));
+  cam.x += (c.x - cam.x) * k;
+  cam.z += (c.z - cam.z) * k;
+  cam.baseY += (c.baseY - cam.baseY) * k;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const STAGE_NAMES = ['Seed', 'Sprout', 'Bush', 'Young tree', 'Branches', 'Great tree'];
+const JESUS_X = -200;   // where Jesus stands in the garden (world x)
+
+const LEVEL_NAMES = [
+  'A Tiny Seed',
+  'The Busy Garden',
+  'A Dry Spell',
+  'A Windy Day',
+  'Birds of the Air',
+  'The Greatest Tree',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Great Tree ${n}`,
+    needGap: Math.max(3, 8 - (n - 1) * 0.9),          // seconds between needs
+    grace: Math.max(4.5, 11 - (n - 1) * 1.2),         // how long a need can wait
+    drain: 2.5 + (n - 1) * 0.7,                       // health lost per second per late need
+    passive: Math.max(2.5, 4.5 - (n - 1) * 0.3),      // growth while healthy
+    stagePts: Math.min(130, 70 + n * 10),
+    branchPts: Math.min(60, 35 + n * 4),
+    weedGap: Math.max(4, 11 - n),
+    maxWeeds: Math.min(6, 2 + Math.floor(n / 2)),
+    pestGap: n === 1 ? 20 : Math.max(4.5, 13 - n * 1.5),
+    maxPests: Math.min(4, 1 + Math.floor(n / 2)),
+    pestSpeed: n === 1 ? 0.75 : 0.9 + (n - 2) * 0.12,
+    dry: n === 3 || (n >= 6 && n % 2 === 0),
+    wind: n === 4 || (n >= 5 && n % 2 === 1) ? Math.min(1 + (n - 4) * 0.15, 1.6) : 0,
+    branches: Math.min(7, 4 + Math.floor(n / 2)),
+    birds: Math.min(9, 2 + n),
+    birdGap: Math.max(2.5, 5.5 - n * 0.4),
+    patience: n >= 3 ? Math.max(8, 17 - (n - 3) * 2.5) : 0,
+    par: 80 + n * 30,
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('mustardBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let plant;
+let needs = [], weeds = [], pests = [], birds = [], branches = [], spots = [];
+let particles = [], tools = [];
+let needTimer = 0, weedTimer = 0, pestTimer = 0, birdTimer = 0;
+let message = { text: '', t: 0 };
+let bubble = null;          // Jesus's speech bubble { text, t }
+let introT = 0, introDur = 4;
+let endTimer = 0, lastScore = null;
+let selBird = null;
+let kbCursor = 0, kbShow = false;
+const cloud = { cover: 0, target: 0 };
+let gust = 0, gustTarget = 0, gustTimer = 0;
+let crowdEvent = { mood: 'watch', t: 0 };
+let playTime = 0, healthSum = 0, healthN = 0;
+let windKnockCd = 0, windHinted = false;
+let flashT = 0;
+
+function newPlant() {
+  return {
+    stage: 0, growth: 0, h: 5, health: 100, droop: 0, droopSide: Math.random() < 0.5 ? -1 : 1,
+    mood: 'happy', joyT: 0, credits: 0, chosen: 0,
+    soil: 1, soilTarget: 1, wet: 0.6, tilt: 0, sway: 0, pop: 0,
+    blink: 0, blinkT: 2,
+  };
+}
+
+// ============================================================
+//  Plant geometry (world units)
+// ============================================================
+function trunkPt(f) {
+  const h = plant.h, b = plant.tilt + plant.sway, d = plant.droop;
+  return {
+    x: b * h * f * f * 0.6 + d * h * 0.25 * f * f * f * plant.droopSide,
+    y: -h * f * (1 - d * 0.14 * f),
+  };
+}
+function trunkW0() { return plant.stage <= 2 ? 9 + plant.h * 0.07 : 14 + plant.h * 0.07; }
+function trunkW(f) { return trunkW0() * (1 - f * 0.6); }
+function topClumpR() { return plant.stage >= 3 ? 26 + (plant.h - 160) * 0.1 : 0; }
+
+// The places a branch may grow from: five heights on each side of the trunk
+const BUD_H = [0.42, 0.54, 0.66, 0.78, 0.9];
+const BUDS = [];
+BUD_H.forEach((hf, i) => [-1, 1].forEach((side) => BUDS.push({ hf, side, i })));
+
+function budPos(b) {
+  const p = trunkPt(b.hf);
+  return { x: p.x + b.side * (trunkW(b.hf) / 2 + 4), y: p.y };
+}
+function budUsed(b) { return branches.some((br) => br.hf === b.hf && br.side === b.side); }
+
+function branchGeom(br) {
+  const o = trunkPt(br.hf);
+  const a = (br.side > 0 ? -0.55 : Math.PI + 0.55) + (plant.tilt + plant.sway) * 1.2 + plant.droop * 0.5 * br.side;
+  const L = br.len * ease(br.grow);
+  const end = { x: o.x + Math.cos(a) * L, y: o.y + Math.sin(a) * L };
+  const ctrl = { x: (o.x + end.x) / 2, y: (o.y + end.y) / 2 - L * 0.16 };
+  return { o, end, ctrl, L };
+}
+function bez(g, f) {
+  const u = 1 - f;
+  return {
+    x: u * u * g.o.x + 2 * u * f * g.ctrl.x + f * f * g.end.x,
+    y: u * u * g.o.y + 2 * u * f * g.ctrl.y + f * f * g.end.y,
+  };
+}
+
+// Nesting spots: sizes S / M / L, bigger spots on the lower, thicker branches
+function spotWorld(s) {
+  if (!s.br) { const p = trunkPt(1); return { x: p.x, y: p.y - topClumpR() * 0.55 }; }
+  const p = bez(branchGeom(s.br), s.f);
+  return { x: p.x, y: p.y - 6 };
+}
+function spotReady(s) { return plant.stage >= 5 && (!s.br || s.br.grow >= 1); }
+const NEST_W = { S: 24, M: 32, L: 40 };
+const SIZE_WORD = { S: 'little', M: 'middle-sized', L: 'big' };
+
+function addBranch(b) {
+  const len = lerp(165, 95, (b.hf - 0.42) / 0.48);
+  const br = { hf: b.hf, side: b.side, len, grow: 0 };
+  branches.push(br);
+  const sizes = b.i <= 1 ? ['L', 'M'] : b.i <= 3 ? ['M', 'S'] : ['S', 'S'];
+  spots.push({ br, f: 0.55, size: sizes[0], bird: null });
+  spots.push({ br, f: 1, size: sizes[1], bird: null });
+  plant.chosen++;
+  plant.credits--;
+  const p = wp(budPos(b).x, budPos(b).y);
+  for (let i = 0; i < 16; i++) {
+    const a = rand(0, TAU), sp = rand(30, 110);
+    spawn(p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1), ['#fff3a0', '#b6f07a', '#ffffff'][i % 3], rand(2, 4));
+  }
+  sfx.grow(0.4 + plant.chosen / cfg.branches * 0.6);
+  plant.joyT = 1;
+  kbCursor = 0;
+}
+
+function balanceInfo() {
+  let sum = 0, tot = 0;
+  for (const br of branches) { const w = br.len * ease(br.grow); sum += br.side * w; tot += w; }
+  return { sum, tot, imbalance: tot ? Math.abs(sum) / tot : 0 };
+}
+
+function hTarget() {
+  const g = clamp(plant.growth / cfg.stagePts, 0, 1);
+  switch (plant.stage) {
+    case 0: return 4 + g * 8;
+    case 1: return 22 + g * 38;
+    case 2: return 70 + g * 90;
+    case 3: return 180 + g * 200;
+    case 4: return 400 + (plant.chosen / cfg.branches) * 90;
+    default: return 500;
+  }
+}
+
+function growthFrac() {
+  if (plant.stage < 4) return clamp(plant.growth / cfg.stagePts, 0, 1);
+  if (plant.stage === 4) return clamp((plant.chosen + (plant.credits > 0 ? 0 : plant.growth / cfg.branchPts)) / cfg.branches, 0, 1);
+  return clamp(nestedCount() / cfg.birds, 0, 1);
+}
+
+function nestedCount() { return birds.filter((b) => b.state === 'nest').length; }
+
+// ============================================================
+//  Needs: water, sunshine and compost, shown as bubbles
+// ============================================================
+const NEED_TYPES = ['water', 'sun', 'soil'];
+
+function spawnNeed() {
+  const free = NEED_TYPES.filter((k) => !needs.some((n) => n.type === k));
+  if (!free.length) return;
+  const weight = { water: cfg.dry ? 3.2 : 1.3, sun: 1, soil: level === 1 ? 0.6 : 0.9 };
+  let r = Math.random() * free.reduce((s, k) => s + weight[k], 0);
+  let type = free[0];
+  for (const k of free) { r -= weight[k]; if (r <= 0) { type = k; break; } }
+  const grace = cfg.grace * (type === 'water' && cfg.dry ? 0.8 : 1);
+  needs.push({ type, age: 0, grace, pop: 0 });
+  if (type === 'sun') cloud.target = 1;
+  if (type === 'soil') plant.soilTarget = 0.2;
+  if (type === 'water') plant.wet = 0;
+  sfx.pip();
+}
+
+function meetNeed(type) {
+  const i = needs.findIndex((n) => n.type === type);
+  if (type === 'water') { tools.push({ type: 'water', t: 0 }); plant.wet = 1; sfx.splash(); }
+  if (type === 'sun') { cloud.target = 0; sfx.puff(0.3); }
+  if (type === 'soil') { tools.push({ type: 'soil', t: 0 }); plant.soilTarget = 1; sfx.puff(0.2); }
+  if (i < 0) return false;
+  const n = needs[i];
+  needs.splice(i, 1);
+  addGrowth(n.age < n.grace ? 25 : 15);
+  plant.joyT = 1.3;
+  const p = plantTopP();
+  for (let k = 0; k < 12; k++) {
+    const a = rand(0, TAU), sp = rand(30, 90);
+    spawn(p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp - 30, rand(0.5, 1),
+      type === 'water' ? '#8fd3ff' : type === 'sun' ? '#ffe27a' : '#b6f07a', rand(2, 4));
+  }
+  sfx.tap(0.2 + plant.stage * 0.15);
+  return true;
+}
+
+function addGrowth(pts) {
+  if (plant.stage >= 5) return;
+  plant.growth += pts;
+}
+
+function plantTopP() {
+  if (plant.stage === 0) return wp(0, -10);
+  const p = trunkPt(1);
+  return wp(p.x, p.y - topClumpR());
+}
+
+// Bubbles float in a row above the top of the plant
+function bubbleLayout() {
+  const top = plantTopP();
+  const y = Math.max(top.y - 70, 205 - offY);
+  const n = needs.length;
+  return needs.map((nd, i) => ({ nd, x: clamp(top.x + (i - (n - 1) / 2) * 78, 40, W - 40), y }));
+}
+
+// ============================================================
+//  Weeds and pests
+// ============================================================
+function visHalf() { return W / 2 / cam.z; }
+
+function spawnWeed() {
+  if (weeds.length >= cfg.maxWeeds) return;
+  const reach = Math.min(150, visHalf() * 0.8);
+  for (let tries = 0; tries < 8; tries++) {
+    const x = (Math.random() < 0.5 ? -1 : 1) * rand(Math.min(28, reach * 0.5), reach);
+    if (weeds.every((w) => Math.abs(w.x - x) > 22 / cam.z * 1.4)) {
+      weeds.push({ x, grow: 0, phase: rand(0, TAU), pull: 0 });
+      return;
+    }
+  }
+}
+
+function spawnPest() {
+  if (plant.stage < 1 || pests.filter((p) => p.phase !== 'flick').length >= cfg.maxPests) return;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const type = level >= 2 && Math.random() < 0.4 ? 'snail' : 'cat';
+  pests.push({ type, side, phase: 'ground', x: side * (visHalf() + 20), f: 0, wig: rand(0, TAU), vx: 0, vy: 0, px: 0, py: 0, rot: 0, life: 0 });
+}
+
+function pestP(pe) {
+  if (pe.phase === 'flick') return { x: pe.px, y: pe.py, rot: pe.rot };
+  if (pe.phase === 'ground') { const p = wp(pe.x, 0); return { x: p.x, y: p.y - 8 * es(), rot: 0 }; }
+  const tp = trunkPt(pe.f);
+  const p = wp(tp.x + pe.side * trunkW(pe.f) * 0.45, tp.y);
+  return { x: p.x, y: p.y, rot: -pe.side * Math.PI / 2 };
+}
+function pestTop() { return plant.stage >= 3 ? 0.62 : plant.stage === 2 ? 0.75 : 0.85; }
+
+function flick(pe) {
+  const p = pestP(pe);
+  pe.phase = 'flick';
+  pe.px = p.x; pe.py = p.y; pe.rot = p.rot;
+  pe.vx = pe.side * rand(220, 320); pe.vy = -rand(260, 360); pe.life = 1.6;
+  addGrowth(10);
+  sfx.boing();
+  showMessage(pe.type === 'snail' ? pickLine(['Off you go, snail!', 'Boing! Bye, snail!']) : pickLine(['Wheee! Off you go!', 'Flick! Bye, caterpillar!']));
+}
+
+function pullWeed(w) {
+  if (w.pull) return;
+  w.pull = 0.01;
+  addGrowth(8);
+  const p = wp(w.x, 0);
+  for (let i = 0; i < 10; i++) spawn(p.x, p.y, rand(-60, 60), rand(-140, -40), rand(0.5, 0.9), i % 2 ? '#7a5230' : '#5a9a34', rand(2, 4), 300);
+  sfx.pop();
+}
+
+function pickLine(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+// ============================================================
+//  Birds
+// ============================================================
+const BIRD_TYPES = [
+  { name: 'sparrow',  size: 'S', body: '#a8764c', wing: '#6e4a2c', belly: '#ecd6b4', beak: '#e0a040' },
+  { name: 'finch',    size: 'S', body: '#f2c230', wing: '#4a4030', belly: '#ffe98a', beak: '#f08a30' },
+  { name: 'bluebird', size: 'M', body: '#3d8fd9', wing: '#2a64a8', belly: '#f3a468', beak: '#3a3a3a' },
+  { name: 'robin',    size: 'M', body: '#8a6440', wing: '#5f432a', belly: '#ec6a3c', beak: '#e0a040' },
+  { name: 'dove',     size: 'L', body: '#f2f2f7', wing: '#c9cedb', belly: '#ffffff', beak: '#e89aa0' },
+  { name: 'hoopoe',   size: 'L', body: '#e59c5c', wing: '#3a3030', belly: '#f3c994', beak: '#4a3a30', crest: true },
+];
+const BIRD_R = { S: 13, M: 17, L: 22 };
+
+function birdWaitSlot(i) { return { x: i === 0 ? 90 : W - 90, y: Math.max(150, 250 - offY) }; }
+
+function spawnBird() {
+  const waiting = birds.filter((b) => b.state === 'arrive' || b.state === 'wait');
+  if (waiting.length >= 2 || nestedCount() + waiting.length >= cfg.birds) return;
+  // Only send birds that have a free spot of their size waiting for them
+  const count = { S: 0, M: 0, L: 0 };
+  for (const s of spots) if (!s.bird && spotReady(s)) count[s.size]++;
+  for (const b of waiting) count[b.size]--;
+  const sizes = Object.keys(count).filter((k) => count[k] > 0);
+  if (!sizes.length) return;
+  const size = sizes[Math.floor(Math.random() * sizes.length)];
+  const kinds = BIRD_TYPES.filter((k) => k.size === size);
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  const used = waiting.map((b) => b.slot);
+  const slot = used.includes(0) ? 1 : 0;
+  const tgt = birdWaitSlot(slot);
+  const start = { x: slot === 0 ? -60 : W + 60, y: tgt.y - 80 };
+  const ws = pw(start.x, start.y), wt = pw(tgt.x, tgt.y);
+  birds.push({
+    kind, size, slot, state: 'arrive', x: ws.x, y: ws.y, tx: wt.x, ty: wt.y,
+    patience: cfg.patience, flap: rand(0, TAU), facing: slot === 0 ? 1 : -1, spot: null, nestT: 0, hop: 0,
+  });
+  sfx.chirp(size);
+}
+
+function birdP(b) {
+  if (b.state === 'nest') {
+    const s = wp(spotWorld(b.spot).x, spotWorld(b.spot).y);
+    return { x: s.x, y: s.y - BIRD_R[b.size] * es() * 0.5 - Math.abs(Math.sin(b.hop)) * 3 };
+  }
+  return wp(b.x, b.y);
+}
+
+function sendToSpot(b, s) {
+  b.state = 'fly';
+  b.spot = s;
+  s.bird = b;
+  if (selBird === b) selBird = null;
+  sfx.chirp(b.size);
+}
+
+function birdFlyAway(b, why) {
+  if (b.spot) b.spot.bird = null;
+  b.spot = null;
+  b.state = 'leave';
+  if (selBird === b) selBird = null;
+  b.facing = b.x < 0 ? -1 : 1;
+  if (why) showMessage(why);
+}
+
+function trySpot(s) {
+  if (!spotReady(s) || s.bird) return false;
+  let b = selBird;
+  if (!b) b = birds.find((x) => x.state === 'wait' && x.size === s.size);
+  if (!b) {
+    const w = birds.find((x) => x.state === 'wait');
+    if (w) showMessage(`That spot is for a ${SIZE_WORD[s.size]} bird.`);
+    return true;
+  }
+  if (b.size !== s.size) {
+    showMessage(BIRD_R[b.size] > BIRD_R[s.size] ? `Too small for the ${b.kind.name}!` : `Too big for a little ${b.kind.name}!`);
+    sfx.bounce();
+    return true;
+  }
+  sendToSpot(b, s);
+  return true;
+}
+
+// ============================================================
+//  The crowd (they watch Jesus tell the story, then the plant)
+// ============================================================
+const DISCIPLES = [
+  { name: 'Peter',       robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { name: 'Andrew',      robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56' },
+  { name: 'James',       robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070' },
+  { name: 'John',        robe: '#d9a13a', hair: '#6b3f1d', beard: false, skin: '#e3b184' },
+  { name: 'Mary',        robe: '#7a4fa0', hair: '#3a2716', beard: false, skin: '#c58a55', scarf: '#e8dcc0' },
+  { name: 'Thomas',      robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { name: 'Martha',      robe: '#3c8f86', hair: '#1f140c', beard: false, skin: '#b87a48', scarf: '#d8c7a0' },
+  { name: 'Matthew',     robe: '#5a6475', hair: '#2a1a0e', beard: true,  skin: '#c88e5a', scarf: '#c9b27a' },
+  { name: 'Child',       robe: '#c46b8c', hair: '#5c3a1c', beard: false, skin: '#dca678' },
+].map((d, i) => ({
+  ...d, i,
+  mood: 'watch', switchT: 0,
+  delay: d.name === 'Peter' ? 0 : rand(0.05, 0.5),
+  blinkT: rand(1, 4), blink: 0,
+  phase: rand(0, TAU),
+}));
+
+// World positions: some beside Jesus on the left, the rest on the right of the garden
+const CROWD = [
+  { d: 1, x: -262, row: 0, s: 1.2 }, { d: 4, x: -312, row: 0, s: 1.15 }, { d: 0, x: -290, row: 1, s: 1.3 },
+  { d: 8, x: -240, row: 1, s: 0.95 },
+  { d: 2, x: 232, row: 0, s: 1.2 }, { d: 6, x: 292, row: 0, s: 1.15 }, { d: 5, x: 352, row: 0, s: 1.2 },
+  { d: 3, x: 262, row: 1, s: 1.3 }, { d: 7, x: 330, row: 1, s: 1.3 },
+];
+let lookAt = { x: 0, y: 0 };
+
+function crowdSlots() {
+  return CROWD.map((c) => {
+    const p = wp(c.x, 0);
+    return { d: DISCIPLES[c.d], x: p.x, y: p.y + (c.row === 1 ? 8 : -6) * cam.z, s: c.s * cam.z, row: c.row };
+  });
+}
+
+function crowdMood() {
+  if (state === 'title') return 'watch';
+  if (state === 'intro') return introT > 1 ? 'wow' : 'watch';
+  if (state === 'win') return 'joy';
+  if (state === 'fail') return 'dismay';
+  if (crowdEvent.t > 0) return crowdEvent.mood;
+  if (plant.health < 35) return 'worried';
+  if (pests.some((p) => p.phase === 'eat')) return 'worried';
+  return 'watch';
+}
+function crowdReact(mood, dur = 1.6) { crowdEvent = { mood, t: dur }; }
+
+function updateDisciples(dt) {
+  const target = crowdMood();
+  for (const d of DISCIPLES) {
+    let want = target;
+    if (d.name === 'Thomas' && want === 'watch') want = 'doubt';
+    if (want !== d.mood) {
+      d.switchT += dt;
+      if (d.switchT > d.delay) { d.mood = want; d.switchT = 0; }
+    } else d.switchT = 0;
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+}
+
+function drawDisciple(slot) {
+  const { d, x, s } = slot;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+
+  ctx.save();
+  ctx.translate(x, slot.y - jump * s);
+  ctx.scale(s, s);
+  if (slot.row === 0) ctx.filter = 'brightness(0.92)';
+
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  // Look toward whatever everyone is watching
+  let lx = 0, ly = -1;
+  {
+    const wx = x, wy = slot.y - 52 * s;
+    const dx = lookAt.x - wx, dy = lookAt.y - wy;
+    const len = Math.hypot(dx, dy) || 1;
+    lx = dx / len; ly = dy / len;
+  }
+
+  // Arms raised for joy / pointing up in wonder
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'wow' && d.i % 3 === 0) {
+    arm(11, -32, 20 + lx * 6, -70);
+  }
+
+  // Robe
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+
+  // Resting arms
+  if (mood === 'watch' || mood === 'doubt' || (mood === 'wow' && d.i % 3 !== 0)) {
+    if (mood === 'doubt') { arm(-11, -32, 4, -26); arm(11, -32, -4, -24); } // folded arms
+    else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);           // hands clasped
+  }
+
+  // Head
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // Hair / head cloth
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  // Beard
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+
+  drawFace(d, mood, hy, lx, ly);
+
+  // Hands over the face come last
+  if (mood === 'shock') {
+    arm(-11, -32, -15, hy + 4);
+    arm(11, -32, 15, hy + 4);
+  } else if (mood === 'dismay' && d.i % 2 === 0) {
+    arm(11, -32, 2, hy - 3);   // facepalm
+    ctx.fillStyle = d.skin;
+    roundRect(-9, hy - 8, 20, 9, 4); ctx.fill();
+  } else if (mood === 'dismay') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  }
+
+  ctx.restore();
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      if (d.i % 2 === 0) {
+        mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      } else {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-ex - 3, ey - 2); ctx.lineTo(-ex + 2, ey); ctx.lineTo(-ex - 3, ey + 2);
+        ctx.moveTo(ex + 3, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex + 3, ey + 2);
+        ctx.stroke();
+        mouthLine(() => {
+          ctx.moveTo(-6, mouthY); ctx.lineTo(-3, mouthY - 2); ctx.lineTo(0, mouthY);
+          ctx.lineTo(3, mouthY - 2); ctx.lineTo(6, mouthY);
+        });
+      }
+      break;
+  }
+}
+
+// ============================================================
+//  Jesus, holding up the tiny seed
+// ============================================================
+function drawJesus(x, y, s, pose, face) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  const up = pose === 'joy';
+
+  if (up || pose === 'hold' || pose === 'teach') {
+    const g = ctx.createRadialGradient(0, -35, 5, 0, -35, 70);
+    g.addColorStop(0, 'rgba(255,235,150,0.45)');
+    g.addColorStop(1, 'rgba(255,235,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -35, 70, 0, TAU); ctx.fill();
+  }
+
+  // Halo
+  ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, -56, 15, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Hair (back)
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath(); ctx.ellipse(0, -51, 12.5, 14, 0, 0, TAU); ctx.fill();
+  roundRect(-12.5, -52, 25, 16, 6); ctx.fill();
+
+  // Robe with red sash
+  ctx.fillStyle = '#fdfcf6'; ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-9, -41);
+  ctx.quadraticCurveTo(0, -44, 9, -41);
+  ctx.lineTo(15, -2);
+  ctx.quadraticCurveTo(0, 2, -15, -2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-9, -42); ctx.lineTo(15, -10); ctx.stroke();
+  ctx.restore();
+
+  // Arms: both raised for joy, one holding up the seed, pointing while teaching
+  let hands = [[-20, -22], [20, -22]];
+  if (up) hands = [[-21, -66], [21, -66]];
+  else if (pose === 'hold') hands = [[-20, -22], [23, -68]];
+  else if (pose === 'teach') hands = [[-20, -22], [26, -44 + Math.sin(t * 3) * 3]];
+  for (const [hx, hy] of hands) {
+    const sx = hx < 0 ? -8 : 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#cfc8b4'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (hy < -40 ? 4 : 0)); ctx.stroke();
+    ctx.strokeStyle = '#fdfcf6'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(sx, -38); ctx.lineTo(hx * 0.9, hy + (hy < -40 ? 4 : 0)); ctx.stroke();
+    ctx.fillStyle = '#e0a877';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.3, 0, TAU); ctx.fill();
+  }
+  // The tiny seed, twinkling between finger and thumb
+  if (pose === 'hold') {
+    const tw = 0.6 + 0.4 * Math.sin(t * 5);
+    const g = ctx.createRadialGradient(23, -73, 0, 23, -73, 10);
+    g.addColorStop(0, `rgba(255,240,160,${0.9 * tw})`);
+    g.addColorStop(1, 'rgba(255,240,160,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(23, -73, 10, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#b8862e';
+    ctx.beginPath(); ctx.arc(23, -72.5, 1.6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(255,250,210,${tw})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(23, -80); ctx.lineTo(23, -77); ctx.moveTo(16, -73); ctx.lineTo(19, -73); ctx.moveTo(27, -73); ctx.lineTo(30, -73); ctx.stroke();
+  }
+
+  // Head
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.arc(0, -52, 10.5, 0, TAU); ctx.fill();
+  // fringe
+  ctx.fillStyle = '#5b3a1f';
+  ctx.beginPath();
+  ctx.arc(0, -53, 11, Math.PI, TAU);
+  ctx.quadraticCurveTo(5, -58, 0, -57.5);
+  ctx.quadraticCurveTo(-5, -58, -11, -53);
+  ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-10, -52);
+  ctx.quadraticCurveTo(-10, -38, 0, -37);
+  ctx.quadraticCurveTo(10, -38, 10, -52);
+  ctx.quadraticCurveTo(6, -45, 0, -45.5);
+  ctx.quadraticCurveTo(-6, -45, -10, -52);
+  ctx.fill();
+
+  // Face
+  const dark = '#2b1d12';
+  ctx.lineCap = 'round';
+  if (face === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(-4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(4 + 2.4 * Math.cos(Math.PI * 1.1), -52 + 2.4 * Math.sin(Math.PI * 1.1));
+    ctx.arc(4, -52, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(-4, -53, 1.5, 0, TAU); ctx.arc(4, -53, 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#e0a877';
+  ctx.beginPath(); ctx.ellipse(0, -46, 3.6, 2.2, 0, 0, TAU); ctx.fill();
+  if (face === 'talk') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(0, -46, 1.8, 1 + Math.abs(Math.sin(t * 12)) * 1.4, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, -47.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function jesusPose() {
+  if (state === 'win') return ['joy', 'joy'];
+  const face = bubble ? 'talk' : 'calm';
+  if (state === 'intro' && introT > 0.6) return ['hold', face];
+  if (state === 'title' || bubble) return ['teach', face];
+  return ['rest', face];
+}
+
+function say(text, dur) { bubble = { text, t: dur }; }
+
+// ============================================================
+//  Particles (playfield coordinates)
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0) {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Main play update
+// ============================================================
+function updateGust(dt) {
+  gustTimer -= dt;
+  if (gustTimer <= 0) {
+    gustTarget = rand(-1, 1) * (Math.random() < 0.3 ? 1.6 : 1);
+    gustTimer = rand(1, 3.5);
+  }
+  gust += (gustTarget - gust) * Math.min(1, dt * 1.2);
+}
+
+// Weeds grow and bugs crawl (also runs behind the end screens so flicks finish)
+function updateCritters(dt) {
+  // --- Weeds ---
+  let bigWeeds = 0;
+  for (let i = weeds.length - 1; i >= 0; i--) {
+    const w = weeds[i];
+    if (w.pull) { w.pull += dt * 3; if (w.pull > 1) weeds.splice(i, 1); continue; }
+    w.grow = Math.min(1, w.grow + dt / Math.max(4, 8 - level * 0.6));
+    if (w.grow >= 1) bigWeeds++;
+  }
+
+  // --- Pests ---
+  let eating = 0;
+  const pz = cam.z;
+  for (let i = pests.length - 1; i >= 0; i--) {
+    const pe = pests[i];
+    const spd = cfg.pestSpeed * (pe.type === 'snail' ? 0.6 : 1);
+    pe.wig += dt * (pe.phase === 'eat' ? 10 : 6) * spd;
+    if (pe.phase === 'flick') {
+      pe.vy += 700 * dt; pe.px += pe.vx * dt; pe.py += pe.vy * dt; pe.rot += pe.side * 8 * dt;
+      pe.life -= dt;
+      if (pe.life <= 0) pests.splice(i, 1);
+      continue;
+    }
+    if (pe.phase === 'ground') {
+      pe.x -= pe.side * 40 * spd / pz * dt;
+      if (pe.side * pe.x <= trunkW0() * 0.5) { pe.phase = 'climb'; pe.f = 0; }
+    } else if (pe.phase === 'climb') {
+      pe.f += dt * 0.13 * spd * (plant.stage >= 3 ? 0.75 : 1);
+      if (pe.f >= pestTop() && state === 'play') {
+        pe.phase = 'eat';
+        pe.f = pestTop();
+        showMessage(pe.type === 'snail' ? 'A snail is nibbling the leaves!' : 'A caterpillar is munching!');
+        crowdReact('shock', 1.2);
+      }
+    } else if (pe.phase === 'eat') {
+      eating++;
+      if (Math.random() < dt * 6) {
+        const q = pestP(pe);
+        spawn(q.x, q.y, rand(-30, 30), rand(-20, 10), 0.6, '#6fbf45', rand(1.5, 3), 200);
+      }
+    }
+  }
+
+  return { bigWeeds, eating };
+}
+
+function updatePlay(dt) {
+  const p = plant;
+  playTime += dt;
+
+  // --- Spawners ---
+  needTimer -= dt * (p.stage >= 5 ? 0.7 : 1);
+  if (needTimer <= 0) { spawnNeed(); needTimer = cfg.needGap * rand(0.75, 1.25); }
+  weedTimer -= dt;
+  if (weedTimer <= 0) { spawnWeed(); weedTimer = cfg.weedGap * rand(0.7, 1.3); }
+  pestTimer -= dt;
+  if (pestTimer <= 0) { spawnPest(); pestTimer = cfg.pestGap * rand(0.7, 1.3); }
+  if (p.stage >= 5) {
+    birdTimer -= dt;
+    if (birdTimer <= 0) { spawnBird(); birdTimer = cfg.birdGap * rand(0.8, 1.2); }
+  }
+
+  // --- Needs ---
+  let late = 0;
+  for (const n of needs) {
+    n.age += dt;
+    n.pop = Math.min(1, n.pop + dt * 4);
+    if (n.age > n.grace) late++;
+  }
+
+  const { bigWeeds, eating } = updateCritters(dt);
+
+  // --- Health ---
+  let drain = late * cfg.drain + bigWeeds * 0.8 + eating * 3;
+  if (drain > 0) p.health -= drain * dt;
+  else p.health = Math.min(100, p.health + 4 * dt);
+  healthSum += p.health * dt; healthN += dt;
+
+  // --- Growth ---
+  if (p.health > 45 && late === 0 && eating === 0) addGrowth(cfg.passive * dt);
+  if (p.stage < 4 && p.growth >= cfg.stagePts) nextStage();
+  else if (p.stage === 4) {
+    const remaining = cfg.branches - p.chosen - p.credits;
+    if (remaining <= 0) p.growth = 0;
+    else if (p.growth >= cfg.branchPts) {
+      p.growth -= cfg.branchPts;
+      p.credits++;
+      if (p.credits === 1) { showMessage('A new bud! Tap it to grow a branch'); sfx.pip(); }
+    }
+    for (const br of branches) br.grow = Math.min(1, br.grow + dt * 0.9);
+    if (p.chosen >= cfg.branches && branches.every((br) => br.grow >= 1)) nextStage();
+  }
+
+  // --- Soil & water shading ---
+  p.soil += (p.soilTarget - p.soil) * Math.min(1, dt * 2);
+  p.wet = Math.max(0, p.wet - dt * 0.05);
+
+  // --- Birds ---
+  updateBirds(dt);
+
+  // --- Wind and balance ---
+  const bal = balanceInfo();
+  p.tilt += ((bal.tot ? bal.sum / (bal.tot + 150) : 0) * 0.12 - p.tilt) * Math.min(1, dt * 2);
+  const windSway = cfg.wind ? gust * cfg.wind * (0.025 + bal.imbalance * 0.12) : 0;
+  p.sway = Math.sin(t * 1.3) * 0.012 + windSway;
+  if (cfg.wind && p.stage >= 4 && bal.imbalance > 0.35 && !windHinted) {
+    windHinted = true;
+    showMessage('Windy! Keep the branches balanced');
+  }
+  windKnockCd = Math.max(0, windKnockCd - dt);
+  if (cfg.wind && p.stage >= 5 && Math.abs(gust) > 0.85 && bal.imbalance > 0.3 && windKnockCd <= 0) {
+    const heavy = Math.sign(bal.sum);
+    const nb = birds.find((b) => b.state === 'nest' && b.spot.br && b.spot.br.side === heavy);
+    if (nb) {
+      birdFlyAway(nb, 'Whoosh! The lopsided tree swayed. A bird flew off!');
+      crowdReact('worried', 1.5);
+      windKnockCd = 6;
+    }
+  }
+
+  // --- Droop and the plant's face ---
+  const want = late > 0 || p.health < 45 ? clamp(1.1 - p.health / 100, 0.25, 1) : 0;
+  p.droop += (want - p.droop) * Math.min(1, dt * 1.5);
+  p.joyT = Math.max(0, p.joyT - dt);
+  p.pop = Math.max(0, p.pop - dt * 1.5);
+  if (p.joyT > 0) p.mood = 'joy';
+  else if (eating) p.mood = 'ouch';
+  else if (p.health < 35) p.mood = 'sad';
+  else if (late) p.mood = 'worried';
+  else p.mood = 'happy';
+
+  if (p.health <= 0) { p.health = 0; fail(); return; }
+  if (p.stage >= 5 && nestedCount() >= cfg.birds) win();
+}
+
+function nextStage() {
+  const p = plant;
+  p.stage++;
+  p.growth = 0;
+  p.pop = 1;
+  p.joyT = 1.6;
+  crowdReact('wow', 1.8);
+  sfx.grow(p.stage / 5);
+  const q = plantTopP();
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, TAU), sp = rand(40, 160);
+    spawn(q.x, q.y + 30, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.7, 1.4), ['#fff3a0', '#b6f07a', '#ffffff', '#ffd966'][i % 4], rand(2, 4.5), 40);
+  }
+  const lines = ['', 'Look! A little sprout!', 'It’s a bushy plant now!', 'It’s becoming a tree!', 'Tap a glowing bud to grow a branch!', 'A great tree! Now invite the birds'];
+  showMessage(lines[p.stage]);
+  if (p.stage === 4) { p.credits = 1; say(verseText('branches'), 3.2); }
+  if (p.stage === 5) {
+    spots.push({ br: null, f: 1, size: 'M', bird: null });
+    say(verseText('lodge'), 4);
+    birdTimer = 1.2;
+    setTimeout(() => {
+      if (state === 'play' && nestedCount() === 0) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap a bird, then a nest spot' : 'Click a bird, then a nest spot');
+    }, 4200);
+  }
+}
+
+function updateBirds(dt) {
+  for (let i = birds.length - 1; i >= 0; i--) {
+    const b = birds[i];
+    b.flap += dt * (b.state === 'nest' ? 0 : 14);
+    if (b.state === 'arrive' || b.state === 'wait') {
+      b.x += (b.tx - b.x) * Math.min(1, dt * 2.2);
+      b.y += (b.ty + (b.state === 'wait' ? Math.sin(t * 2 + b.slot) * 6 : 0) - b.y) * Math.min(1, dt * 2.2);
+      if (b.state === 'arrive' && Math.hypot(b.tx - b.x, b.ty - b.y) < 8) b.state = 'wait';
+      if (cfg.patience && b.state === 'wait') {
+        b.patience -= dt;
+        if (b.patience <= 0) birdFlyAway(b, `The ${b.kind.name} flew on… more will come!`);
+      }
+    } else if (b.state === 'fly') {
+      const s = spotWorld(b.spot);
+      const dx = s.x - b.x, dy = s.y - b.y;
+      b.facing = dx >= 0 ? 1 : -1;
+      const d = Math.hypot(dx, dy);
+      const step = Math.min(d, (260 / cam.z) * dt + d * dt * 2);
+      if (d < 4) {
+        b.state = 'nest'; b.nestT = 0;
+        sfx.chirp(b.size);
+        crowdReact('joy', 1.4);
+        plant.joyT = 1.2;
+        const q = birdP(b);
+        for (let k = 0; k < 14; k++) spawn(q.x, q.y, rand(-70, 70), rand(-90, 10), rand(0.5, 1), ['#ffd1e8', '#fff3a0', '#ffffff'][k % 3], rand(2, 3.5));
+        showMessage(pickLine(['Tweet tweet! A cosy nest!', 'A happy new home!', 'Chirp! Welcome, little bird!']));
+      } else { b.x += dx / d * step; b.y += dy / d * step; }
+    } else if (b.state === 'nest') {
+      b.nestT += dt;
+      b.hop += dt * (b.nestT < 1.5 ? 6 : 1.2);
+      if (b.nestT > 1.6 && !b.chicks) { b.chicks = b.size === 'S' ? 2 : 3; sfx.chirp('S'); }
+    } else if (b.state === 'leave') {
+      b.x += b.facing * (320 / cam.z) * dt;
+      b.y -= (120 / cam.z) * dt;
+      if (Math.abs(wp(b.x, b.y).x - W / 2) > W / 2 + 120) birds.splice(i, 1);
+    }
+  }
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  const bal = balanceInfo();
+  const nested = nestedCount();
+  const speed = Math.max(0, Math.round((cfg.par - playTime) * 10));
+  const healthPts = Math.round((healthN ? healthSum / healthN : 100) * 8);
+  const birdPts = nested * 150;
+  const balancePts = Math.round((1 - bal.imbalance) * 500);
+  const levelBonus = level * 500;
+  const score = speed + healthPts + birdPts + balancePts + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('mustardBest', best); } catch (e) {} }
+  lastScore = { speed, healthPts, birdPts, balancePts, levelBonus, score, nested };
+  needs.length = 0; cloud.target = 0;
+  for (const pe of pests) if (pe.phase !== 'flick') flick(pe);
+  for (const w of weeds) pullWeed(w);
+  for (const b of birds) if (b.state !== 'nest') birdFlyAway(b);
+  selBird = null;
+  plant.joyT = 99; plant.mood = 'joy'; plant.droop = 0;
+  message.t = 0;
+  bubble = null;
+  setTimeout(() => { if (state === 'win') showMessage('Hallelujah! A great tree!'); }, 700);
+  sfx.win();
+  endTimer = 3.4;
+}
+
+function fail() {
+  state = 'fail';
+  plant.mood = 'sad';
+  plant.droop = Math.max(plant.droop, 0.6);
+  selBird = null;
+  bubble = null;
+  showMessage('Oh… the plant has wilted');
+  sfx.fail();
+  endTimer = 2;
+}
+
+function showMessage(text) { message = { text, t: 2.6 }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+// btn2 / action2 add an optional second, smaller button
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetLevelState() {
+  cfg = makeConfig(level);
+  plant = newPlant();
+  needs = []; weeds = []; pests = []; birds = []; branches = []; spots = [];
+  particles = []; ripples.length = 0; tools = [];
+  needTimer = level === 1 ? 3.5 : 2.5;
+  weedTimer = level === 1 ? 7 : 4;
+  pestTimer = level === 1 ? 14 : 7;
+  birdTimer = 1;
+  cloud.cover = 0; cloud.target = 0;
+  gust = 0; gustTarget = 0; gustTimer = 0;
+  crowdEvent = { mood: 'watch', t: 0 };
+  playTime = 0; healthSum = 0; healthN = 0;
+  windKnockCd = 0; windHinted = false;
+  selBird = null; kbCursor = 0; kbShow = false;
+  bubble = null; flashT = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevelState();
+  const c = camTarget(); cam.x = c.x; cam.z = c.z; cam.baseY = c.baseY;
+  showOverlay('The Mustard Seed', 'The smallest seed',
+    `${verseHTML('kingdom')}
+     <ul>
+       <li>Jesus holds up the <b>tiniest seed</b>. Help it grow into a <b>great tree</b> where the birds can nest!</li>
+       <li><b>Tap the bubbles</b> above the plant: water, sunshine (tap the cloud away) and compost.</li>
+       <li><b>Tap weeds</b> to pull them, and <b>tap caterpillars and snails</b> to flick them off.</li>
+       <li>When the tree is big, <b>tap glowing buds</b> to choose where branches grow &mdash; keep it balanced!</li>
+       <li>Then <b>tap a bird</b>, and <b>tap a nest spot</b> of the right size.</li>
+       <li><b>Keyboard:</b> <kbd>1</kbd> water, <kbd>2</kbd> sun, <kbd>3</kbd> weed/pest, <kbd>4</kbd> compost, <kbd>&larr;</kbd><kbd>&rarr;</kbd> + <kbd>Space</kbd> for buds and birds.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Plant the seed', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  resetLevelState();
+  state = 'intro';
+  introT = 0;
+  introDur = level === 1 ? 4.6 : 3.4;
+  const c = camTarget(); cam.x = c.x; cam.z = c.z; cam.baseY = c.baseY;
+  hideOverlay();
+  const key = level === 1 ? 'least' : ['least', 'liken', 'resemble'][(level - 1) % 3];
+  say(verseText(key), introDur);
+  showMessage(`Level ${level}: ${cfg.name}`);
+  sfx.levelStart();
+}
+
+function beginPlay() {
+  state = 'play';
+  if (bubble && bubble.t > 0.5) bubble.t = 0.5;
+  // The seed drops into the soil
+  const q = wp(0, 0);
+  for (let i = 0; i < 12; i++) spawn(q.x + rand(-20, 20), q.y, rand(-50, 50), rand(-90, -30), 0.7, '#8a5a33', rand(2, 4), 300);
+  if (level === 1) showMessage(matchMedia('(pointer: coarse)').matches ? 'Tap the bubbles to help it grow!' : 'Click the bubbles (or press 1, 2, 3, 4)');
+  else if (cfg.dry) showMessage('A dry spell! Keep the water coming');
+  else if (cfg.wind) showMessage('A windy day! Balance your branches');
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Hallelujah!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('greatest')}
+       <p style="text-align:center">God's kingdom starts tiny, like a seed, but it grows and grows until there is room for everyone &mdash; like birds finding a home in the branches.</p>
+       <p class="score">Growing speed: <b>${s.speed}</b><br>Health kept: <b>${s.healthPts}</b><br>Birds nested (${s.nested}): <b>${s.birdPts}</b><br>Balance bonus: <b>${s.balancePts}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Plant another seed', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh… no', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The little plant wilted. Keep an eye on its bubbles, pull the weeds and flick off the bugs. Let's plant it again!</p>
+       ${verseHTML('grew')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'intro') {
+    pausedFrom = state;
+    state = 'pause';
+    sfx.thrust(0);
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', startLevel);
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+const ripples = [];
+
+// Everything you can tap, nearest the finger first
+function tapAt(x, y) {
+  const E = es();
+  // Sunshine: the cloud over the sun (HUD space, converted to playfield)
+  if (cloud.cover > 0.4) {
+    const c = cloudPos();
+    if (Math.hypot(x - c.x, y - c.y) < 70) { meetNeed('sun'); return; }
+  }
+  // Need bubbles
+  for (const b of bubbleLayout()) {
+    if (Math.hypot(x - b.x, y - b.y) < 36) { meetNeed(b.nd.type); return; }
+  }
+  // Pests
+  let bestPe = null, bd = 44 * E;
+  for (const pe of pests) {
+    if (pe.phase === 'flick') continue;
+    const p = pestP(pe);
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d < bd) { bd = d; bestPe = pe; }
+  }
+  if (bestPe) { flick(bestPe); return; }
+  // Weeds
+  for (const w of weeds) {
+    if (w.pull) continue;
+    const p = wp(w.x, 0);
+    if (Math.hypot(x - p.x, y - (p.y - 16 * E)) < 36 * E) { pullWeed(w); return; }
+  }
+  // Birds
+  if (plant.stage >= 5) {
+    for (const b of birds) {
+      if (b.state !== 'wait' && b.state !== 'arrive') continue;
+      const p = birdP(b);
+      if (Math.hypot(x - p.x, y - p.y) < BIRD_R[b.size] * E + 24) {
+        selBird = selBird === b ? null : b;
+        if (selBird) sfx.chirp(b.size);
+        return;
+      }
+    }
+    let bs = null, sd = 40 * E;
+    for (const s of spots) {
+      if (!spotReady(s) || s.bird) continue;
+      const w = spotWorld(s), p = wp(w.x, w.y);
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < sd) { sd = d; bs = s; }
+    }
+    if (bs) { trySpot(bs); return; }
+  }
+  // Buds
+  if (plant.stage === 4) {
+    for (const b of BUDS) {
+      if (budUsed(b)) continue;
+      const w = budPos(b), p = wp(w.x, w.y);
+      if (Math.hypot(x - p.x, y - p.y) < 30 * E) {
+        if (plant.credits > 0) addBranch(b);
+        else showMessage('Keep caring for the tree to grow a new bud');
+        return;
+      }
+    }
+  }
+}
+
+// Keyboard: arrows pick a bud / bird / nest spot, Space chooses it
+function kbTargets() {
+  if (state !== 'play') return [];
+  const list = [];
+  if (plant.stage === 4 && plant.credits > 0) {
+    for (const b of BUDS) {
+      if (budUsed(b)) continue;
+      const w = budPos(b), p = wp(w.x, w.y);
+      list.push({ x: p.x, y: p.y, r: 22, act: () => addBranch(b) });
+    }
+  }
+  if (plant.stage >= 5) {
+    if (selBird) {
+      for (const s of spots) {
+        if (!spotReady(s) || s.bird || s.size !== selBird.size) continue;
+        const w = spotWorld(s), p = wp(w.x, w.y);
+        list.push({ x: p.x, y: p.y, r: NEST_W[s.size] * es() * 0.6 + 6, act: () => trySpot(s) });
+      }
+    } else {
+      for (const b of birds) {
+        if (b.state !== 'wait') continue;
+        const p = birdP(b);
+        list.push({ x: p.x, y: p.y, r: BIRD_R[b.size] * es() + 10, act: () => { selBird = b; kbCursor = 0; sfx.chirp(b.size); } });
+      }
+    }
+  }
+  list.sort((a, b) => a.x - b.x || a.y - b.y);
+  return list;
+}
+
+function keyHelp(code) {
+  if (code === 'Digit1' || code === 'Numpad1') { meetNeed('water'); return true; }
+  if (code === 'Digit2' || code === 'Numpad2') { if (cloud.cover > 0.2 || needs.some((n) => n.type === 'sun')) meetNeed('sun'); return true; }
+  if (code === 'Digit4' || code === 'Numpad4') { meetNeed('soil'); return true; }
+  if (code === 'Digit3' || code === 'Numpad3') {
+    // The bug highest up is the most urgent; otherwise pull the biggest weed
+    const live = pests.filter((p) => p.phase !== 'flick');
+    if (live.length) {
+      live.sort((a, b) => (b.phase === 'ground' ? -1 : b.f) - (a.phase === 'ground' ? -1 : a.f));
+      flick(live[0]);
+    } else {
+      const ws = weeds.filter((w) => !w.pull).sort((a, b) => b.grow - a.grow);
+      if (ws.length) pullWeed(ws[0]);
+    }
+    return true;
+  }
+  return false;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'intro' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { beginPlay(); return; }
+  if (state !== 'play') return;
+  if (keyHelp(e.code)) return;
+  const list = kbTargets();
+  if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(e.code)) {
+    kbShow = true;
+    if (list.length) {
+      const dir = e.code === 'ArrowLeft' || e.code === 'ArrowUp' ? -1 : 1;
+      kbCursor = (clamp(kbCursor, 0, list.length - 1) + dir + list.length) % list.length;
+    }
+    return;
+  }
+  if (e.code === 'Space' && !e.repeat) {
+    if (list.length) { kbShow = true; list[clamp(kbCursor, 0, list.length - 1)].act(); }
+    else if (selBird) selBird = null;
+    return;
+  }
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toPlayfield(e) {
+  return { x: e.clientX * dpr / scale - offX, y: e.clientY * dpr / scale - offY, vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toPlayfield(e);
+  // HUD buttons
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'intro') { beginPlay(); return; }
+  if (state !== 'play') return;
+  kbShow = false;
+  ripples.push({ x: p.x, y: p.y, t: 0 });
+  tapAt(p.x, p.y);
+});
+// iOS only unlocks audio on some gestures, so try again when the finger lifts
+canvas.addEventListener('pointerup', () => sfx.init());
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+// ============================================================
+//  Heavenly music: a synthesised "Hal-le-lu-jah" choir
+//  (motif after Handel's Messiah, 1741, public domain)
+// ============================================================
+const VOWELS = {             // formant frequencies for each sung vowel
+  a: [800, 1150, 2900],      // "Hal", "jah"
+  e: [500, 1750, 2600],      // "le"
+  u: [350, 700, 2500],       // "lu"
+  o: [450, 800, 2830],       // "oh"
+};
+const NOTE_OFFSETS = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+  const semis = NOTE_OFFSETS[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (m[3] - 4) * 12;
+  return 440 * Math.pow(2, semis / 12);
+}
+
+// Scores: [vowel, beats, soprano, alto, tenor, bass]; a null vowel is a rest
+const SCORE_WIN = [
+  ['a', 1, 'A4', 'F#4', 'D4', 'D3'], ['e', 0.75, 'A4', 'F#4', 'D4', 'D3'],
+  ['u', 0.25, 'B4', 'G4', 'D4', 'D3'], ['a', 1, 'A4', 'F#4', 'D4', 'D3'], [null, 0.5],
+  ['a', 1, 'E5', 'C#5', 'E4', 'A2'], ['e', 0.75, 'E5', 'C#5', 'E4', 'A2'],
+  ['u', 0.25, 'F#5', 'D5', 'F#4', 'A2'], ['a', 1, 'E5', 'C#5', 'E4', 'A2'], [null, 0.5],
+  ['a', 1.25, 'D5', 'B4', 'G4', 'G2'], ['e', 0.5, 'D5', 'B4', 'G4', 'G2'],
+  ['u', 0.75, 'C#5', 'A4', 'E4', 'A2'], ['a', 3, 'D5', 'A4', 'F#4', 'D3'],
+];
+const SCORE_START = [['a', 3, 'D5', 'A4', 'F#4', 'D3']];
+const SCORE_FAIL = [['o', 1.2, 'F#4', 'D4', 'A3', 'D3'], ['o', 2.4, 'D4', 'B3', 'F#3', 'B2']];
+const TAP_SCALE = ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5', 'A5'];
+
+// One choir part sung legato: a few detuned voices through vowel formant filters
+function singPart(ac, out, t0, beat, score, part, vol, opts = {}) {
+  const total = score.reduce((s, n) => s + n[1], 0) * beat;
+  const end = t0 + total;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.connect(out);
+  const formants = [0, 1, 2].map((k) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = [6, 9, 12][k];
+    const g = ac.createGain(); g.gain.value = [1, 0.55, 0.25][k] * 3;
+    bp.connect(g); g.connect(env);
+    return bp;
+  });
+  const voices = [];
+  for (let v = 0; v < 3; v++) {
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lfo = ac.createOscillator(), depth = ac.createGain();
+    lfo.frequency.value = 4.8 + Math.random() * 1.2; depth.gain.value = 14;
+    lfo.connect(depth); depth.connect(o.detune);
+    o.detune.value = (v - 1) * 9;
+    formants.forEach((f) => o.connect(f));
+    o.start(t0); o.stop(end + 0.6); lfo.start(t0); lfo.stop(end + 0.6);
+    voices.push(o);
+  }
+  let t = t0, first = true;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (!vowel) {
+      env.gain.setTargetAtTime(0.0001, t, 0.04);
+      first = true; t += d; continue;
+    }
+    const f = noteFreq(notes[part]);
+    voices.forEach((o) => (first ? o.frequency.setValueAtTime(f, t) : o.frequency.setTargetAtTime(f, t, 0.02)));
+    VOWELS[vowel].forEach((ff, k) => (first ? formants[k].frequency.setValueAtTime(ff, t) : formants[k].frequency.setTargetAtTime(ff, t, 0.03)));
+    // consonant: a quick dip in volume at the start of each syllable
+    env.gain.setTargetAtTime(vol * 0.35, t, 0.012);
+    env.gain.setTargetAtTime(vol, t + 0.035, first ? 0.05 : 0.025);
+    first = false;
+    t += d;
+  }
+  if (opts.swell) env.gain.setTargetAtTime(vol * 1.5, end - score[score.length - 1][1] * beat * 0.8, 0.4);
+  if (opts.droop) voices.forEach((o) => o.frequency.setTargetAtTime(noteFreq(score[score.length - 1][2 + part]) * 0.93, end - 0.8, 0.35));
+  env.gain.setTargetAtTime(0.0001, end, 0.18);
+}
+
+// Pipe organ: stacked sine pipes (8', 4', 2 2/3', 2')
+function organ(ac, out, t0, beat, score, vol) {
+  let t = t0;
+  for (const [vowel, beats, ...notes] of score) {
+    const d = beats * beat;
+    if (vowel) {
+      for (const n of notes) {
+        const f = noteFreq(n);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.03);
+        g.gain.setValueAtTime(vol, t + d - 0.04);
+        g.gain.linearRampToValueAtTime(0.0001, t + d + 0.08);
+        g.connect(out);
+        [[1, 1], [2, 0.5], [3, 0.25], [4, 0.2]].forEach(([h, a]) => {
+          const o = ac.createOscillator(), og = ac.createGain();
+          o.frequency.value = f * h; og.gain.value = a;
+          o.connect(og); og.connect(g);
+          o.start(t); o.stop(t + d + 0.1);
+        });
+      }
+    }
+    t += d;
+  }
+}
+
+// Plays one piece ('win' | 'start' | 'fail'): the choir with a pipe organ beneath
+function playHeaven(ac, out, t0, piece) {
+  const score = { win: SCORE_WIN, start: SCORE_START, fail: SCORE_FAIL }[piece];
+  const beat = piece === 'win' ? 0.42 : piece === 'start' ? 0.45 : 0.5;
+  const opts = { swell: piece === 'win', droop: piece === 'fail' };
+  const vols = [0.2, 0.14, 0.13, 0.16];
+  for (let part = 0; part < 4; part++) singPart(ac, out, t0, beat, score, part, vols[part], opts);
+  organ(ac, out, t0, beat, score, 0.045);
+}
+
+// A single sung note for each tap, pitched higher the higher Jesus is
+function playTapNote(ac, out, t0, height) {
+  const n = TAP_SCALE[Math.round(clamp(height, 0, 1) * (TAP_SCALE.length - 1))];
+  singPart(ac, out, t0, 0.22, [['a', 1, n, n, n, n]], 0, 0.12);
+  organ(ac, out, t0, 0.2, [['a', 1, n]], 0.03);
+}
+
+const sfx = {
+  ctx: null, master: null, thrustGain: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();   // keeps the full choir from clipping
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      src.connect(bp); bp.connect(this.thrustGain); this.thrustGain.connect(this.master);
+      src.start();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  },
+  thrust(level) {
+    if (!this.thrustGain) return;
+    this.thrustGain.gain.setTargetAtTime(level * 0.22, this.ctx.currentTime, 0.06);
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'win'); },
+  levelStart() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'start'); },
+  tap(height) {
+    if (!this.ctx) return;
+    this.puff(0.15);
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, height);
+  },
+  puff(vol = 0.35) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  bounce() { this.tone(220, 0.18, 'sine', 0.35, 0, 110); },
+  fail() { if (this.ctx) playHeaven(this.ctx, this.master, this.ctx.currentTime + 0.05, 'fail'); },
+  thunder() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 1.3);
+  },
+};
+
+// Little garden sounds, made with the same tone()/noise helpers
+Object.assign(sfx, {
+  pip() { this.tone(880, 0.12, 'sine', 0.12); this.tone(1320, 0.1, 'sine', 0.08, 0.08); },
+  pop() { this.tone(260, 0.14, 'sine', 0.3, 0, 640); },
+  boing() { this.tone(640, 0.3, 'triangle', 0.22, 0, 170); this.tone(900, 0.12, 'sine', 0.08, 0.05, 1400); },
+  splash() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.35, t0 + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 1);
+    for (let i = 0; i < 4; i++) this.tone(rand(900, 1500), 0.06, 'sine', 0.06, 0.1 + i * 0.12, rand(500, 800));
+  },
+  chirp(size = 'S') {
+    const f = { S: 3000, M: 2300, L: 1500 }[size];
+    for (let i = 0; i < 3; i++) this.tone(f * (1 + i * 0.04), 0.07, 'sine', 0.11, i * 0.1, f * 1.35);
+  },
+  grow(h) {
+    if (!this.ctx) return;
+    playTapNote(this.ctx, this.master, this.ctx.currentTime + 0.01, h);
+    this.tone(1760, 0.3, 'sine', 0.06, 0.12);
+    this.tone(2640, 0.3, 'sine', 0.04, 0.2);
+  },
+});
+
+// ============================================================
+//  Rendering: sky, sun, hills and the garden
+// ============================================================
+function sunP() { return { x: viewW - 72 - offX, y: 150 - offY }; }
+function cloudPos() { const s = sunP(); return { x: s.x + (1 - cloud.cover) * 200, y: s.y + 8 }; }
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#d8e6f4', puffCount = 0) {
+  const n = puffCount || Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+const bgClouds = Array.from({ length: 5 }, () => ({ f: Math.random(), y: rand(-120, 260), w: rand(80, 150), speed: rand(4, 9) }));
+const streaks = Array.from({ length: 26 }, () => ({ f: Math.random(), y: rand(0, H - 200), len: rand(0.5, 1.2) }));
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, cam.baseY);
+  if (cfg.dry) { g.addColorStop(0, '#8cc6ec'); g.addColorStop(1, '#fbe7b8'); }
+  else { g.addColorStop(0, '#7fc0ec'); g.addColorStop(0.7, '#c4e6f8'); g.addColorStop(1, '#eef8fb'); }
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  for (const c of bgClouds) {
+    const x = -offX - 150 + c.f * (viewW + 300);
+    drawCloud(x, c.y, c.w, c.w * 0.3, 'rgba(255,255,255,0.85)', 'rgba(220,235,250,0.7)');
+  }
+}
+
+function drawSun() {
+  const s = sunP();
+  const R = cfg.dry ? 38 : 32;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  const g = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2.6);
+  g.addColorStop(0, 'rgba(255,236,150,0.6)'); g.addColorStop(1, 'rgba(255,236,150,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 2.6, 0, TAU); ctx.fill();
+  ctx.rotate(t * 0.3);
+  ctx.strokeStyle = '#ffc93a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * TAU;
+    ctx.moveTo(Math.cos(a) * (R + 7), Math.sin(a) * (R + 7));
+    ctx.lineTo(Math.cos(a) * (R + 16), Math.sin(a) * (R + 16));
+  }
+  ctx.stroke();
+  ctx.rotate(-t * 0.3);
+  ctx.fillStyle = '#ffd84a';
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+  // A sunny smile
+  ctx.fillStyle = '#b8741a';
+  ctx.beginPath(); ctx.arc(-9, -5, 2.6, 0, TAU); ctx.arc(9, -5, 2.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#b8741a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, 3, 9, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,130,90,0.4)';
+  ctx.beginPath(); ctx.arc(-16, 5, 4, 0, TAU); ctx.arc(16, 5, 4, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  // The sleepy grey cloud that hides the sun
+  if (cloud.cover > 0.02) {
+    const c = cloudPos();
+    const bob = Math.sin(t * 2) * 3;
+    ctx.globalAlpha = clamp(cloud.cover * 1.5, 0, 1);
+    drawCloud(c.x, c.y + bob, 130, 52, '#b9c2d3', '#8f99ad');
+    ctx.strokeStyle = '#4e5668'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(c.x - 14, c.y - 10 + bob, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.moveTo(c.x + 19, c.y - 10 + bob); ctx.arc(c.x + 14, c.y - 10 + bob, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+    ctx.fillStyle = '#4e5668';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y + 6 + bob, 4, 3 + Math.sin(t * 3) * 1, 0, 0, TAU); ctx.fill();
+    // "z" to show it's dozing
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('z', c.x + 50, c.y - 30 + bob - (t * 10) % 8);
+    ctx.globalAlpha = 1;
+    if (state === 'play' && needs.some((n) => n.type === 'sun')) {
+      ctx.fillStyle = '#5a4210'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('tap me!', c.x, c.y + 44 + bob);
+    }
+  }
+}
+
+function drawHills() {
+  const x0 = -offX - 10, x1 = W + offX + 10, by = cam.baseY;
+  const par = cam.x * cam.z * 0.15;
+  ctx.fillStyle = cfg.dry ? '#d6d49a' : '#b7dba0';
+  ctx.beginPath(); ctx.moveTo(x0, by + 5);
+  for (let x = x0; x <= x1; x += 16) ctx.lineTo(x, by - 70 + Math.sin((x + par) / 110) * 22 + Math.sin((x + par) / 43) * 7);
+  ctx.lineTo(x1, by + 5); ctx.fill();
+  // distant olive trees on the far hills
+  for (let k = 0; k < 9; k++) {
+    const x = ((k * 173 - par * 1.4) % (viewW + 100) + viewW + 100) % (viewW + 100) - offX - 50;
+    const y = by - 66 + Math.sin((x + par) / 110) * 22 + Math.sin((x + par) / 43) * 7;
+    ctx.fillStyle = '#7a9a5e';
+    ctx.beginPath(); ctx.arc(x, y - 8, 8, 0, TAU); ctx.arc(x + 7, y - 5, 6, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = cfg.dry ? '#c6c983' : '#9fcd7d';
+  ctx.beginPath(); ctx.moveTo(x0, by + 5);
+  for (let x = x0; x <= x1; x += 16) ctx.lineTo(x, by - 32 + Math.sin((x + par * 2) / 70) * 10);
+  ctx.lineTo(x1, by + 5); ctx.fill();
+}
+
+const FLOWERS = [-620, -540, -455, -170, 175, 440, 520, 640].map((x, i) => ({ x, y: 30 + (i % 3) * 14, c: ['#ff8fb1', '#ffd23f', '#b18cff', '#ff9f5a'][i % 4] }));
+
+function drawGround() {
+  const xa = pw(-offX - 20, 0).x, xb = pw(W + offX + 20, 0).x;
+  const yb = (H + offY + 20 - cam.baseY) / cam.z + 20;
+  const grass = cfg.dry ? '#b8c46a' : '#86c35a';
+  const g = ctx.createLinearGradient(0, 0, 0, 200);
+  g.addColorStop(0, grass); g.addColorStop(1, cfg.dry ? '#9aa850' : '#6aa844');
+  ctx.fillStyle = g;
+  ctx.fillRect(xa, 0, xb - xa, yb);
+  ctx.strokeStyle = cfg.dry ? '#98a650' : '#6aa844'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(xa, 1); ctx.lineTo(xb, 1); ctx.stroke();
+
+  // The garden bed
+  const soil = mix('#c2a57a', '#6a4424', plant.soil * 0.7 + plant.wet * 0.3);
+  ctx.fillStyle = soil;
+  ctx.beginPath(); ctx.ellipse(0, 6, 180, 16, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = shade(cfg.dry ? '#a08a60' : '#5a3a1e', -10); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(0, 6, 180, 16, 0, 0, TAU); ctx.stroke();
+  // pebbles and dry cracks
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (const [x, y] of [[-140, 8], [-95, 14], [-40, 2], [62, 12], [118, 5], [150, 12]]) {
+    ctx.beginPath(); ctx.ellipse(x, y, 4, 2.5, 0, 0, TAU); ctx.fill();
+  }
+  if (cfg.dry && plant.wet < 0.4) {
+    ctx.strokeStyle = 'rgba(90,60,30,0.5)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (const x of [-120, -60, 40, 100]) { ctx.moveTo(x, 2); ctx.lineTo(x + 6, 8); ctx.lineTo(x + 2, 14); ctx.moveTo(x + 6, 8); ctx.lineTo(x + 13, 10); }
+    ctx.stroke();
+  }
+
+  // Flowers in the grass
+  const sway = cfg.wind ? gust * 3 : 0;
+  for (const f of FLOWERS) {
+    ctx.strokeStyle = '#4f8f32'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.quadraticCurveTo(f.x, f.y - 8, f.x + sway, f.y - 16); ctx.stroke();
+    ctx.fillStyle = f.c;
+    for (let k = 0; k < 5; k++) {
+      const a = k / 5 * TAU;
+      ctx.beginPath(); ctx.arc(f.x + sway + Math.cos(a) * 4, f.y - 16 + Math.sin(a) * 4, 3.2, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#ffe98a'; ctx.beginPath(); ctx.arc(f.x + sway, f.y - 16, 2.6, 0, TAU); ctx.fill();
+  }
+}
+
+// ============================================================
+//  The mustard plant (world coordinates)
+// ============================================================
+function leafColours() {
+  const d = plant.droop;
+  return {
+    dark: mix('#4a9a2c', '#8c8a3c', d),
+    mid: mix('#6cc03f', '#aaa24c', d),
+    light: mix('#a3e36a', '#cfc47a', d),
+  };
+}
+
+function drawLeaf(x, y, len, ang, col) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(ang);
+  ctx.fillStyle = col.mid; ctx.strokeStyle = col.dark; ctx.lineWidth = Math.max(0.8, len * 0.06);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(len * 0.5, -len * 0.38, len, 0);
+  ctx.quadraticCurveTo(len * 0.5, len * 0.38, 0, 0);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len * 0.85, 0); ctx.stroke();
+  ctx.restore();
+}
+
+const CLUMP = [[0, 0, 1], [-0.62, 0.22, 0.72], [0.62, 0.22, 0.72], [-0.32, -0.42, 0.7], [0.36, -0.4, 0.66]];
+function drawClump(x, y, r, seed, col, flowers) {
+  if (r < 1) return;
+  ctx.fillStyle = col.dark;
+  ctx.beginPath();
+  for (const [dx, dy, rr] of CLUMP) { const cx = x + dx * r, cy = y + dy * r + r * 0.18; ctx.moveTo(cx + rr * r, cy); ctx.arc(cx, cy, rr * r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = col.mid;
+  ctx.beginPath();
+  for (const [dx, dy, rr] of CLUMP) { const cx = x + dx * r, cy = y + dy * r; ctx.moveTo(cx + rr * r, cy); ctx.arc(cx, cy, rr * r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = col.light;
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  for (const [dx, dy, rr] of CLUMP) {
+    const cx = x + dx * r - rr * r * 0.25, cy = y + dy * r - rr * r * 0.3;
+    ctx.moveTo(cx + rr * r * 0.42, cy); ctx.arc(cx, cy, rr * r * 0.42, 0, TAU);
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // Little yellow mustard flowers
+  if (flowers && plant.droop < 0.6) {
+    const fr = Math.max(1.6, r * 0.075);
+    for (let k = 0; k < 5; k++) {
+      const a = seed * 2.3 + k * 1.9;
+      const d = r * (0.25 + 0.5 * ((Math.sin(seed * 7.1 + k * 3.3) + 1) / 2));
+      const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d * 0.8 - r * 0.1;
+      ctx.fillStyle = '#ffd93a';
+      ctx.beginPath();
+      for (let q = 0; q < 4; q++) { const b = q / 4 * TAU + 0.4; ctx.moveTo(fx + Math.cos(b) * fr + fr, fy + Math.sin(b) * fr); ctx.arc(fx + Math.cos(b) * fr, fy + Math.sin(b) * fr, fr, 0, TAU); }
+      ctx.fill();
+      ctx.fillStyle = '#f0a020'; ctx.beginPath(); ctx.arc(fx, fy, fr * 0.7, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+// The plant's cheerful cartoon face
+function drawPlantFace(x, y, r, mood) {
+  const dark = '#2b1d12';
+  const ex = r * 0.4, ey = y - r * 0.12;
+  const blink = plant.blink > 0 && mood !== 'joy' && mood !== 'ouch';
+  ctx.lineCap = 'round';
+  // cheeks
+  ctx.fillStyle = 'rgba(255,120,120,0.45)';
+  ctx.beginPath(); ctx.arc(x - r * 0.62, y + r * 0.22, r * 0.17, 0, TAU); ctx.arc(x + r * 0.62, y + r * 0.22, r * 0.17, 0, TAU); ctx.fill();
+  const eyes = (ry, look) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, r * 0.1);
+        ctx.beginPath(); ctx.moveTo(x + sx - r * 0.15, ey); ctx.lineTo(x + sx + r * 0.15, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(x + sx, ey, r * 0.21, r * ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(x + sx, ey + look * r * 0.06, r * 0.12, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(x + sx - r * 0.04, ey + look * r * 0.06 - r * 0.05, r * 0.04, 0, TAU); ctx.fill();
+    }
+  };
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = Math.max(1, r * 0.1);
+  switch (mood) {
+    case 'joy':
+      ctx.strokeStyle = dark;
+      ctx.beginPath();
+      ctx.arc(x - ex, ey + r * 0.08, r * 0.17, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(x + ex + r * 0.17 * Math.cos(Math.PI * 1.1), ey + r * 0.08 + r * 0.17 * Math.sin(Math.PI * 1.1));
+      ctx.arc(x + ex, ey + r * 0.08, r * 0.17, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      ctx.fillStyle = '#7a2e22';
+      ctx.beginPath(); ctx.moveTo(x - r * 0.3, y + r * 0.2); ctx.arc(x, y + r * 0.2, r * 0.3, 0, Math.PI); ctx.closePath(); ctx.fill();
+      break;
+    case 'worried':
+      eyes(0.26, -1);
+      ctx.strokeStyle = dark;
+      ctx.beginPath();
+      ctx.moveTo(x - ex - r * 0.2, ey - r * 0.3); ctx.lineTo(x - ex + r * 0.15, ey - r * 0.42);
+      ctx.moveTo(x + ex + r * 0.2, ey - r * 0.3); ctx.lineTo(x + ex - r * 0.15, ey - r * 0.42);
+      ctx.stroke();
+      ctx.strokeStyle = '#6a2a1e';
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.25, y + r * 0.35);
+      ctx.quadraticCurveTo(x - r * 0.12, y + r * 0.25, x, y + r * 0.35);
+      ctx.quadraticCurveTo(x + r * 0.12, y + r * 0.45, x + r * 0.25, y + r * 0.35);
+      ctx.stroke();
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(x + r * 0.85, y - r * 0.5); ctx.quadraticCurveTo(x + r * 1.05, y - r * 0.15, x + r * 0.85, y - r * 0.1);
+      ctx.quadraticCurveTo(x + r * 0.65, y - r * 0.15, x + r * 0.85, y - r * 0.5); ctx.fill();
+      break;
+    case 'sad':
+      eyes(0.18, 1);
+      ctx.beginPath(); ctx.arc(x, y + r * 0.55, r * 0.22, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+      break;
+    case 'ouch':
+      ctx.strokeStyle = dark;
+      ctx.beginPath();
+      ctx.moveTo(x - ex - r * 0.15, ey - r * 0.12); ctx.lineTo(x - ex + r * 0.12, ey); ctx.lineTo(x - ex - r * 0.15, ey + r * 0.12);
+      ctx.moveTo(x + ex + r * 0.15, ey - r * 0.12); ctx.lineTo(x + ex - r * 0.12, ey); ctx.lineTo(x + ex + r * 0.15, ey + r * 0.12);
+      ctx.stroke();
+      ctx.fillStyle = '#7a2e22';
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.35, r * 0.15, r * (0.12 + Math.abs(Math.sin(t * 8)) * 0.1), 0, 0, TAU); ctx.fill();
+      break;
+    default:
+      eyes(0.26, 0);
+      ctx.beginPath(); ctx.arc(x, y + r * 0.12, r * 0.28, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+
+function drawPlant() {
+  const p = plant;
+  const col = leafColours();
+  const mound = mix('#c2a57a', '#5e3b1e', p.soil * 0.7 + p.wet * 0.3);
+  const sq = 1 + p.pop * 0.1 * Math.sin(p.pop * 18);
+  ctx.save();
+  ctx.scale(2 - sq, sq);
+
+  if (p.stage === 0) {
+    // The tiny seed, peeking out of the soil
+    const g = clamp(p.growth / cfg.stagePts, 0, 1);
+    if (g > 0.3) {
+      const sh = (g - 0.3) * 22;
+      ctx.strokeStyle = col.mid; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(2, -9); ctx.quadraticCurveTo(5, -9 - sh * 0.6, 1, -9 - sh); ctx.stroke();
+      drawLeaf(1, -9 - sh, 4 + sh * 0.3, -0.5, col);
+    }
+    const sg = ctx.createLinearGradient(0, -14, 0, 2);
+    sg.addColorStop(0, '#e8bd6a'); sg.addColorStop(1, '#9a6a2a');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.ellipse(0, -4, 10, 8.5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#8a5a22'; ctx.lineWidth = 0.8; ctx.stroke();
+    drawPlantFace(0, -5, 7, p.mood);
+    ctx.fillStyle = mound;
+    ctx.beginPath(); ctx.ellipse(0, 4, 20, 5.5, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // Soil mound round the stem
+  ctx.fillStyle = mound;
+  ctx.beginPath(); ctx.ellipse(0, 2, 16 + Math.min(p.h, 300) * 0.1, 6 + Math.min(p.h, 300) * 0.015, 0, 0, TAU); ctx.fill();
+
+  const woody = p.stage >= 3;
+  const steps = 12;
+
+  // Bush: leafy side shoots behind the stem
+  if (p.stage === 2) {
+    for (let k = 0; k < 5; k++) {
+      const f0 = 0.28 + k * 0.13, side = k % 2 ? 1 : -1;
+      const o = trunkPt(f0);
+      const len = p.h * (0.42 - k * 0.05);
+      const a = (side > 0 ? -0.75 : Math.PI + 0.75) + p.droop * 0.6 * side + p.sway;
+      const ex = o.x + Math.cos(a) * len, ey = o.y + Math.sin(a) * len;
+      ctx.strokeStyle = col.dark; ctx.lineWidth = Math.max(2, trunkW(f0) * 0.45); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.quadraticCurveTo((o.x + ex) / 2, (o.y + ey) / 2 - len * 0.2, ex, ey); ctx.stroke();
+      drawClump(ex, ey, 9 + p.h * 0.075, k + 1, col, true);
+    }
+  }
+
+  // Branches (behind the trunk's leaves)
+  for (const br of branches) {
+    const g = branchGeom(br);
+    const w0 = trunkW(br.hf) * 0.6;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5e3a1a'; ctx.lineWidth = w0 + 3;
+    ctx.beginPath(); ctx.moveTo(g.o.x, g.o.y); ctx.quadraticCurveTo(g.ctrl.x, g.ctrl.y, g.end.x, g.end.y); ctx.stroke();
+    ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = w0;
+    ctx.beginPath(); ctx.moveTo(g.o.x, g.o.y); ctx.quadraticCurveTo(g.ctrl.x, g.ctrl.y, g.end.x, g.end.y); ctx.stroke();
+  }
+
+  // Trunk / stem
+  const L = [], R = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps, q = trunkPt(f), w = trunkW(f) / 2;
+    L.push([q.x - w, q.y]); R.push([q.x + w, q.y]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(L[0][0] - (woody ? 6 : 1), L[0][1] + 2);
+  for (const [x, y] of L) ctx.lineTo(x, y);
+  for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]);
+  ctx.lineTo(R[0][0] + (woody ? 6 : 1), R[0][1] + 2);
+  ctx.closePath();
+  const w0 = trunkW0();
+  const tg = ctx.createLinearGradient(-w0 / 2, 0, w0 / 2, 0);
+  if (woody) { tg.addColorStop(0, '#6e4520'); tg.addColorStop(0.45, '#a06a36'); tg.addColorStop(1, '#6e4520'); }
+  else { tg.addColorStop(0, col.dark); tg.addColorStop(0.45, col.light); tg.addColorStop(1, col.dark); }
+  ctx.fillStyle = tg; ctx.fill();
+  ctx.strokeStyle = woody ? '#5e3a1a' : col.dark; ctx.lineWidth = woody ? 2 : 1; ctx.stroke();
+  if (woody) {
+    // bark lines
+    ctx.strokeStyle = 'rgba(80,45,20,0.45)'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (const [f, dx] of [[0.1, -0.2], [0.35, 0.15], [0.5, -0.1], [0.65, 0.2]]) {
+      const q = trunkPt(f), w = trunkW(f);
+      ctx.moveTo(q.x + dx * w, q.y); ctx.quadraticCurveTo(q.x + dx * w + 3, q.y - 10, q.x + dx * w, q.y - 20);
+    }
+    ctx.stroke();
+  }
+
+  // Leaves
+  const top = trunkPt(1);
+  if (p.stage === 1) {
+    const len = 8 + p.h * 0.28;
+    const d = p.droop * 0.9;
+    drawLeaf(top.x, top.y, len, -Math.PI + 0.55 - d, col);
+    drawLeaf(top.x, top.y, len, -0.55 + d, col);
+    drawLeaf(top.x, top.y, len * 0.6, -Math.PI / 2 + p.droop * p.droopSide, col);
+  } else if (p.stage === 2) {
+    drawClump(top.x, top.y, 12 + p.h * 0.09, 9, col, true);
+  } else {
+    for (const br of branches) {
+      const g = branchGeom(br);
+      const m = bez(g, 0.55);
+      drawClump(m.x, m.y - 4, 24 * ease(br.grow), br.hf * 10, col, true);
+      drawClump(g.end.x, g.end.y - 4, 32 * ease(br.grow), br.hf * 13 + br.side, col, true);
+    }
+    const tr = topClumpR();
+    const s1 = trunkPt(0.84);
+    drawClump(s1.x - tr * 0.7, s1.y, tr * 0.65, 3, col, true);
+    drawClump(s1.x + tr * 0.7, s1.y, tr * 0.65, 5, col, true);
+    drawClump(top.x, top.y - tr * 0.3, tr, 7, col, true);
+  }
+
+  // The face
+  const ff = p.stage === 1 ? 0.42 : p.stage === 2 ? 0.34 : 0.22;
+  const fq = trunkPt(ff);
+  drawPlantFace(fq.x, fq.y, trunkW(ff) * (woody ? 0.5 : 0.62), p.mood);
+  ctx.restore();
+}
+
+// ============================================================
+//  Buds, nest spots, birds, weeds and bugs (screen sized)
+// ============================================================
+function drawBuds() {
+  if (plant.stage !== 4 || state !== 'play') return;
+  const E = es();
+  for (const b of BUDS) {
+    if (budUsed(b)) continue;
+    const w = budPos(b), p = wp(w.x, w.y);
+    if (plant.credits > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 5 + b.hf * 9);
+      const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 26 * E);
+      g.addColorStop(0, `rgba(255,250,170,${0.7 + pulse * 0.3})`);
+      g.addColorStop(1, 'rgba(255,250,170,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 26 * E, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#9be05e'; ctx.strokeStyle = '#4a9a2c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, (8 + pulse * 2) * E, (10 + pulse * 2) * E, b.side * 0.6, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff6a0';
+      ctx.beginPath(); ctx.arc(p.x - 2 * E, p.y - 3 * E, 3 * E, 0, TAU); ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(130,180,80,0.8)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 4.5 * E, 6 * E, b.side * 0.6, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawNest(x, y, w, part) {
+  // part 'back' is the inside of the bowl, 'front' is the woven rim
+  if (part === 'back') {
+    ctx.fillStyle = '#5e3c1e';
+    ctx.beginPath(); ctx.ellipse(x, y, w * 0.45, w * 0.14, 0, 0, TAU); ctx.fill();
+    return;
+  }
+  ctx.fillStyle = '#a0703c'; ctx.strokeStyle = '#6e4622'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.5, y);
+  ctx.quadraticCurveTo(x - w * 0.45, y + w * 0.38, x, y + w * 0.38);
+  ctx.quadraticCurveTo(x + w * 0.45, y + w * 0.38, x + w * 0.5, y);
+  ctx.quadraticCurveTo(x, y + w * 0.1, x - w * 0.5, y);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  for (let k = 0; k < 3; k++) {
+    const yy = y + w * (0.1 + k * 0.09);
+    ctx.moveTo(x - w * (0.45 - k * 0.07), yy); ctx.quadraticCurveTo(x, yy + w * 0.08, x + w * (0.45 - k * 0.07), yy);
+  }
+  ctx.moveTo(x - w * 0.5, y); ctx.lineTo(x - w * 0.62, y - w * 0.08);
+  ctx.moveTo(x + w * 0.5, y); ctx.lineTo(x + w * 0.64, y - w * 0.05);
+  ctx.stroke();
+}
+
+function drawSpots() {
+  if (plant.stage < 5) return;
+  const E = es();
+  for (const s of spots) {
+    if (!spotReady(s) || s.bird) continue;
+    const w = spotWorld(s), p = wp(w.x, w.y);
+    const r = NEST_W[s.size] * E * 0.55;
+    const fits = selBird && selBird.size === s.size;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+    if (fits) {
+      const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, r * 2);
+      g.addColorStop(0, 'rgba(255,240,150,0.9)'); g.addColorStop(1, 'rgba(255,240,150,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = selBird && !fits ? 0.35 : 1;
+    // a little twig platform shows where a nest can go
+    ctx.strokeStyle = '#6e4622'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(p.x - r * 0.8, p.y + 4); ctx.quadraticCurveTo(p.x, p.y + 9, p.x + r * 0.8, p.y + 4); ctx.stroke();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = fits ? '#e0a526' : 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = fits ? 3.5 : 2.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r + (fits ? pulse * 3 : 0), 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawBird(x, y, kind, r, flap, facing, sitting) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(facing, 1);
+  // tail
+  ctx.fillStyle = kind.wing;
+  ctx.beginPath(); ctx.moveTo(-r * 0.7, -r * 0.1); ctx.lineTo(-r * 1.45, -r * 0.45); ctx.lineTo(-r * 1.35, r * 0.2); ctx.closePath(); ctx.fill();
+  // body
+  ctx.fillStyle = kind.body; ctx.strokeStyle = shade(kind.wing, -20); ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.78, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = kind.belly;
+  ctx.beginPath(); ctx.ellipse(r * 0.2, r * 0.22, r * 0.62, r * 0.48, 0, 0, TAU); ctx.fill();
+  // head
+  const hx = r * 0.72, hy = -r * 0.58;
+  if (kind.crest) {
+    for (let k = 0; k < 3; k++) {
+      const a = -2.1 + k * 0.45;
+      ctx.strokeStyle = '#e59c5c'; ctx.lineWidth = r * 0.22; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(a) * r * 0.95, hy + Math.sin(a) * r * 0.95); ctx.stroke();
+      ctx.fillStyle = '#2e2e2e';
+      ctx.beginPath(); ctx.arc(hx + Math.cos(a) * r * 0.95, hy + Math.sin(a) * r * 0.95, r * 0.11, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.fillStyle = kind.body;
+  ctx.beginPath(); ctx.arc(hx, hy, r * 0.52, 0, TAU); ctx.fill(); ctx.stroke();
+  // beak
+  ctx.fillStyle = kind.beak;
+  ctx.beginPath(); ctx.moveTo(hx + r * 0.45, hy - r * 0.1); ctx.lineTo(hx + r * 0.9, hy + r * 0.04); ctx.lineTo(hx + r * 0.45, hy + r * 0.16); ctx.closePath(); ctx.fill();
+  // eye and cheek
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(hx + r * 0.16, hy - r * 0.08, r * 0.17, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1e140c';
+  ctx.beginPath(); ctx.arc(hx + r * 0.2, hy - r * 0.08, r * 0.1, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,120,140,0.5)';
+  ctx.beginPath(); ctx.arc(hx + r * 0.05, hy + r * 0.22, r * 0.11, 0, TAU); ctx.fill();
+  // wing
+  ctx.fillStyle = kind.wing;
+  ctx.save();
+  ctx.translate(-r * 0.1, -r * 0.2);
+  ctx.rotate(sitting ? 0.25 : -0.4 + Math.sin(flap) * 0.9);
+  ctx.beginPath(); ctx.ellipse(-r * 0.3, 0, r * 0.7, r * 0.34, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawBirds() {
+  const E = es();
+  for (const b of birds) {
+    const r = BIRD_R[b.size] * E;
+    const p = birdP(b);
+    if (b.state === 'nest') {
+      const sw = spotWorld(b.spot), sp = wp(sw.x, sw.y);
+      const nw = NEST_W[b.size] * E * 1.15;
+      drawNest(sp.x, sp.y, nw, 'back');
+      drawBird(sp.x, p.y - r * 0.1, b.kind, r, 0, b.spot.br ? -b.spot.br.side : 1, true);
+      if (b.chicks) {
+        for (let k = 0; k < b.chicks; k++) {
+          const cx = sp.x + (k - (b.chicks - 1) / 2) * nw * 0.3;
+          const cy = sp.y - Math.abs(Math.sin(t * 5 + k * 1.7)) * 3 * E;
+          ctx.fillStyle = '#ffe066'; ctx.strokeStyle = '#d9a41c'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(cx, cy, 4.2 * E, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#f08a30';
+          const open = Math.sin(t * 8 + k) > 0 ? 2 : 0.6;
+          ctx.beginPath(); ctx.moveTo(cx - 2 * E, cy - 1 * E); ctx.lineTo(cx, cy - (4 + open) * E); ctx.lineTo(cx + 2 * E, cy - 1 * E); ctx.fill();
+          ctx.fillStyle = '#1e140c';
+          ctx.beginPath(); ctx.arc(cx - 1.6 * E, cy - 1.2 * E, 0.9 * E, 0, TAU); ctx.arc(cx + 1.6 * E, cy - 1.2 * E, 0.9 * E, 0, TAU); ctx.fill();
+        }
+      }
+      drawNest(sp.x, sp.y, nw, 'front');
+      continue;
+    }
+    if (b === selBird) {
+      const g = ctx.createRadialGradient(p.x, p.y, r * 0.5, p.x, p.y, r * 2.2);
+      g.addColorStop(0, 'rgba(255,240,150,0.9)'); g.addColorStop(1, 'rgba(255,240,150,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.2, 0, TAU); ctx.fill();
+    }
+    const hop = b === selBird ? Math.abs(Math.sin(t * 8)) * 4 : 0;
+    drawBird(p.x, p.y - hop, b.kind, r, b.flap, b.state === 'wait' ? (b.slot === 0 ? 1 : -1) : b.facing, false);
+    if (b.state === 'wait') {
+      // size tag, and (on later levels) how long it will wait
+      ctx.font = `700 ${Math.round(11 * E)}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      const label = b.kind.name;
+      const tw = ctx.measureText(label).width + 10;
+      roundRect(p.x - tw / 2, p.y + r + 6, tw, 16 * E, 8 * E); ctx.fill();
+      ctx.fillStyle = '#5a4210';
+      ctx.fillText(label, p.x, p.y + r + 6 + 12 * E);
+      if (cfg.patience) {
+        const f = clamp(b.patience / cfg.patience, 0, 1);
+        ctx.strokeStyle = f > 0.5 ? '#40c057' : f > 0.25 ? '#fab005' : '#fa5252';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.55, -Math.PI / 2, -Math.PI / 2 + f * TAU); ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawWeeds() {
+  const E = es();
+  for (const w of weeds) {
+    const p = wp(w.x, 0);
+    const s = E * (0.35 + 0.65 * w.grow) * (w.pull ? 1 - w.pull * 0.5 : 1);
+    const lift = w.pull ? w.pull * 60 : 0;
+    ctx.save();
+    ctx.translate(p.x, p.y + 2 - lift);
+    if (w.pull) ctx.rotate(w.pull * 1.5);
+    ctx.globalAlpha = w.pull ? 1 - w.pull : 1;
+    ctx.scale(s, s);
+    const wob = Math.sin(t * 2 + w.phase) * 0.08;
+    ctx.fillStyle = '#3f7f2a'; ctx.strokeStyle = '#2c5e1c'; ctx.lineWidth = 1.5;
+    for (let k = -2; k <= 2; k++) {
+      ctx.save();
+      ctx.rotate(k * 0.42 + wob);
+      ctx.beginPath();
+      ctx.moveTo(-3, 0);
+      ctx.lineTo(-6, -10); ctx.lineTo(-2, -12); ctx.lineTo(-5, -22); ctx.lineTo(0, -32 + Math.abs(k) * 5);
+      ctx.lineTo(5, -22); ctx.lineTo(2, -12); ctx.lineTo(6, -10); ctx.lineTo(3, 0);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    if (w.grow >= 1) {
+      ctx.strokeStyle = '#2c5e1c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(wob * 30, -40); ctx.stroke();
+      ctx.fillStyle = '#9b59b6';
+      ctx.beginPath(); ctx.arc(wob * 30, -44, 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#c38fe0'; ctx.beginPath(); ctx.arc(wob * 30 - 1.5, -46, 2.5, 0, TAU); ctx.fill();
+    }
+    // a cheeky little face
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-3.5, -9, 2.6, 0, TAU); ctx.arc(3.5, -9, 2.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1e140c';
+    ctx.beginPath(); ctx.arc(-3, -8.5, 1.3, 0, TAU); ctx.arc(4, -8.5, 1.3, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#1e140c'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-6, -13); ctx.lineTo(-1.5, -11.5); ctx.moveTo(6, -13); ctx.lineTo(1.5, -11.5); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPests() {
+  const E = es();
+  for (const pe of pests) {
+    const q = pestP(pe);
+    let fx = 1, fy = 1;
+    if (pe.phase === 'ground') fx = pe.side > 0 ? -1 : 1;
+    else if (pe.phase !== 'flick') fy = pe.side > 0 ? -1 : 1;
+    ctx.save();
+    ctx.translate(q.x, q.y);
+    ctx.rotate(q.rot);
+    ctx.scale(fx * E, fy * E);
+    if (pe.type === 'cat') drawCaterpillar(pe);
+    else drawSnail(pe);
+    ctx.restore();
+  }
+}
+
+function drawCaterpillar(pe) {
+  const eat = pe.phase === 'eat';
+  for (let k = 0; k < 5; k++) {
+    const cx = -22 + k * 9, cy = -7 - Math.abs(Math.sin(pe.wig + k * 0.9)) * 3;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath(); ctx.arc(cx, 0, 1.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = k % 2 ? '#5cbf3a' : '#7ed957';
+    ctx.strokeStyle = '#3e8a26'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, k === 4 ? 8.5 : 7, 0, TAU); ctx.fill(); ctx.stroke();
+    if (k < 4) { ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(cx, cy - 3, 1.6, 0, TAU); ctx.fill(); }
+  }
+  const hx = 14, hy = -7 - Math.abs(Math.sin(pe.wig + 3.6)) * 3;
+  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(hx - 2, hy - 7); ctx.lineTo(hx - 5, hy - 14); ctx.moveTo(hx + 2, hy - 7); ctx.lineTo(hx + 4, hy - 14); ctx.stroke();
+  ctx.fillStyle = '#ff6b8a';
+  ctx.beginPath(); ctx.arc(hx - 5, hy - 14, 2, 0, TAU); ctx.arc(hx + 4, hy - 14, 2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(hx - 1, hy - 2, 2.6, 0, TAU); ctx.arc(hx + 4, hy - 2, 2.6, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1e140c';
+  ctx.beginPath(); ctx.arc(hx, hy - 2, 1.3, 0, TAU); ctx.arc(hx + 5, hy - 2, 1.3, 0, TAU); ctx.fill();
+  if (eat) { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(hx + 3, hy + 4, 2, 1 + Math.abs(Math.sin(pe.wig)) * 2, 0, 0, TAU); ctx.fill(); }
+  else { ctx.strokeStyle = '#1e140c'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.arc(hx + 2, hy + 2, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+}
+
+function drawSnail(pe) {
+  const st = Math.sin(pe.wig) * 1.5;
+  ctx.fillStyle = '#d8c3a0'; ctx.strokeStyle = '#a88f68'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-20, 0); ctx.quadraticCurveTo(-4, -2 - st * 0.3, 16, -2);
+  ctx.quadraticCurveTo(24, -4, 22, -12); ctx.quadraticCurveTo(18, -16, 14, -10);
+  ctx.lineTo(-18, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // eye stalks
+  ctx.strokeStyle = '#a88f68'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(18, -12); ctx.lineTo(16 + st, -24); ctx.moveTo(21, -12); ctx.lineTo(24 + st, -23); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(16 + st, -25, 3, 0, TAU); ctx.arc(24 + st, -24, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1e140c';
+  ctx.beginPath(); ctx.arc(16.8 + st, -25, 1.4, 0, TAU); ctx.arc(24.8 + st, -24, 1.4, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(20, -8, 2, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+  // shell
+  ctx.fillStyle = '#e39650'; ctx.strokeStyle = '#9a5a2a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(-4, -13, 12, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  for (let a = 0; a < TAU * 2.2; a += 0.2) {
+    const r = 10 - a * 0.7;
+    const x = -4 + Math.cos(a) * r, y = -13 + Math.sin(a) * r;
+    a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ============================================================
+//  Bubbles, tools, speech and messages
+// ============================================================
+function drawNeedIcon(type, x, y, s) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  if (type === 'water') {
+    const g = ctx.createLinearGradient(0, -14, 0, 12);
+    g.addColorStop(0, '#8fd3ff'); g.addColorStop(1, '#2f8ee0');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(0, -15); ctx.bezierCurveTo(4, -6, 11, 0, 11, 5); ctx.arc(0, 5, 11, 0, Math.PI); ctx.bezierCurveTo(-11, 0, -4, -6, 0, -15); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(-4, 3, 2.5, 4, 0.3, 0, TAU); ctx.fill();
+  } else if (type === 'sun') {
+    ctx.strokeStyle = '#f5a800'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(Math.cos(a) * 16, Math.sin(a) * 16); }
+    ctx.stroke();
+    ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = '#7a4e2a';
+    ctx.beginPath(); ctx.moveTo(-15, 10); ctx.quadraticCurveTo(-10, -6, 0, -7); ctx.quadraticCurveTo(10, -6, 15, 10); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#a0703c';
+    ctx.beginPath(); ctx.arc(-5, 2, 2.5, 0, TAU); ctx.arc(4, -1, 2, 0, TAU); ctx.arc(7, 6, 2.2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#4a9a2c'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(0, -14); ctx.stroke();
+    ctx.fillStyle = '#6cc03f';
+    ctx.beginPath(); ctx.ellipse(-4, -14, 4, 2.2, -0.4, 0, TAU); ctx.ellipse(4, -14, 4, 2.2, 0.4, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawNeedBubbles() {
+  if (state !== 'play') return;
+  const top = plantTopP();
+  for (const b of bubbleLayout()) {
+    const n = b.nd;
+    const u = n.age / n.grace;
+    const late = u > 1;
+    const sx = late ? Math.sin(t * 30) * 2.5 : 0;
+    const s = ease(n.pop) * (1 + Math.sin(t * 4 + b.x) * 0.03);
+    const x = b.x + sx, y = b.y;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s);
+    // little tail pointing down at the plant
+    ctx.fillStyle = '#fffdf2';
+    const tx = clamp((top.x - x) * 0.25, -14, 14);
+    ctx.beginPath(); ctx.moveTo(-8, 22); ctx.lineTo(tx, 38); ctx.lineTo(8, 22); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 28, 0, TAU); ctx.fill();
+    ctx.strokeStyle = late ? (Math.sin(t * 10) > 0 ? '#fa5252' : '#ffa8a8') : 'rgba(224,165,38,0.8)';
+    ctx.lineWidth = 3; ctx.stroke();
+    // time left
+    if (!late) {
+      ctx.strokeStyle = u < 0.5 ? '#40c057' : u < 0.8 ? '#fab005' : '#fd7e14';
+      ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, 33, -Math.PI / 2, -Math.PI / 2 + (1 - u) * TAU); ctx.stroke();
+    }
+    ctx.restore();
+    drawNeedIcon(n.type, x, y, s);
+    if (late) {
+      ctx.fillStyle = '#fa5252';
+      ctx.beginPath(); ctx.arc(x + 21 * s, y - 21 * s, 9 * s, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(14 * s)}px Fredoka, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('!', x + 21 * s, y - 20 * s);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+}
+
+function updateTools(dt) {
+  for (let i = tools.length - 1; i >= 0; i--) {
+    const tl = tools[i];
+    tl.t += dt;
+    const top = plantTopP(), base = wp(0, 0);
+    const sx = top.x - 46, sy = Math.min(top.y, base.y - 40) - 30;
+    if (tl.t > 0.25 && tl.t < 1.1 && Math.random() < dt * 40) {
+      if (tl.type === 'water') spawn(sx + 30 + rand(-4, 4), sy + 10, rand(10, 50), rand(20, 60), 1.4, Math.random() < 0.5 ? '#6cc4ff' : '#bfe6ff', rand(2, 3.5), 500);
+      else spawn(base.x + rand(-30, 30), base.y - 70, rand(-10, 10), rand(20, 60), 0.8, Math.random() < 0.5 ? '#6a4424' : '#8a5a33', rand(2.5, 4), 400);
+    }
+    if (tl.t > 1.3) tools.splice(i, 1);
+  }
+}
+
+function drawTools() {
+  for (const tl of tools) {
+    const a = clamp(Math.min(tl.t / 0.2, (1.3 - tl.t) / 0.2), 0, 1);
+    const top = plantTopP(), base = wp(0, 0);
+    ctx.save();
+    ctx.globalAlpha = a;
+    if (tl.type === 'water') {
+      const sx = top.x - 46, sy = Math.min(top.y, base.y - 40) - 30;
+      ctx.translate(sx, sy);
+      ctx.rotate(0.5 * ease(tl.t / 0.3));
+      ctx.fillStyle = '#4bb3a0'; ctx.strokeStyle = '#2f7f70'; ctx.lineWidth = 2;
+      roundRect(-18, -12, 32, 26, 6); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(32, -12); ctx.lineTo(34, -8); ctx.lineTo(14, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-4, -14, 10, Math.PI, TAU); ctx.stroke();
+    } else {
+      ctx.translate(base.x + 26, base.y - 86);
+      ctx.rotate(-0.6 * ease(tl.t / 0.3));
+      ctx.fillStyle = '#d9b77a'; ctx.strokeStyle = '#9a7a40'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-14, -18); ctx.lineTo(14, -18); ctx.quadraticCurveTo(18, 14, 10, 18); ctx.lineTo(-10, 18); ctx.quadraticCurveTo(-18, 14, -14, -18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#6a4424'; ctx.beginPath(); ctx.ellipse(0, -18, 13, 4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#5a9a34'; ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('☘', 0, 6);
+    }
+    ctx.restore();
+  }
+}
+
+function drawJesusBubble() {
+  if (!bubble) return;
+  const jp = wp(JESUS_X, 0);
+  const s = 1.35 * cam.z;
+  const hx = jp.x, hy = jp.y - 80 * s;
+  const onScreen = hx > -10 && hx < W + 10;
+  ctx.save();
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const maxW = Math.min(W - 60, 420);
+  const lines = wrapText(bubble.text, maxW);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 26, h = lines.length * 21 + 16;
+  const bx = clamp(hx - 40, 14, W - w - 14);
+  const by = onScreen ? Math.max(hy - 26 - h, 118 - offY) : 180 - offY;
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 14); ctx.fill(); ctx.stroke();
+  if (onScreen && hy - 8 > by + h) {
+    // tail down to Jesus
+    const ax = clamp(hx + 6, bx + 16, bx + w - 16);
+    ctx.beginPath(); ctx.moveTo(ax - 9, by + h - 1.5); ctx.lineTo(hx + 4, hy - 8); ctx.lineTo(ax + 9, by + h - 1.5); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(ax - 9, by + h); ctx.lineTo(hx + 4, hy - 8); ctx.lineTo(ax + 9, by + h); ctx.stroke();
+  }
+  ctx.fillStyle = '#8a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 13, by + 8 + 10.5 + i * 21));
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0 || !message.text) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineJoin = 'round';
+  const lines = wrapText(message.text, Math.min(W - 150, 560));
+  const y0 = 140 - offY;
+  lines.forEach((l, i) => {
+    ctx.strokeText(l, W / 2, y0 + i * 28);
+    ctx.fillStyle = '#7a5200';
+    ctx.fillText(l, W / 2, y0 + i * 28);
+  });
+  ctx.restore();
+}
+
+function drawKbCursor() {
+  if (!kbShow || state !== 'play') return;
+  const list = kbTargets();
+  if (!list.length) return;
+  const tg = list[clamp(kbCursor, 0, list.length - 1)];
+  const r = tg.r + 6 + Math.sin(t * 6) * 3;
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(tg.x, tg.y, r, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#e0a526';
+  ctx.beginPath(); ctx.moveTo(tg.x - 8, tg.y - r - 14); ctx.lineTo(tg.x + 8, tg.y - r - 14); ctx.lineTo(tg.x, tg.y - r - 4); ctx.fill();
+}
+
+function drawStreaks() {
+  if (!cfg.wind) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineCap = 'round'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const s of streaks) {
+    const x = -offX - 100 + s.f * (viewW + 200);
+    const len = (12 + Math.abs(gust) * 30) * s.len;
+    const wav = Math.sin(t * 3 + s.y) * 2;
+    ctx.moveTo(x, s.y + wav); ctx.lineTo(x - Math.sign(gust || 1) * len, s.y + wav);
+  }
+  ctx.stroke();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+
+  // Left: level + health
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Mustard Seed' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('HEALTH', 12, 48);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(90,66,16,0.25)';
+  roundRect(64, 38, 124, 13, 6.5); ctx.fill();
+  const hl = plant ? plant.health / 100 : 1;
+  const hg = ctx.createLinearGradient(64, 0, 188, 0);
+  hg.addColorStop(0, '#5cbf3a'); hg.addColorStop(1, '#b6f07a');
+  ctx.fillStyle = hl < 0.25 && Math.sin(t * 10) > 0 ? '#ff6b6b' : hl < 0.45 ? '#fab005' : hg;
+  if (hl > 0) { roundRect(64, 38, 124 * hl, 13, 6.5); ctx.fill(); }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  // Right: growth stage, birds and balance
+  if (plant && state !== 'title') {
+    const rx = viewW - 12;
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#5a4210';
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(`GROWTH · ${STAGE_NAMES[plant.stage].toUpperCase()}`, rx, 20);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(90,66,16,0.25)';
+    roundRect(rx - 124, 27, 124, 12, 6); ctx.fill();
+    const gf = growthFrac();
+    const gg = ctx.createLinearGradient(rx - 124, 0, rx, 0);
+    gg.addColorStop(0, '#f7c948'); gg.addColorStop(1, '#fff1a8');
+    ctx.fillStyle = gg;
+    if (gf > 0) { roundRect(rx - 124, 27, 124 * gf, 12, 6); ctx.fill(); }
+    // birds
+    ctx.shadowBlur = 4;
+    ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.fillStyle = '#5a4210';
+    ctx.fillText(`${nestedCount()} / ${cfg.birds}`, rx, 62);
+    ctx.shadowBlur = 0;
+    const tw = ctx.measureText(`${nestedCount()} / ${cfg.birds}`).width;
+    drawBird(rx - tw - 18, 55, BIRD_TYPES[2], 8, 0, 1, true);
+    if (plant.stage >= 4) {
+      const bal = Math.round((1 - balanceInfo().imbalance) * 100);
+      ctx.shadowBlur = 4;
+      ctx.font = '600 13px Fredoka, sans-serif';
+      ctx.fillStyle = bal >= 75 ? '#2b8a3e' : bal >= 50 ? '#d9480f' : '#c92a2a';
+      ctx.fillText(`Balance ${bal}%`, rx, 82);
+      ctx.shadowBlur = 0;
+    }
+  }
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+
+  drawSky();
+  drawSun();
+  drawHills();
+
+  // The garden, in world coordinates
+  ctx.save();
+  ctx.translate(W / 2 - cam.x * cam.z, cam.baseY);
+  ctx.scale(cam.z, cam.z);
+  drawGround();
+  ctx.restore();
+
+  // Jesus and the listening crowd
+  const jp = wp(JESUS_X, 0), js = 1.35 * cam.z;
+  if (state === 'title' || state === 'intro') lookAt = { x: jp.x, y: jp.y - 70 * js };
+  else { const tp = plantTopP(), bp = wp(0, 0); lookAt = { x: tp.x, y: lerp(tp.y, bp.y, 0.3) }; }
+  const slots = crowdSlots();
+  for (const s of slots) if (s.row === 0) drawDisciple(s);
+  const [pose, face] = jesusPose();
+  drawJesus(jp.x, jp.y, js, pose, face);
+  for (const s of slots) if (s.row === 1) drawDisciple(s);
+
+  ctx.save();
+  ctx.translate(W / 2 - cam.x * cam.z, cam.baseY);
+  ctx.scale(cam.z, cam.z);
+  drawPlant();
+  ctx.restore();
+
+  // A dull shadow while the cloud hides the sun
+  if (cloud.cover > 0.05) {
+    ctx.fillStyle = `rgba(60,70,100,${0.12 * cloud.cover})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  drawBuds();
+  drawSpots();
+  drawWeeds();
+  drawPests();
+  drawBirds();
+  drawTools();
+  drawParticles();
+  drawStreaks();
+
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.4)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + r.t * 70, 0, TAU); ctx.stroke();
+  }
+
+  drawNeedBubbles();
+  drawKbCursor();
+  drawJesusBubble();
+  drawMessage();
+
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${flashT * 2})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateGust(dt);
+  updateParticles(dt);
+  updateDisciples(dt);
+  updateCamera(dt);
+  for (const c of bgClouds) { c.f += c.speed * (1 + (cfg.wind ? Math.abs(gust) * 3 : 0)) * dt / (viewW + 300); if (c.f > 1) c.f -= 1; }
+  if (cfg.wind) for (const s of streaks) { s.f += gust * 0.5 * dt; if (s.f > 1) s.f -= 1; if (s.f < 0) s.f += 1; }
+  crowdEvent.t = Math.max(0, crowdEvent.t - dt);
+  cloud.cover += (cloud.target - cloud.cover) * Math.min(1, dt * 2.5);
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  plant.blinkT -= dt;
+  if (plant.blinkT <= 0) { plant.blink = 0.14; plant.blinkT = rand(2, 5); }
+  if (plant.blink > 0) plant.blink -= dt;
+
+  if (state === 'intro') {
+    introT += dt;
+    if (introT >= introDur) beginPlay();
+  } else if (state === 'play') {
+    updatePlay(dt);
+  } else if (state === 'win' || state === 'fail') {
+    updateCritters(dt);
+    updateBirds(dt);
+    for (const br of branches) br.grow = Math.min(1, br.grow + dt);
+    if (state === 'fail') { plant.droop = Math.min(1, plant.droop + dt * 0.5); plant.mood = 'sad'; }
+    if (state === 'win' && Math.random() < dt * 10) {
+      const q = plantTopP();
+      spawn(q.x + rand(-160, 160) * cam.z, q.y + rand(0, 300) * cam.z, 0, -20, 1.2, Math.random() < 0.5 ? '#fff6d0' : '#ffe27a', 3);
+    }
+    plant.h += (hTarget() - plant.h) * Math.min(1, dt * 2);
+  }
+  if (state === 'play') plant.h += (hTarget() - plant.h) * Math.min(1, dt * 2);
+  updateTools(dt);
+  flashT = Math.max(0, flashT - dt);
+  message.t -= dt;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > 0.4) ripples.splice(i, 1); }
+  endScreens(dt);
+  sfx.thrust(state === 'play' && cfg.wind ? Math.abs(gust) * 0.35 : 0);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
