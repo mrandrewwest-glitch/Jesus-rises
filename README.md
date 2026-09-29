@@ -94,7 +94,7 @@ It's the fourth watch of the night and the sea is rough. Jesus says "Come", and 
 | **Palm Sunday** | Slide your finger up / down to change lanes, flick up to hop | ↑/↓ lanes, `Space` hop | Ride the donkey to Jerusalem's gate, dodging obstacles and collecting palms and cloaks |
 | **Cleansing the Temple** | Tap stalls, cages and animals | Arrows move the ring, `Space` acts | Clear the market before it fills, without disturbing the worshippers |
 | **Let the Children Come** | Tap ahead to hop, beside to step; the Call button once a level | Arrows, `C` call | Help each child through the crowd to be blessed by Jesus |
-| **The Wise Builder** | Pick a block, tap the grid; "Let the storm come!" | `1`–`7` blocks, arrows + `Space`, `Enter` storm | Build a house that meets the goal card and still stands after the storm |
+| **The Wise Builder** | Tap a spot of rock for the foundation, tap the glowing squares, then "Let the storm come!" | ←/→ + `Enter` foundation, arrows + `Space` build, `Enter` storm | Find the rock, build your house on it, and see it stand through the storm |
 | **He Is Risen** | Tap in time with the notes (hold the blue ones) | `Space`/↑ | Roll away the stone in rhythm before sunrise, then meet the risen Jesus |
 | **Legion** | Pull back on the imp and let go (or flick it) | ←/→ angle, ↑/↓ power, `Space` launch | Fling every shadow imp out of the man and into the herd of pigs |
 | **Through the Roof** | Tap roof tiles to dig; tap left / right to let out each side's ropes | Arrows + `Space` dig; `A`/`D` ropes | Open the roof and lower your friend down to Jesus, level and gentle |
