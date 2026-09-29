@@ -1,6 +1,6 @@
 # Stories of Jesus ✨
 
-45 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
+40 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
 Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files, libraries or build step.
 
@@ -18,7 +18,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 - **Bible version:** pick **KJV, NKJV, NIV or NLT** on the menu. Every verse in every game is quoted word for word in the chosen version and credited to its publisher. The shared code is in `bible.js`, and each game keeps its own `VERSES` table.
 - **Sound:** the shared engine in `music.js` uses a harp and a shepherd's pipe. Each game has its own public-domain hymn tune (Amazing Grace, Jesus Loves Me, Joy to the World, O Come All Ye Faithful, Ode to Joy, the Doxology or the Hallelujah) and a soft background sound (sea, birdsong, crowd, wind, night, campfire or market). The background sound only plays during play.
 
-## The Life of Jesus (28 games, in story order)
+## The Life of Jesus (23 games, in story order)
 
 | Game | Story | What you do | File |
 |---|---|---|---|
@@ -33,14 +33,9 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 | **Legion** | Into the swine · Mark 5:13 | Flick the cheeky shadow imps out of the man and into the herd of pigs, slingshot style! | `legion.html` |
 | **Feeding the 5,000** | Loaves and fish · John 6:11 | Share five loaves and two fish with a hungry hillside, then gather twelve baskets. | `feeding-5000.html` |
 | **Walking on Water** | Peter steps out · Matthew 14:29 | Help Peter cross the stormy sea. Jump the waves and chase away fears to keep his eyes on Jesus. | `walking-on-water.html` |
-| **On the Mountain** | The Transfiguration · Matthew 17:2 | Climb the high mountain with Peter, James and John and see Jesus shine like the sun. | `transfiguration.html` |
 | **The Coin in the Fish** | Peter goes fishing · Matthew 17:27 | Cast your hook and find the one fish with a coin in its mouth. | `coin-in-fish.html` |
-| **Mary and Martha** | The good part · Luke 10:42 | Rush round Martha's kitchen, then learn what matters most: sitting with Jesus. | `mary-martha.html` |
-| **The Man Born Blind** | Now I see · John 9:25 | Guide the man through the streets to wash in the Pool of Siloam, and see! | `man-born-blind.html` |
-| **The Ten Lepers** | Where are the nine? · Luke 17:17 | Ten are healed, but can you spot the one who comes back to say thank you? | `ten-lepers.html` |
 | **Lazarus, Come Forth!** | The resurrection and the life · John 11:43 | Roll away the stone, then swipe fast to unwrap Lazarus! | `raising-lazarus.html` |
 | **Let the Children Come** | Jesus blesses the children · Mark 10:14 | Help the children weave through the crowd to reach Jesus. Great for little ones! | `blesses-children.html` |
-| **Blind Bartimaeus** | Have mercy on me! · Mark 10:47 | Shout louder than the crowd so Jesus hears you, and receive your sight. | `bartimaeus.html` |
 | **Zacchaeus Climbs** | Up the sycamore · Luke 19:4 | Help Zacchaeus climb the tree to see Jesus over the crowd. | `zacchaeus.html` |
 | **Palm Sunday** | Hosanna! · Matthew 21:9 | Ride into Jerusalem on the donkey. Slide between lanes, hop the rocks and collect palm branches. | `palm-sunday.html` |
 | **Cleansing the Temple** | My Father's house · John 2:16 | Clear the market stalls from the temple courts, but don't disturb the people praying. | `cleansing-temple.html` |
