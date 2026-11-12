@@ -13,7 +13,7 @@ Copy these into App Store Connect. The character limits Apple enforces are shown
 | **Primary category** | Games, subcategory **Family** |
 | **Secondary category** | Education |
 | **Kids Category** | Optional. If you opt in, pick **Ages 6–8**. (Once opted in, an app can't leave the Kids Category.) |
-| **Price** | Free (or your choice) |
+| **Price** | Free. No in-app purchases, ads or subscriptions. |
 | **Support URL** | `https://mrandrewwest-glitch.github.io/Jesus-rises/support.html` |
 | **Privacy Policy URL** | `https://mrandrewwest-glitch.github.io/Jesus-rises/privacy.html` |
 | **Copyright** | 2026 your name or business name |
