@@ -2,12 +2,16 @@
 
 37 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
-Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files, libraries or build step.
+Each game is a single self-contained HTML file. The art is all drawn in code and the music is synthesised, so there are no images, sound files or libraries. The only shared files are `bible.js`, `music.js` and the bundled Fredoka font in `fonts/`, so the games work offline.
 
 ## Play and share
 
 - **Play locally:** open `index.html` in any modern browser.
 - **Share online:** turn on **GitHub Pages** (Settings → Pages → Deploy from a branch → `main`, `/ (root)`). The menu is then at `https://mrandrewwest-glitch.github.io/Jesus-rises/`.
+
+## iPhone, iPad and Android app
+
+The games are also packed into an iOS and Android app with Capacitor (`ios/`, `android/`, `capacitor.config.json`). See [`app-store/README.md`](app-store/README.md) for how to build and publish it, and [`app-store/LISTING.md`](app-store/LISTING.md) for the App Store listing text.
 
 ## Features in every game
 
@@ -37,7 +41,7 @@ Each game is a single self-contained HTML file. The art is all drawn in code and
 | **Lazarus, Come Forth!** | The resurrection and the life · John 11:43 | Roll away the stone, then swipe fast to unwrap Lazarus! | `raising-lazarus.html` |
 | **Let the Children Come** | Jesus blesses the children · Mark 10:14 | Help the children weave through the crowd to reach Jesus. Great for little ones! | `blesses-children.html` |
 | **Zacchaeus Climbs** | Up the sycamore · Luke 19:4 | Help Zacchaeus climb the tree to see Jesus over the crowd. | `zacchaeus.html` |
-| **Palm Sunday** | Hosanna! · Matthew 21:9 | Endless 3D runner (Temple Run style) riding the donkey down the Mount of Olives: swipe left/right to switch lanes and turn corners, up to jump, down to duck; collect palm branches, cloak magnets and a child's palm shield as it speeds up. | `palm-sunday.html` |
+| **Palm Sunday** | Hosanna! · Matthew 21:9 | Endless 3D runner riding the donkey down the Mount of Olives: swipe left/right to switch lanes and turn corners, up to jump, down to duck; collect palm branches, cloak magnets and a child's palm shield as it speeds up. | `palm-sunday.html` |
 | **Cleansing the Temple** | My Father's house · John 2:16 | Clear the market stalls from the temple courts, but don't disturb the people praying. | `cleansing-temple.html` |
 | **Washing Feet** | Love one another · John 13:5 | Scrub off the mud, pop out the pebbles and clean under every toenail. So satisfying! | `washing-feet.html` |
 | **He Is Risen** | The empty tomb · Matthew 28:6 | Tap in time with the music to roll away the stone on Easter morning. | `empty-tomb.html` |
