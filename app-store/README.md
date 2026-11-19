@@ -47,9 +47,20 @@ You need an [Apple Developer Program](https://developer.apple.com/programs/) mem
 6. In [App Store Connect](https://appstoreconnect.apple.com), the build appears under **TestFlight** after a few minutes. Add family and friends as testers.
 7. When you're happy, fill in the listing from `LISTING.md`, attach the build and **Submit for Review**.
 
-**Without a Mac:** a cloud service such as Codemagic, or GitHub Actions' macOS machines, can run the same build and upload to TestFlight. It needs an App Store Connect API key, which you create in App Store Connect under **Users and Access → Integrations**.
+**Without a Mac (GitHub Actions):** `.github/workflows/ios-testflight.yml` builds the app on one of GitHub's Macs and uploads it to TestFlight. The build number goes up by itself each run.
 
-For each new upload, raise the build number (Xcode: target **App → General → Build**), and the version for a new release.
+One-time setup:
+
+1. In [App Store Connect](https://appstoreconnect.apple.com), go to **Users and Access → Integrations → App Store Connect API → Team Keys** and click **+**. Name it "GitHub build", give it **Admin** access (needed so Xcode can create the signing certificate in the cloud), and click **Generate**.
+2. Note the **Key ID** and the **Issuer ID** (shown above the list of keys), then **Download** the key file `AuthKey_XXXXXXXXXX.p8`. Apple only lets you download it once.
+3. In GitHub, open the repository's **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - `APP_STORE_CONNECT_KEY_ID`: the Key ID
+   - `APP_STORE_CONNECT_ISSUER_ID`: the Issuer ID
+   - `APP_STORE_CONNECT_KEY`: open the `.p8` file in a text editor and paste everything, including the `BEGIN` and `END` lines
+
+To build: **Actions → iOS → TestFlight → Run workflow** (the workflow shows there once it is on `main`), or push a tag starting with `ios-`, such as `ios-1.0-1`. When it finishes, the build appears under **TestFlight** in App Store Connect after Apple has processed it.
+
+For each new upload from Xcode, raise the build number (target **App → General → Build**); the GitHub build does this for you. For a new release, raise the version (`MARKETING_VERSION`, currently 1.0).
 
 ## Building for Android (optional)
 
