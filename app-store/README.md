@@ -1,4 +1,4 @@
-# Publishing Stories of Jesus as an app
+# Publishing Good News Games as an app
 
 The games are packed into real iOS and Android apps with [Capacitor](https://capacitorjs.com). Everything runs from inside the app: no internet needed, no website wrapper.
 

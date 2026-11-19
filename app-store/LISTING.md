@@ -1,4 +1,4 @@
-# App Store listing: Stories of Jesus
+# App Store listing: Good News Games
 
 Copy these into App Store Connect. The character limits Apple enforces are shown in brackets.
 
@@ -6,10 +6,11 @@ Copy these into App Store Connect. The character limits Apple enforces are shown
 
 | Field | Value |
 |---|---|
-| **Name** [30] | Stories of Jesus |
+| **Name** [30] | Good News Games |
+| **Home-screen name** | Good News (set in `Info.plist` and Android `strings.xml`; the full name would be cut off under the icon) |
 | **Subtitle** [30] | Cartoon Bible games for kids |
 | **Bundle ID** | `com.bibleminigames.westy` (set in `capacitor.config.json` and both app projects; it can never change after the first upload) |
-| **SKU** | stories-of-jesus-001 |
+| **SKU** | good-news-games-001 |
 | **Primary category** | Games, subcategory **Family** |
 | **Secondary category** | Education |
 | **Kids Category** | Optional. If you opt in, pick **Ages 6–8**. (Once opted in, an app can't leave the Kids Category.) |
@@ -26,7 +27,7 @@ Both URLs work once GitHub Pages is serving the branch that holds `support.html`
 
 ## Description [4000]
 
-Stories of Jesus is a collection of 37 colourful cartoon games based on the life of Jesus and the parables He told, made for children and families.
+Good News Games is a collection of 37 colourful cartoon games based on the life of Jesus and the parables He told, made for children and families.
 
 Each game is short, simple to pick up and gets harder as you go. Every game ends with the Bible verse it comes from, so children learn the story as they play.
 
@@ -57,9 +58,9 @@ MADE FOR FAMILIES
 
 ## Keywords [100]
 
-bible,kids,christian,parables,gospel,sunday school,church,faith,family,easter,christmas,children,god
+jesus,bible,kids,christian,stories,parables,gospel,sunday school,church,faith,easter,christmas
 
-(Words already in the name, like "Jesus" and "stories", don't need repeating.)
+(Words already in the name, like "good", "news" and "games", don't need repeating.)
 
 ## What's New (version 1.0)
 
@@ -92,4 +93,4 @@ Apple scales these down for the smaller devices. Upload up to 10 per slot; the m
 
 ## Notes for the App Review team
 
-Stories of Jesus is a family game app of 37 cartoon mini-games based on Gospel stories. All games are bundled in the app and run offline. There is no login, no purchases, no ads and no data collection. To try it: pick any game on the main menu and tap Begin. Bible quotations are credited to their publishers on each game's title and results cards.
+Good News Games is a family game app of 37 cartoon mini-games based on Gospel stories. All games are bundled in the app and run offline. There is no login, no purchases, no ads and no data collection. To try it: pick any game on the main menu and tap Begin. Bible quotations are credited to their publishers on each game's title and results cards.

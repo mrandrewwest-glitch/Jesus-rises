@@ -1,4 +1,4 @@
-# Stories of Jesus ✨
+# Good News Games ✨
 
 37 small cartoon games based on stories of Jesus from the Gospels, made for phones, tablets and computers. Open `index.html` for the menu, then pick a game. Every game has a 🏠 button and an **All games** link back to the menu.
 
