@@ -41,7 +41,7 @@ You need an [Apple Developer Program](https://developer.apple.com/programs/) mem
 
 1. `npm install && npm run sync`
 2. `npm run open:ios` opens the project in Xcode.
-3. In **Signing & Capabilities**, pick your team. Xcode creates the certificates for you.
+3. In **Signing & Capabilities**, check the team is yours (Team ID `5MPWZAYMTK` is already set). Xcode creates the certificates for you.
 4. Choose **Any iOS Device**, then **Product → Archive**.
 5. In the Organizer, **Distribute App → App Store Connect → Upload**.
 6. In [App Store Connect](https://appstoreconnect.apple.com), the build appears under **TestFlight** after a few minutes. Add family and friends as testers.
