@@ -1,4 +1,4 @@
-package app.storiesofjesus.games;
+package com.bibleminigames.westy;
 
 import com.getcapacitor.BridgeActivity;
 

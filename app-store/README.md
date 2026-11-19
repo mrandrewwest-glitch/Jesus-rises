@@ -19,10 +19,10 @@ The games are packed into real iOS and Android apps with [Capacitor](https://cap
 
 ## Before you submit
 
-1. **Bible permissions.** KJV is public domain. Get written permission from Thomas Nelson (NKJV), Biblica (NIV) and Tyndale (NLT), or remove those versions, before the app goes on sale.
+1. **Bible permissions.** KJV is public domain. Get written permission from Thomas Nelson (NKJV), Biblica (NIV) and Tyndale (NLT), or remove those versions, before the app is released.
 2. **Support email.** Replace `SUPPORT-EMAIL` in `privacy.html` and `support.html`.
 3. **Publish the two pages.** Merge into `main` so GitHub Pages serves `privacy.html` and `support.html`.
-4. **Bundle ID.** `app.storiesofjesus.games` is set in `capacitor.config.json`, `ios/App/App.xcodeproj` and `android/app/build.gradle`. Change it now if you want a different one; it can't change after the first upload.
+4. **Bundle ID.** `com.bibleminigames.westy` is set in `capacitor.config.json`, `ios/App/App.xcodeproj` and `android/app/build.gradle`. Register this exact ID in the Apple Developer portal (Certificates, Identifiers & Profiles → Identifiers). It can't change after the first upload.
 
 ## After changing a game
 

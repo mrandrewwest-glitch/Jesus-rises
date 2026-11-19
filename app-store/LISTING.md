@@ -8,7 +8,7 @@ Copy these into App Store Connect. The character limits Apple enforces are shown
 |---|---|
 | **Name** [30] | Stories of Jesus |
 | **Subtitle** [30] | Cartoon Bible games for kids |
-| **Bundle ID** | `app.storiesofjesus.games` (set in `capacitor.config.json`; change it before the first upload if you like, never after) |
+| **Bundle ID** | `com.bibleminigames.westy` (set in `capacitor.config.json` and both app projects; it can never change after the first upload) |
 | **SKU** | stories-of-jesus-001 |
 | **Primary category** | Games, subcategory **Family** |
 | **Secondary category** | Education |
