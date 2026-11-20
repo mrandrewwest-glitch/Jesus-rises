@@ -85,6 +85,32 @@
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
   }
   .section-note { margin: 0 0 12px; font-weight: 600; color: var(--muted); }
+  /* Story groups: one tab per group, only the chosen group is shown */
+  .groups {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; justify-content: safe center; gap: 8px; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -16px 4px; padding: 10px 16px;
+    background: linear-gradient(rgba(255, 243, 207, 0.95), rgba(255, 243, 207, 0.85));
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .groups::-webkit-scrollbar { display: none; }
+  .groups:empty { display: none; }
+  .groups button {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 76px; padding: 8px 12px 6px;
+    font: inherit; font-weight: 700; font-size: 0.95rem; color: var(--muted);
+    background: var(--card); border: none; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 3px 10px rgba(60, 40, 0, 0.12), inset 0 0 0 2px rgba(224, 165, 38, 0.35);
+    touch-action: manipulation;
+  }
+  .groups button .icon { font-size: 1.7rem; line-height: 1.1; }
+  .groups button[aria-pressed="true"] {
+    color: #fff; background: linear-gradient(#f7c948, #d9961c);
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+    box-shadow: 0 3px 0 var(--gold-dark);
+  }
+  .js .group:not(.shown) { display: none; }
+  .group > h2.section:first-child { margin-top: 18px; }
   .best { font-size: 0.85rem; color: var(--muted); margin-top: 8px; min-height: 1em; }
   .soon { opacity: 0.62; }
   .soon .play { background: #cfc5ad; box-shadow: 0 3px 0 #a99d80; text-shadow: none; }
@@ -108,7 +134,9 @@
       --sky-top: #1b2748; --sky-mid: #22325c; --sky-bottom: #0f1830;
     }
     :root:not([data-theme="light"]) footer { color: #b8c6e0; }
+    :root:not([data-theme="light"]) .groups { background: linear-gradient(rgba(27, 39, 72, 0.95), rgba(27, 39, 72, 0.85)); }
   }
+  :root[data-theme="dark"] .groups { background: linear-gradient(rgba(27, 39, 72, 0.95), rgba(27, 39, 72, 0.85)); }
   :root[data-theme="dark"] {
     --ink: #f3ead6; --muted: #c9bb99; --card: rgba(34, 40, 64, 0.95);
     --sky-top: #1b2748; --sky-mid: #22325c; --sky-bottom: #0f1830;
@@ -119,7 +147,7 @@
 <main>
   <header>
     <h1>Good News Games</h1>
-    <p>Little games about Jesus from the Gospels. Pick one to play!</p>
+    <p>Little games from the Bible. Pick a story to play!</p>
     <div class="bible">
       <span>Bible version:</span>
       <div class="versions" role="group" aria-label="Bible version">
@@ -131,6 +159,9 @@
     </div>
   </header>
 
+  <nav class="groups" id="groups" aria-label="Bible story groups"></nav>
+
+  <section class="group" data-group="jesus" data-label="Jesus" data-icon="✝️">
   <h2 class="section">The Life of Jesus</h2>
   <p class="section-note">From His birth to His ascension, in story order.</p>
   <div class="grid">
@@ -482,6 +513,8 @@
     </a>
   </div>
 
+  </section>
+
   <footer>
     Works on phones, tablets and computers.
     <p class="credit" id="credit"></p>
@@ -490,6 +523,36 @@
 
 <script src="bible.js"></script>
 <script>
+  // Story groups: a tab for each <section class="group">; only the chosen one is shown.
+  // The choice is remembered, so "All games" from a game comes back to the same group.
+  (function () {
+    document.documentElement.classList.add('js');
+    const sections = [...document.querySelectorAll('section.group')];
+    const nav = document.getElementById('groups');
+    let current = null;
+    try { current = localStorage.getItem('menuGroup'); } catch (e) {}
+    if (location.hash) current = location.hash.slice(1);
+    if (!sections.some((s) => s.dataset.group === current)) current = sections[0].dataset.group;
+    const tabs = sections.map((s) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `<span class="icon" aria-hidden="true">${s.dataset.icon}</span>${s.dataset.label}`;
+      b.addEventListener('click', () => { show(s.dataset.group); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      nav.appendChild(b);
+      return b;
+    });
+    function show(g) {
+      current = g;
+      sections.forEach((s, i) => {
+        s.classList.toggle('shown', s.dataset.group === g);
+        tabs[i].setAttribute('aria-pressed', s.dataset.group === g);
+      });
+      try { localStorage.setItem('menuGroup', g); } catch (e) {}
+    }
+    if (sections.length < 2) nav.remove();
+    show(current);
+  })();
+
   // Bible version picker: remembered on this device and used by every game
   const buttons = document.querySelectorAll('.versions button');
   function showVersion() {
