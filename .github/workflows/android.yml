@@ -1,0 +1,90 @@
+# Builds the Android app on GitHub.
+#
+# Every run makes a test APK you can install straight onto an Android phone or tablet
+# (download "good-news-games-test-apk" from the run's Artifacts).
+#
+# When these four repository secrets are set (Settings → Secrets and variables → Actions),
+# it also makes the signed release bundle (.aab) to upload to Google Play:
+#   ANDROID_KEYSTORE_BASE64    the upload keystore file, base64-encoded
+#   ANDROID_KEYSTORE_PASSWORD  the keystore password
+#   ANDROID_KEY_ALIAS          the key alias inside the keystore
+#   ANDROID_KEY_PASSWORD       the key password
+#
+# Run it from the Actions tab (Run workflow), or push a tag starting with "android-".
+name: Android
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['android-*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and copy the games into the Android project
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Build the test APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: good-news-games-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Restore the upload key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No ANDROID_KEYSTORE_BASE64 secret, so skipping the signed Google Play bundle." >> "$GITHUB_STEP_SUMMARY"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/keys/upload.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/keys/upload.jks" >> "$GITHUB_ENV"
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build the signed Google Play bundle
+        if: steps.key.outputs.present == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon bundleRelease
+          echo "Built version code $VERSION_CODE. Download good-news-games-play-bundle and upload the .aab in Google Play Console." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.present == 'true'
+        with:
+          name: good-news-games-play-bundle
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Remove the upload key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

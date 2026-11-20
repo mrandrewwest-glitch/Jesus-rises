@@ -62,9 +62,23 @@ To build: **Actions → iOS → TestFlight → Run workflow** (the workflow show
 
 For each new upload from Xcode, raise the build number (target **App → General → Build**); the GitHub build does this for you. For a new release, raise the version (`MARKETING_VERSION`, currently 1.0).
 
-## Building for Android (optional)
+## Building for Android (Google Play)
 
-1. `npm install && npm run sync`
-2. `npm run open:android` opens Android Studio.
-3. **Build → Generate Signed App Bundle**, create an upload key, and keep it safe.
-4. Upload the `.aab` in the [Google Play Console](https://play.google.com/console). New personal accounts must run a closed test with 12 testers for 14 days before going public.
+`.github/workflows/android.yml` builds the Android app on GitHub. No Android Studio needed.
+
+- **Test APK (no setup):** run **Actions → Android → Run workflow** (or push a tag starting with `android-`). Download **good-news-games-test-apk** from the run's Artifacts and open it on an Android phone or tablet to install it (allow "install unknown apps" when asked).
+- **Google Play bundle:** needs an upload key. Add these repository secrets and the same run also produces **good-news-games-play-bundle** (`app-release.aab`):
+  - `ANDROID_KEYSTORE_BASE64`: the keystore file, base64-encoded
+  - `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`
+
+  The version code is the workflow run number, so each upload is higher than the last.
+
+Publishing:
+
+1. Create a [Google Play developer account](https://play.google.com/console) (US$25 once).
+2. **Create app**: name Good News Games, app or game: **Game**, free.
+3. Turn on **Play App Signing** (the default). Google keeps the real signing key; yours is only an upload key, and Google can reset it if it is ever lost.
+4. Upload the `.aab` to **Testing → Closed testing** first. New personal accounts need 12 testers opted in for 14 days before the app can go to Production.
+5. Fill in the store listing (reuse `LISTING.md` and the screenshots), the content rating questionnaire, the **Target audience** (pick the children's age groups, which brings in Google's Families policy) and **Data safety** (no data collected).
+
+To build on a computer instead: `npm install && npm run sync`, then `npm run open:android` and use Android Studio's **Build → Generate Signed App Bundle**.
