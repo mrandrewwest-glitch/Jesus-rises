@@ -1,0 +1,1752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4a5670">
+<title>Build the Ark</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2a1f2e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Build the Ark</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'harp', accent: 'pipe', ambience: 'wind', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  make: { ref: 'Genesis 6:14', KJV: 'Make thee an ark of gopher wood; rooms shalt thou make in the ark, and shalt pitch it within and without with pitch.', NKJV: 'Make yourself an ark of gopherwood; make rooms in the ark, and cover it inside and outside with pitch.', NIV: 'So make yourself an ark of cypress wood; make rooms in it and coat it with pitch inside and out.', NLT: 'Build a large boat from cypress wood and waterproof it with tar, inside and out.' },
+  // Win card (later levels)
+  door: { ref: 'Genesis 6:16', KJV: 'A window shalt thou make to the ark... and the door of the ark shalt thou set in the side thereof; with lower, second, and third stories shalt thou make it.', NKJV: 'You shall make a window for the ark... and set the door of the ark in its side. You shall make it with lower, second, and third decks.', NIV: 'Make a roof for it... Put a door in the side of the ark and make lower, middle and upper decks.', NLT: 'Put the door on the side, and build three decks inside the boat—lower, middle, and upper.' },
+  // Win card
+  obeyed: { ref: 'Genesis 6:22', KJV: 'Thus did Noah; according to all that God commanded him, so did he.', NKJV: 'Thus Noah did; according to all that God commanded him, so he did.', NIV: 'Noah did everything just as God commanded him.', NLT: 'So Noah did everything exactly as God had commanded him.' },
+  // Fail card
+  pitch: { ref: 'Genesis 6:14', KJV: 'pitch it within and without with pitch', NKJV: 'cover it inside and outside with pitch', NIV: 'coat it with pitch inside and out', NLT: 'waterproof it with tar, inside and out' },
+};
+
+let state = 'title';      // title | play | pause | win | fail
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('buildArkBest') || 0; } catch (e) {}
+let t = 0;
+
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#e6eef6') {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  People (Noah and his family)
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'wow':
+      eyes(4, 5.5, 2.1); brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2); brows(-10, -6, -10, -6);
+      mouthLine(() => { ctx.moveTo(-5, mouthY); ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY); ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY); });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 4, 2); brows(-9, -5, -9, -5);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    default:  // watch / work
+      eyes(3.5, 4.5, 2); brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// d: { robe, hair, skin, beard, longBeard, scarf, kid, blink }
+// mood: watch | work | wow | worried | joy | dismay | point
+function drawPerson(d, x, y, s, mood, lookX = 0, lookY = 0.2, extra = 0) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + (d.phase || 0))) * 12;
+  if (d.kid) s *= 0.78;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + (d.phase || 0)) * 4;
+    arm(-11, -32, -24 + wave, -66); arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'point') {
+    arm(11, -32, 30, -50 + Math.sin(t * 5) * 2);
+  }
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0); ctx.quadraticCurveTo(-17, -30, -11, -37); ctx.quadraticCurveTo(0, -41, 11, -37); ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  if (mood === 'watch' || mood === 'wow' || mood === 'dismay') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  else if (mood === 'point') arm(-11, -32, -15, -12);
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    const L = d.longBeard ? 34 : 21;
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + L, 0, hy + L + 1);
+    ctx.quadraticCurveTo(14, hy + L, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+    if (d.longBeard) { ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-4, hy + 14); ctx.lineTo(-3, hy + L - 4); ctx.moveTo(4, hy + 14); ctx.lineTo(3, hy + L - 4); ctx.stroke(); }
+  }
+  drawFace(d, mood === 'work' || mood === 'point' ? 'watch' : mood, hy, lookX, lookY);
+  if (mood === 'work') {
+    // swinging a mallet
+    const a = -0.6 + Math.max(0, Math.sin(extra)) * 1.3;
+    ctx.save(); ctx.translate(14, -32); ctx.rotate(a);
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(14, 10); ctx.stroke();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(14, 10); ctx.lineTo(16, -14); ctx.stroke();
+    ctx.fillStyle = '#6b4423'; roundRect(8, -22, 16, 9, 2); ctx.fill();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(14, 10, 4, 0, TAU); ctx.fill();
+    ctx.restore();
+    arm(-11, -32, -15, -12);
+  }
+  ctx.restore();
+}
+
+// A friendly pointing hand (for first-time hints)
+function drawHand(x, y, ang = -Math.PI / 2) {
+  const bob = Math.sin(t * 6) * 6;
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.translate(0, 18 + bob);
+  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-5, 0); ctx.lineTo(-5, 20); ctx.quadraticCurveTo(-15, 18, -14, 28);
+  ctx.lineTo(-12, 44); ctx.quadraticCurveTo(0, 54, 14, 44); ctx.lineTo(16, 26);
+  ctx.quadraticCurveTo(16, 20, 9, 20); ctx.lineTo(5, 20); ctx.lineTo(5, 0);
+  ctx.quadraticCurveTo(0, -6, -5, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-1, 22); ctx.lineTo(-1, 30); ctx.moveTo(6, 22); ctx.lineTo(6, 30); ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles (playfield coordinates)
+// ============================================================
+let particles = [];
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffd0e0']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), v = rand(60, 260);
+    spawn(x, y, Math.cos(a) * v, Math.sin(a) * v - 40, rand(0.5, 1.1), pick(cols), rand(2.5, 5), 160, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max * 1.5, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const r = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, rr = k % 2 ? r * 0.35 : r; ctx.lineTo(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr); }
+      ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+let message = { text: '', t: 0 };
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  tap(h) { if (this.ctx) Music.tap(clamp(h, 0, 1)); },
+  bonk() { this.tone(220, 0.2, 'triangle', 0.25, 0, 130); },
+  pop() { this.tone(520, 0.12, 'sine', 0.25, 0, 900); },
+  sparkle() { [1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.1, i * 0.07)); },
+  whoosh() { this.noiseBurst(500, 0.9, 0.3, 0.6, 1600); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Touch hardening and HUD buttons
+// ============================================================
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+function toView(e) { return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale }; }
+function hudHit(p) {
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return true; }
+  }
+  return false;
+}
+
+function drawHudButtons() {
+  ctx.save();
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// Level name top-left (view coordinates)
+function drawHudTitle(text, ink = '#fff6dc') {
+  ctx.save();
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = ink;
+  ctx.fillText(text, 12, 26);
+  ctx.restore();
+}
+
+// A meter at the top right (view coordinates)
+function drawMeter(label, frac, col, warn) {
+  const w = Math.min(170, viewW - 300), x = viewW - w - 14, y = 40;
+  ctx.save();
+  ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'right';
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#fff6dc';
+  ctx.fillText(label, viewW - 14, 30);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  roundRect(x, y, w, 14, 7); ctx.fill();
+  ctx.fillStyle = warn && Math.sin(t * 10) > 0 ? '#ff7b6b' : col;
+  if (frac > 0) { roundRect(x, y, Math.max(14, w * frac), 14, 7); ctx.fill(); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+  roundRect(x, y, w, 14, 7); ctx.stroke();
+  ctx.restore();
+}
+
+// Big friendly message (view coordinates)
+function drawMessage(y) {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  lines.forEach((l, i) => {
+    const yy = y + i * 29;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(40,30,60,0.85)';
+    ctx.strokeText(l, viewW / 2, yy);
+    ctx.fillStyle = '#fff3c4';
+    ctx.fillText(l, viewW / 2, yy);
+  });
+  ctx.restore();
+}
+// ============================================================
+//  Tuning
+// ============================================================
+const GROUND = 690;       // playfield y of the ground under the ark
+const TRAY_Y = 742;       // top of the timber tray
+const TRAY_H = 140;
+const WRONG_TIME = 4;     // seconds the clouds jump ahead for a piece that doesn't fit
+
+// The ark's parts, from the keel up. Each plan says how many of each.
+const PLANS = {
+  small: { ribs: 2, rows: 2, rooms1: 0, rooms2: 0, cw: 60, window: false },
+  rooms: { ribs: 2, rows: 2, rooms1: 2, rooms2: 0, cw: 56, window: true },
+  big:   { ribs: 3, rows: 3, rooms1: 3, rooms2: 2, cw: 72, window: true },
+  huge:  { ribs: 4, rows: 3, rooms1: 4, rooms2: 3, cw: 84, window: true },
+};
+
+const LEVELS = [
+  { name: 'Noah Begins',          plan: 'small', time: 100, tray: 3, decoys: 0,  gaps: 3, coats: 1, wind: 0 },
+  { name: 'Rooms in the Ark',     plan: 'rooms', time: 90,  tray: 4, decoys: 3,  gaps: 4, coats: 1, wind: 0 },
+  { name: 'Three Decks High',     plan: 'big',   time: 85, tray: 4, decoys: 5,  gaps: 5, coats: 1, wind: 0 },
+  { name: 'The Wind Picks Up',    plan: 'big',   time: 80,  tray: 5, decoys: 6,  gaps: 5, coats: 2, wind: 1 },
+  { name: 'Clouds Are Gathering', plan: 'huge',  time: 85,  tray: 5, decoys: 8,  gaps: 6, coats: 2, wind: 1.4 },
+  { name: 'The Whole Great Ark',  plan: 'huge',  time: 78,  tray: 6, decoys: 10, gaps: 7, coats: 2, wind: 1.8 },
+];
+function makeConfig(n) {
+  const L = LEVELS[Math.min(n, LEVELS.length) - 1];
+  const extra = Math.max(0, n - LEVELS.length);
+  return { ...L, n, time: Math.max(62, L.time - extra * 6), name: extra ? `${L.name} ${extra + 1}` : L.name, labels: n <= 2, hand: n === 1 };
+}
+
+const NAMES = { keel: 'keel', rib: 'rib', plank: 'hull plank', deck: 'deck', room: 'room', roof: 'roof', window: 'window', door: 'door',
+  wheel: 'cart wheel', bent: 'bent plank', twig: 'twig', broken: 'broken board', stub: 'little stub' };
+const DECOYS = ['bent', 'wheel', 'twig', 'broken', 'stub'];
+
+// ============================================================
+//  Game state
+// ============================================================
+let cfg = makeConfig(1);
+let slots = [];           // the ark's parts in build order
+let nextSlot = 0;
+let gaps = [];            // seams to seal with pitch
+let phase = 'build';      // build | pitch
+let tray = [];            // pieces in the tray (or null)
+let flying = [];          // pieces blown about by the wind
+let decoysLeft = 0;
+let selected = null;      // the piece lifted from the tray
+let drag = null;          // { piece, x, y, moved }
+let timeLeft = 0;
+let wrongs = 0, catches = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0;
+let gustT = 0, gust = 0, gustDir = 1, nextGust = 99;
+let hammerT = 0;
+let rain = [];
+let told = {};
+let lastScore = null;
+let attempted = 0;
+const NOAH = { robe: '#8a6a45', hair: '#f4f1ea', skin: '#d9a066', beard: true, longBeard: true, scarf: '#e8dcc0', blink: 0, blinkT: 2 };
+
+// ============================================================
+//  Building the plan
+// ============================================================
+const hullHW = (y) => 36 + 14 * Math.pow(clamp((-y - 3) / 19, 0, 1), 1.3);
+
+function buildSlots() {
+  const P = PLANS[cfg.plan];
+  const s = [];
+  s.push({ kind: 'keel' });
+  for (let i = 0; i < P.ribs; i++) s.push({ kind: 'rib', x: lerp(-30, 30, P.ribs === 1 ? 0.5 : i / (P.ribs - 1)) });
+  for (let i = 0; i < P.rows; i++) s.push({ kind: 'plank', y0: -3 - 19 * i / P.rows, y1: -3 - 19 * (i + 1) / P.rows, row: i });
+  s.push({ kind: 'deck', x0: -52, x1: 52, y0: -25, y1: -22 });
+  let top = -25, topW = P.cw;
+  if (P.rooms1) {
+    const w = P.cw / P.rooms1;
+    for (let i = 0; i < P.rooms1; i++) s.push({ kind: 'room', x0: -P.cw / 2 + i * w, w, y0: -38, h: 13, i });
+    top = -38;
+  }
+  if (P.rooms2) {
+    const cw2 = P.cw * P.rooms2 / P.rooms1;
+    s.push({ kind: 'deck', x0: -cw2 / 2 - 3, x1: cw2 / 2 + 3, y0: -40.5, y1: -38 });
+    const w = cw2 / P.rooms2;
+    for (let i = 0; i < P.rooms2; i++) s.push({ kind: 'room', x0: -cw2 / 2 + i * w, w, y0: -53.5, h: 13, i: i + 1 });
+    top = -53.5; topW = cw2;
+  }
+  s.push({ kind: 'roof', top, w: topW + 12 });
+  if (P.window) s.push({ kind: 'window', top });
+  s.push({ kind: 'door' });
+  for (const q of s) { q.placed = false; q.popT = 0; }
+  slots = s;
+  nextSlot = 0;
+  // the seams that will need pitch
+  gaps = [];
+  for (let k = 0; k < 200 && gaps.length < cfg.gaps; k++) {
+    const row = Math.floor(rand(0, P.rows + 1));
+    const y = row === P.rows ? -22.2 : -3 - 19 * (row + 0.5) / P.rows;
+    const hw = hullHW(y) - 7;
+    const x = rand(-hw, hw);
+    if (x > 19 && x < 35) continue;
+    if (gaps.some((g) => Math.hypot(g.x - x, (g.y - y) * 1.6) < 15)) continue;
+    gaps.push({ x, y, coats: 0, need: cfg.coats, a: rand(-0.3, 0.3), brushT: 0 });
+  }
+}
+
+function arkTopUnits() {
+  const P = PLANS[cfg.plan];
+  return (P.rooms2 ? 53.5 : P.rooms1 ? 38 : 25) + 13;
+}
+
+// Where the ark sits on screen (playfield coordinates)
+function layout() {
+  const unitsH = arkTopUnits() + 4;
+  const narrow = W < 760;
+  // On narrow phones the ark fills the width and stands taller, up on high stocks
+  const k = narrow ? (W - 24) / 106 : Math.min((W - 120) / 106, 450 / unitsH, 7.4);
+  const ky = narrow ? Math.min(k * 1.5, 470 / unitsH) : k;
+  const AW = 106 * k;
+  const ax = narrow ? W / 2 : W / 2 + 50;
+  const ay = GROUND - 12 - (narrow ? 70 : 0);
+  const noahX = narrow ? 44 : Math.max(46, ax - AW / 2 - 50);
+  return { k, ky, ax, ay, AW, top: ay - unitsH * ky, noahX, narrow };
+}
+function toArk(L, ux, uy) { return { x: L.ax + ux * L.k, y: L.ay + uy * L.ky }; }
+
+function slotCenter(s) {
+  switch (s.kind) {
+    case 'keel': return [0, -2];
+    case 'rib': return [s.x, -12.5];
+    case 'plank': return [0, (s.y0 + s.y1) / 2];
+    case 'deck': return [(s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2];
+    case 'room': return [s.x0 + s.w / 2, s.y0 + s.h / 2];
+    case 'roof': return [0, s.top - 6];
+    case 'window': return [0, s.top - 5.5];
+    case 'door': return [27, -12.5];
+  }
+  return [0, 0];
+}
+
+// ============================================================
+//  The tray of timber
+// ============================================================
+function trayLayout(i) {
+  const n = cfg.tray;
+  const cw = Math.min(124, (W - 24) / n - 8);
+  const total = n * cw + (n - 1) * 8;
+  const x = W / 2 - total / 2 + i * (cw + 8) + cw / 2;
+  return { x, y: TRAY_Y + TRAY_H / 2 + 4, w: cw, h: 118 };
+}
+
+function remainingNeed() {
+  const need = {};
+  for (let i = nextSlot; i < slots.length; i++) need[slots[i].kind] = (need[slots[i].kind] || 0) + 1;
+  return need;
+}
+function inPlay() {
+  const all = tray.filter(Boolean).concat(flying.map((f) => f.piece));
+  if (drag && !all.includes(drag.piece)) all.push(drag.piece);
+  return all;
+}
+
+function fillTray() {
+  if (phase !== 'build') return;
+  for (let i = 0; i < cfg.tray; i++) {
+    if (tray[i]) continue;
+    const have = {};
+    for (const p of inPlay()) if (!p.decoy) have[p.kind] = (have[p.kind] || 0) + 1;
+    const need = remainingNeed();
+    const next = slots[nextSlot] && slots[nextSlot].kind;
+    let kind = null, decoy = false;
+    if (next && !have[next]) kind = next;
+    else {
+      // upcoming parts that aren't already waiting in the tray
+      const want = [];
+      for (let j = nextSlot; j < Math.min(slots.length, nextSlot + 5); j++) {
+        const kk = slots[j].kind;
+        if ((have[kk] || 0) + want.filter((w) => w === kk).length < need[kk]) want.push(kk);
+      }
+      const pd = decoysLeft / (decoysLeft + Math.max(1, slots.length - nextSlot));
+      if (decoysLeft > 0 && (Math.random() < pd * 1.6 || !want.length)) { kind = pick(DECOYS); decoy = true; decoysLeft--; }
+      else if (want.length) kind = pick(want);
+    }
+    if (!kind) continue;
+    const L = trayLayout(i);
+    tray[i] = { kind, decoy, x: L.x, y: L.y + 160, born: playT, wob: 0 };
+  }
+}
+
+// ============================================================
+//  Placing pieces
+// ============================================================
+function selectPiece(p) {
+  if (selected === p) return;
+  selected = p;
+  sfx.tap(0.3 + Math.random() * 0.3);
+  if (cfg.hand && !told.placeHint) { told.placeHint = true; showMessage('Now tap the glowing spot on the ark!', 2.6); }
+}
+
+function tryPlace(p) {
+  const s = slots[nextSlot];
+  if (!s) return;
+  const L = layout();
+  if (p.decoy) {
+    // It doesn't fit: toss it on the scrap pile
+    wrongs++;
+    timeLeft = Math.max(0, timeLeft - WRONG_TIME);
+    removePiece(p);
+    const c = toArk(L, ...slotCenter(s));
+    for (let i = 0; i < 8; i++) spawn(c.x, c.y, rand(-120, 120), rand(-200, -60), 0.7, '#b98a5a', rand(3, 5), 500);
+    showMessage(`That ${NAMES[p.kind]} doesn't fit! Leave the odd pieces.`, 2.2);
+    sfx.bonk();
+    shakeT = 0.25;
+    return;
+  }
+  if (p.kind !== s.kind) {
+    showMessage(`Not yet! First the ${NAMES[s.kind]}.`, 1.8);
+    sfx.bonk();
+    p.wob = 0.5;
+    selected = null;
+    return;
+  }
+  // It fits!
+  removePiece(p);
+  s.placed = true; s.popT = 0.35;
+  nextSlot++;
+  hammerT = 0.6;
+  const c = toArk(L, ...slotCenter(s));
+  sparkleBurst(c.x, c.y, 10, ['#ffe27a', '#fff6d0', '#d6a35c']);
+  sfx.knock();
+  sfx.tap(nextSlot / slots.length);
+  if (nextSlot >= slots.length) startPitch();
+  else setTimeout(fillTray, 300);
+}
+
+function removePiece(p) {
+  const i = tray.indexOf(p);
+  if (i >= 0) tray[i] = null;
+  flying = flying.filter((f) => f.piece !== p);
+  if (selected === p) selected = null;
+  if (drag && drag.piece === p) drag = null;
+  setTimeout(fillTray, 350);
+}
+
+function startPitch() {
+  phase = 'pitch';
+  tray = []; flying = []; selected = null; drag = null;
+  showMessage(cfg.coats > 1 ? 'Now seal it with pitch! Each gap needs two coats.' : 'Now seal it with pitch! Tap every gap.', 2.8);
+}
+
+function pitchGap(g) {
+  g.coats++;
+  g.brushT = 0.4;
+  const L = layout();
+  const c = toArk(L, g.x, g.y);
+  for (let i = 0; i < 6; i++) spawn(c.x, c.y, rand(-60, 60), rand(-90, -20), 0.5, '#3a2a1a', rand(2, 4), 400);
+  sfx.brush();
+  if (g.coats >= g.need) { sfx.tap(0.5 + gaps.filter((q) => q.coats >= q.need).length / gaps.length * 0.5); }
+  if (gaps.every((q) => q.coats >= q.need)) win();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(timeLeft * 15);
+  const careBonus = Math.max(0, 500 - wrongs * 120);
+  const catchBonus = catches * 100;
+  const levelBonus = level * 400;
+  const score = timeBonus + careBonus + catchBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('buildArkBest', best); } catch (e) {} }
+  lastScore = { timeBonus, careBonus, catchBonus, levelBonus, score };
+  showMessage('Here comes the rain… not one leak!', 2.6);
+  sfx.win();
+  endTimer = 4.6;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  selected = null; drag = null;
+  showMessage('The rain came before the ark was ready…', 2.6);
+  sfx.fail();
+  endTimer = 3.4;
+}
+
+// ============================================================
+//  Screens
+// ============================================================
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(1);
+  buildSlots();
+  for (const s of slots) s.placed = true;
+  phase = 'build';
+  showOverlay('Build the Ark', 'Noah obeyed God and built a big boat',
+    `${verseHTML('make')}
+     <ul>
+       <li>God told Noah to build an <b>ark</b>. The rain is coming, so help him build it <b>before the clouds arrive</b>!</li>
+       <li>The <b>glowing spot</b> on the ark shows which part goes next. <b>Tap the matching piece</b> in the timber pile, then <b>tap the ark</b> (or <b>drag</b> the piece onto it).</li>
+       <li>Some pieces <b>don't fit</b> &mdash; a bent plank, a wheel, a twig. Leave them, or the clouds come closer!</li>
+       <li>When it's built, <b>tap every gap</b> to brush on sticky <b>pitch</b>, so not one drop leaks in.</li>
+       <li><b>Keys:</b> <kbd>1</kbd>&ndash;<kbd>6</kbd> pick a piece, <kbd>Space</kbd> fits it or brushes pitch.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start building', () => { level = 1; totalScore = 0; attempted = 0; startLevel(); });
+}
+
+function startLevel(retry = false) {
+  cfg = makeConfig(level);
+  buildSlots();
+  phase = 'build';
+  tray = []; flying = []; selected = null; drag = null;
+  decoysLeft = cfg.decoys;
+  timeLeft = cfg.time;
+  wrongs = 0; catches = 0;
+  playT = 0; winT = 0; failT = 0; endTimer = 0;
+  gust = 0; gustT = 0; nextGust = cfg.wind ? rand(6, 9) : 99;
+  rain = []; particles = [];
+  told = {};
+  hammerT = 0; shakeT = 0;
+  keys.clear();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  fillTray();
+  for (let i = 0; i < tray.length; i++) if (tray[i]) tray[i].y = trayLayout(i).y + 80 + i * 40;
+  showMessage(`Level ${level}: ${cfg.name}`, 2.2);
+  attempted++;
+  const hint = level === 1 ? 'Tap the glowing piece of wood!' : level === 2 ? 'Watch out: some pieces don’t fit!' : level === 3 ? 'A bigger ark: two floors of rooms!' : level === 4 ? 'Wind! Tap a flying piece to catch it.' : null;
+  if (hint && !retry) setTimeout(() => { if (state === 'play' && level === cfg.n) showMessage(hint, 2.8); }, 2300);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Thus did Noah!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('obeyed')}
+       <p style="text-align:center">Noah listened to God and did <b>everything</b> God asked. The ark was ready, sealed tight with pitch.</p>
+       ${level >= 3 ? verseHTML('door') : ''}
+       <p class="score">Time left: <b>${s.timeBonus}</b><br>Careful building (${wrongs} wrong): <b>${s.careBonus}</b><br>${catches ? `Pieces caught: <b>${s.catchBonus}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      level < LEVELS.length ? 'Next level' : 'Build again, faster!', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const left = slots.length - nextSlot, open = gaps.filter((g) => g.coats < g.need).length;
+    showOverlay('Drip, drip…', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The rain came before the ark was finished${left ? ` (${left} part${left > 1 ? 's' : ''} still to fit)` : ` (${open} gap${open > 1 ? 's' : ''} still leaking)`}. Look for the <b>glowing spot</b>, pick the piece that matches, and leave the odd pieces alone!</p>
+       ${verseHTML('pitch')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    state = 'pause';
+    syncAmbience();
+    drag = null;
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = 'play';
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating
+// ============================================================
+function updateTray(dt) {
+  for (let i = 0; i < tray.length; i++) {
+    const p = tray[i];
+    if (!p || (drag && drag.piece === p)) continue;
+    const L = trayLayout(i);
+    let ty = L.y - (p === selected ? 16 : 0);
+    let tx = L.x + gust * gustDir * 6 * Math.sin(t * 9 + i);
+    const k = 1 - Math.pow(0.0008, dt);
+    p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
+    p.wob = Math.max(0, p.wob - dt);
+  }
+}
+
+function updateWind(dt) {
+  if (!cfg.wind || phase !== 'build') { gust = Math.max(0, gust - dt); return; }
+  nextGust -= dt;
+  if (nextGust <= 0) {
+    nextGust = rand(7, 11) / cfg.wind + 3;
+    gustT = 2.4; gustDir = Math.random() < 0.5 ? -1 : 1;
+    sfx.whoosh();
+    if (!told.wind) { told.wind = true; showMessage('Whoosh! Catch the flying piece!', 2.2); }
+    // a piece is lifted off the pile and tumbles through the sky
+    const cand = tray.map((p, i) => [p, i]).filter(([p]) => p && p !== selected && !(drag && drag.piece === p));
+    if (cand.length) {
+      const [p, i] = pick(cand);
+      tray[i] = null;
+      flying.push({ piece: p, slot: i, t: 0, dur: 3.2 + rand(0, 0.8), x0: p.x, y0: p.y, dir: gustDir });
+      setTimeout(fillTray, 1200);
+    }
+  }
+  if (gustT > 0) { gustT -= dt; gust = Math.min(1, gust + dt * 3); } else gust = Math.max(0, gust - dt * 1.5);
+  for (const f of flying) {
+    f.t += dt;
+    const u = f.t / f.dur;
+    const L = layout();
+    f.piece.x = lerp(f.x0, f.dir > 0 ? W - 60 : 60, ease(clamp(u * 1.4, 0, 1))) + Math.sin(u * 7) * 40;
+    f.piece.y = f.y0 - Math.sin(clamp(u, 0, 1) * Math.PI) * (f.y0 - L.top + 40) * 0.9;
+    f.piece.spin = (f.piece.spin || 0) + dt * 5 * f.dir;
+  }
+  // a piece that wasn't caught lands back in a free spot in the pile
+  for (const f of flying.slice()) {
+    if (f.t < f.dur) continue;
+    flying.splice(flying.indexOf(f), 1);
+    const free = tray.findIndex((p, i) => !p && i < cfg.tray);
+    if (free >= 0 || tray.length < cfg.tray) tray[free >= 0 ? free : tray.length] = f.piece;
+    else if (!f.piece.decoy) { const di = tray.findIndex((p) => p && p.decoy); if (di >= 0) tray[di] = f.piece; }
+    f.piece.spin = 0;
+  }
+}
+
+function catchFlying(f) {
+  flying.splice(flying.indexOf(f), 1);
+  f.piece.spin = 0;
+  if (!f.piece.decoy) catches++;
+  sparkleBurst(f.piece.x, f.piece.y, 14);
+  sfx.pop();
+  const free = tray.findIndex((p) => !p);
+  if (free >= 0) tray[free] = f.piece;
+  else if (tray.length < cfg.tray) tray.push(f.piece);
+  else if (!f.piece.decoy) { const di = tray.findIndex((p) => p && p.decoy); if (di >= 0) tray[di] = f.piece; }
+  showMessage(f.piece.decoy ? 'Caught! (But that one won’t fit.)' : 'Caught it!', 1.4);
+}
+
+function updateRain(dt, amount) {
+  const L = layout();
+  if (Math.random() < dt * 60 * amount) {
+    for (let i = 0; i < 3; i++) rain.push({ x: rand(-offX, W + offX), y: -offY - 20, v: rand(600, 800) });
+  }
+  for (let i = rain.length - 1; i >= 0; i--) {
+    const r = rain[i];
+    r.y += r.v * dt; r.x -= r.v * dt * 0.12;
+    // drops bounce off a finished, sealed ark
+    const ux = (r.x - L.ax) / L.k;
+    if (state === 'win' && Math.abs(ux) < 50 && r.y > roofYAt(L, ux)) { spawn(r.x, r.y, rand(-50, 50), rand(-120, -40), 0.3, 'rgba(180,215,255,0.9)', 2, 600); rain.splice(i, 1); continue; }
+    if (r.y > GROUND + 20) { rain.splice(i, 1); }
+  }
+}
+function roofYAt(L, ux) {
+  const roof = slots.find((s) => s.kind === 'roof');
+  if (roof && Math.abs(ux) < roof.w / 2) return L.ay + (roof.top - 12 * (1 - Math.abs(ux) / (roof.w / 2)) * 0.9) * L.ky;
+  return L.ay - 25 * L.ky;
+}
+
+const keys = new Set();
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  NOAH.blinkT -= dt;
+  if (NOAH.blinkT <= 0) { NOAH.blink = 0.13; NOAH.blinkT = rand(1.5, 4); }
+  if (NOAH.blink > 0) NOAH.blink -= dt;
+  hammerT = Math.max(0, hammerT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  for (const s of slots) s.popT = Math.max(0, s.popT - dt);
+  for (const g of gaps) g.brushT = Math.max(0, g.brushT - dt);
+  if (state === 'play') {
+    playT += dt;
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; fail(); }
+    updateTray(dt);
+    updateWind(dt);
+    if (timeLeft < cfg.time * 0.25 && !told.hurry) { told.hurry = true; showMessage('The clouds are nearly here — hurry!', 2); }
+  } else if (state === 'win') {
+    winT += dt;
+    updateRain(dt, winT < 3 ? 1 : 0.2);
+    if (winT > 2.2 && Math.random() < dt * 8) { const L = layout(); sparkleBurst(L.ax + rand(-L.AW / 2, L.AW / 2), L.top + rand(0, 200), 3); }
+  } else if (state === 'fail') {
+    failT += dt;
+    updateRain(dt, 1.2);
+    updateLeaks(dt);
+  }
+  message.t -= dt;
+  endScreens(dt);
+}
+
+function updateLeaks(dt) {
+  const L = layout();
+  const spots = gaps.filter((g) => g.coats < g.need).map((g) => [g.x, g.y]);
+  for (let i = nextSlot; i < slots.length; i++) spots.push(slotCenter(slots[i]));
+  for (const [ux, uy] of spots) {
+    if (Math.random() < dt * 6) {
+      const p = toArk(L, ux, uy);
+      spawn(p.x + rand(-4, 4), p.y, 0, 30, 0.9, '#7cc4f2', 3.5, 500, 'drop');
+    }
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function toPlay(p) { return { x: p.vx - offX, y: p.vy - offY }; }
+
+function pieceAt(x, y) {
+  for (const f of flying) if (Math.hypot(x - f.piece.x, y - f.piece.y) < 52) return { flying: f };
+  for (let i = 0; i < tray.length; i++) {
+    const p = tray[i]; if (!p) continue;
+    const L = trayLayout(i);
+    if (Math.abs(x - L.x) < L.w / 2 + 4 && Math.abs(y - L.y) < L.h / 2 + 10) return { piece: p };
+  }
+  return null;
+}
+function onArk(x, y) {
+  const L = layout();
+  return x > L.ax - L.AW / 2 - 30 && x < L.ax + L.AW / 2 + 30 && y > L.top - 40 && y < L.ay + 40;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const v = toView(e);
+  if (hudHit(v)) return;
+  if (state === 'win' && winT > 2.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const { x, y } = toPlay(v);
+  if (phase === 'pitch') {
+    const L = layout();
+    let bestG = null, bd = 46;
+    for (const g of gaps) {
+      if (g.coats >= g.need) continue;
+      const c = toArk(L, g.x, g.y);
+      const d = Math.hypot(x - c.x, y - c.y);
+      if (d < bd) { bd = d; bestG = g; }
+    }
+    if (bestG) pitchGap(bestG);
+    return;
+  }
+  const hit = pieceAt(x, y);
+  if (hit && hit.flying) { catchFlying(hit.flying); return; }
+  if (hit && hit.piece) {
+    selectPiece(hit.piece);
+    drag = { piece: hit.piece, sx: x, sy: y, ox: hit.piece.x - x, oy: hit.piece.y - y, moved: false, id: e.pointerId };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    return;
+  }
+  if (selected && onArk(x, y)) tryPlace(selected);
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag || state !== 'play') return;
+  const { x, y } = toPlay(toView(e));
+  if (!drag.moved && Math.hypot(x - drag.sx, y - drag.sy) > 14) drag.moved = true;
+  if (drag.moved) { drag.piece.x = x + drag.ox; drag.piece.y = y + drag.oy; }
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  if (!d.moved || state !== 'play') return;
+  const { x, y } = toPlay(toView(e));
+  if (onArk(x, y) && tray.includes(d.piece)) tryPlace(d.piece);
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', () => { drag = null; });
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && winT > 2.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || e.repeat) return;
+  const n = parseInt(e.key, 10);
+  if (phase === 'build' && n >= 1 && n <= tray.length && tray[n - 1]) { selectPiece(tray[n - 1]); return; }
+  if (phase === 'build' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+    const list = tray.filter(Boolean);
+    if (!list.length) return;
+    const i = list.indexOf(selected);
+    selectPiece(list[(i + (e.code === 'ArrowLeft' ? -1 : 1) + list.length) % list.length]);
+    return;
+  }
+  if (e.code === 'Space' || e.code === 'Enter') {
+    if (phase === 'pitch') { const g = gaps.find((q) => q.coats < q.need); if (g) pitchGap(g); }
+    else if (selected) tryPlace(selected);
+    else if (flying.length) catchFlying(flying[0]);
+  }
+});
+window.addEventListener('blur', () => keys.clear());
+
+// ============================================================
+//  Extra sounds
+// ============================================================
+sfx.knock = function () { this.tone(180, 0.09, 'triangle', 0.35); this.noiseBurst(400, 0.1, 0.25, 1, 200, 'lowpass'); this.tone(150, 0.09, 'triangle', 0.25, 0.13); };
+sfx.brush = function () { this.noiseBurst(900, 0.25, 0.2, 0.7, 400, 'lowpass'); };
+
+// ============================================================
+//  Drawing the ark's parts (in ark units)
+// ============================================================
+function partPath(s) {
+  ctx.beginPath();
+  switch (s.kind) {
+    case 'keel': ctx.roundRect ? ctx.roundRect(-41, -4, 82, 4.5, 1.6) : ctx.rect(-41, -4, 82, 4.5); break;
+    case 'rib':
+      ctx.moveTo(s.x - 1.6, -3); ctx.quadraticCurveTo(s.x - 1.6 + Math.sign(s.x || 1) * 2.5, -12.5, s.x - 1.6 + Math.sign(s.x || 1) * 0.5, -22.5);
+      ctx.lineTo(s.x + 1.6 + Math.sign(s.x || 1) * 0.5, -22.5); ctx.quadraticCurveTo(s.x + 1.6 + Math.sign(s.x || 1) * 2.5, -12.5, s.x + 1.6, -3);
+      ctx.closePath(); break;
+    case 'plank': {
+      const a = hullHW(s.y0), b = hullHW(s.y1);
+      ctx.moveTo(-a, s.y0); ctx.lineTo(a, s.y0);
+      ctx.quadraticCurveTo(b + 1.5, (s.y0 + s.y1) / 2, b, s.y1);
+      ctx.lineTo(-b, s.y1);
+      ctx.quadraticCurveTo(-b - 1.5, (s.y0 + s.y1) / 2, -a, s.y0);
+      ctx.closePath(); break;
+    }
+    case 'deck': ctx.rect(s.x0, s.y0, s.x1 - s.x0, s.y1 - s.y0); break;
+    case 'room': ctx.rect(s.x0, s.y0, s.w, s.h); break;
+    case 'roof':
+      ctx.moveTo(-s.w / 2, s.top); ctx.lineTo(-s.w / 2 + 9, s.top - 12); ctx.lineTo(s.w / 2 - 9, s.top - 12); ctx.lineTo(s.w / 2, s.top); ctx.closePath(); break;
+    case 'window': ctx.rect(-6, s.top - 8.5, 12, 5.5); break;
+    case 'door': ctx.rect(23, -19.5, 8, 14); break;
+  }
+}
+
+function drawPart(s, k) {
+  const lw = 1 / k;
+  ctx.save();
+  if (s.popT > 0) {
+    const [cx, cy] = slotCenter(s);
+    const f = 1 + Math.sin(s.popT / 0.35 * Math.PI) * 0.12;
+    ctx.translate(cx, cy); ctx.scale(f, f); ctx.translate(-cx, -cy);
+  }
+  ctx.lineJoin = 'round';
+  switch (s.kind) {
+    case 'keel':
+      partPath(s); ctx.fillStyle = '#5e3b1d'; ctx.fill();
+      ctx.strokeStyle = '#3e2610'; ctx.lineWidth = 2 * lw; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(-40, -3.6, 80, 1);
+      break;
+    case 'rib':
+      partPath(s); ctx.fillStyle = '#8a5a2b'; ctx.fill(); ctx.strokeStyle = '#5a3818'; ctx.lineWidth = 2 * lw; ctx.stroke();
+      break;
+    case 'plank': {
+      partPath(s); ctx.fillStyle = s.row % 2 ? '#b97a45' : '#a8693a'; ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.strokeStyle = 'rgba(90,50,20,0.35)'; ctx.lineWidth = 1.2 * lw;
+      const m = (s.y0 + s.y1) / 2;
+      ctx.beginPath(); ctx.moveTo(-40, m - 1); ctx.quadraticCurveTo(0, m + 1, 40, m - 1.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-20, m + 2); ctx.quadraticCurveTo(10, m + 1, 30, m + 2.5); ctx.stroke();
+      ctx.restore();
+      partPath(s); ctx.strokeStyle = '#6a3f1c'; ctx.lineWidth = 2 * lw; ctx.stroke();
+      ctx.fillStyle = '#4a3020';
+      for (const x of [-30, -10, 10, 30]) { ctx.beginPath(); ctx.arc(x, m, 0.55, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'deck':
+      partPath(s); ctx.fillStyle = '#d6a35c'; ctx.fill(); ctx.strokeStyle = '#8f6230'; ctx.lineWidth = 2 * lw; ctx.stroke();
+      ctx.fillStyle = '#7a5228';
+      for (let x = s.x0 + 4; x < s.x1; x += 8) { ctx.beginPath(); ctx.arc(x, (s.y0 + s.y1) / 2, 0.45, 0, TAU); ctx.fill(); }
+      break;
+    case 'room': {
+      ctx.fillStyle = '#6e4a2a'; ctx.fillRect(s.x0, s.y0, s.w, s.h);
+      ctx.fillStyle = '#e5c06a'; ctx.fillRect(s.x0, s.y0 + s.h - 2.6, s.w, 2.6);     // straw
+      ctx.fillStyle = 'rgba(255,220,140,0.18)'; ctx.fillRect(s.x0 + 1.5, s.y0 + 1.5, s.w - 3, 5);
+      // a little feed trough
+      ctx.fillStyle = '#9a6a3a'; ctx.fillRect(s.x0 + s.w * 0.25, s.y0 + s.h - 4.6, s.w * 0.5, 2);
+      if (state === 'win' && (s.i % 2 === 0)) {
+        // someone is peeking out already!
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(s.x0 + s.w / 2 - 1.2, s.y0 + 6, 0.9, 0, TAU); ctx.arc(s.x0 + s.w / 2 + 1.2, s.y0 + 6, 0.9, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#222';
+        ctx.beginPath(); ctx.arc(s.x0 + s.w / 2 - 1.2, s.y0 + 6.2, 0.45, 0, TAU); ctx.arc(s.x0 + s.w / 2 + 1.2, s.y0 + 6.2, 0.45, 0, TAU); ctx.fill();
+      }
+      ctx.strokeStyle = '#9a6a3a'; ctx.lineWidth = 1.3; ctx.strokeRect(s.x0 + 0.6, s.y0 + 0.6, s.w - 1.2, s.h - 1.2);
+      ctx.strokeStyle = '#5a3818'; ctx.lineWidth = 1.5 * lw; ctx.strokeRect(s.x0, s.y0, s.w, s.h);
+      break;
+    }
+    case 'roof': {
+      partPath(s); ctx.fillStyle = '#7a4a2a'; ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.strokeStyle = 'rgba(40,20,5,0.35)'; ctx.lineWidth = 1.2 * lw;
+      for (let y = s.top - 3; y > s.top - 12; y -= 3) { ctx.beginPath(); ctx.moveTo(-s.w / 2, y); ctx.lineTo(s.w / 2, y); ctx.stroke(); }
+      ctx.restore();
+      partPath(s); ctx.strokeStyle = '#4a2a12'; ctx.lineWidth = 2 * lw; ctx.stroke();
+      ctx.fillStyle = '#5a341a'; ctx.fillRect(-s.w / 2 + 8, s.top - 13, s.w - 16, 1.6);
+      break;
+    }
+    case 'window':
+      ctx.fillStyle = '#c08850'; ctx.fillRect(-6, s.top - 8.5, 12, 5.5);
+      ctx.fillStyle = state === 'fail' ? '#3a4a66' : '#ffe9a0'; ctx.fillRect(-5, s.top - 7.6, 10, 3.7);
+      ctx.fillStyle = '#c08850'; ctx.fillRect(-0.5, s.top - 8, 1, 4.8); ctx.fillRect(-5, s.top - 6, 10, 0.8);
+      break;
+    case 'door':
+      ctx.fillStyle = '#8f5b33'; roundRect(23, -19.5, 8, 14, 1); ctx.fill();
+      ctx.strokeStyle = '#5a3818'; ctx.lineWidth = 1.5 * lw; ctx.stroke();
+      ctx.strokeStyle = 'rgba(60,30,10,0.5)'; ctx.lineWidth = 1 * lw;
+      ctx.beginPath(); ctx.moveTo(25.7, -19); ctx.lineTo(25.7, -6); ctx.moveTo(28.3, -19); ctx.lineTo(28.3, -6); ctx.stroke();
+      ctx.fillStyle = '#e0b34a'; ctx.beginPath(); ctx.arc(29.4, -12.5, 0.7, 0, TAU); ctx.fill();
+      break;
+  }
+  ctx.restore();
+}
+
+function drawGhost(s, k, isNext) {
+  partPath(s);
+  if (isNext) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+    ctx.fillStyle = `rgba(255,214,90,${0.35 + pulse * 0.3})`;
+    ctx.fill();
+    ctx.shadowColor = 'rgba(255,220,100,0.9)'; ctx.shadowBlur = 18 * k * 0.15;
+    ctx.strokeStyle = `rgba(255,236,150,${0.8 + pulse * 0.2})`; ctx.lineWidth = 3 / k;
+    ctx.setLineDash([]); ctx.stroke();
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5 / k;
+    ctx.setLineDash([4 / k, 3 / k]); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function drawArk() {
+  const L = layout();
+  // the wooden stocks it is built on
+  ctx.fillStyle = '#7b5a3a';
+  for (const ux of [-30, 0, 30]) { const p = toArk(L, ux, 0); roundRect(p.x - 3 * L.k, p.y - 2, 6 * L.k, GROUND - p.y + 6, 3); ctx.fill(); }
+  if (L.narrow) {
+    // a sturdy scaffold holds the ark up off the ground
+    const a = toArk(L, -33, 0), b = toArk(L, 33, 0), m = (a.y + GROUND) / 2;
+    ctx.strokeStyle = '#6a4a2c'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x, m); ctx.lineTo(b.x, m); ctx.moveTo(a.x, a.y + 4); ctx.lineTo(L.ax, GROUND - 4); ctx.lineTo(b.x, a.y + 4); ctx.stroke();
+  }
+  ctx.save();
+  ctx.translate(L.ax, L.ay); ctx.scale(L.k, L.ky);
+  // ghosts first so placed parts sit on top of them
+  for (let i = 0; i < slots.length; i++) if (!slots[i].placed && i !== nextSlot) drawGhost(slots[i], L.k, false);
+  const order = ['rib', 'keel', 'plank', 'deck', 'room', 'roof', 'window', 'door'];
+  for (const kind of order) for (const s of slots) if (s.placed && s.kind === kind) drawPart(s, L.k);
+  if (state !== 'title' && phase === 'build' && slots[nextSlot]) drawGhost(slots[nextSlot], L.k, true);
+  // gaps and pitch
+  if (phase === 'pitch' || state === 'win' || state === 'fail') {
+    for (const g of gaps) {
+      ctx.save(); ctx.translate(g.x, g.y); ctx.rotate(g.a * 0.3);
+      const done = g.coats >= g.need;
+      if (!done) {
+        // a crack with daylight showing through
+        ctx.fillStyle = '#20140a';
+        ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-2, -0.9); ctx.lineTo(0, 0.2); ctx.lineTo(2, -0.8); ctx.lineTo(4, 0); ctx.lineTo(2, 0.9); ctx.lineTo(0, 0.3); ctx.lineTo(-2, 1); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,240,190,0.85)';
+        ctx.fillRect(-2.5, -0.25, 5, 0.5);
+        if (state === 'play') {
+          const pulse = 0.5 + 0.5 * Math.sin(t * 6 + g.x);
+          ctx.strokeStyle = `rgba(255,236,150,${0.5 + pulse * 0.5})`; ctx.lineWidth = 2.5 / L.k;
+          ctx.beginPath(); ctx.arc(0, 0, 5.5 + pulse * 1.2, 0, TAU); ctx.stroke();
+        }
+      }
+      if (g.coats > 0) {
+        // blobs of sticky black pitch
+        const r = done ? 3.6 : 2.4;
+        ctx.fillStyle = '#231a12';
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 1.6, r * 0.8, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.beginPath(); ctx.ellipse(-r * 0.5, -r * 0.3, r * 0.5, r * 0.2, 0, 0, TAU); ctx.fill();
+      }
+      if (g.brushT > 0) {
+        // the brush sweeping across
+        const f = 1 - g.brushT / 0.4;
+        ctx.translate(lerp(-5, 5, f), -2.5);
+        ctx.rotate(-0.5);
+        ctx.fillStyle = '#9a6a3a'; ctx.fillRect(-0.6, -9, 1.2, 8);
+        ctx.fillStyle = '#231a12'; roundRect(-1.8, -1.5, 3.6, 3, 0.8); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Tray piece icons
+// ============================================================
+function drawIcon(kind, s) {
+  // s = size (about 80); drawn around (0,0)
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const wood = (col, dark) => { ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 2.5; ctx.stroke(); };
+  const h = s / 2;
+  switch (kind) {
+    case 'keel': roundRect(-h * 0.95, -h * 0.13, h * 1.9, h * 0.26, 4); wood('#5e3b1d', '#3e2610'); break;
+    case 'rib':
+      ctx.beginPath(); ctx.moveTo(-h * 0.2, h * 0.8); ctx.quadraticCurveTo(h * 0.45, 0, -h * 0.15, -h * 0.8);
+      ctx.lineTo(h * 0.05, -h * 0.8); ctx.quadraticCurveTo(h * 0.65, 0, 0, h * 0.8); ctx.closePath(); wood('#8a5a2b', '#5a3818'); break;
+    case 'plank':
+      ctx.beginPath(); ctx.moveTo(-h, 0); ctx.quadraticCurveTo(-h * 0.8, -h * 0.2, -h * 0.6, -h * 0.2); ctx.lineTo(h * 0.6, -h * 0.2);
+      ctx.quadraticCurveTo(h * 0.8, -h * 0.2, h, 0); ctx.quadraticCurveTo(h * 0.8, h * 0.2, h * 0.6, h * 0.2); ctx.lineTo(-h * 0.6, h * 0.2);
+      ctx.quadraticCurveTo(-h * 0.8, h * 0.2, -h, 0); wood('#b97a45', '#6a3f1c');
+      ctx.strokeStyle = 'rgba(90,50,20,0.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-h * 0.6, -h * 0.03); ctx.lineTo(h * 0.6, h * 0.03); ctx.stroke(); break;
+    case 'deck':
+      roundRect(-h * 0.95, -h * 0.11, h * 1.9, h * 0.22, 2); wood('#d6a35c', '#8f6230');
+      ctx.fillStyle = '#7a5228'; for (let x = -h * 0.8; x <= h * 0.8; x += h * 0.4) { ctx.beginPath(); ctx.arc(x, 0, 2, 0, TAU); ctx.fill(); } break;
+    case 'room':
+      ctx.fillStyle = '#6e4a2a'; ctx.fillRect(-h * 0.6, -h * 0.5, h * 1.2, h);
+      ctx.fillStyle = '#e5c06a'; ctx.fillRect(-h * 0.6, h * 0.3, h * 1.2, h * 0.2);
+      ctx.strokeStyle = '#9a6a3a'; ctx.lineWidth = 5; ctx.strokeRect(-h * 0.6 + 2.5, -h * 0.5 + 2.5, h * 1.2 - 5, h - 5);
+      ctx.strokeStyle = '#5a3818'; ctx.lineWidth = 2; ctx.strokeRect(-h * 0.6, -h * 0.5, h * 1.2, h); break;
+    case 'roof':
+      ctx.beginPath(); ctx.moveTo(-h * 0.95, h * 0.3); ctx.lineTo(-h * 0.5, -h * 0.35); ctx.lineTo(h * 0.5, -h * 0.35); ctx.lineTo(h * 0.95, h * 0.3); ctx.closePath(); wood('#7a4a2a', '#4a2a12');
+      ctx.strokeStyle = 'rgba(40,20,5,0.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-h * 0.75, 0); ctx.lineTo(h * 0.75, 0); ctx.stroke(); break;
+    case 'window':
+      ctx.fillStyle = '#c08850'; ctx.fillRect(-h * 0.45, -h * 0.3, h * 0.9, h * 0.6);
+      ctx.fillStyle = '#ffe9a0'; ctx.fillRect(-h * 0.35, -h * 0.2, h * 0.7, h * 0.4);
+      ctx.fillStyle = '#c08850'; ctx.fillRect(-2, -h * 0.25, 4, h * 0.5); ctx.fillRect(-h * 0.4, -2, h * 0.8, 4);
+      ctx.strokeStyle = '#6a3f1c'; ctx.lineWidth = 2; ctx.strokeRect(-h * 0.45, -h * 0.3, h * 0.9, h * 0.6); break;
+    case 'door':
+      roundRect(-h * 0.3, -h * 0.55, h * 0.6, h * 1.1, 4); wood('#8f5b33', '#5a3818');
+      ctx.strokeStyle = 'rgba(60,30,10,0.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-h * 0.1, -h * 0.5); ctx.lineTo(-h * 0.1, h * 0.5); ctx.moveTo(h * 0.1, -h * 0.5); ctx.lineTo(h * 0.1, h * 0.5); ctx.stroke();
+      ctx.fillStyle = '#e0b34a'; ctx.beginPath(); ctx.arc(h * 0.19, 0, 3, 0, TAU); ctx.fill(); break;
+    // pieces that don't fit
+    case 'bent':
+      ctx.beginPath(); ctx.moveTo(-h * 0.95, h * 0.1); ctx.lineTo(-h * 0.1, -h * 0.35); ctx.lineTo(h * 0.95, h * 0.05); ctx.lineTo(h * 0.95, h * 0.33); ctx.lineTo(-h * 0.1, -h * 0.05); ctx.lineTo(-h * 0.95, h * 0.38); ctx.closePath(); wood('#b07445', '#6a3f1c'); break;
+    case 'wheel':
+      ctx.beginPath(); ctx.arc(0, 0, h * 0.62, 0, TAU); ctx.strokeStyle = '#6a3f1c'; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = '#a8693a'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 3.5;
+      for (let a = 0; a < 6; a++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a * Math.PI / 3) * h * 0.58, Math.sin(a * Math.PI / 3) * h * 0.58); ctx.stroke(); }
+      ctx.fillStyle = '#5e3b1d'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.fill(); break;
+    case 'twig':
+      ctx.strokeStyle = '#7a5a3a'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-h * 0.9, h * 0.35); ctx.quadraticCurveTo(0, h * 0.1, h * 0.9, -h * 0.3); ctx.moveTo(-h * 0.1, h * 0.17); ctx.lineTo(h * 0.1, -h * 0.35); ctx.stroke();
+      ctx.fillStyle = '#6fae4a';
+      for (const [x, y, a] of [[h * 0.9, -h * 0.3, -0.5], [h * 0.1, -h * 0.35, -1.2], [h * 0.45, -h * 0.05, 0.6], [-h * 0.5, h * 0.25, 0.9]]) { ctx.beginPath(); ctx.ellipse(x, y, 9, 4.5, a, 0, TAU); ctx.fill(); }
+      break;
+    case 'broken':
+      ctx.save(); ctx.rotate(-0.12);
+      ctx.beginPath(); ctx.moveTo(-h * 0.95, -h * 0.17); ctx.lineTo(-h * 0.1, -h * 0.17); ctx.lineTo(-h * 0.02, -h * 0.05); ctx.lineTo(-h * 0.14, h * 0.03); ctx.lineTo(-h * 0.04, h * 0.17); ctx.lineTo(-h * 0.95, h * 0.17); ctx.closePath(); wood('#b97a45', '#6a3f1c');
+      ctx.rotate(0.3);
+      ctx.beginPath(); ctx.moveTo(h * 0.95, -h * 0.17); ctx.lineTo(h * 0.12, -h * 0.17); ctx.lineTo(h * 0.04, -h * 0.05); ctx.lineTo(h * 0.16, h * 0.03); ctx.lineTo(h * 0.06, h * 0.17); ctx.lineTo(h * 0.95, h * 0.17); ctx.closePath(); wood('#b97a45', '#6a3f1c');
+      ctx.restore(); break;
+    case 'stub':
+      roundRect(-h * 0.22, -h * 0.13, h * 0.44, h * 0.26, 3); wood('#d6a35c', '#8f6230');
+      ctx.fillStyle = '#7a5228'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, TAU); ctx.fill(); break;
+  }
+}
+
+function drawTray() {
+  // the timber pile's wooden shelf
+  ctx.fillStyle = '#6b4a2c';
+  roundRect(6, TRAY_Y, W - 12, TRAY_H + 10, 18); ctx.fill();
+  ctx.fillStyle = '#835c38';
+  roundRect(10, TRAY_Y + 4, W - 20, TRAY_H + 2, 15); ctx.fill();
+  const next = slots[nextSlot];
+  for (let i = 0; i < cfg.tray; i++) {
+    const L = trayLayout(i);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    roundRect(L.x - L.w / 2, L.y - L.h / 2, L.w, L.h, 14); ctx.fill();
+  }
+  const drawPiece = (p, i) => {
+    const L = i >= 0 ? trayLayout(i) : { w: 104, h: 112 };
+    const glow = cfg.hand && phase === 'build' && next && !p.decoy && p.kind === next.kind && state === 'play';
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (p.spin) ctx.rotate(p.spin);
+    if (p.wob > 0) ctx.rotate(Math.sin(p.wob * 40) * 0.12);
+    ctx.fillStyle = p === selected ? '#fff6d6' : '#f4e6c4';
+    ctx.shadowColor = glow || p === selected ? 'rgba(255,214,90,0.95)' : 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = glow || p === selected ? 18 + 6 * Math.sin(t * 6) : 6;
+    ctx.shadowOffsetY = glow || p === selected ? 0 : 3;
+    roundRect(-L.w / 2 + 3, -L.h / 2 + 3, L.w - 6, L.h - 6, 12); ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    if (p === selected || glow) { ctx.strokeStyle = '#f2b632'; ctx.lineWidth = 4; ctx.stroke(); }
+    ctx.translate(0, cfg.labels ? -8 : 0);
+    drawIcon(p.kind, Math.min(L.w - 14, 92));
+    if (cfg.labels) {
+      ctx.fillStyle = '#6a4a20'; ctx.font = '600 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(NAMES[p.kind], 0, L.h / 2 - 8);
+    }
+    ctx.restore();
+  };
+  for (let i = 0; i < tray.length; i++) if (tray[i] && !(drag && drag.piece === tray[i])) drawPiece(tray[i], i);
+  return drawPiece;
+}
+
+// ============================================================
+//  Scenery
+// ============================================================
+function drawSky() {
+  const f = state === 'title' ? 0 : state === 'win' ? Math.max(0, 1 - winT / 3) * 0.7 : 1 - timeLeft / cfg.time;
+  const g = ctx.createLinearGradient(0, -offY, 0, GROUND);
+  const top = mix('#8fd0f2', '#4a5670', f), mid = mix('#cdeaf7', '#7d8798', f), low = mix('#fff1c8', '#a9a8a0', f);
+  g.addColorStop(0, top); g.addColorStop(0.6, mid); g.addColorStop(1, low);
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, GROUND + offY + 10);
+  // sun (fading behind the clouds)
+  ctx.globalAlpha = 1 - f * 0.8;
+  const sg = ctx.createRadialGradient(W * 0.8, 210, 10, W * 0.8, 210, 120);
+  sg.addColorStop(0, 'rgba(255,250,220,0.95)'); sg.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.8, 210, 120, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 1;
+  // far hills
+  ctx.fillStyle = mix('#a9cf8a', '#6f8070', f);
+  ctx.beginPath(); ctx.moveTo(-offX, GROUND);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, GROUND - 120 + Math.sin(x / 120) * 30 + Math.sin(x / 47) * 10);
+  ctx.lineTo(W + offX, GROUND); ctx.fill();
+  // storm clouds drifting in from both sides
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const side = i % 2 ? 1 : -1;
+    const home = lerp(-0.1, 1.1, hash(i, 3));
+    const start = side < 0 ? -0.5 : 1.5;
+    const x = lerp(start, home, ease(clamp(f * 1.5 - hash(i, 9) * 0.4, 0, 1))) * W + Math.sin(t * 0.3 + i) * 12;
+    const y = -offY * 0.6 + 70 + hash(i, 5) * 170;
+    const w = 180 + hash(i, 7) * 160;
+    drawCloud(x, y, w, w * 0.34, mix('#f4f6fa', '#6c7488', f), mix('#d8dfe9', '#4f566a', f));
+  }
+  // friendly white clouds when the rain has passed
+  if (state === 'title') for (let i = 0; i < 4; i++) drawCloud(((hash(i, 2) * (W + 300) + t * 8) % (W + 300)) - 150, 120 + hash(i, 4) * 150 - offY * 0.4, 130, 44);
+}
+function mix(a, b, f) {
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(lerp((A >> s) & 255, (B >> s) & 255, clamp(f, 0, 1)));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function drawGround() {
+  ctx.fillStyle = '#8fbf62';
+  ctx.fillRect(-offX, GROUND - 6, viewW, H - GROUND + 6);
+  ctx.fillStyle = '#7aae55';
+  ctx.beginPath(); ctx.moveTo(-offX, GROUND);
+  for (let x = -offX; x <= W + offX; x += 24) ctx.quadraticCurveTo(x + 12, GROUND - 8, x + 24, GROUND);
+  ctx.lineTo(W + offX, H); ctx.lineTo(-offX, H); ctx.fill();
+  // wood shavings and a sawhorse
+  ctx.fillStyle = '#e8c88a';
+  for (let k = 0; k < 14; k++) { ctx.beginPath(); ctx.ellipse(hash(k, 1) * W, GROUND + 10 + hash(k, 2) * 30, 4, 1.6, hash(k, 3) * 3, 0, TAU); ctx.fill(); }
+}
+
+function drawRain() {
+  ctx.strokeStyle = 'rgba(190,220,255,0.75)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const r of rain) { ctx.moveTo(r.x, r.y); ctx.lineTo(r.x + 3, r.y - 18); }
+  ctx.stroke();
+}
+
+function drawWind() {
+  if (gust <= 0.02) return;
+  ctx.save();
+  ctx.strokeStyle = `rgba(255,255,255,${gust * 0.6})`; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const y = 200 + hash(i, 1) * 480;
+    const x = ((t * 700 * gustDir + hash(i, 2) * (W + 400)) % (W + 400) + W + 400) % (W + 400) - 200;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 50 * gustDir, y - 10, x + 100 * gustDir, y);
+    ctx.arc(x + 100 * gustDir, y - 10, 10, Math.PI / 2, gustDir > 0 ? -Math.PI / 2 : Math.PI * 1.5, gustDir < 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawNextBanner() {
+  if (state !== 'play') return;
+  const y = 150;
+  let text, kind = null;
+  if (phase === 'build') { const s = slots[nextSlot]; if (!s) return; text = `Next: the ${NAMES[s.kind]}`; kind = s.kind; }
+  else { const left = gaps.filter((g) => g.coats < g.need).length; text = `Brush pitch on the gaps: ${left} left`; }
+  ctx.save();
+  ctx.font = '700 20px Fredoka, sans-serif';
+  const tw = ctx.measureText(text).width;
+  const w = tw + (kind ? 74 : 30), h = 50;
+  const x = W / 2 - w / 2;
+  ctx.fillStyle = 'rgba(255,250,232,0.94)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(x, y - h / 2, w, h, 25); ctx.fill(); ctx.stroke();
+  if (kind) { ctx.save(); ctx.translate(x + 34, y); drawIcon(kind, 42); ctx.restore(); }
+  ctx.fillStyle = '#6a4a10'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + (kind ? 62 : 15), y + 1);
+  ctx.restore();
+}
+
+function drawHint() {
+  if (!cfg.hand || state !== 'play') return;
+  const L = layout();
+  if (phase === 'build') {
+    const next = slots[nextSlot]; if (!next) return;
+    if (selected && !selected.decoy && selected.kind === next.kind) {
+      const c = toArk(L, ...slotCenter(next));
+      drawHand(c.x, c.y + 6, -Math.PI / 2);
+    } else {
+      const i = tray.findIndex((p) => p && !p.decoy && p.kind === next.kind);
+      if (i >= 0 && !drag) drawHand(tray[i].x, tray[i].y + 18, -Math.PI / 2);
+    }
+  } else {
+    const g = gaps.find((q) => q.coats < q.need);
+    if (g) { const c = toArk(L, g.x, g.y); drawHand(c.x, c.y + 8, -Math.PI / 2); }
+  }
+}
+
+function drawNoah() {
+  const L = layout();
+  let mood = 'watch';
+  if (state === 'win') mood = winT > 1 ? 'joy' : 'wow';
+  else if (state === 'fail') mood = 'dismay';
+  else if (state === 'play' && hammerT > 0) mood = 'work';
+  else if (state === 'play' && timeLeft < cfg.time * 0.25) mood = 'worried';
+  else if (state === 'play') mood = 'point';
+  drawPerson(NOAH, L.noahX, GROUND + 26, W < 600 ? 1.15 : 1.4, mood, 0.6, -0.2, (0.6 - hammerT) * 18);
+  // the pitch pot beside him
+  if (phase === 'pitch' || state === 'win') {
+    const x = L.noahX + 34, y = GROUND + 30;
+    ctx.fillStyle = '#5a4030'; roundRect(x - 13, y - 22, 26, 22, 6); ctx.fill();
+    ctx.fillStyle = '#231a12'; ctx.beginPath(); ctx.ellipse(x, y - 21, 12, 4, 0, 0, TAU); ctx.fill();
+  }
+}
+
+// ============================================================
+//  Render
+// ============================================================
+let shakeT = 0;
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 3; sy = rand(-3, 3) * shakeT * 3; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawSky();
+  drawGround();
+  drawArk();
+  drawNoah();
+  drawRain();
+  const drawPiece = drawTray();
+  drawWind();
+  for (const f of flying) drawPiece(f.piece, -1);
+  if (drag && drag.piece) drawPiece(drag.piece, -1);
+  drawParticles();
+  drawNextBanner();
+  drawHint();
+  if (state === 'win' && winT > 1.2) {
+    // a soft glow of God's blessing over the finished ark
+    const L = layout();
+    const a = clamp((winT - 1.2) / 1.5, 0, 0.5);
+    const g = ctx.createRadialGradient(L.ax, L.top, 10, L.ax, L.top, L.AW * 0.8);
+    g.addColorStop(0, `rgba(255,245,200,${a})`); g.addColorStop(1, 'rgba(255,245,200,0)');
+    ctx.fillStyle = g; ctx.fillRect(-offX, -offY, viewW, GROUND + offY);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHudTitle(state === 'title' ? 'Build the Ark' : `Level ${level} · ${cfg.name}`);
+  if (state !== 'title') drawMeter(`Rain in ${Math.ceil(timeLeft)}s`, timeLeft / cfg.time, timeLeft < cfg.time * 0.25 ? '#ff9a6b' : '#7cc4f2', timeLeft < cfg.time * 0.15 && state === 'play');
+  drawHudButtons();
+  drawMessage(offY + 214);
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
