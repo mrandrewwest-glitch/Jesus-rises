@@ -226,6 +226,9 @@ function resize() {
   W = Math.min(viewW, MAX_W);
   offX = (viewW - W) / 2;
   offY = viewH - H;   // any extra height becomes sky above the playfield
+  HZ = -clamp(offY, 0, 300) * 0.6;
+  PY0 = 380 + HZ;
+  SZ = clamp(W / 760, 1, 1.4);
   keepInside();
 }
 window.addEventListener('resize', resize);
@@ -265,7 +268,9 @@ function hash(a, b) {
 //  Tuning
 // ============================================================
 const TOPH = 104;         // HUD strip at the top of the screen
-const PY0 = 380;          // top of the pasture (the hills are above it)
+let PY0 = 380;            // top of the pasture (the hills are above it); moves up on tall screens
+let HZ = 0;               // how far the horizon is lifted on tall screens
+let SZ = 1;               // size of the animals and David (a little bigger on wide screens)
 const HIT_R = 62;         // how close a tap must be to a lion or bear
 const SHEEP_R = 46;       // how close a tap must be to a wandering sheep
 const MAX_LOST = 3;       // lambs you may lose before the level is lost
@@ -274,9 +279,9 @@ const LEVELS = [
   { name: 'Green Pastures',          sheep: 5, lions: 3, bears: 0, together: 1, dur: 38, sneak: 52, carry: 48, wander: 11, wspeed: 26, night: false, bush: false },
   { name: 'A Bear in the Bushes',    sheep: 6, lions: 2, bears: 2, together: 1, dur: 44, sneak: 58, carry: 54, wander: 9,  wspeed: 30, night: false, bush: false },
   { name: 'Lion and Bear Together',  sheep: 7, lions: 4, bears: 2, together: 2, dur: 50, sneak: 68, carry: 62, wander: 7,  wspeed: 33, night: false, bush: false },
-  { name: 'Sneaky in the Bushes',    sheep: 7, lions: 4, bears: 3, together: 2, dur: 54, sneak: 76, carry: 68, wander: 6,  wspeed: 36, night: false, bush: true },
-  { name: 'Night Watch',             sheep: 8, lions: 5, bears: 3, together: 2, dur: 56, sneak: 80, carry: 72, wander: 6,  wspeed: 38, night: true,  bush: false },
-  { name: 'The Longest Night',       sheep: 9, lions: 6, bears: 4, together: 3, dur: 64, sneak: 92, carry: 80, wander: 5,  wspeed: 42, night: true,  bush: true },
+  { name: 'Sneaky in the Bushes',    sheep: 7, lions: 5, bears: 3, together: 2, dur: 56, sneak: 84, carry: 72, wander: 5.5, wspeed: 36, night: false, bush: true },
+  { name: 'Night Watch',             sheep: 8, lions: 6, bears: 3, together: 3, dur: 60, sneak: 96, carry: 80, wander: 4.5, wspeed: 40, night: true,  bush: false },
+  { name: 'The Longest Night',       sheep: 9, lions: 8, bears: 5, together: 3, dur: 70, sneak: 108, carry: 88, wander: 3.5, wspeed: 44, night: true,  bush: true },
 ];
 const LAST_LEVEL = LEVELS.length;
 const LEVEL_VERSE = ['youngest', 'shepherd', 'pastures', 'shepherd', 'youngest', 'pastures'];
@@ -314,9 +319,11 @@ let told = {};
 let flashT = 0, shakeT = 0;
 const david = { x: 0, y: 0, tx: 0, ty: 0, swing: 0, mood: 'watch', moodT: 0, face: 1, blink: 0, blinkT: 2, walk: 0, moving: false, hair: '#7a3a1a', i: 0 };
 
-const flockC = () => ({ x: W / 2, y: 650 });
-const flockR = () => ({ x: Math.min(W * 0.28, 210), y: 95 });
+const flockC = () => ({ x: W / 2, y: 650 + HZ * 0.45 });
+const flockR = () => ({ x: Math.min(W * 0.28, 260), y: 95 - HZ * 0.2 });
 const leftEdge = () => -offX - 80;
+// Wide screens leave a longer walk from the edge to the flock, so lions and bears move a bit faster there
+const speedScale = () => clamp(Math.pow((W / 2 - flockR().x + offX + 80) / 186, 0.7), 1, 2);
 const rightEdge = () => W + offX + 80;
 
 // ============================================================
@@ -385,7 +392,7 @@ function updateSheep(dt) {
       s.mood = s.state === 'scared' ? 'shock' : 'joy';
     } else if (s.state === 'carried' && s.by) {
       const p = s.by;
-      s.x = p.x + p.face * 38 * p.k; s.y = p.y - 6;
+      s.x = p.x + p.face * 40 * p.k * SZ; s.y = p.y - 10 * SZ;
       s.face = p.face;
       s.mood = 'shock';
       continue;
@@ -450,7 +457,7 @@ function spawnPred(kind) {
   const y = rand(PY0 + 90, H - 50);
   const bear = kind === 'bear';
   const p = { kind, x, y, face: -side, k: bear ? 1.12 : 1, hp: bear ? 2 : 1, state: 'sneak', target: null, walk: 0, stun: 0, hitT: 0,
-    speed: cfg.sneak * (bear ? 0.85 : 1) * rand(0.92, 1.08), bush: cfg.bush, blink: 0, flee: 0, id: Math.random() };
+    speed: cfg.sneak * speedScale() * (bear ? 0.85 : 1) * rand(0.92, 1.08), bush: cfg.bush, blink: 0, flee: 0, id: Math.random() };
   pickTarget(p);
   preds.push(p);
   sfx.rustle();
@@ -497,7 +504,7 @@ function updatePreds(dt) {
       }
     } else if (p.state === 'carry') {
       tx = p.face < 0 ? leftEdge() - 40 : rightEdge() + 40; ty = p.y;
-      sp = cfg.carry * (p.kind === 'bear' ? 0.9 : 1);
+      sp = cfg.carry * speedScale() * (p.kind === 'bear' ? 0.9 : 1);
       if (p.x < leftEdge() + 10 || p.x > rightEdge() - 10) {
         const s = p.target;
         s.state = 'gone'; s.by = null;
@@ -522,7 +529,7 @@ function updatePreds(dt) {
   }
 }
 
-function predCenter(p) { return { x: p.x + p.face * 10 * p.k, y: p.y - 34 * p.k }; }
+function predCenter(p) { return { x: p.x + p.face * 10 * p.k * SZ, y: p.y - 34 * p.k * SZ }; }
 
 function hitPred(p) {
   const c = predCenter(p);
@@ -619,7 +626,9 @@ function drawParticles() {
   ctx.globalAlpha = 1;
 }
 function popText(x, y, text, col = '#fff2b0') {
-  x = clamp(x, -offX + 90, W + offX - 90);
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const hw = ctx.measureText(text).width / 2 + 12;
+  x = clamp(x, -offX + hw, W + offX - hw);
   popups.push({ x, y, text, col, t: 1.4 });
 }
 function addScore(n, x, y, text) {
@@ -736,7 +745,7 @@ function woolPuffs(cx, cy, rx, ry, r, n) {
 
 function drawSheep(s) {
   if (s.state === 'gone') return;
-  const sc = s.lamb ? 0.68 : 0.88;
+  const sc = (s.lamb ? 0.68 : 0.88) * SZ;
   ctx.save();
   ctx.translate(s.x, s.y);
   if (s.state !== 'carried') {
@@ -784,7 +793,7 @@ function drawSheep(s) {
 // ============================================================
 function drawPred(p, dark) {
   const bear = p.kind === 'bear';
-  const k = p.k;
+  const k = p.k * SZ;
   const moving = p.state !== 'sneak' || p.stun <= 0;
   const run = p.walk;
   const bob = moving ? Math.abs(Math.sin(run)) * 2.5 : 0;
@@ -897,7 +906,7 @@ function drawPred(p, dark) {
 
 // Night: the eyes shine on top of the darkness so you can find them
 function drawPredEyes(p) {
-  const bear = p.kind === 'bear', k = p.k;
+  const bear = p.kind === 'bear', k = p.k * SZ;
   const hx = p.x + p.face * (bear ? 34 : 30) * k, hy = p.y - (bear ? 50 : 48) * k * (p.state === 'sneak' ? 0.86 : 1);
   const glow = 0.75 + 0.25 * Math.sin(t * 5 + p.id * 9);
   for (const ex of [-3, 7]) {
@@ -1029,7 +1038,7 @@ function tapAt(x, y) {
   for (const p of preds) {
     if (p.state === 'flee') continue;
     const c = predCenter(p);
-    const r = HIT_R * p.k + (p.bush ? 14 : 0);
+    const r = HIT_R * p.k * SZ + (p.bush ? 14 : 0);
     const d = Math.hypot(x - c.x, (y - c.y) * 0.85);
     if (d < r && d < bd) { bd = d; bestP = p; }
   }
@@ -1042,8 +1051,8 @@ function tapAt(x, y) {
   let bestS = null; bd = 1e9;
   for (const s of sheep) {
     if (s.state !== 'wander') continue;
-    const d = Math.hypot(x - s.x, y - (s.y - 26));
-    if (d < SHEEP_R + 10 && d < bd) { bd = d; bestS = s; }
+    const d = Math.hypot(x - s.x, y - (s.y - 26 * SZ));
+    if (d < SHEEP_R * SZ + 10 && d < bd) { bd = d; bestS = s; }
   }
   if (bestS) {
     runTo(bestS.x - bestS.face * 34, bestS.y + 4);
@@ -1393,6 +1402,7 @@ function drawWorld() {
   const f = dayF();
   // sky: the day grows golden towards sunset; the night grows towards dawn
   const g = ctx.createLinearGradient(0, top, 0, PY0);
+  const arcBase = 250 + HZ;
   if (night) {
     const dawn = state === 'win' ? 1 : Math.max(0, f - 0.8) / 0.2;
     g.addColorStop(0, `rgb(${lerp(14, 120, dawn) | 0},${lerp(22, 160, dawn) | 0},${lerp(60, 220, dawn) | 0})`);
@@ -1405,10 +1415,10 @@ function drawWorld() {
   ctx.fillStyle = g;
   ctx.fillRect(x0, top, x1 - x0, PY0 - top + 10);
   // sun or moon crosses the sky as the time passes
-  const arcX = lerp(x0 + 60, x1 - 60, f), arcY = 250 - Math.sin(f * Math.PI) * 170;
+  const arcX = lerp(x0 + 60, x1 - 60, f), arcY = arcBase - Math.sin(f * Math.PI) * Math.min(170, arcBase - top - 120);
   if (night) {
     for (let i = 0; i < 60; i++) {
-      const sx = lerp(x0, x1, hash(i, 1)), sy = lerp(top, PY0 - 120, hash(i, 2));
+      const sx = lerp(x0, x1, hash(i, 1)), sy = lerp(top, 250 + HZ, hash(i, 2));
       ctx.fillStyle = `rgba(255,255,230,${0.4 + 0.5 * Math.abs(Math.sin(t * 1.5 + i))})`;
       ctx.beginPath(); ctx.arc(sx, sy, 1.2 + hash(i, 3) * 1.4, 0, TAU); ctx.fill();
     }
@@ -1425,15 +1435,16 @@ function drawWorld() {
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     for (let i = 0; i < 4; i++) {
       const cx = ((hash(i, 7) * (x1 - x0) + t * (6 + i * 3)) % (x1 - x0 + 300)) + x0 - 150;
-      drawCloud(cx, lerp(top + 130, 200, hash(i, 8)), 120 + hash(i, 9) * 80, 30);
+      drawCloud(cx, lerp(top + 130, 200 + HZ, hash(i, 8)), 120 + hash(i, 9) * 80, 30);
     }
   }
-  // far hills with little Bethlehem on top
+  // far hills with little Bethlehem on top (lifted on tall screens)
+  ctx.save(); ctx.translate(0, HZ);
   const hillCol = night ? '#2c4a3a' : '#9cc47a';
   ctx.fillStyle = hillCol;
-  ctx.beginPath(); ctx.moveTo(x0, PY0);
+  ctx.beginPath(); ctx.moveTo(x0, 400);
   for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 270 + Math.sin(x * 0.006) * 30 + Math.sin(x * 0.017 + 1) * 14);
-  ctx.lineTo(x1, PY0 + 10); ctx.lineTo(x0, PY0 + 10); ctx.fill();
+  ctx.lineTo(x1, 400); ctx.lineTo(x0, 400); ctx.fill();
   // Bethlehem
   const bx = W * 0.72;
   for (let i = 0; i < 6; i++) {
@@ -1445,9 +1456,10 @@ function drawWorld() {
   }
   // near hill
   ctx.fillStyle = night ? '#24402e' : '#86b85e';
-  ctx.beginPath(); ctx.moveTo(x0, PY0 + 20);
+  ctx.beginPath(); ctx.moveTo(x0, 410);
   for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 330 + Math.sin(x * 0.011 + 2) * 22);
-  ctx.lineTo(x1, PY0 + 20); ctx.fill();
+  ctx.lineTo(x1, 410); ctx.fill();
+  ctx.restore();
   // the meadow
   const mg = ctx.createLinearGradient(0, PY0 - 40, 0, H);
   mg.addColorStop(0, night ? '#2f5a36' : '#8fcf5e'); mg.addColorStop(1, night ? '#1f4026' : '#5fa83e');
@@ -1468,7 +1480,7 @@ function drawWorld() {
     }
   }
   // bushes at the edges where lions and bears hide
-  for (const [bx2, by] of [[x0 + 10, 470], [x0 + 4, 720], [x1 - 10, 520], [x1 - 4, 800]]) {
+  for (const [bx2, by] of [[x0 + 10, 470 + HZ * 0.8], [x0 + 4, 720 + HZ * 0.3], [x1 - 10, 520 + HZ * 0.7], [x1 - 4, 800]]) {
     ctx.fillStyle = night ? '#1d3a22' : '#3d6e2e';
     ctx.beginPath(); ctx.arc(bx2, by, 46, 0, TAU); ctx.arc(bx2 + (bx2 < W / 2 ? 30 : -30), by + 16, 34, 0, TAU); ctx.fill();
     ctx.fillStyle = night ? '#24462a' : '#4f8a3a';
@@ -1489,7 +1501,7 @@ function drawEntities() {
   const list = [];
   for (const s of sheep) if (s.state !== 'gone' && s.state !== 'carried') list.push({ y: s.y, f: () => drawSheep(s) });
   for (const p of preds) list.push({ y: p.y, f: () => { drawPred(p, night); if (p.target && p.target.state === 'carried' && p.target.by === p) drawSheep(p.target); } });
-  list.push({ y: david.y, f: () => drawDavid(david.x, david.y, 1.25) });
+  list.push({ y: david.y, f: () => drawDavid(david.x, david.y, 1.25 * SZ) });
   list.sort((a, b) => a.y - b.y);
   for (const e of list) e.f();
 }
@@ -1609,7 +1621,7 @@ function drawHints() {
   for (const p of preds) {
     if (p.state === 'flee' || p.hintDone) continue;
     const c = predCenter(p);
-    const r = 56 * p.k + Math.sin(t * 6) * 6;
+    const r = 56 * p.k * SZ + Math.sin(t * 6) * 6;
     ctx.strokeStyle = 'rgba(255,240,150,0.9)'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, TAU); ctx.stroke();
     // a little pointing hand
@@ -1659,7 +1671,7 @@ function update(dt) {
     // sheep wander off now and then
     wanderT -= dt;
     if (wanderT <= 0) {
-      if (sheep.filter((s) => s.state === 'wander').length < (level >= 4 ? 2 : 1)) startWander();
+      if (sheep.filter((s) => s.state === 'wander').length < (level >= 6 ? 3 : level >= 4 ? 2 : 1)) startWander();
       wanderT = cfg.wander * rand(0.75, 1.25);
     }
     // lions and bears arrive on their schedule

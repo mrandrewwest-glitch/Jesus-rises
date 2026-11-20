@@ -1,0 +1,1547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14183a">
+<title>Let There Be Light</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #14183a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Let There Be Light</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'harp', accent: 'pipe', ambience: 'none', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  light: { ref: 'Genesis 1:3', KJV: 'And God said, Let there be light: and there was light.', NKJV: 'Then God said, “Let there be light”; and there was light.', NIV: 'And God said, “Let there be light,” and there was light.', NLT: 'Then God said, “Let there be light,” and there was light.' },
+  // When the sky splits into day and night
+  divided: { ref: 'Genesis 1:4', KJV: 'And God saw the light, that it was good: and God divided the light from the darkness.', NKJV: 'And God saw the light, that it was good; and God divided the light from the darkness.', NIV: 'God saw that the light was good, and he separated the light from the darkness.', NLT: 'And God saw that the light was good. Then he separated the light from the darkness.' },
+  // Level cards
+  dayNight: { ref: 'Genesis 1:5', KJV: 'And God called the light Day, and the darkness he called Night.', NKJV: 'God called the light Day, and the darkness He called Night.', NIV: 'God called the light “day,” and the darkness he called “night.”', NLT: 'God called the light “day” and the darkness “night.”' },
+  firstDay: { ref: 'Genesis 1:5', KJV: 'And the evening and the morning were the first day.', NKJV: 'So the evening and the morning were the first day.', NIV: 'And there was evening, and there was morning —the first day.', NLT: 'And evening passed and morning came, marking the first day.' },
+  lights: { ref: 'Genesis 1:14', KJV: 'Let there be lights in the firmament of the heaven to divide the day from the night', NKJV: 'Let there be lights in the firmament of the heavens to divide the day from the night', NIV: 'Let there be lights in the vault of the sky to separate the day from the night', NLT: 'Let lights appear in the sky to separate the day from the night.' },
+  seasons: { ref: 'Genesis 1:14', KJV: 'let them be for signs, and for seasons, and for days, and years', NKJV: 'let them be for signs and seasons, and for days and years', NIV: 'let them serve as signs to mark sacred times, and days and years', NLT: 'Let them be signs to mark the seasons, days, and years.' },
+  // Win card
+  greatLights: { ref: 'Genesis 1:16', KJV: 'And God made two great lights; the greater light to rule the day, and the lesser light to rule the night: he made the stars also.', NKJV: 'Then God made two great lights: the greater light to rule the day, and the lesser light to rule the night. He made the stars also.', NIV: 'God made two great lights—the greater light to govern the day and the lesser light to govern the night. He also made the stars.', NLT: 'God made two great lights—the larger one to govern the day, and the smaller one to govern the night. He also made the stars.' },
+  // Fail card
+  good: { ref: 'Genesis 1:4', KJV: 'And God saw the light, that it was good', NKJV: 'And God saw the light, that it was good', NIV: 'God saw that the light was good', NLT: 'And God saw that the light was good.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const GROUND = 790;       // things that float down land here
+const SPAWN_Y = 150;      // where new things appear
+const TAP_PAD = 22;       // extra reach around a thing for a finger
+const FLIP_T = 0.38;      // seconds to glide across the middle
+
+// What belongs to the day and what belongs to the night
+const KINDS = {
+  sun:        { side: 'day',   name: 'Sun',        tip: 'The sun shines in the DAY!' },
+  moon:       { side: 'night', name: 'Moon',       tip: 'The moon shines at NIGHT!' },
+  star:       { side: 'night', name: 'Star',       tip: 'Stars twinkle at NIGHT!' },
+  rooster:    { side: 'day',   name: 'Rooster',    tip: 'Roosters crow in the morning: DAY!' },
+  owl:        { side: 'night', name: 'Owl',        tip: 'Owls wake up at NIGHT!' },
+  sunflower:  { side: 'day',   name: 'Sunflower',  tip: 'Sunflowers love the DAY sun!' },
+  bat:        { side: 'night', name: 'Bat',        tip: 'Bats fly about at NIGHT!' },
+  butterfly:  { side: 'day',   name: 'Butterfly',  tip: 'Butterflies flutter in the DAY!' },
+  firefly:    { side: 'night', name: 'Firefly',    tip: 'Fireflies glow at NIGHT!' },
+  bluebird:   { side: 'day',   name: 'Bluebird',   tip: 'Birds sing in the DAY!' },
+  bee:        { side: 'day',   name: 'Bee',        tip: 'Bees buzz in the DAY!' },
+  moth:       { side: 'night', name: 'Moth',       tip: 'Moths look like butterflies, but come out at NIGHT!' },
+  moonflower: { side: 'night', name: 'Moonflower', tip: 'Moonflowers open at NIGHT!' },
+};
+
+const LEVELS = [
+  { name: 'Let There Be Light',  kinds: ['sun', 'moon', 'star'], count: 8,  speed: 62,  gap: 3.0,  hearts: 5, sparks: 4, sparkLife: 5.5, drift: 0,    driftV: 0 },
+  { name: 'Morning and Evening', kinds: ['sun', 'moon', 'star', 'rooster', 'owl', 'sunflower', 'bat'], count: 12, speed: 84, gap: 2.2, hearts: 4, sparks: 5, sparkLife: 4.2, drift: 0, driftV: 0 },
+  { name: 'Wings and Glow',      kinds: ['sun', 'moon', 'star', 'rooster', 'owl', 'sunflower', 'bat', 'butterfly', 'firefly', 'bluebird', 'bee'], count: 16, speed: 104, gap: 1.65, hearts: 4, sparks: 6, sparkLife: 3.3, drift: 0, driftV: 0 },
+  { name: 'The Wind Blows',      kinds: ['sun', 'moon', 'star', 'rooster', 'owl', 'sunflower', 'bat', 'butterfly', 'firefly', 'bluebird', 'bee'], count: 20, speed: 118, gap: 1.4, hearts: 3, sparks: 6, sparkLife: 2.7, drift: 0.5, driftV: 48 },
+  { name: 'Look-alikes',         kinds: ['sun', 'moon', 'star', 'rooster', 'owl', 'sunflower', 'bat', 'butterfly', 'firefly', 'bluebird', 'bee', 'moth', 'moonflower', 'moth', 'moonflower'], count: 24, speed: 132, gap: 1.18, hearts: 3, sparks: 7, sparkLife: 2.3, drift: 0.5, driftV: 58 },
+  { name: 'Lights in the Sky',   kinds: ['sun', 'moon', 'star', 'rooster', 'owl', 'sunflower', 'bat', 'butterfly', 'firefly', 'bluebird', 'bee', 'moth', 'moonflower'], count: 30, speed: 150, gap: 0.98, hearts: 3, sparks: 8, sparkLife: 1.9, drift: 0.6, driftV: 66 },
+];
+const NEW_IN_LEVEL = [
+  'Tap the little lights in the dark. Then send the <b>sun</b> to DAY and the <b>moon</b> and <b>stars</b> to NIGHT.',
+  'New friends! <b>Roosters</b> and <b>sunflowers</b> love the day. <b>Owls</b> and <b>bats</b> love the night.',
+  'More wings! <b>Butterflies</b>, <b>bees</b> and <b>bluebirds</b> belong to the day. <b>Fireflies</b> glow at night.',
+  'The <b>wind</b> blows things sideways! Watch out: something on the right side can drift across the middle.',
+  'Look closely! <b>Moths</b> look like butterflies but fly at night. <b>Moonflowers</b> are white and open at night.',
+  'The last and fastest sky of all. Keep the day and the night in order!',
+];
+const LEVEL_VERSE = ['dayNight', 'firstDay', 'lights', 'seasons', 'dayNight', 'lights'];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | pause | win | fail | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('lightBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0;
+let phase = 'spark';      // spark | split | sort
+let phaseT = 0;
+let lightAmt = 0;         // 0 dark .. 1 bright (the sparks phase)
+let splitF = 0;           // 0 one sky .. 1 split into day and night
+let sparks = [], sparksDone = 0, sparkBonus = 0;
+let sideDeck = [];
+let things = [], spawned = 0, landed = 0, spawnT = 0;
+let hearts = 3, combo = 0, bestCombo = 0, rightCount = 0;
+let particles = [], floaters = [], bursts = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0, heartFx = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};            // things already explained (kept across levels)
+let lastScore = null;
+
+const MID = () => W / 2;
+const sideOf = (x) => (x < MID() ? 'day' : 'night');
+
+// ============================================================
+//  Level setup
+// ============================================================
+function resetLevel() {
+  cfg = LEVELS[level - 1];
+  phase = 'spark'; phaseT = 0;
+  lightAmt = 0; splitF = 0;
+  sparks = []; sparksDone = 0; sparkBonus = 0;
+  things = []; spawned = 0; landed = 0; spawnT = 1.0;
+  // A fair deck: about 3 in 5 start on the wrong side (level 1 opens with two of them)
+  const nWrong = Math.ceil(cfg.count * 0.6);
+  sideDeck = Array.from({ length: cfg.count }, (_, i) => i < nWrong).sort(() => Math.random() - 0.5);
+  if (level === 1) { sideDeck.sort((a, b) => b - a); sideDeck = [true, true, ...sideDeck.slice(2).sort(() => Math.random() - 0.5)]; }
+  hearts = cfg.hearts; combo = 0; bestCombo = 0; rightCount = 0;
+  levelScore = 0;
+  particles = []; floaters = []; bursts = [];
+  flashT = shakeT = heartFx = 0;
+  endTimer = 0; winT = 0; failT = 0;
+  message.t = 0;
+  keys.clear();
+  newSpark();
+}
+
+function newSpark() {
+  // somewhere in the open sky, away from the last one
+  let x, y, k = 0;
+  const last = sparks[sparks.length - 1];
+  do {
+    x = rand(70, W - 70); y = rand(SPAWN_Y + 40, GROUND - 120);
+    k++;
+  } while (last && Math.hypot(x - last.x, y - last.y) < 200 && k < 30);
+  sparks = [{ x, y, life: cfg.sparkLife, max: cfg.sparkLife, born: t }];
+}
+
+function tapSpark(s) {
+  sparks = [];
+  sparksDone++;
+  const bonus = Math.round(40 + 60 * (s.life / s.max));
+  sparkBonus += bonus;
+  levelScore += bonus;
+  floaters.push({ x: s.x, y: s.y - 30, text: `+${bonus}`, t: 1, col: '#fff3b0' });
+  bursts.push({ x: s.x, y: s.y, t: 0 });
+  sparkleBurst(s.x, s.y, 26, ['#fff6d0', '#ffe27a', '#ffffff', '#ffd166']);
+  sfx.sparkle(sparksDone / cfg.sparks);
+  if (sparksDone >= cfg.sparks) {
+    phase = 'split'; phaseT = 0;
+    flashT = 0.35;
+    showMessage(Bible.verse(VERSES.light).text, 2.6);
+    sfx.whoosh(0.6);
+  } else {
+    newSpark();
+  }
+}
+
+// One new thing floats down from the top of the sky
+function spawnThing() {
+  const kind = pick(cfg.kinds);
+  const home = KINDS[kind].side;
+  // Level 1 starts with two easy ones on the wrong side so the first tap is learned at once
+  const wrongSide = sideDeck[spawned];
+  const side = wrongSide ? (home === 'day' ? 'night' : 'day') : home;
+  const r = 36;
+  const m = MID();
+  const x = side === 'day' ? rand(r + 14, m - r - 24) : rand(m + r + 24, W - r - 14);
+  let vx = 0;
+  if (cfg.drift && Math.random() < cfg.drift) vx = (side === 'day' ? 1 : -1) * cfg.driftV * rand(0.7, 1.2);
+  const fast = level >= 6 && Math.random() < 0.18;
+  things.push({
+    kind, x, y: SPAWN_Y, vy: cfg.speed * rand(0.88, 1.12) * (fast ? 1.35 : 1), vx, r,
+    flip: null, born: t, phase: rand(0, TAU), out: null, outT: 0, fast,
+    label: !told[kind],
+  });
+  if (!told[kind]) {
+    told[kind] = true;
+    showMessage(KINDS[kind].tip, 2.6);
+  }
+  spawned++;
+}
+
+function flipThing(th) {
+  if (th.flip || th.out) return;
+  const tx = clamp(W - th.x, th.r + 8, W - th.r - 8);
+  // make sure the glide always crosses the middle line by a clear margin
+  const m = MID();
+  const fx = th.x < m ? Math.max(tx, m + th.r + 16) : Math.min(tx, m - th.r - 16);
+  th.flip = { x0: th.x, x1: fx, t: 0 };
+  th.vx = -th.vx;
+  sfx.whoosh(0.35);
+  sfx.tap(fx > m ? 0.3 : 0.75);
+  sparkleBurst(th.x, th.y, 6, ['#ffffff', '#fff6d0']);
+}
+
+function landThing(th) {
+  landed++;
+  const ok = sideOf(th.x) === KINDS[th.kind].side;
+  if (ok) {
+    combo++; rightCount++;
+    bestCombo = Math.max(bestCombo, combo);
+    const pts = 50 + 10 * Math.min(combo - 1, 10);
+    levelScore += pts;
+    th.out = 'happy';
+    floaters.push({ x: th.x, y: th.y - 46, text: combo >= 3 ? `+${pts} ×${combo}` : `+${pts}`, t: 1.1, col: th.x < MID() ? '#7a4a00' : '#fff3b0' });
+    sparkleBurst(th.x, th.y, 14, th.x < MID() ? ['#ffe27a', '#ffffff', '#ffd166'] : ['#cfe0ff', '#ffffff', '#fff3b0']);
+    sfx.good(combo);
+    if (combo === 5 || combo === 10 || combo === 15) showMessage(combo === 5 ? 'Five in a row!' : combo === 10 ? 'Ten in a row! Wonderful!' : 'Amazing order!', 1.6);
+  } else {
+    combo = 0;
+    hearts--;
+    heartFx = 0.6;
+    shakeT = 0.25;
+    th.out = 'dizzy';
+    const home = KINDS[th.kind].side;
+    showMessage(`Oops! The ${KINDS[th.kind].name.toLowerCase()} belongs to ${home === 'day' ? 'DAY' : 'NIGHT'}.`, 2);
+    puff(th.x, th.y, 10);
+    sfx.bad();
+    if (hearts <= 0) { fail(); return; }
+  }
+  if (landed >= cfg.count && state === 'play') win();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * 150;
+  const levelBonus = level * 200;
+  const sortPts = levelScore - sparkBonus;
+  const score = levelScore + heartBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('lightBest', best); } catch (e) {} }
+  lastScore = { sparkBonus, sortPts, heartBonus, levelBonus, score };
+  showMessage('And God saw that it was good!', 2.6);
+  flashT = 0.3;
+  sfx.win();
+  endTimer = 3.2;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  showMessage('The day and night got muddled…', 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function puff(x, y, n) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-14, 14), y + rand(-8, 8), rand(-50, 50), rand(-60, -10), rand(0.5, 1), 'rgba(200,200,215,0.8)', rand(5, 10), -10, 'puff');
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'puff') { p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.3, dt); p.size += dt * 8; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 40 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+  for (let i = bursts.length - 1; i >= 0; i--) { bursts[i].t += dt; if (bursts[i].t > 1.2) bursts.splice(i, 1); }
+}
+function drawStar5(x, y, R, r, rot = -Math.PI / 2) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = rot + k * Math.PI / 5, rr = k % 2 ? r : R;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = p.kind === 'puff' ? a * 0.7 : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = f.col === '#7a4a00' ? 'rgba(255,255,255,0.85)' : 'rgba(10,14,40,0.7)';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Drawing the things of day and night (centred on 0,0, about 36 across the middle)
+// ============================================================
+function eyes(sep, y, rx, ry, mood, lookX = 0, lookY = 0.2) {
+  const dark = '#2b1d12';
+  for (const sx of [-sep, sep]) {
+    if (mood === 'happy') {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(sx, y + 1.5, rx * 0.9, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      continue;
+    }
+    if (mood === 'dizzy') {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx - 3, y - 3); ctx.lineTo(sx + 3, y + 3); ctx.moveTo(sx + 3, y - 3); ctx.lineTo(sx - 3, y + 3); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(sx, y, rx, ry, 0, 0, TAU); ctx.fill();
+    const pr = Math.min(rx, ry) * 0.55;
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(sx + lookX * (rx - pr), y + lookY * (ry - pr), pr, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(sx + lookX * (rx - pr) - pr * 0.35, y + lookY * (ry - pr) - pr * 0.4, pr * 0.35, 0, TAU); ctx.fill();
+  }
+}
+function mouth(y, w, mood) {
+  ctx.lineCap = 'round';
+  if (mood === 'dizzy') {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-w, y + 2); ctx.quadraticCurveTo(-w / 2, y - 2, 0, y + 2); ctx.quadraticCurveTo(w / 2, y + 5, w, y + 1); ctx.stroke();
+  } else if (mood === 'happy') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.moveTo(-w, y - 1); ctx.arc(0, y - 1, w, 0, Math.PI); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, y - w * 0.6, w, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+function cheeks(sep, y, a = 0.4) {
+  ctx.fillStyle = `rgba(255,120,120,${a})`;
+  ctx.beginPath(); ctx.arc(-sep, y, 3.2, 0, TAU); ctx.arc(sep, y, 3.2, 0, TAU); ctx.fill();
+}
+
+function drawThing(kind, mood = 'normal', tt = t, ph = 0) {
+  switch (kind) {
+    case 'sun': {
+      ctx.save(); ctx.rotate(tt * 0.6 + ph);
+      ctx.fillStyle = '#ffb53b';
+      for (let k = 0; k < 12; k++) {
+        ctx.rotate(TAU / 12);
+        ctx.beginPath(); ctx.moveTo(-5, -25); ctx.lineTo(0, -37 - (k % 2) * 4); ctx.lineTo(5, -25); ctx.fill();
+      }
+      ctx.restore();
+      const g = ctx.createRadialGradient(-6, -6, 2, 0, 0, 26);
+      g.addColorStop(0, '#fff3a0'); g.addColorStop(1, '#ffc531');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 25, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 2; ctx.stroke();
+      eyes(8, -4, 4, 5, mood); cheeks(14, 5); mouth(8, 6, mood);
+      break;
+    }
+    case 'moon': {
+      const g = ctx.createRadialGradient(-6, -8, 2, 0, 0, 28);
+      g.addColorStop(0, '#fffbe6'); g.addColorStop(1, '#e9dc9c');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 27, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#c9b874'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = 'rgba(190,170,110,0.45)';
+      ctx.beginPath(); ctx.arc(-14, -12, 4, 0, TAU); ctx.arc(15, 12, 5, 0, TAU); ctx.arc(10, -16, 3, 0, TAU); ctx.fill();
+      // a sleepy nightcap
+      ctx.fillStyle = '#4a5fc1';
+      ctx.beginPath(); ctx.moveTo(-22, -14); ctx.quadraticCurveTo(-4, -40, 20, -16); ctx.quadraticCurveTo(26, -38, 36, -30); ctx.quadraticCurveTo(10, -28, 18, -14); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(36, -30, 5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-21, -14); ctx.quadraticCurveTo(0, -20, 19, -15); ctx.stroke();
+      if (mood === 'normal') {
+        ctx.strokeStyle = '#5a4a20'; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(-8, -1, 4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.moveTo(12, 0); ctx.arc(8, -1, 4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      } else eyes(8, -1, 4, 5, mood);
+      cheeks(15, 7); mouth(10, 5, mood);
+      break;
+    }
+    case 'star': {
+      ctx.save(); ctx.rotate(Math.sin(tt * 2 + ph) * 0.15);
+      ctx.fillStyle = 'rgba(255,240,150,0.35)'; drawStar5(0, 0, 38, 17); ctx.fill();
+      const g = ctx.createRadialGradient(-5, -6, 2, 0, 0, 30);
+      g.addColorStop(0, '#fffbd0'); g.addColorStop(1, '#ffd84a');
+      ctx.fillStyle = g; drawStar5(0, 2, 32, 15); ctx.fill();
+      ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+      eyes(6, 0, 3.4, 4.4, mood); cheeks(11, 7, 0.35); mouth(9, 4, mood);
+      ctx.restore();
+      break;
+    }
+    case 'rooster': {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(-4, 16); ctx.lineTo(-6, 30); ctx.moveTo(6, 16); ctx.lineTo(8, 30); ctx.stroke();
+      // tail
+      const tc = ['#2e7d5b', '#d94f2b', '#1f5f8b', '#e0a526'];
+      tc.forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(12, 2); ctx.quadraticCurveTo(30, -18 + i * 6, 26 + i * 3, 10 + i * 4); ctx.stroke(); });
+      ctx.fillStyle = '#fff3df';
+      ctx.beginPath(); ctx.ellipse(2, 4, 20, 16, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#d8c2a0'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#efdcc0'; ctx.beginPath(); ctx.ellipse(6, 6, 9, 7, -0.4, 0, TAU); ctx.fill();
+      // head
+      ctx.fillStyle = '#fff3df'; ctx.beginPath(); ctx.arc(-12, -14, 12, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#e23b2e';
+      ctx.beginPath(); ctx.arc(-18, -26, 4.5, 0, TAU); ctx.arc(-12, -28, 5, 0, TAU); ctx.arc(-6, -26, 4.5, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-20, -4, 3, 5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f2a33a'; ctx.beginPath(); ctx.moveTo(-22, -16); ctx.lineTo(-32, -12); ctx.lineTo(-22, -9); ctx.fill();
+      ctx.save(); ctx.translate(-12, -16); eyes(4.5, 0, 3, 3.6, mood, -0.5, 0); ctx.restore();
+      break;
+    }
+    case 'owl': {
+      ctx.fillStyle = '#8d6a4a';
+      ctx.beginPath(); ctx.moveTo(-18, -22); ctx.lineTo(-14, -34); ctx.lineTo(-6, -24); ctx.lineTo(6, -24); ctx.lineTo(14, -34); ctx.lineTo(18, -22); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 2, 23, 28, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#6d4e34';
+      const fl = Math.sin(tt * 6 + ph) * 0.15;
+      ctx.save(); ctx.translate(-20, 2); ctx.rotate(0.2 + fl); ctx.beginPath(); ctx.ellipse(0, 0, 7, 16, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(20, 2); ctx.rotate(-0.2 - fl); ctx.beginPath(); ctx.ellipse(0, 0, 7, 16, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#e8d2ad'; ctx.beginPath(); ctx.ellipse(0, 12, 14, 15, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#c4a57c'; ctx.lineWidth = 1.5;
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-5 + k * 5, 8 + (k % 2) * 6, 3, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke(); }
+      ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(-9, -8, 10, 0, TAU); ctx.arc(9, -8, 10, 0, TAU); ctx.fill();
+      eyes(9, -8, 7, 7, mood);
+      ctx.fillStyle = '#e8902a'; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.lineTo(3, -1); ctx.lineTo(0, 5); ctx.fill();
+      ctx.strokeStyle = '#e8902a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-8, 29); ctx.lineTo(-8, 33); ctx.moveTo(8, 29); ctx.lineTo(8, 33); ctx.stroke();
+      break;
+    }
+    case 'sunflower':
+    case 'moonflower': {
+      const sunf = kind === 'sunflower';
+      ctx.strokeStyle = '#4f9a3a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, 10); ctx.quadraticCurveTo(4, 24, 0, 36); ctx.stroke();
+      ctx.fillStyle = '#5fae47';
+      ctx.beginPath(); ctx.ellipse(-9, 28, 9, 4, 0.5, 0, TAU); ctx.ellipse(9, 24, 9, 4, -0.5, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(0, -6);
+      if (sunf) {
+        ctx.fillStyle = '#ffc425';
+        for (let k = 0; k < 14; k++) { ctx.save(); ctx.rotate(k * TAU / 14 + Math.sin(tt + ph) * 0.05); ctx.beginPath(); ctx.ellipse(0, -21, 6, 11, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+        ctx.fillStyle = '#e8a020';
+        for (let k = 0; k < 14; k++) { ctx.save(); ctx.rotate(k * TAU / 14 + 0.22); ctx.beginPath(); ctx.ellipse(0, -18, 4, 8, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+        ctx.fillStyle = '#7a4a1e'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#5c3614';
+        for (let k = 0; k < 8; k++) { const a = k * TAU / 8; ctx.beginPath(); ctx.arc(Math.cos(a) * 10, Math.sin(a) * 10, 1.5, 0, TAU); ctx.fill(); }
+      } else {
+        ctx.fillStyle = 'rgba(220,225,255,0.35)'; ctx.beginPath(); ctx.arc(0, 0, 32, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#f7f5ff'; ctx.strokeStyle = '#c9c4ea'; ctx.lineWidth = 1.5;
+        for (let k = 0; k < 5; k++) { ctx.save(); ctx.rotate(k * TAU / 5 + Math.sin(tt + ph) * 0.05); ctx.beginPath(); ctx.ellipse(0, -16, 12, 14, 0, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore(); }
+        ctx.fillStyle = '#e4dcff'; ctx.beginPath(); ctx.arc(0, 0, 13, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#c7b8f2'; drawStar5(0, 0, 12, 5); ctx.fill();
+        ctx.fillStyle = '#f7f5ff'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU); ctx.fill();
+      }
+      eyes(5, -2, 2.8, 3.4, mood); mouth(5, 3.5, mood);
+      ctx.restore();
+      break;
+    }
+    case 'bat': {
+      const fl = Math.sin(tt * 10 + ph);
+      ctx.fillStyle = '#5a4a72';
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.scale(s, 1); ctx.translate(8, -2); ctx.scale(1, 0.75 + fl * 0.25);
+        ctx.beginPath(); ctx.moveTo(0, -8); ctx.quadraticCurveTo(16, -20, 32, -10);
+        ctx.quadraticCurveTo(28, 2, 30, 8); ctx.quadraticCurveTo(22, 2, 18, 10); ctx.quadraticCurveTo(12, 4, 6, 12); ctx.quadraticCurveTo(2, 4, 0, 8); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#6c5b86';
+      ctx.beginPath(); ctx.moveTo(-11, -12); ctx.lineTo(-9, -26); ctx.lineTo(-2, -15); ctx.moveTo(11, -12); ctx.lineTo(9, -26); ctx.lineTo(2, -15); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, 13, 16, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#8e7da8'; ctx.beginPath(); ctx.ellipse(0, 6, 7, 8, 0, 0, TAU); ctx.fill();
+      eyes(5, -4, 3.5, 4.2, mood); cheeks(9, 2, 0.35);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-3, 3); ctx.lineTo(-1.5, 6); ctx.lineTo(0, 3); ctx.moveTo(0, 3); ctx.lineTo(1.5, 6); ctx.lineTo(3, 3); ctx.fill();
+      break;
+    }
+    case 'butterfly':
+    case 'moth': {
+      const bf = kind === 'butterfly';
+      const fl = 0.55 + 0.45 * Math.abs(Math.sin(tt * (bf ? 7 : 5) + ph));
+      const c1 = bf ? '#ff7eb6' : '#b9a68a', c2 = bf ? '#ffb347' : '#9c8a6e', spot = bf ? '#ffe066' : '#d7c9ad';
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.scale(s * fl, 1);
+        ctx.fillStyle = c1; ctx.beginPath(); ctx.ellipse(14, -10, bf ? 15 : 16, bf ? 14 : 12, -0.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = c2; ctx.beginPath(); ctx.ellipse(11, 11, bf ? 10 : 12, bf ? 10 : 9, 0.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = spot; ctx.beginPath(); ctx.arc(17, -11, bf ? 5 : 4, 0, TAU); ctx.fill();
+        if (!bf) { ctx.fillStyle = '#7a6a52'; ctx.beginPath(); ctx.arc(17, -11, 2, 0, TAU); ctx.fill(); }
+        ctx.restore();
+      }
+      ctx.fillStyle = bf ? '#3b2f4a' : '#8a7860';
+      ctx.beginPath(); ctx.ellipse(0, 4, bf ? 4 : 6, 16, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -13, bf ? 7 : 8, 0, TAU); ctx.fill();
+      ctx.strokeStyle = bf ? '#3b2f4a' : '#8a7860'; ctx.lineWidth = bf ? 1.8 : 1.4; ctx.lineCap = 'round';
+      if (bf) {
+        ctx.beginPath(); ctx.moveTo(-3, -18); ctx.quadraticCurveTo(-8, -30, -12, -30); ctx.moveTo(3, -18); ctx.quadraticCurveTo(8, -30, 12, -30); ctx.stroke();
+        ctx.fillStyle = '#3b2f4a'; ctx.beginPath(); ctx.arc(-12, -30, 2.5, 0, TAU); ctx.arc(12, -30, 2.5, 0, TAU); ctx.fill();
+      } else {
+        // feathery antennae
+        for (const s of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(3 * s, -19); ctx.quadraticCurveTo(8 * s, -28, 14 * s, -30); ctx.stroke();
+          for (let k = 0; k < 4; k++) { const px = (5 + k * 2.4) * s, py = -22 - k * 2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 3 * s, py + 3); ctx.moveTo(px, py); ctx.lineTo(px - 1 * s, py - 4); ctx.stroke(); }
+        }
+      }
+      ctx.save(); ctx.translate(0, -13); eyes(3.3, 0, 2.6, 3, mood); ctx.restore();
+      break;
+    }
+    case 'firefly': {
+      const glow = 0.6 + 0.4 * Math.sin(tt * 4 + ph);
+      const g = ctx.createRadialGradient(0, 12, 2, 0, 12, 30);
+      g.addColorStop(0, `rgba(230,255,120,${0.9 * glow})`); g.addColorStop(1, 'rgba(230,255,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 12, 30, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(220,235,255,0.7)';
+      const fl = Math.sin(tt * 14 + ph) * 0.3;
+      ctx.save(); ctx.rotate(-0.5 + fl); ctx.beginPath(); ctx.ellipse(-10, -6, 8, 13, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.rotate(0.5 - fl); ctx.beginPath(); ctx.ellipse(10, -6, 8, 13, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#e8ff7a'; ctx.beginPath(); ctx.ellipse(0, 13, 9, 11, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3d3a5c'; ctx.beginPath(); ctx.ellipse(0, -2, 10, 10, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#d9543a'; ctx.beginPath(); ctx.arc(0, -14, 8, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#3d3a5c'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-3, -20); ctx.lineTo(-8, -28); ctx.moveTo(3, -20); ctx.lineTo(8, -28); ctx.stroke();
+      ctx.save(); ctx.translate(0, -14); eyes(3.3, 0, 2.6, 3, mood); ctx.restore();
+      break;
+    }
+    case 'bluebird': {
+      const fl = Math.sin(tt * 9 + ph) * 0.4;
+      ctx.fillStyle = '#4a90d9';
+      ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(32, -6); ctx.lineTo(30, 8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 2, 20, 17, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f39a4a'; ctx.beginPath(); ctx.ellipse(-4, 8, 12, 10, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3572b8'; ctx.save(); ctx.translate(6, 0); ctx.rotate(-0.3 + fl); ctx.beginPath(); ctx.ellipse(6, -6, 12, 7, -0.3, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#4a90d9'; ctx.beginPath(); ctx.arc(-12, -12, 12, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f2b33a'; ctx.beginPath(); ctx.moveTo(-23, -13); ctx.lineTo(-32, -10); ctx.lineTo(-23, -7); ctx.fill();
+      ctx.save(); ctx.translate(-12, -14); eyes(4.5, 0, 3, 3.6, mood, -0.5, 0); ctx.restore();
+      ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-3, 18); ctx.lineTo(-4, 26); ctx.moveTo(4, 18); ctx.lineTo(5, 26); ctx.stroke();
+      break;
+    }
+    case 'bee': {
+      const fl = Math.sin(tt * 18 + ph) * 0.35;
+      ctx.fillStyle = 'rgba(230,245,255,0.8)'; ctx.strokeStyle = '#a9c4dc'; ctx.lineWidth = 1.2;
+      ctx.save(); ctx.rotate(-0.3 + fl); ctx.beginPath(); ctx.ellipse(-6, -18, 8, 13, -0.3, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.rotate(0.3 - fl); ctx.beginPath(); ctx.ellipse(6, -18, 8, 13, 0.3, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = '#ffc927'; ctx.beginPath(); ctx.ellipse(2, 2, 22, 16, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.ellipse(2, 2, 22, 16, 0, 0, TAU); ctx.clip();
+      ctx.fillStyle = '#3b2f1e'; ctx.fillRect(2, -16, 6, 34); ctx.fillRect(14, -16, 6, 34); ctx.restore();
+      ctx.fillStyle = '#3b2f1e'; ctx.beginPath(); ctx.moveTo(23, 0); ctx.lineTo(30, 3); ctx.lineTo(23, 6); ctx.fill();
+      ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(-14, 0, 11, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#3b2f1e'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-17, -10); ctx.lineTo(-21, -19); ctx.moveTo(-11, -10); ctx.lineTo(-9, -19); ctx.stroke();
+      ctx.save(); ctx.translate(-14, -1); eyes(4, 0, 2.8, 3.3, mood, -0.3, 0); mouth(6, 3, mood); ctx.restore();
+      break;
+    }
+  }
+}
+
+// ============================================================
+//  Background: the dark, the light, the day and the night
+// ============================================================
+const BGSTARS = Array.from({ length: 70 }, (_, i) => ({ x: hash(i, 1), y: hash(i, 2), s: 0.8 + hash(i, 3) * 1.8, p: hash(i, 4) * TAU }));
+const CLOUDS = Array.from({ length: 5 }, (_, i) => ({ x: hash(i, 7), y: 0.08 + hash(i, 8) * 0.45, w: 70 + hash(i, 9) * 60, v: 6 + hash(i, 10) * 8 }));
+
+function drawCloud(cx, cy, w, a = 1) {
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.5, w * 0.2, 0, 0, TAU);
+  ctx.ellipse(cx - w * 0.2, cy - w * 0.1, w * 0.22, w * 0.18, 0, 0, TAU);
+  ctx.ellipse(cx + w * 0.12, cy - w * 0.15, w * 0.25, w * 0.22, 0, 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// draws in view coordinates; split: 0..1, light: 0..1
+function drawSky(light, split) {
+  const midV = offX + MID();
+  const top = 0, bot = viewH;
+  // the dark
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(0, 0, viewW, viewH);
+  // one golden light (before the split)
+  const one = light * (1 - split);
+  if (one > 0) {
+    ctx.globalAlpha = one;
+    const g = ctx.createLinearGradient(0, top, 0, bot);
+    g.addColorStop(0, '#f6d77a'); g.addColorStop(1, '#fff3d0');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, viewH);
+    ctx.globalAlpha = 1;
+  }
+  if (split > 0) {
+    // day spreads out from the middle to the left, night to the right
+    const reach = ease(split);
+    const dayX = midV - midV * reach, nightX = midV + (viewW - midV) * reach;
+    const dg = ctx.createLinearGradient(0, top, 0, bot);
+    dg.addColorStop(0, '#5fb4ee'); dg.addColorStop(0.65, '#b9e3fb'); dg.addColorStop(1, '#e8f7ff');
+    ctx.fillStyle = dg; ctx.fillRect(dayX, 0, midV - dayX, viewH);
+    const ng = ctx.createLinearGradient(0, top, 0, bot);
+    ng.addColorStop(0, '#0d1238'); ng.addColorStop(0.65, '#1d2a66'); ng.addColorStop(1, '#2d3f86');
+    ctx.fillStyle = ng; ctx.fillRect(midV, 0, nightX - midV, viewH);
+    // the sun's glow in the top corner of the day, the moon's in the night
+    ctx.globalAlpha = reach;
+    const sg = ctx.createRadialGradient(midV * 0.25, offY + 160, 10, midV * 0.25, offY + 160, 260);
+    sg.addColorStop(0, 'rgba(255,240,170,0.75)'); sg.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, midV, viewH);
+    // background stars twinkle on the night side
+    for (const s of BGSTARS) {
+      const x = midV + s.x * (viewW - midV), y = s.y * (offY + GROUND - 40);
+      ctx.globalAlpha = reach * (0.45 + 0.4 * Math.sin(t * 2 + s.p));
+      ctx.fillStyle = '#fff8d8';
+      ctx.beginPath(); ctx.arc(x, y, s.s, 0, TAU); ctx.fill();
+    }
+    // gentle clouds on the day side
+    for (const c of CLOUDS) {
+      const span = midV + 160;
+      const x = ((c.x * span + t * c.v) % span) - 80;
+      if (x - c.w / 2 > midV - 6) continue;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, midV, viewH); ctx.clip();
+      drawCloud(x, offY + 120 + c.y * 520, c.w, 0.7 * reach);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawGround(light, split) {
+  const midV = offX + MID();
+  const gy = offY + GROUND + 12;
+  const a = Math.max(light, split);
+  if (a <= 0) return;
+  ctx.globalAlpha = a;
+  const s = ease(split);
+  // day hills
+  const hill = (x0, x1, top, base, c1, c2) => {
+    ctx.fillStyle = c1;
+    ctx.beginPath(); ctx.moveTo(x0, viewH);
+    for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, top + Math.sin(x * 0.012) * 10 + Math.sin(x * 0.031) * 5);
+    ctx.lineTo(x1, viewH); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c2;
+    ctx.beginPath(); ctx.moveTo(x0, viewH);
+    for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, base + Math.sin(x * 0.02 + 1) * 8);
+    ctx.lineTo(x1, viewH); ctx.closePath(); ctx.fill();
+  };
+  const dayC = s > 0 ? ['#86c96a', '#5fae55'] : ['#b8a070', '#a08860'];
+  hill(0, midV, gy - 6, gy + 34, dayC[0], dayC[1]);
+  hill(midV, viewW, gy - 6, gy + 34, s > 0 ? '#29504a' : '#a08860', s > 0 ? '#1d3d3a' : '#8a7450');
+  ctx.globalAlpha = 1;
+  // the signs
+  if (split > 0.5) {
+    ctx.globalAlpha = clamp((split - 0.5) * 2, 0, 1);
+    sign(offX + MID() / 2, offY + GROUND + 64, 'DAY', 'day');
+    sign(offX + MID() * 1.5, offY + GROUND + 64, 'NIGHT', 'night');
+    ctx.globalAlpha = 1;
+  }
+}
+
+function sign(x, y, text, side) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#7a5230';
+  ctx.fillRect(-4, 0, 8, 30);
+  ctx.fillStyle = side === 'day' ? '#f7e3a8' : '#3a4a8a';
+  ctx.strokeStyle = side === 'day' ? '#b8892e' : '#c9d4ff';
+  ctx.lineWidth = 3;
+  roundRect(-62, -22, 124, 40, 12); ctx.fill(); ctx.stroke();
+  // little sun or moon icon
+  if (side === 'day') {
+    ctx.fillStyle = '#ffb53b'; ctx.beginPath(); ctx.arc(-38, -2, 9, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffb53b'; ctx.lineWidth = 2;
+    for (let k = 0; k < 8; k++) { const a = k * TAU / 8; ctx.beginPath(); ctx.moveTo(-38 + Math.cos(a) * 11, -2 + Math.sin(a) * 11); ctx.lineTo(-38 + Math.cos(a) * 15, -2 + Math.sin(a) * 15); ctx.stroke(); }
+  } else {
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(-38, -2, 10, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3a4a8a'; ctx.beginPath(); ctx.arc(-33, -6, 9, 0, TAU); ctx.fill();
+  }
+  ctx.font = '700 20px Fredoka, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = side === 'day' ? '#7a4a00' : '#fff3b0';
+  ctx.fillText(text, 10, -1);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+function drawDivider(split) {
+  if (split <= 0) return;
+  const x = offX + MID();
+  const top = 0, bot = offY + GROUND + 20;
+  const len = (bot - top) * ease(clamp(split * 1.4, 0, 1));
+  const g = ctx.createLinearGradient(x - 14, 0, x + 14, 0);
+  g.addColorStop(0, 'rgba(255,250,220,0)'); g.addColorStop(0.5, 'rgba(255,250,220,0.9)'); g.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 14, top, 28, len);
+  ctx.fillStyle = '#fffbe6';
+  ctx.fillRect(x - 1.5, top, 3, len);
+  for (let k = 0; k < 6; k++) {
+    const yy = top + ((t * 60 + k * 140) % (bot - top));
+    if (yy > top + len) continue;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#ffffff';
+    drawStar5(x + Math.sin(t * 3 + k) * 5, yy, 5, 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Rendering the playfield
+// ============================================================
+function drawSparks() {
+  for (const b of bursts) {
+    const f = b.t / 1.2;
+    const R = 40 + f * 320;
+    const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R);
+    g.addColorStop(0, `rgba(255,248,210,${0.6 * (1 - f)})`); g.addColorStop(1, 'rgba(255,248,210,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, TAU); ctx.fill();
+  }
+  for (const s of sparks) {
+    const age = t - s.born;
+    const grow = clamp(age / 0.35, 0, 1);
+    const fade = clamp(s.life / 0.8, 0, 1);
+    const pulse = 1 + Math.sin(t * 7) * 0.12;
+    const R = 46 * grow * pulse;
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, R * 1.8);
+    g.addColorStop(0, `rgba(255,250,215,${0.95 * fade})`); g.addColorStop(0.35, `rgba(255,220,120,${0.55 * fade})`); g.addColorStop(1, 'rgba(255,220,120,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, R * 1.8, 0, TAU); ctx.fill();
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(t * 1.5); ctx.globalAlpha = fade;
+    ctx.fillStyle = '#fffbe6'; drawStar5(0, 0, 18 * grow * pulse, 7 * grow); ctx.fill();
+    ctx.restore();
+    // a ring that shrinks: how long the light will wait
+    ctx.strokeStyle = `rgba(255,240,180,${0.7 * fade})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 30 + 30 * (s.life / s.max), -Math.PI / 2, -Math.PI / 2 + TAU * (s.life / s.max)); ctx.stroke();
+    if (level === 1 && sparksDone === 0) {
+      ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(255,248,215,${0.6 + 0.4 * Math.sin(t * 5)})`;
+      ctx.fillText('Tap!', s.x, s.y + 80);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawThings() {
+  const m = MID();
+  for (const th of things) {
+    ctx.save();
+    let a = 1, sc = 1;
+    const age = t - th.born;
+    sc = Math.min(1, age / 0.3);
+    if (th.out === 'happy') { sc = 1 + th.outT * 0.6; a = 1 - th.outT / 0.7; }
+    if (th.out === 'dizzy') { a = 1 - th.outT / 1.1; }
+    ctx.globalAlpha = clamp(a, 0, 1);
+    let y = th.y;
+    if (th.out === 'happy') y -= Math.sin(clamp(th.outT / 0.7, 0, 1) * Math.PI) * 30;
+    ctx.translate(th.x, y);
+    // Level 1: a pulsing ring shows which ones need a tap
+    if (level === 1 && !th.out && !th.flip && sideOf(th.x) !== KINDS[th.kind].side) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 6)})`; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 46 + Math.sin(t * 6) * 4, 0, TAU); ctx.stroke();
+    }
+    if (th.fast && !th.out) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3;
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 12, -44); ctx.lineTo(k * 12, -62); ctx.stroke(); }
+    }
+    const tilt = th.flip ? Math.sin(th.flip.t / FLIP_T * Math.PI) * (th.flip.x1 > th.flip.x0 ? 0.5 : -0.5) : Math.sin(t * 2 + th.phase) * 0.08;
+    ctx.rotate(th.out === 'dizzy' ? Math.sin(th.outT * 20) * 0.2 : tilt);
+    ctx.scale(sc, sc);
+    // a soft halo so things stand out on both skies
+    ctx.fillStyle = th.x < m ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.arc(0, 0, 40, 0, TAU); ctx.fill();
+    drawThing(th.kind, th.out === 'happy' ? 'happy' : th.out === 'dizzy' ? 'dizzy' : 'normal', t, th.phase);
+    ctx.restore();
+    if (th.out === 'dizzy') {
+      for (let k = 0; k < 3; k++) {
+        const an = t * 5 + k * TAU / 3;
+        ctx.fillStyle = '#ffe27a'; drawStar5(th.x + Math.cos(an) * 26, th.y - 40 + Math.sin(an) * 7, 6, 2.6); ctx.fill();
+      }
+    }
+    // the name, the first time a new thing appears
+    if (th.label && !th.out) {
+      ctx.font = '700 17px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = th.x < m ? 'rgba(255,255,255,0.9)' : 'rgba(10,14,40,0.85)';
+      ctx.strokeText(KINDS[th.kind].name, th.x, th.y + 58);
+      ctx.fillStyle = th.x < m ? '#5a3a00' : '#fff3b0';
+      ctx.fillText(KINDS[th.kind].name, th.x, th.y + 58);
+    }
+  }
+}
+
+// The title scene: the sun on the day side, the moon on the night side
+function drawTitleScene() {
+  const m = MID();
+  ctx.save(); ctx.translate(m * 0.5, 380 + Math.sin(t * 1.2) * 8); ctx.scale(2.2, 2.2); drawThing('sun', 'normal'); ctx.restore();
+  ctx.save(); ctx.translate(m * 1.5, 380 + Math.sin(t * 1.2 + 1) * 8); ctx.scale(2.2, 2.2); drawThing('moon', 'normal'); ctx.restore();
+  ctx.save(); ctx.translate(m * 0.3, 640); ctx.scale(1.3, 1.3); drawThing('rooster', 'normal'); ctx.restore();
+  ctx.save(); ctx.translate(m * 0.72, 650); ctx.scale(1.3, 1.3); drawThing('sunflower', 'normal'); ctx.restore();
+  ctx.save(); ctx.translate(m * 1.3, 640); ctx.scale(1.3, 1.3); drawThing('owl', 'normal'); ctx.restore();
+  ctx.save(); ctx.translate(m * 1.72, 560); ctx.scale(1.2, 1.2); drawThing('star', 'normal'); ctx.restore();
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = LEVELS[0];
+  things = []; sparks = [];
+  showOverlay('Let There Be Light', 'The first day of creation',
+    `${verseHTML('light')}
+     <ul>
+       <li>In the beginning the world was dark. <b>Tap the little lights</b> to fill it with God's light!</li>
+       <li>Then the sky splits into <b>DAY</b> and <b>NIGHT</b>. Things float down from the sky.</li>
+       <li>If something is on the <b>wrong side</b>, <b>tap it</b> to send it across. Leave the right ones alone!</li>
+       <li>The <b>sun</b>, roosters and sunflowers belong to the day. The <b>moon</b>, stars, owls and bats belong to the night.</li>
+       <li>A light that fades before you tap it, or a thing that lands on the wrong side, costs a <b>heart</b>.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd> sends the lowest night-side thing to day, <kbd>&rarr;</kbd> the lowest day-side thing to night, <kbd>Space</kbd> taps a light.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  if (retry) { beginPlay(); return; }
+  state = 'intro';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${NEW_IN_LEVEL[level - 1]}</p>
+     ${verseHTML(LEVEL_VERSE[level - 1])}
+     <p class="score">Sort <b>${cfg.count}</b> things &middot; ${cfg.hearts} hearts</p>`,
+    level === 1 ? 'Let there be light!' : 'Go!', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 ? 'Tap the little light!' : `Level ${level}: tap the lights!`, 2.2);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LEVELS.length;
+    showOverlay(last ? 'It was very good!' : 'It was good!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'greatLights' : 'divided')}
+       <p class="score">Lights: <b>${s.sparkBonus}</b><br>Sorting (${rightCount}/${cfg.count} right, best run ${bestCombo}): <b>${s.sortPts}</b><br>Hearts left: <b>${s.heartBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${last ? '<p style="text-align:center">You kept every day and every night in order. God made the light, and the sun, the moon and the stars too!</p>' : ''}
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', () => {
+        if (last) titleScreen();
+        else { level++; startLevel(); }
+      });
+  } else if (state === 'fail') {
+    showOverlay('Oh no!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${phase === 'spark' ? 'The little lights faded away. <b>Tap</b> each light quickly!' : 'Too many things landed on the wrong side. Watch each one as it floats down, and <b>tap</b> it if it is on the wrong side!'}</p>
+       ${verseHTML('good')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating play
+// ============================================================
+function updatePlay(dt) {
+  phaseT += dt;
+  if (phase === 'spark') {
+    lightAmt = lerp(lightAmt, sparksDone / cfg.sparks, 1 - Math.pow(0.05, dt));
+    for (const s of sparks) {
+      s.life -= dt;
+      if (s.life <= 0) {
+        // a light that fades away costs a heart
+        hearts--; heartFx = 0.6; combo = 0;
+        sfx.bad();
+        if (hearts <= 0) { sparks = []; fail(); return; }
+        showMessage('Quick! Tap each light before it fades.', 2);
+        newSpark();
+        break;
+      }
+    }
+  } else if (phase === 'split') {
+    lightAmt = Math.min(1, lightAmt + dt);
+    splitF = clamp(phaseT / 2.2, 0, 1);
+    if (phaseT > 2.4) {
+      phase = 'sort'; phaseT = 0;
+      showMessage(level === 1 ? 'Tap the ones on the wrong side!' : 'Keep the day and night in order!', 2.4);
+    }
+  } else if (phase === 'sort') {
+    if (spawned < cfg.count) {
+      spawnT -= dt;
+      if (spawnT <= 0) { spawnThing(); spawnT = cfg.gap * rand(0.85, 1.15); }
+    }
+    for (const th of things) {
+      if (th.out) continue;
+      if (th.flip) {
+        th.flip.t += dt;
+        const f = ease(clamp(th.flip.t / FLIP_T, 0, 1));
+        th.x = lerp(th.flip.x0, th.flip.x1, f);
+        if (th.flip.t >= FLIP_T) th.flip = null;
+        th.y += th.vy * dt * 0.3;
+      } else {
+        th.y += th.vy * dt;
+        th.x += th.vx * dt;
+        if (th.x < th.r + 6) { th.x = th.r + 6; th.vx = Math.abs(th.vx); }
+        if (th.x > W - th.r - 6) { th.x = W - th.r - 6; th.vx = -Math.abs(th.vx); }
+        if (th.fast) th.vy += 20 * dt;
+      }
+      if (th.y >= GROUND - 14 && !th.flip) { th.y = GROUND - 14; landThing(th); if (state !== 'play') break; }
+    }
+  }
+}
+
+function updateThings(dt) {
+  for (let i = things.length - 1; i >= 0; i--) {
+    const th = things[i];
+    if (th.out) { th.outT += dt; if (th.outT > (th.out === 'happy' ? 0.7 : 1.1)) things.splice(i, 1); }
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && !e.repeat) {
+    if (phase === 'spark' && (e.code === 'Space' || e.code === 'Enter') && sparks[0]) { tapSpark(sparks[0]); return; }
+    if (phase === 'sort' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD')) {
+      const fromNight = e.code === 'ArrowLeft' || e.code === 'KeyA';
+      const cands = things.filter((th) => !th.out && !th.flip && sideOf(th.x) === (fromNight ? 'night' : 'day'));
+      cands.sort((a, b) => b.y - a.y);
+      if (cands[0]) flipThing(cands[0]);
+    }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const x = p.vx - offX, y = p.vy - offY;
+  tapAt(x, y);
+});
+
+function tapAt(x, y) {
+  if (phase === 'spark') {
+    const s = sparks[0];
+    if (s && Math.hypot(x - s.x, y - s.y) < 70) tapSpark(s);
+    else { sfx.tone(520, 0.08, 'sine', 0.08); spawn(x, y, 0, -20, 0.5, 'rgba(255,248,215,0.6)', 4, 0, 'star'); }
+    return;
+  }
+  if (phase !== 'sort') return;
+  let best = null, bd = Infinity;
+  for (const th of things) {
+    if (th.out || th.flip) continue;
+    const d = Math.hypot(th.x - x, th.y - y);
+    if (d < th.r + TAP_PAD && d < bd) { bd = d; best = th; }
+  }
+  if (best) flipThing(best);
+}
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+  sparkle(h) { if (!this.ctx) return; Music.tap(0.4 + h * 0.6); [1568, 2093, 2637].forEach((f, i) => this.tone(f * (1 + h * 0.25), 0.4, 'sine', 0.08, i * 0.05)); },
+  whoosh(v = 0.5) { this.noiseBurst(700, 0.3, 0.2 * v, 0.9, 2600); },
+  good(c) { if (this.ctx) { Music.tap(clamp(0.2 + c * 0.06, 0, 1)); this.tone(1320, 0.18, 'sine', 0.08, 0.04); } },
+  bad() { this.tone(240, 0.3, 'triangle', 0.25, 0, 130); this.noiseBurst(400, 0.25, 0.2, 0.7, 200, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function heartPath(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+}
+
+function pill(x, y, w, h) {
+  ctx.fillStyle = 'rgba(255,250,232,0.85)';
+  roundRect(x, y, w, h, h / 2); ctx.fill();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const inPlay = state === 'play' || state === 'win' || state === 'fail' || state === 'pause';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const title = state === 'title' ? 'Let There Be Light' : `Level ${level} · ${cfg.name}`;
+  const tw = ctx.measureText(title).width;
+  pill(4, 8, tw + 18, 26);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.fillText(title, 13, 27);
+
+  if (inPlay) {
+    // score and hearts on the right
+    ctx.textAlign = 'right';
+    const sc = `Score ${totalScore + levelScore}`;
+    const sw = ctx.measureText(sc).width;
+    pill(viewW - sw - 22, 8, sw + 18, 26);
+    ctx.fillStyle = '#5a4210';
+    ctx.fillText(sc, viewW - 13, 27);
+    const hs = 11, gap = 27;
+    const n = cfg.hearts;
+    pill(viewW - n * gap - 16, 40, n * gap + 12, 28);
+    for (let i = 0; i < n; i++) {
+      const x = viewW - 24 - i * gap, y = 54;
+      const full = i < hearts;
+      const pop = !full && i === hearts && heartFx > 0 ? 1 + heartFx : 1;
+      heartPath(x, y, hs * pop);
+      ctx.fillStyle = full ? '#e8505b' : 'rgba(120,100,100,0.35)';
+      ctx.fill();
+    }
+    // progress
+    if (phase === 'sort' || state !== 'play') {
+      const pw = Math.min(170, viewW - 150), px = viewW - pw - 10, py = 76;
+      pill(px - 46, py - 2, pw + 50, 18);
+      ctx.fillStyle = 'rgba(90,66,16,0.18)';
+      roundRect(px, py + 2, pw, 10, 5); ctx.fill();
+      ctx.fillStyle = '#f2b33a';
+      if (landed > 0) { roundRect(px, py + 2, pw * landed / cfg.count, 10, 5); ctx.fill(); }
+      ctx.font = '600 12px Fredoka, sans-serif';
+      ctx.fillStyle = '#5a4210'; ctx.textAlign = 'right';
+      ctx.fillText(`${landed} / ${cfg.count}`, px - 8, py + 12);
+    } else if (phase === 'spark') {
+      ctx.font = '600 14px Fredoka, sans-serif';
+      const txt = `Lights ${sparksDone} / ${cfg.sparks}`;
+      const w2 = ctx.measureText(txt).width;
+      pill(viewW - w2 - 22, 74, w2 + 18, 22);
+      ctx.fillStyle = '#5a4210'; ctx.fillText(txt, viewW - 13, 90);
+    }
+    if (combo >= 3 && state === 'play') {
+      ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'left';
+      const ct = `Run ×${combo}`;
+      pill(126, 72, ctx.measureText(ct).width + 18, 24);
+      ctx.fillStyle = '#b5503f'; ctx.fillText(ct, 135, 89);
+    }
+  }
+
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  const y0 = Math.max(138, offY + 118);
+  const dark = phase === 'spark' && state === 'play' && lightAmt < 0.6;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 29;
+    ctx.lineWidth = 6; ctx.lineJoin = 'round';
+    ctx.strokeStyle = dark ? 'rgba(10,10,24,0.9)' : 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = dark ? '#fff3b0' : '#6a4200';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+
+  const showcase = state === 'title' || state === 'intro' && level === 1;
+  const L = showcase ? 1 : state === 'intro' ? 1 : lightAmt;
+  const S = showcase ? 1 : state === 'intro' ? 1 : splitF;
+  // background in view coordinates
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, sy * scale);
+  drawSky(L, S);
+  drawGround(L, S);
+  drawDivider(S);
+  // playfield
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  if (state === 'title' || state === 'intro') drawTitleScene();
+  else {
+    drawSparks();
+    drawThings();
+    drawParticles();
+    if (state === 'win') {
+      // the sun and the moon come out to celebrate
+      const f = ease(clamp(winT / 1.2, 0, 1));
+      const m = MID();
+      ctx.save(); ctx.translate(m * 0.5, lerp(-120, 330, f)); ctx.scale(2, 2); drawThing('sun', 'happy'); ctx.restore();
+      ctx.save(); ctx.translate(m * 1.5, lerp(-120, 330, f)); ctx.scale(2, 2); drawThing('moon', 'happy'); ctx.restore();
+    }
+  }
+  if (flashT > 0) {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') updatePlay(dt);
+  if (state === 'play' || state === 'win' || state === 'fail') updateThings(dt);
+  if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 12) spawn(rand(0, W), rand(200, GROUND - 100), 0, -20, 1.2, pick(['#fff6d0', '#ffe27a']), 3, 0, 'star');
+  }
+  if (state === 'fail') failT += dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  heartFx = Math.max(0, heartFx - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

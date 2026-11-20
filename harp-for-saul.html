@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3a2a3e">
+<title>A Song for King Saul</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3a2a3e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">A Song for King Saul</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'harp', accent: 'strings', ambience: 'none', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  refreshed: { ref: '1 Samuel 16:23', KJV: 'David took an harp, and played with his hand: so Saul was refreshed, and was well', NKJV: 'David would take a harp and play it with his hand. Then Saul would become refreshed and well', NIV: 'David would take up his lyre and play. Then relief would come to Saul; he would feel better', NLT: 'David would play the harp. Then Saul would feel better' },
+  // Level cards
+  skilful: { ref: '1 Samuel 16:18', KJV: 'I have seen a son of Jesse the Bethlehemite, that is cunning in playing... and the Lord is with him.', NKJV: 'I have seen a son of Jesse the Bethlehemite, who is skillful in playing... and the Lord is with him.', NIV: 'I have seen a son of Jesse of Bethlehem who knows how to play the lyre... And the Lord is with him.', NLT: 'One of Jesse’s sons from Bethlehem is a talented harp player... and the Lord is with him.' },
+  praise: { ref: 'Psalm 33:2', KJV: 'Praise the Lord with harp', NKJV: 'Praise the Lord with the harp', NIV: 'Praise the Lord with the harp', NLT: 'Praise the Lord with melodies on the lyre' },
+  newSong: { ref: 'Psalm 33:3', KJV: 'Sing unto him a new song; play skilfully with a loud noise.', NKJV: 'Sing to Him a new song; Play skillfully with a shout of joy.', NIV: 'Sing to him a new song; play skillfully, and shout for joy.', NLT: 'Sing a new song of praise to him; play skillfully on the harp, and sing with joy.' },
+  awake: { ref: 'Psalm 57:8', KJV: 'Awake up, my glory; awake, psaltery and harp: I myself will awake early.', NKJV: 'Awake, my glory! Awake, lute and harp! I will awaken the dawn.', NIV: 'Awake, my soul! Awake, harp and lyre! I will awaken the dawn.', NLT: 'Wake up, my heart! Wake up, O lyre and harp! I will wake the dawn with my song.' },
+  // Win card
+  well: { ref: '1 Samuel 16:23', KJV: 'so Saul was refreshed, and was well', NKJV: 'Then Saul would become refreshed and well', NIV: 'Then relief would come to Saul; he would feel better', NLT: 'Then Saul would feel better' },
+  strength: { ref: 'Psalm 28:7', KJV: 'The Lord is my strength and my shield; my heart trusted in him, and I am helped: therefore my heart greatly rejoiceth; and with my song will I praise him.', NKJV: 'The Lord is my strength and my shield; My heart trusted in Him, and I am helped; Therefore my heart greatly rejoices, And with my song I will praise Him.', NIV: 'The Lord is my strength and my shield; my heart trusts in him, and he helps me. My heart leaps for joy, and with my song I praise him.', NLT: 'The Lord is my strength and shield. I trust him with all my heart. He helps me, and my heart is filled with joy. I burst out in songs of thanksgiving.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  The song: Amazing Grace (John Newton's hymn, tune "New Britain"), G major, 3/4
+// ============================================================
+const SONG = 'D4/1 G4/2 B4/.5 G4/.5 B4/2 A4/1 G4/2 E4/1 D4/2 D4/1 G4/2 B4/.5 G4/.5 B4/2 A4/1 D5/5 ' +
+             'B4/1 D5/2 B4/.5 G4/.5 B4/2 A4/1 G4/2 E4/1 D4/2 D4/1 G4/2 B4/.5 G4/.5 B4/2 A4/1 G4/3';
+const SONG_HALF = 16;     // notes in the first half ("...that saved a wretch like me")
+const CHORDS = ['G', 'G', 'C', 'G', 'G', 'D', 'D', 'D', 'G', 'G', 'C', 'G', 'G', 'D', 'G'];   // one per bar after the pick-up
+const PITCHES = ['D4', 'E4', 'G4', 'A4', 'B4', 'D5'];
+const CHORD_NOTE = { G: 'G3', C: 'C4', D: 'D4' };
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 104;
+const HIT_Y = 770;        // where the notes reach the strings
+const LANE_TOP = 360;     // where notes appear (higher on tall screens)
+
+const LEVELS = [
+  { name: 'A Quiet Song',          lanes: 3, beat: 0.64, half: true,  eighths: false, holds: false, chords: 0, fall: 2.5,  perfect: 0.1,  good: 0.22, miss: 0.13, start: 0.5 },
+  { name: 'Four Strings',          lanes: 4, beat: 0.56, half: false, eighths: false, holds: true,  chords: 0, fall: 2.25, perfect: 0.09, good: 0.19, miss: 0.13, start: 0.55 },
+  { name: 'Quick Little Notes',    lanes: 4, beat: 0.5,  half: false, eighths: true,  holds: true,  chords: 0, fall: 2.05, perfect: 0.08, good: 0.17, miss: 0.14, start: 0.55 },
+  { name: 'Two Strings Together',  lanes: 5, beat: 0.46, half: false, eighths: true,  holds: true,  chords: 2, fall: 1.9,  perfect: 0.075, good: 0.16, miss: 0.14, start: 0.6 },
+  { name: 'The King’s Bad Day',    lanes: 5, beat: 0.42, half: false, eighths: true,  holds: true,  chords: 1, fall: 1.75, perfect: 0.07, good: 0.15, miss: 0.15, start: 0.6 },
+  { name: 'Every String Sings',    lanes: 6, beat: 0.37, half: false, eighths: true,  holds: true,  chords: 1, fall: 1.6,  perfect: 0.065, good: 0.14, miss: 0.16, start: 0.62 },
+];
+const LAST_LEVEL = LEVELS.length;
+const LEVEL_VERSE = ['skilful', 'praise', 'newSong', 'awake', 'praise', 'newSong'];
+const LEVEL_TIPS = [
+  'Golden notes slide down onto David’s harp. <b>Tap the string</b> just as a note <b>touches the glowing line</b>.',
+  'Now there are <b>four strings</b>. A note with a long tail is a <b>long note</b>: keep your finger on it for a bonus!',
+  'Some notes come <b>quickly, two in a row</b>. Keep up with the tune!',
+  'Five strings, and sometimes <b>two notes at once</b>. Tap both strings together!',
+  'King Saul is very grumpy today. The song is faster, with two-note chords on every bar.',
+  'All <b>six strings</b> and the fastest song of all. Play skilfully, David!',
+];
+const KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH'];
+const KEYS2 = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
+const STRING_COLS = ['#e8a33a', '#e07a5f', '#c46b8c', '#7a8fd0', '#4fa0a0', '#7ab05a'];
+const makeConfig = (n) => Object.assign({}, LEVELS[Math.min(n, LAST_LEVEL) - 1]);
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('harpSaulBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0, playT = 0, songT = -3, endTimer = 0, winT = 0;
+let notes = [], chordTimes = [], chordIdx = 0;
+let cloud = 0.5, cloudShow = 0.5;
+let combo = 0, maxCombo = 0, perfects = 0, goods = 0, misses = 0, wrongs = 0, holdsDone = 0;
+let particles = [], popups = [], rings = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let told = {};
+let lastScore = null;
+let strings = [];         // vibration of each string
+let holding = new Map();  // pointer/key id -> the long note being held
+const LEAD = 2.8;         // seconds before the first note reaches the strings
+const david = { mood: 'watch', moodT: 0, blink: 0, blinkT: 2, hair: '#7a3a1a', i: 0, pluck: 0 };
+const saul = { blink: 0, blinkT: 3, hair: '#4a3a2a', i: 1 };
+
+function parseSong(str) {
+  return str.trim().split(/\s+/).map((tok) => { const [n, b] = tok.split('/'); return { note: n, beats: +b }; });
+}
+
+// Builds the falling notes for this level from the real melody
+function buildChart() {
+  let mel = parseSong(SONG);
+  if (cfg.half) mel = mel.slice(0, SONG_HALF);
+  if (!cfg.eighths) {
+    // two quick half-beat notes become one note
+    const m2 = [];
+    for (let i = 0; i < mel.length; i++) {
+      if (mel[i].beats === 0.5 && mel[i + 1] && mel[i + 1].beats === 0.5) { m2.push({ note: mel[i].note, beats: 1 }); i++; }
+      else m2.push(mel[i]);
+    }
+    mel = m2;
+  }
+  const lanes = cfg.lanes;
+  const laneOf = (n) => Math.min(lanes - 1, Math.floor(PITCHES.indexOf(n) * lanes / PITCHES.length));
+  notes = [];
+  let beat = 0;
+  for (const m of mel) {
+    const hold = cfg.holds && m.beats >= 3;
+    notes.push({ t: beat * cfg.beat, lane: laneOf(m.note), freq: Music.noteFreq(m.note), dur: m.beats * cfg.beat, hold, hit: false, missed: false, judged: null, heldTo: 0 });
+    beat += m.beats;
+  }
+  // bars start after the one-beat pick-up
+  chordTimes = [];
+  for (let bar = 0; 1 + bar * 3 < beat; bar++) chordTimes.push({ t: (1 + bar * 3) * cfg.beat, ch: CHORDS[bar % CHORDS.length], bar });
+  // chords: a second string to tap on the first beat of a bar
+  if (cfg.chords) {
+    for (const c of chordTimes) {
+      if (c.bar % cfg.chords !== 0) continue;
+      const mn = notes.find((n) => Math.abs(n.t - c.t) < 0.01);
+      if (!mn) continue;
+      let lane = (mn.lane + Math.ceil(lanes / 2)) % lanes;
+      notes.push({ t: c.t, lane, freq: Music.noteFreq(CHORD_NOTE[c.ch]), dur: cfg.beat * 2, hold: false, hit: false, missed: false, judged: null, chord: true, heldTo: 0 });
+    }
+  }
+  notes.sort((a, b) => a.t - b.t || a.lane - b.lane);
+  // link the two notes of a chord so they are drawn joined
+  for (let i = 1; i < notes.length; i++) if (Math.abs(notes[i].t - notes[i - 1].t) < 0.01) { notes[i].partner = notes[i - 1]; }
+  chordIdx = 0;
+}
+
+function songEnd() { const n = notes[notes.length - 1]; return n ? Math.max(...notes.map((q) => q.t + (q.hold ? q.dur : 0))) : 0; }
+
+// ============================================================
+//  Layout
+// ============================================================
+function harpBox() {
+  const n = cfg.lanes;
+  const lw = Math.min(118, (W - 60) / n);
+  const w = lw * n;
+  return { x0: W / 2 - w / 2, x1: W / 2 + w / 2, lw, n };
+}
+function laneX(l) { const b = harpBox(); return b.x0 + b.lw * (l + 0.5); }
+function laneTop() { return LANE_TOP - Math.min(Math.max(0, offY), 200) * 0.4; }
+function noteY(n) { return HIT_Y - (n.t - songT) / cfg.fall * (HIT_Y - laneTop()); }
+function sceneY() { return -Math.min(Math.max(0, offY), 200) * 0.4; }   // Saul's room lifts on tall screens
+
+// ============================================================
+//  Playing the strings
+// ============================================================
+function pluck(lane, id) {
+  if (state !== 'play') return;
+  strings[lane] = { amp: 1, t: 0 };
+  david.pluck = 0.2;
+  // the nearest note on this string that is still waiting
+  let bestN = null, bd = 1e9;
+  for (const n of notes) {
+    if (n.lane !== lane || n.hit || n.missed) continue;
+    const d = Math.abs(n.t - songT);
+    if (d < bd) { bd = d; bestN = n; }
+    if (n.t - songT > 1) break;
+  }
+  const x = laneX(lane);
+  if (bestN && bd <= cfg.good) {
+    const n = bestN;
+    n.hit = true;
+    const perfect = bd <= cfg.perfect;
+    n.judged = perfect ? 'perfect' : 'good';
+    combo++; maxCombo = Math.max(maxCombo, combo);
+    if (perfect) perfects++; else goods++;
+    const pts = (perfect ? 100 : 50) + Math.min(50, combo * 5);
+    levelScore += pts;
+    setCloud(cloud - (perfect ? 0.065 : 0.04));
+    popText(x, HIT_Y - 46, perfect ? 'Perfect!' : 'Good', perfect ? '#fff2b0' : '#d8f0ff');
+    sfx.note(n.freq, n.dur, perfect ? 1 : 0.8);
+    for (let k = 0; k < (perfect ? 8 : 4); k++) spawn(x + rand(-14, 14), HIT_Y - 10, rand(-50, 50), rand(-220, -120), 1, pick(['#ffe27a', '#fff6d0', '#ffffff']), rand(3, 5), 0, k % 3 ? 'dot' : 'star');
+    spawn(x, HIT_Y - 30, rand(-20, 20), -160 - rand(0, 60), 1.6, STRING_COLS[lane], 9, -30, 'note');
+    if (n.hold && id != null) { holding.set(id, n); n.heldTo = n.t; }
+    if (!told.hold && n.hold) { told.hold = true; showMessage('A long note: keep holding!', 2); }
+  } else {
+    // a pluck with no note: the harp sounds out of tune and Saul frowns
+    wrongs++;
+    combo = 0;
+    setCloud(cloud + 0.035);
+    sfx.wrong(lane);
+    popText(x, HIT_Y - 46, 'Oops', '#ffd0c8');
+  }
+}
+
+function releaseHold(id) {
+  const n = holding.get(id);
+  if (!n) return;
+  holding.delete(id);
+  if (songT >= n.t + n.dur - 0.18) finishHold(n);
+}
+function finishHold(n) {
+  if (n.holdDone) return;
+  n.holdDone = true;
+  holdsDone++;
+  levelScore += 60;
+  setCloud(cloud - 0.03);
+  popText(laneX(n.lane), HIT_Y - 80, 'Long note! +60', '#fff2b0');
+}
+
+function setCloud(v) { cloud = clamp(v, 0, 1); }
+
+function updateNotes(dt) {
+  songT += dt;
+  // a note that slides past the line is missed
+  for (const n of notes) {
+    if (!n.hit && !n.missed && songT - n.t > cfg.good) {
+      n.missed = true;
+      misses++; combo = 0;
+      setCloud(cloud + cfg.miss);
+      popText(laneX(n.lane), HIT_Y - 46, 'Miss', '#ffb0a0');
+      sfx.rumble();
+      if (!told.miss) { told.miss = true; showMessage('Missed notes make Saul’s cloud grow!', 2.4); }
+    }
+  }
+  // long notes held right to the end
+  for (const [id, n] of holding) {
+    n.heldTo = songT;
+    if (songT >= n.t + n.dur - 0.05) { finishHold(n); holding.delete(id); }
+    else if (Math.random() < dt * 20) spawn(laneX(n.lane) + rand(-8, 8), HIT_Y - 6, rand(-30, 30), rand(-120, -60), 0.6, '#fff2b0', 3);
+  }
+  // soft strings play the chords underneath
+  while (chordIdx < chordTimes.length && songT >= chordTimes[chordIdx].t) {
+    sfx.chord(chordTimes[chordIdx].ch, cfg.beat * 3);
+    chordIdx++;
+  }
+  if (cloud >= 1 && state === 'play') { fail(); return; }
+  if (songT > songEnd() + 1.2 && state === 'play') win();
+  if (!told.first && songT > -1.2) { told.first = true; if (level === 1) showMessage('Tap the string when the note touches the glowing line!', 3); }
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevel();
+  cloud = cloudShow = 0.75;
+  syncAmbience();
+  showOverlay('A Song for King Saul', 'David plays the harp',
+    `${verseHTML('refreshed')}
+     <ul>
+       <li>King Saul is troubled and grumpy: a <b>storm cloud</b> hangs over his head. The young shepherd David is sent to play his harp for him.</li>
+       <li>Golden notes slide down onto the strings of David’s harp. <b>Tap the string</b> (anywhere in its lane) just as a note <b>reaches the glowing line</b>.</li>
+       <li>Each good note plays the tune <b>Amazing Grace</b> and shrinks the cloud. Missed notes make it grow! If the cloud fills up, try again.</li>
+       <li>Long notes have a tail: <b>keep holding</b> for a bonus. Two notes side by side: <b>tap both</b>.</li>
+       <li><b>Keys:</b> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> (or <kbd>1</kbd>–<kbd>6</kbd>) pluck the strings from left to right.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'level';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(LEVEL_VERSE[level - 1])}
+     <p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     <p class="score">${cfg.lanes} strings &middot; ${notes.length} notes${cfg.chords ? ' &middot; chords' : ''}</p>`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; popups = []; rings = [];
+  levelScore = 0; playT = 0; songT = -LEAD; endTimer = 0; winT = 0;
+  cloud = cloudShow = cfg.start;
+  combo = 0; maxCombo = 0; perfects = 0; goods = 0; misses = 0; wrongs = 0; holdsDone = 0;
+  flashT = shakeT = 0;
+  told = { hold: level > 2, miss: level > 1, first: level > 1 };
+  strings = Array.from({ length: cfg.lanes }, () => ({ amp: 0, t: 0 }));
+  holding.clear();
+  keys.clear();
+  buildChart();
+}
+
+function startLevel(retry = false) {
+  if (retry || state !== 'level') resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.2);
+}
+
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const total = notes.length;
+  const acc = (perfects + goods * 0.6) / Math.max(1, total);
+  const calmBonus = Math.round((1 - cloud) * 1000);
+  const levelBonus = level * 300;
+  const fullBonus = misses === 0 ? 500 : 0;
+  levelScore += calmBonus + levelBonus + fullBonus;
+  totalScore += levelScore;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('harpSaulBest', best); } catch (e) {} }
+  lastScore = { acc, calmBonus, levelBonus, fullBonus, total };
+  sfx.win();
+  showMessage('King Saul feels better!', 2.6);
+  endTimer = 3.6;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  sfx.fail();
+  showMessage('The storm cloud grew too big…', 2.4);
+  shakeT = 0.3;
+  endTimer = 2.6;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LAST_LEVEL;
+    const stars = s.acc > 0.9 ? 3 : s.acc > 0.7 ? 2 : 1;
+    showOverlay(last ? 'Saul Is Refreshed!' : 'What a lovely song!', `Level ${level} complete — ${cfg.name}`,
+      `<p class="score" style="font-size:1.6rem;color:#e0a526">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</p>
+       ${verseHTML(last ? 'strength' : 'well')}
+       <p class="score">Perfect: <b>${perfects}</b> &middot; Good: <b>${goods}</b> &middot; Missed: <b>${misses}</b><br>Best run: <b>${maxCombo}</b>${holdsDone ? ` &middot; Long notes: <b>${holdsDone}</b>` : ''}<br>Saul is calm: <b>${s.calmBonus}</b>${s.fullBonus ? `<br>No misses!: <b>${s.fullBonus}</b>` : ''}<br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next song', last ? () => { level = 1; totalScore = 0; levelCard(); } : () => { level++; levelCard(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh dear…', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">King Saul is still grumpy. Watch the golden notes and <b>tap the string</b> just as each note <b>touches the glowing line</b>. Try not to tap empty strings!</p>
+       ${verseHTML('refreshed')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    holding.clear();
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    // give a moment to get ready again
+    songT -= 0.6;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'play' && !e.repeat) {
+    let lane = KEYS.indexOf(e.code);
+    if (lane < 0) lane = KEYS2.indexOf(e.code);
+    if (lane >= 0 && lane < cfg.lanes) { pluck(lane, 'k' + e.code); return; }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => { keys.delete(e.code); releaseHold('k' + e.code); });
+window.addEventListener('blur', () => { keys.clear(); holding.clear(); });
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && endTimer > 0 && endTimer < 2.4) { endTimer = 0.01; return; }
+  if (state !== 'play') return;
+  const wx = p.vx - offX, wy = p.vy - offY;
+  const b = harpBox();
+  if (wy < laneTop() - 60 || p.vy < TOPH) return;
+  // a little forgiveness beyond the outer strings
+  if (wx < b.x0 - 40 || wx > b.x1 + 40) return;
+  const lane = clamp(Math.floor((wx - b.x0) / b.lw), 0, b.n - 1);
+  rings.push({ x: laneX(lane), y: HIT_Y, t: 0 });
+  pluck(lane, 'p' + e.pointerId);
+});
+canvas.addEventListener('pointerup', (e) => releaseHold('p' + e.pointerId));
+canvas.addEventListener('pointercancel', (e) => releaseHold('p' + e.pointerId));
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound: each good pluck plays the real note of the tune on the harp
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  note(freq, dur, vol = 1) {
+    if (!this.ctx || !Music.out) return;
+    Music.instruments.harp(this.ctx, Music.out, this.ctx.currentTime + 0.005, freq, Math.max(0.3, dur), 0.3 * vol);
+  },
+  chord(ch, dur) {
+    if (!this.ctx || !Music.out) return;
+    Music.instruments.strings(this.ctx, Music.out, this.ctx.currentTime + 0.01, Music.voiceChord(ch), dur * 0.95, 0.05);
+  },
+  wrong(lane) { this.tone(180 + lane * 23, 0.18, 'square', 0.04, 0, 150 + lane * 20); this.tone(190 + lane * 23, 0.18, 'square', 0.03); },
+  rumble() { this.noiseBurst(160, 0.5, 0.18, 0.7, 80, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Particles, popups and messages
+// ============================================================
+// ============================================================
+//  Particles, popups and messages
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, rot: rand(0, TAU) });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+  for (let i = rings.length - 1; i >= 0; i--) { rings[i].t += dt; if (rings[i].t > 0.5) rings.splice(i, 1); }
+}
+function drawStar(x, y, s) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const an = k * Math.PI / 5 - Math.PI / 2, r = k % 2 ? s * 0.45 : s; ctx.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r); }
+  ctx.closePath(); ctx.fill();
+}
+function drawHeart(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.8);
+    else if (p.kind === 'heart') drawHeart(p.x, p.y, p.size);
+    else if (p.kind === 'leaf') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.size * 1.4, p.size * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  for (const r of rings) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.5)})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 14 + r.t * 90, 0, TAU); ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.lineJoin = 'round';
+  for (const p of popups) {
+    const a = clamp(p.t / 0.4, 0, 1), y = p.y - (1.4 - p.t) * 30;
+    ctx.globalAlpha = a;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(40,30,10,0.85)';
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+function popText(x, y, text, col = '#fff2b0') {
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const hw = ctx.measureText(text).width / 2 + 12;
+  x = clamp(x, -offX + hw, W + offX - hw);
+  popups.push({ x, y, text, col, t: 1.4 });
+}
+function addScore(n, x, y, text) {
+  levelScore += n;
+  if (x != null) popText(x, y, text || `+${n}`);
+}
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Faces (shared by David and the sheep)
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'shout':
+      eyes(4, 5, 2.1);
+      brows(-8, -11, -8, -11);
+      mouthFill(() => ctx.ellipse(0, mouthY, 4.5, 5, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4, 5, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 4, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+  }
+}
+
+// ============================================================
+//  Drawing: Saul's room, Saul, David and the harp
+// ============================================================
+function drawRoom() {
+  const x0 = -offX - 2, x1 = W + offX + 2, top = -offY - 2;
+  const calm = 1 - cloudShow;
+  // the palace wall (warmer and brighter as the king calms down)
+  const g = ctx.createLinearGradient(0, top, 0, H);
+  g.addColorStop(0, `rgb(${lerp(70, 120, calm) | 0},${lerp(60, 92, calm) | 0},${lerp(86, 80, calm) | 0})`);
+  g.addColorStop(1, `rgb(${lerp(40, 70, calm) | 0},${lerp(30, 48, calm) | 0},${lerp(46, 44, calm) | 0})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, top, x1 - x0, H - top + 4);
+  // stone blocks
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 2;
+  for (let y = top - (top % 40) ; y < 400; y += 40) {
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    for (let x = x0 + ((y / 40) % 2) * 40; x < x1; x += 80) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 40); ctx.stroke(); }
+  }
+  // a window with the sky: grey and rainy when Saul is troubled, sunny when he is well
+  const sy = sceneY();
+  for (const wx of [W * 0.12, W * 0.88]) {
+    const ww = 70, wh = 110, wy = 150 + sy;
+    const sk = ctx.createLinearGradient(0, wy - wh / 2, 0, wy + wh / 2);
+    sk.addColorStop(0, `rgb(${lerp(110, 120, calm) | 0},${lerp(120, 190, calm) | 0},${lerp(140, 240, calm) | 0})`);
+    sk.addColorStop(1, `rgb(${lerp(150, 230, calm) | 0},${lerp(150, 230, calm) | 0},${lerp(160, 200, calm) | 0})`);
+    ctx.fillStyle = sk;
+    ctx.beginPath(); ctx.moveTo(wx - ww / 2, wy + wh / 2); ctx.lineTo(wx - ww / 2, wy - wh / 2 + ww / 2); ctx.arc(wx, wy - wh / 2 + ww / 2, ww / 2, Math.PI, TAU); ctx.lineTo(wx + ww / 2, wy + wh / 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#c9a56a'; ctx.lineWidth = 6; ctx.stroke();
+  }
+  // the floor and a long red rug
+  ctx.fillStyle = '#5a4030';
+  ctx.fillRect(x0, 400 + sy, x1 - x0, H);
+  ctx.fillStyle = '#8a2e3a';
+  ctx.fillRect(W / 2 - 130, 400 + sy, 260, 12);
+}
+
+// King Saul on his throne, with his storm cloud
+function drawSaul(x, y) {
+  const c = cloudShow;
+  const mood = state === 'win' ? 'joy' : c > 0.66 ? 'grumpy' : c > 0.33 ? 'meh' : 'smile';
+  ctx.save();
+  ctx.translate(x, y);
+  // throne
+  ctx.fillStyle = '#c9952e';
+  roundRect(-52, -150, 104, 150, 16); ctx.fill();
+  ctx.fillStyle = '#7a2e5a';
+  roundRect(-40, -136, 80, 110, 12); ctx.fill();
+  ctx.fillStyle = '#e8b84a';
+  for (const sx of [-52, 52]) { ctx.beginPath(); ctx.arc(sx, -150, 10, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#b07e26';
+  roundRect(-62, -48, 124, 18, 8); ctx.fill();
+  // Saul (sitting)
+  const s = 1.35;
+  ctx.scale(s, s);
+  const robe = '#5b3a8a', skin = '#d7a070';
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-24, -14); ctx.quadraticCurveTo(-22, -56, 0, -60); ctx.quadraticCurveTo(22, -56, 24, -14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = shade(robe, -20);
+  roundRect(-26, -24, 52, 18, 8); ctx.fill();                 // knees
+  ctx.fillStyle = '#e8d8b0';
+  ctx.fillRect(-3, -58, 6, 40);                                // the edge of his cloak
+  ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  const arms = mood === 'joy' ? Math.sin(t * 8) * 4 : 0;
+  ctx.beginPath();
+  if (mood === 'grumpy') { ctx.moveTo(-16, -48); ctx.lineTo(4, -38); ctx.moveTo(16, -48); ctx.lineTo(-4, -36); }   // arms folded
+  else if (mood === 'joy') { ctx.moveTo(-16, -48); ctx.lineTo(-4 + arms, -64); ctx.moveTo(16, -48); ctx.lineTo(4 - arms, -64); }  // clapping
+  else { ctx.moveTo(-16, -48); ctx.lineTo(-22, -26); ctx.moveTo(16, -48); ctx.lineTo(22, -26); }
+  ctx.stroke();
+  const hy = -76;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = saul.hair;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05); ctx.quadraticCurveTo(0, hy - 10, -16, hy + 1); ctx.closePath(); ctx.fill();
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(-15, hy + 2); ctx.quadraticCurveTo(-14, hy + 24, 0, hy + 25); ctx.quadraticCurveTo(14, hy + 24, 15, hy + 2); ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8); ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+  ctx.fill();
+  // crown
+  ctx.fillStyle = '#f2c230';
+  ctx.beginPath(); ctx.moveTo(-13, hy - 12); ctx.lineTo(-13, hy - 26); ctx.lineTo(-7, hy - 18); ctx.lineTo(0, hy - 30); ctx.lineTo(7, hy - 18); ctx.lineTo(13, hy - 26); ctx.lineTo(13, hy - 12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(0, hy - 16, 2.5, 0, TAU); ctx.fill();
+  // face
+  const fm = mood === 'grumpy' ? 'grumpy' : mood === 'meh' ? 'worried' : mood === 'smile' ? 'watch' : 'joy';
+  if (fm === 'grumpy') {
+    const dark = '#2b1d12';
+    ctx.fillStyle = '#fff';
+    for (const sx of [-6, 6]) { ctx.beginPath(); ctx.ellipse(sx, hy - 1, 3.5, 3, 0, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = dark;
+    for (const sx of [-6, 6]) { ctx.beginPath(); ctx.arc(sx, hy - 0.5, 1.8, 0, TAU); ctx.fill(); }
+    ctx.strokeStyle = shade(saul.hair, -10); ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-11, hy - 8); ctx.lineTo(-2, hy - 4); ctx.moveTo(2, hy - 4); ctx.lineTo(11, hy - 8); ctx.stroke();
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy + 13, 5, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+  } else drawFace(saul, fm, hy, 0, 0.3);
+  ctx.restore();
+}
+
+function drawStormCloud(x, y, c) {
+  const k = 0.35 + c * 1.0;
+  const calm = 1 - c;
+  // sunshine peeping out as the king calms down
+  if (c < 0.5 || state === 'win') {
+    const sa = state === 'win' ? 1 : clamp((0.5 - c) / 0.4, 0, 1);
+    ctx.save();
+    ctx.translate(x + 40 * k, y - 10);
+    ctx.rotate(t * 0.3);
+    ctx.fillStyle = `rgba(255,220,100,${0.5 * sa})`;
+    for (let i = 0; i < 10; i++) { ctx.rotate(TAU / 10); ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(8, -70); ctx.lineTo(-8, -70); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = `rgba(255,226,122,${sa})`;
+    ctx.beginPath(); ctx.arc(0, 0, 30, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  if (c < 0.02) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  // rain
+  if (c > 0.45) {
+    ctx.strokeStyle = 'rgba(150,190,230,0.7)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 7; i++) {
+      const rx = -60 + i * 20, ry = 30 + ((t * 160 + i * 37) % 60);
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 12); ctx.stroke();
+    }
+  }
+  const shadeC = Math.round(lerp(210, 95, c));
+  const wob = Math.sin(t * 3) * 3;
+  ctx.fillStyle = `rgb(${shadeC - 10},${shadeC - 6},${shadeC + 8})`;
+  ctx.beginPath();
+  for (const [px, py, r] of [[-50, 10, 28], [-20, -10, 38], [20, -16, 42], [56, 6, 30], [0, 18, 34], [-62, 22, 18], [66, 24, 18]]) { ctx.moveTo(px + r, py + wob * 0.3); ctx.arc(px, py + wob * 0.3, r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = `rgb(${shadeC + 22},${shadeC + 24},${shadeC + 34})`;
+  ctx.beginPath();
+  for (const [px, py, r] of [[-20, -18, 26], [18, -24, 28]]) { ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU); }
+  ctx.fill();
+  // a cartoon lightning flash when the cloud is big
+  if (c > 0.7 && Math.sin(t * 2.3) > 0.85) {
+    ctx.fillStyle = '#ffe066';
+    ctx.beginPath(); ctx.moveTo(4, 30); ctx.lineTo(-10, 60); ctx.lineTo(2, 58); ctx.lineTo(-6, 86); ctx.lineTo(16, 52); ctx.lineTo(4, 54); ctx.lineTo(14, 30); ctx.closePath(); ctx.fill();
+  }
+  // the cloud's grumpy little face (it smiles as it shrinks)
+  ctx.fillStyle = 'rgba(40,40,60,0.7)';
+  ctx.beginPath(); ctx.arc(-12, 4, 3.5, 0, TAU); ctx.arc(12, 4, 3.5, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(40,40,60,0.7)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  if (calm > 0.5) ctx.arc(0, 10, 7, 0.2 * Math.PI, 0.8 * Math.PI); else ctx.arc(0, 22, 7, 1.2 * Math.PI, 1.8 * Math.PI);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// David sitting on a stool, playing his little harp for the king
+function drawDavid(x, y) {
+  const d = david;
+  const mood = state === 'win' ? 'joy' : state === 'fail' ? 'dismay' : d.pluck > 0 ? 'joy' : 'watch';
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1.25, 1.25);
+  const skin = '#e3ad78', robe = '#d4782f';
+  // stool
+  ctx.fillStyle = '#8a5a2b';
+  roundRect(-18, -22, 36, 8, 3); ctx.fill();
+  ctx.fillRect(-14, -14, 5, 14); ctx.fillRect(9, -14, 5, 14);
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-16, -18); ctx.quadraticCurveTo(-15, -50, 0, -56); ctx.quadraticCurveTo(15, -50, 16, -18); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#7a3f1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-15, -34); ctx.quadraticCurveTo(0, -31, 15, -34); ctx.stroke();
+  // the lyre on his lap
+  ctx.save();
+  ctx.translate(16, -40);
+  ctx.strokeStyle = '#b07a2e'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-8, 14); ctx.quadraticCurveTo(-16, -8, -8, -22); ctx.moveTo(8, 14); ctx.quadraticCurveTo(16, -8, 8, -22); ctx.moveTo(-10, -16); ctx.lineTo(10, -16); ctx.stroke();
+  ctx.fillStyle = '#8a5a2b'; roundRect(-10, 8, 20, 9, 3); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,240,200,0.9)'; ctx.lineWidth = 1;
+  for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 4, -16); ctx.lineTo(i * 4 + (d.pluck > 0 ? Math.sin(t * 80) * 1 : 0), 9); ctx.stroke(); }
+  ctx.restore();
+  ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  const strum = d.pluck > 0 ? Math.sin(d.pluck * 30) * 4 : 0;
+  ctx.beginPath(); ctx.moveTo(-10, -48); ctx.lineTo(10, -30 + strum); ctx.moveTo(10, -48); ctx.lineTo(20, -46); ctx.stroke();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(10, -30 + strum, 4, 0, TAU); ctx.arc(20, -46, 4, 0, TAU); ctx.fill();
+  const hy = -72;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  for (const [hx, hy2, r] of [[-12, -6, 6], [-6, -12, 7], [2, -14, 7], [10, -10, 6.5], [14, -3, 5], [-15, 1, 5]]) { ctx.moveTo(hx + r, hy + hy2); ctx.arc(hx, hy + hy2, r, 0, TAU); }
+  ctx.fill();
+  ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  drawFace(d, mood, hy, 0.6, -0.2);
+  ctx.restore();
+}
+
+// The big harp at the bottom: one string for each lane
+function drawHarp() {
+  const b = harpBox();
+  const top = laneTop();
+  const crossY = HIT_Y - 120, boxY = 862;
+  // lanes (faint guides where the notes slide down)
+  for (let l = 0; l < b.n; l++) {
+    const x = laneX(l);
+    const lg = ctx.createLinearGradient(0, top, 0, crossY);
+    lg.addColorStop(0, 'rgba(255,240,200,0)'); lg.addColorStop(1, 'rgba(255,240,200,0.10)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(x - b.lw / 2 + 3, top, b.lw - 6, crossY - top);
+  }
+  // the frame: two curving arms, a crossbar and the sound box
+  const L = b.x0 - 26, R = b.x1 + 26;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#7a4a1a'; ctx.lineWidth = 22;
+  ctx.beginPath(); ctx.moveTo(L + 20, boxY); ctx.bezierCurveTo(L - 30, HIT_Y, L + 10, crossY + 20, L - 6, crossY - 40);
+  ctx.moveTo(R - 20, boxY); ctx.bezierCurveTo(R + 30, HIT_Y, R - 10, crossY + 20, R + 6, crossY - 40); ctx.stroke();
+  ctx.strokeStyle = '#c98a3a'; ctx.lineWidth = 14;
+  ctx.stroke();
+  ctx.fillStyle = '#e8b84a';
+  for (const x of [L - 6, R + 6]) { ctx.beginPath(); ctx.arc(x, crossY - 44, 12, 0, TAU); ctx.fill(); }
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.moveTo(L - 4, crossY); ctx.lineTo(R + 4, crossY); ctx.stroke();
+  // strings
+  for (let l = 0; l < b.n; l++) {
+    const x = laneX(l), s = strings[l] || { amp: 0 };
+    const wob = s.amp * Math.sin(t * 90 + l) * 6;
+    ctx.strokeStyle = STRING_COLS[l]; ctx.lineWidth = 4 + (b.n - l) * 0.4;
+    ctx.beginPath(); ctx.moveTo(x, crossY); ctx.quadraticCurveTo(x + wob, (crossY + boxY) / 2, x, boxY - 10); ctx.stroke();
+    ctx.fillStyle = '#f2d27a';
+    ctx.beginPath(); ctx.arc(x, crossY, 5, 0, TAU); ctx.fill();
+  }
+  // the glowing line where notes are plucked
+  const pulse = 0.55 + 0.25 * Math.sin(t * 4);
+  ctx.fillStyle = `rgba(255,236,150,${pulse * 0.35})`;
+  roundRect(b.x0 - 10, HIT_Y - 9, b.x1 - b.x0 + 20, 18, 9); ctx.fill();
+  ctx.strokeStyle = `rgba(255,240,170,${pulse})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(b.x0 - 6, HIT_Y); ctx.lineTo(b.x1 + 6, HIT_Y); ctx.stroke();
+  for (let l = 0; l < b.n; l++) {
+    ctx.strokeStyle = 'rgba(255,250,220,0.8)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(laneX(l), HIT_Y, 16, 0, TAU); ctx.stroke();
+  }
+  // sound box
+  const bg = ctx.createLinearGradient(0, boxY - 14, 0, boxY + 40);
+  bg.addColorStop(0, '#b07a3a'); bg.addColorStop(1, '#6a4018');
+  ctx.fillStyle = bg;
+  roundRect(L, boxY - 14, R - L, 50, 18); ctx.fill();
+  ctx.fillStyle = '#3a2410';
+  ctx.beginPath(); ctx.ellipse(W / 2, boxY + 10, 26, 9, 0, 0, TAU); ctx.fill();
+  // key letters for computers
+  if (!matchMedia('(pointer: coarse)').matches) {
+    ctx.fillStyle = 'rgba(255,240,200,0.7)'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    for (let l = 0; l < b.n; l++) ctx.fillText('ASDFGH'[l], laneX(l), boxY + 26);
+  }
+}
+
+function drawNotes() {
+  const b = harpBox();
+  const top = laneTop();
+  const r = Math.min(24, b.lw * 0.3);
+  for (const n of notes) {
+    if (n.hit && !n.hold) continue;
+    const y = noteY(n);
+    if (y < top - 40) break;
+    if (n.missed && y > HIT_Y + 120) continue;
+    const x = laneX(n.lane);
+    const a = clamp((y - top + 40) / 80, 0, 1) * (n.missed ? 0.35 : 1);
+    ctx.globalAlpha = a;
+    // the tail of a long note
+    if (n.hold) {
+      const endY = HIT_Y - (n.t + n.dur - songT) / cfg.fall * (HIT_Y - top);
+      const yy = n.hit ? HIT_Y : y;
+      if (!n.holdDone || songT < n.t + n.dur) {
+        ctx.fillStyle = n.hit ? 'rgba(255,236,150,0.75)' : 'rgba(255,236,150,0.45)';
+        roundRect(x - r * 0.45, Math.max(top, endY), r * 0.9, Math.max(0, yy - Math.max(top, endY)), r * 0.45); ctx.fill();
+      }
+      if (n.hit) { ctx.globalAlpha = 1; continue; }
+    }
+    // a bar joining the two notes of a chord
+    if (n.partner && !n.partner.hit && !n.hit) {
+      ctx.strokeStyle = 'rgba(255,236,150,0.6)'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(laneX(n.partner.lane), y); ctx.lineTo(x, y); ctx.stroke();
+    }
+    const gl = ctx.createRadialGradient(x, y, 2, x, y, r * 1.8);
+    gl.addColorStop(0, 'rgba(255,230,120,0.6)'); gl.addColorStop(1, 'rgba(255,230,120,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, TAU); ctx.fill();
+    ctx.fillStyle = n.missed ? '#9a8f80' : '#ffd451';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = STRING_COLS[n.lane]; ctx.lineWidth = 4; ctx.stroke();
+    // a little music note drawn on it
+    ctx.fillStyle = '#7a4a10'; ctx.strokeStyle = '#7a4a10'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(x - 3, y + 5, 5.5, 4, -0.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 2, y + 4); ctx.lineTo(x + 2, y - 11); ctx.quadraticCurveTo(x + 8, y - 6, x + 10, y - 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawNoteParticle(p) {
+  ctx.fillStyle = p.color;
+  ctx.beginPath(); ctx.ellipse(p.x - 3, p.y + 5, 6, 4.5, -0.4, 0, TAU); ctx.fill();
+  ctx.strokeStyle = p.color; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(p.x + 2.5, p.y + 4); ctx.lineTo(p.x + 2.5, p.y - 12); ctx.lineTo(p.x + 9, p.y - 8); ctx.stroke();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(20,12,24,0.75)'); hg.addColorStop(1, 'rgba(20,12,24,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  const ink = '#fff4cc';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ink;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'A Song for King Saul' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    // the storm meter
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('STORM', 12, 50);
+    const bx = 62, bw = 130;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,244,204,0.22)'; roundRect(bx, 39, bw, 13, 6.5); ctx.fill();
+    ctx.fillStyle = cloudShow > 0.8 && Math.sin(t * 10) > 0 ? '#ff6b6b' : cloudShow > 0.6 ? '#8a8fa8' : '#b8c4d8';
+    if (cloudShow > 0.02) { roundRect(bx, 39, Math.max(13, bw * cloudShow), 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = ink;
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + levelScore}`, viewW - 12, 26);
+    ctx.font = '600 13px Fredoka, sans-serif';
+    if (combo >= 3) ctx.fillText(`Run of ${combo}!`, viewW - 12, 50);
+    // song progress
+    const f = clamp((songT + LEAD) / (songEnd() + LEAD), 0, 1);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,244,204,0.22)'; roundRect(viewW - 132, 76, 120, 8, 4); ctx.fill();
+    ctx.fillStyle = '#ffd451'; roundRect(viewW - 132, 76, Math.max(8, 120 * f), 8, 4); ctx.fill();
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = TOPH + 40 + Math.max(0, offY) * 0.5;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(30,24,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff4cc';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawRoom();
+  const scY = sceneY();
+  const narrow = W < 640;
+  const saulX = narrow ? W / 2 + 70 : W / 2 + 90, davidX = narrow ? W / 2 - 120 : W / 2 - 170;
+  drawSaul(saulX, 352 + scY);
+  drawStormCloud(saulX, 178 + scY + (1 - cloudShow) * 20, cloudShow);
+  drawDavid(davidX, 352 + scY);
+  drawHarp();
+  drawNotes();
+  for (const p of particles) if (p.kind === 'note') { ctx.globalAlpha = p.life / p.max; drawNoteParticle(p); }
+  ctx.globalAlpha = 1;
+  particles = particles.filter((p) => p.kind !== 'note' || p.life > 0);
+  drawParticlesNoNotes();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+function drawParticlesNoNotes() {
+  const keep = particles;
+  particles = keep.filter((p) => p.kind !== 'note');
+  drawParticles();
+  particles = keep;
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  for (const s of strings) s.amp = Math.max(0, s.amp - dt * 3);
+  david.pluck = Math.max(0, david.pluck - dt);
+  for (const d of [david, saul]) { d.blinkT -= dt; if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4); } if (d.blink > 0) d.blink -= dt; }
+  cloudShow += (cloud - cloudShow) * Math.min(1, dt * 5);
+  if (state === 'play') {
+    playT += dt;
+    updateNotes(dt);
+  } else if (state === 'win') {
+    winT += dt;
+    cloud = Math.max(0, cloud - dt * 0.4);
+    if (Math.random() < dt * 6) spawn(rand(0, W), rand(120, 400), rand(-20, 20), rand(-60, -20), 1.6, pick(['#ffe27a', '#fff6d0', '#ffb0c8']), 8, -10, 'note');
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

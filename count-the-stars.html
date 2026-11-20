@@ -1,0 +1,1319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#141a3a">
+<title>Count the Stars</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #141a3a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.1rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Count the Stars</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'harp', accent: 'pipe', ambience: 'night', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  lookUp: { ref: 'Genesis 15:5', KJV: 'Look now toward heaven, and tell the stars, if thou be able to number them: and he said unto him, So shall thy seed be.', NKJV: 'Look now toward heaven, and count the stars if you are able to number them.” And He said to him, “So shall your descendants be.', NIV: 'Look up at the sky and count the stars —if indeed you can count them.” Then he said to him, “So shall your offspring be.', NLT: 'Look up into the sky and count the stars if you can. That’s how many descendants you will have!' },
+  // Level cards
+  outside: { ref: 'Genesis 15:5', KJV: 'And he brought him forth abroad, and said, Look now toward heaven', NKJV: 'Then He brought him outside and said, “Look now toward heaven', NIV: 'He took him outside and said, “Look up at the sky and count the stars', NLT: 'Then the Lord took Abram outside and said to him, “Look up into the sky and count the stars' },
+  names: { ref: 'Psalm 147:4', KJV: 'He telleth the number of the stars; he calleth them all by their names.', NKJV: 'He counts the number of the stars; He calls them all by name.', NIV: 'He determines the number of the stars and calls them each by name.', NLT: 'He counts the stars and calls them all by name.' },
+  shield: { ref: 'Genesis 15:1', KJV: 'Fear not, Abram: I am thy shield, and thy exceeding great reward.', NKJV: 'Do not be afraid, Abram. I am your shield, your exceedingly great reward.', NIV: 'Do not be afraid, Abram. I am your shield, your very great reward.', NLT: 'Do not be afraid, Abram, for I will protect you, and your reward will be great.' },
+  multiply: { ref: 'Genesis 22:17', KJV: 'I will multiply thy seed as the stars of the heaven, and as the sand which is upon the sea shore', NKJV: 'multiplying I will multiply your descendants as the stars of the heaven and as the sand which is on the seashore', NIV: 'I will surely bless you and make your descendants as numerous as the stars in the sky and as the sand on the seashore.', NLT: 'I will multiply your descendants beyond number, like the stars in the sky and the sand on the seashore.' },
+  soShall: { ref: 'Genesis 15:5', KJV: 'So shall thy seed be.', NKJV: 'So shall your descendants be.', NIV: 'So shall your offspring be.', NLT: 'That’s how many descendants you will have!' },
+  // Win card
+  believed: { ref: 'Genesis 15:6', KJV: 'And he believed in the Lord; and he counted it to him for righteousness.', NKJV: 'And he believed in the Lord, and He accounted it to him for righteousness.', NIV: 'Abram believed the Lord, and he credited it to him as righteousness.', NLT: 'And Abram believed the Lord, and the Lord counted him as righteous because of his faith.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  layoutBox();
+  makeSkyDots();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Star pictures (points in a 0..1 box, joined in order, closed)
+// ============================================================
+function starShape(n, ro, ri) {
+  const pts = [];
+  for (let k = 0; k < n * 2; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / n, r = k % 2 ? ri : ro;
+    pts.push([0.5 + Math.cos(a) * r, 0.52 + Math.sin(a) * r]);
+  }
+  return pts;
+}
+const PICTURES = {
+  flame: { name: 'A lamp flame', pts: [[0.5, 0.04], [0.82, 0.58], [0.5, 0.96], [0.18, 0.58]] },
+  tent:  { name: 'A tent', pts: [[0.06, 0.86], [0.5, 0.1], [0.94, 0.86], [0.66, 0.86], [0.5, 0.54], [0.34, 0.86]] },
+  fish:  { name: 'A fish', pts: [[0.04, 0.5], [0.3, 0.22], [0.6, 0.34], [0.94, 0.12], [0.84, 0.5], [0.94, 0.88], [0.6, 0.66], [0.3, 0.78]] },
+  moon:  { name: 'The moon', pts: [[0.6, 0.04], [0.24, 0.16], [0.06, 0.5], [0.24, 0.84], [0.6, 0.96], [0.44, 0.74], [0.38, 0.5], [0.44, 0.26]] },
+  heart: { name: 'A heart', pts: [[0.5, 0.3], [0.7, 0.08], [0.94, 0.22], [0.88, 0.54], [0.5, 0.94], [0.12, 0.54], [0.06, 0.22], [0.3, 0.08]] },
+  dove:  { name: 'A dove', pts: [[0.04, 0.42], [0.18, 0.28], [0.34, 0.42], [0.5, 0.06], [0.64, 0.42], [0.96, 0.3], [0.84, 0.6], [0.5, 0.7], [0.2, 0.56]] },
+  star:  { name: 'A shining star', pts: starShape(5, 0.48, 0.2) },
+  palm:  { name: 'A palm tree', pts: [[0.42, 0.96], [0.46, 0.4], [0.06, 0.46], [0.26, 0.12], [0.5, 0.28], [0.74, 0.08], [0.94, 0.42], [0.56, 0.4], [0.6, 0.96]] },
+  sheep: { name: 'A sheep', pts: [[0.1, 0.36], [0.38, 0.18], [0.68, 0.24], [0.96, 0.32], [0.88, 0.58], [0.74, 0.62], [0.74, 0.94], [0.58, 0.66], [0.36, 0.68], [0.28, 0.94], [0.16, 0.64]] },
+  camel: { name: 'A camel', pts: [[0.04, 0.34], [0.16, 0.16], [0.28, 0.3], [0.34, 0.52], [0.48, 0.2], [0.6, 0.42], [0.74, 0.18], [0.94, 0.5], [0.88, 0.94], [0.68, 0.62], [0.46, 0.62], [0.38, 0.94], [0.24, 0.6], [0.12, 0.46]] },
+};
+
+// Each level: the pictures and how the stars are numbered
+// mode: 'one' 1,2,3…  'two' 2,4,6…  'back' n…3,2,1  'five' 5,10,15…
+const LEVELS = [
+  { name: 'Look Toward Heaven',      pics: [['flame', 'one'], ['tent', 'one']],                                   time: 75,  decoys: 0, twinkleLife: 3.2, glow: 2,  drift: 0,    verse: 'outside' },
+  { name: 'Count Them If You Can',   pics: [['fish', 'one'], ['moon', 'one'], ['heart', 'one']],                  time: 80,  decoys: 2, twinkleLife: 2.8, glow: 5,  drift: 0,    verse: 'names' },
+  { name: 'More and More Stars',     pics: [['dove', 'one'], ['star', 'one'], ['sheep', 'one']],                  time: 80,  decoys: 4, twinkleLife: 2.5, glow: 8,  drift: 0,    verse: 'shield' },
+  { name: 'Count by Twos',           pics: [['tent', 'two'], ['heart', 'two'], ['fish', 'two']],                  time: 80,  decoys: 5, twinkleLife: 2.3, glow: 0,  drift: 0,    verse: 'names' },
+  { name: 'Count Backwards',         pics: [['moon', 'back'], ['star', 'back'], ['palm', 'back']],                time: 80,  decoys: 6, twinkleLife: 2.0, glow: 0,  drift: 0.1,  verse: 'multiply' },
+  { name: 'As Many as the Stars',    pics: [['camel', 'one'], ['sheep', 'two'], ['star', 'back'], ['dove', 'five']], time: 105, decoys: 7, twinkleLife: 1.8, glow: 0,  drift: 0.14, verse: 'soShall' },
+];
+const LAST = LEVELS.length;
+const LEVEL_NEWS = [
+  'Tap the stars in order: <b>1, 2, 3…</b> to join them up and make a picture!',
+  'Three pictures tonight. Watch out for <b>extra stars</b> that are not part of the picture!',
+  'Bigger pictures, and more extra stars. Tap the <b>golden twinkling stars</b> to count them for more time!',
+  'Now <b>count by twos</b>: 2, 4, 6, 8… Skip the odd numbers!',
+  '<b>Count backwards</b>: start at the biggest number and go down to 1. The sky slowly turns!',
+  'All kinds of counting: by ones, by twos, backwards and <b>by fives</b> (5, 10, 15…). Watch the number to find next!',
+];
+const MODE_TEXT = { one: 'Count 1, 2, 3…', two: 'Count by twos: 2, 4, 6…', back: 'Count backwards to 1', five: 'Count by fives: 5, 10, 15…' };
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('countStarsBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0;
+let picIndex = 0;
+let pic = null;           // the picture being joined
+let done = [];            // finished pictures, shown small along the top
+let stars = [];           // numbered stars of the current picture plus the decoys
+let twinkles = [];        // golden stars to catch and count
+let counted = 0;          // twinkling stars counted this level
+let timeLeft = 0, wrongs = 0;
+let nextTwinkle = 0;
+let idleT = 0;
+let between = 0;          // pause while a finished picture glows and flies away
+let particles = [];
+let floaters = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastResult = null;
+let cursor = -1;          // keyboard cursor over a star
+let finaleStars = [];
+const box = { x: 0, y: 0, w: 400, h: 400 };
+const abram = { mood: 'watch', moodT: 0, blinkT: 2, blink: 0, point: 0 };
+let skyDots = [];
+
+// ============================================================
+//  Layout of the sky box
+// ============================================================
+function layoutBox() {
+  const top = 150, bottom = 640;
+  const size = Math.min(W - 56, bottom - top, 560);
+  box.w = size; box.h = size;
+  box.x = W / 2 - size / 2;
+  box.y = top + (bottom - top - size) / 2;
+  if (pic) placeStars(false);
+}
+
+function makeSkyDots() {
+  skyDots = [];
+  const n = Math.round(viewW * (viewH * 0.75) / 2600);
+  for (let i = 0; i < n; i++) skyDots.push({ x: hash(i, 1) * viewW - offX, y: -offY + hash(i, 2) * (viewH * 0.78), r: 0.6 + hash(i, 3) * 1.3, ph: hash(i, 4) * TAU });
+}
+
+function labelsFor(n, mode) {
+  if (mode === 'two') return Array.from({ length: n }, (_, i) => 2 * (i + 1));
+  if (mode === 'back') return Array.from({ length: n }, (_, i) => n - i);
+  if (mode === 'five') return Array.from({ length: n }, (_, i) => 5 * (i + 1));
+  return Array.from({ length: n }, (_, i) => i + 1);
+}
+function decoyLabels(labels, mode, k) {
+  const set = new Set(labels);
+  const pool = [];
+  const max = Math.max(...labels);
+  if (mode === 'two') {
+    for (let v = 1; v < max; v += 2) pool.push(v);
+  } else if (mode === 'five') {
+    for (let v = 3; v < max; v++) if (v % 5) pool.push(v);
+  } else {
+    for (let v = max + 1; v <= max + 4; v++) pool.push(v);
+  }
+  return shuffle([...new Set(pool)].filter((v) => !set.has(v))).slice(0, k);
+}
+
+function newPicture() {
+  const [key, mode] = cfg.pics[picIndex];
+  const P = PICTURES[key];
+  const labels = labelsFor(P.pts.length, mode);
+  // a little wobble so a picture is never quite the same twice
+  const jit = P.pts.map(([x, y]) => [clamp(x + rand(-0.025, 0.025), 0.02, 0.98), clamp(y + rand(-0.025, 0.025), 0.02, 0.98)]);
+  pic = { key, mode, name: P.name, pts: jit, labels, next: 0, links: 0, t: 0, doneT: 0, rot: 0 };
+  stars = jit.map(([u, v], i) => ({ u, v, label: labels[i], idx: i, decoy: false, lit: false, shake: 0, pop: rand(0, 0.4), ph: rand(0, TAU), x: 0, y: 0 }));
+  // extra stars that are not in the picture
+  const dl = decoyLabels(labels, mode, cfg.decoys);
+  for (const label of dl) {
+    for (let k = 0; k < 80; k++) {
+      const u = rand(0.02, 0.98), v = rand(0.02, 0.98);
+      if (stars.some((s) => Math.hypot(s.u - u, s.v - v) < 0.17)) continue;
+      if (segDist(u, v) < 0.09) continue;
+      stars.push({ u, v, label, idx: -1, decoy: true, lit: false, shake: 0, pop: rand(0, 0.5), ph: rand(0, TAU), x: 0, y: 0 });
+      break;
+    }
+  }
+  placeStars(true);
+  idleT = 0;
+  cursor = -1;
+  if (mode !== 'one' && !told[mode]) { told[mode] = true; showMessage(MODE_TEXT[mode] + '!', 2.6); }
+}
+
+function segDist(u, v) {
+  let d = 9;
+  const p = pic.pts;
+  for (let i = 0; i < p.length; i++) {
+    const [ax, ay] = p[i], [bx, by] = p[(i + 1) % p.length];
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    const f = clamp(((u - ax) * dx + (v - ay) * dy) / l2, 0, 1);
+    d = Math.min(d, Math.hypot(u - ax - f * dx, v - ay - f * dy));
+  }
+  return d;
+}
+
+// Where a star sits right now (the sky turns slowly on later levels)
+function placeStars() {
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const a = pic ? pic.rot : 0, c = Math.cos(a), s = Math.sin(a);
+  for (const st of stars) {
+    const dx = (st.u - 0.5) * box.w, dy = (st.v - 0.5) * box.h;
+    st.x = cx + dx * c - dy * s;
+    st.y = cy + dx * s + dy * c;
+  }
+}
+
+// ============================================================
+//  Particles and floating words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#cfe0ff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 30, i % 3 ? 'dot' : 'star');
+  }
+}
+function floatText(x, y, text, color = '#fff6d0') { floaters.push({ x, y, text, color, t: 1.3 }); }
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 30 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+}
+function starPath(x, y, ro, ri, n = 5, rot = -Math.PI / 2) {
+  ctx.beginPath();
+  for (let k = 0; k < n * 2; k++) { const a = rot + k * Math.PI / n, r = k % 2 ? ri : ro; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+  ctx.closePath();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') { starPath(p.x, p.y, p.size * 1.6, p.size * 0.6, 4, 0); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.font = '700 20px Fredoka, sans-serif';
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(10,15,40,0.85)';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Joining the stars
+// ============================================================
+function tapStar(st) {
+  if (state !== 'play' || between > 0 || !st || st.lit) return;
+  idleT = 0;
+  if (!st.decoy && st.idx === pic.next) {
+    st.lit = true;
+    pic.next++;
+    abram.point = 0.8;
+    sparkleBurst(st.x, st.y, 10);
+    sfx.star(pic.next / pic.pts.length);
+    if (pic.next >= pic.pts.length) finishPicture();
+  } else {
+    wrongs++;
+    st.shake = 0.5;
+    timeLeft = Math.max(0, timeLeft - 3);
+    floatText(st.x, st.y - 26, '−3 s', '#ffb0a0');
+    abram.mood = 'oops'; abram.moodT = 1;
+    sfx.wrong();
+    shakeT = 0.15;
+    if (!told.wrong) { told.wrong = true; showMessage(`Not that one! Look for ${pic.labels[pic.next]}.`, 2.4); }
+  }
+}
+
+function finishPicture() {
+  const n = pic.pts.length;
+  const pts = n * 50;
+  levelScore += pts;
+  pic.doneT = 0.001;
+  between = 2.2;
+  abram.mood = 'joy'; abram.moodT = 2;
+  flashT = 0.15;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  sparkleBurst(cx, cy, 40);
+  floatText(cx, box.y + box.h + 4, `${pic.name}! +${pts}`, '#ffe27a');
+  sfx.picture();
+}
+
+function afterPicture() {
+  done.push({ key: pic.key, pts: pic.pts.map((p) => [...p]), t: 0 });
+  picIndex++;
+  if (picIndex >= cfg.pics.length) { winLevel(); return; }
+  newPicture();
+}
+
+function catchTwinkle(tw) {
+  tw.caught = true;
+  counted++;
+  timeLeft = Math.min(cfg.time, timeLeft + 1.5);
+  levelScore += 30;
+  sparkleBurst(tw.x, tw.y, 14, ['#ffe27a', '#ffd040', '#fff6d0']);
+  floatText(tw.x, tw.y - 22, `+1  (${counted})`, '#ffe27a');
+  sfx.twinkle(counted);
+  if (!told.twinkle) { told.twinkle = true; showMessage('You counted a star! Each one gives a little more time.', 2.6); }
+}
+
+function updatePlay(dt) {
+  if (between > 0) {
+    between -= dt;
+    pic.doneT += dt;
+    if (between <= 0) afterPicture();
+  } else {
+    timeLeft -= dt;
+    idleT += dt;
+    if (timeLeft <= 0) { timeLeft = 0; failLevel(); return; }
+    if (timeLeft < 10 && !told.hurry) { told.hurry = true; showMessage('Hurry! The sun is coming up!', 2); }
+  }
+  if (pic) {
+    pic.t += dt;
+    if (cfg.drift) { pic.rot = Math.sin(pic.t * 0.35) * cfg.drift; placeStars(); }
+  }
+  // golden twinkling stars to count
+  nextTwinkle -= dt;
+  if (nextTwinkle <= 0 && level >= 1) {
+    nextTwinkle = rand(3, 5.5);
+    for (let k = 0; k < 30; k++) {
+      const x = rand(30, W - 30), y = rand(140, 640);
+      if (stars.some((s) => Math.hypot(s.x - x, s.y - y) < 70)) continue;
+      if (x < 130 && y < 140 - offY) continue;
+      twinkles.push({ x, y, life: cfg.twinkleLife, max: cfg.twinkleLife, caught: false, ph: rand(0, TAU) });
+      break;
+    }
+  }
+}
+
+function updateCommon(dt) {
+  t += dt;
+  updateParticles(dt);
+  for (const st of stars) { st.shake = Math.max(0, st.shake - dt); st.pop = Math.max(0, st.pop - dt); }
+  for (let i = twinkles.length - 1; i >= 0; i--) {
+    const tw = twinkles[i];
+    tw.life -= dt;
+    if (tw.caught || tw.life <= 0) twinkles.splice(i, 1);
+  }
+  for (const d of done) d.t += dt;
+  if (abram.moodT > 0) { abram.moodT -= dt; if (abram.moodT <= 0) abram.mood = 'watch'; }
+  abram.point = Math.max(0, abram.point - dt);
+  abram.blinkT -= dt;
+  if (abram.blinkT <= 0) { abram.blink = 0.14; abram.blinkT = rand(2, 5); }
+  if (abram.blink > 0) abram.blink -= dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  pic = null; stars = []; twinkles = [];
+  const timeBonus = Math.round(timeLeft) * 10;
+  const countBonus = counted * 30;
+  const careBonus = wrongs === 0 ? 300 : Math.max(0, 300 - wrongs * 60);
+  const levelBonus = level * 200;
+  const score = levelScore - countBonus + timeBonus + countBonus + careBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('countStarsBest', best); } catch (e) {} }
+  lastResult = { picPts: levelScore - countBonus, timeBonus, countBonus, careBonus, levelBonus, score };
+  // So shall thy seed be: the sky fills with stars
+  finaleStars = [];
+  const n = level === LAST ? 420 : 160;
+  for (let i = 0; i < n; i++) finaleStars.push({ x: rand(-offX, viewW - offX), y: rand(-offY, 650), r: rand(1, 3.2), d: rand(0, 2.2), ph: rand(0, TAU) });
+  abram.mood = 'joy'; abram.moodT = 99;
+  showMessage(level === LAST ? 'So shall thy seed be!' : 'What a starry sky!', 2.6);
+  sfx.win();
+  endTimer = level === LAST ? 4 : 3;
+}
+
+function failLevel() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  twinkles = [];
+  abram.mood = 'sad'; abram.moodT = 99;
+  showMessage('The sun came up…', 2.4);
+  sfx.fail();
+  endTimer = 2.4;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = LEVELS[0];
+  done = []; pic = null; stars = [];
+  showOverlay('Count the Stars', 'God gives Abram a promise under the night sky',
+    `${verseHTML('lookUp')}
+     <ul>
+       <li>God told Abram to look up and count the stars. Help Abram join them up into <b>star pictures</b>!</li>
+       <li><b>Tap the stars in order</b>, following the numbers: <b>1, 2, 3…</b> Later you will count by twos, backwards and by fives.</li>
+       <li>Finish every picture <b>before the sun comes up</b>. A wrong star costs <b>3 seconds</b>.</li>
+       <li>Tap the <b>golden twinkling stars</b> to count them: each one gives extra time and points.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd> choose a star, <kbd>Space</kbd> taps it, <kbd>P</kbd> pause.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'card';
+  syncAmbience();
+  cfg = LEVELS[level - 1];
+  done = []; pic = null; stars = []; twinkles = []; finaleStars = [];
+  abram.mood = 'watch'; abram.moodT = 0;
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${LEVEL_NEWS[level - 1]}</p>
+     <p class="score"><b>${cfg.pics.length}</b> star pictures · <b>${cfg.time}</b> seconds of night</p>`,
+    'Look up!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  cfg = LEVELS[level - 1];
+  hideOverlay();
+  particles = []; floaters = []; twinkles = []; done = []; finaleStars = [];
+  picIndex = 0;
+  counted = 0; wrongs = 0; levelScore = 0;
+  timeLeft = cfg.time;
+  nextTwinkle = level === 1 ? 6 : 3;
+  between = 0;
+  winT = 0; failT = 0; endTimer = 0; flashT = 0; shakeT = 0;
+  abram.mood = 'watch'; abram.moodT = 0;
+  if (!retry) told = {};
+  layoutBox();
+  newPicture();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 && !retry ? 'Tap star number 1 to begin!' : `Level ${level}: ${cfg.name}`, 2.6);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastResult;
+    const final = level === LAST;
+    showOverlay(final ? 'So shall thy seed be!' : 'What a starry sky!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(final ? 'soShall' : 'believed')}
+       ${final ? `<p style="text-align:center">There were far too many stars to count, and God kept His promise: Abram's family grew and grew.</p>${verseHTML('believed')}` : ''}
+       <p class="score">Star pictures: <b>${s.picPts}</b><br>Time left: <b>${s.timeBonus}</b><br>Stars counted (${counted}): <b>${s.countBonus}</b><br>Careful tapping (${wrongs} wrong): <b>${s.careBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      final ? 'Play again' : 'Next night', () => {
+        if (final) { level = 1; totalScore = 0; } else level++;
+        levelCard();
+      });
+  } else if (state === 'fail') {
+    showOverlay('Morning came!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The sun came up before all the pictures were finished. Look for the <b>next number</b> (it is shown at the bottom), and tap the <b>golden stars</b> for extra time.</p>
+       ${verseHTML('shield')}
+       <p class="score">Pictures finished: <b>${picIndex}</b> of ${cfg.pics.length} &nbsp;&middot;&nbsp; Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The stars will wait for you. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+// Playfield point -> CSS pixels (used by the tests)
+function playToCss(x, y) { return { x: (x + offX) * scale / dpr, y: (y + offY) * scale / dpr }; }
+
+const TAP_R = 40;
+function starNear(x, y) {
+  let bestS = null, bd = TAP_R;
+  for (const st of stars) {
+    if (st.lit) continue;
+    const d = Math.hypot(st.x - x, st.y - y);
+    if (d < bd) { bd = d; bestS = st; }
+  }
+  return bestS;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const v = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(v.vx - b.x, v.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const x = v.vx - offX, y = v.vy - offY;
+  // golden stars first: they are quick to vanish
+  const tw = twinkles.find((q) => !q.caught && Math.hypot(q.x - x, q.y - y) < 42);
+  if (tw) { catchTwinkle(tw); return; }
+  const st = starNear(x, y);
+  if (st) tapStar(st);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function keyStars() { return stars.filter((s) => !s.lit).sort((a, b) => a.x - b.x || a.y - b.y); }
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && winT > 1.2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const list = keyStars();
+  if (!list.length) return;
+  const cur = list.indexOf(stars[cursor]);
+  if (['ArrowRight', 'ArrowDown', 'KeyD', 'KeyS'].includes(e.code)) { cursor = stars.indexOf(list[(cur + 1 + list.length) % list.length]); sfx.tick(); }
+  else if (['ArrowLeft', 'ArrowUp', 'KeyA', 'KeyW'].includes(e.code)) { cursor = stars.indexOf(list[(cur - 1 + list.length * 2) % list.length]); sfx.tick(); }
+  else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat && stars[cursor]) tapStar(stars[cursor]);
+});
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tick() { this.tone(1800, 0.05, 'sine', 0.05); },
+  star(f) { if (this.ctx) { Music.tap(0.15 + f * 0.8); this.tone(2400 + f * 800, 0.3, 'sine', 0.05, 0.03); } },
+  wrong() { this.tone(240, 0.22, 'triangle', 0.22, 0, 170); },
+  twinkle(n) { [2093, 2637, 3136].forEach((f, i) => this.tone(f * (1 + (n % 5) * 0.06), 0.35, 'sine', 0.07, i * 0.05)); },
+  picture() { [1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.1, i * 0.09)); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing: sky and ground
+// ============================================================
+function dawnF() {
+  if (state === 'fail') return clamp(0.55 + failT / 2, 0, 1);
+  if (state !== 'play' && state !== 'pause') return 0;
+  return clamp(1 - timeLeft / (cfg.time * 0.3), 0, 1) * 0.55;
+}
+function mix(c1, c2, f) { return `rgb(${c1.map((v, i) => Math.round(lerp(v, c2[i], f))).join(',')})`; }
+
+function drawSky() {
+  const top = -offY;
+  const d = dawnF();
+  const g = ctx.createLinearGradient(0, top, 0, 720);
+  g.addColorStop(0, mix([12, 16, 46], [70, 110, 170], d));
+  g.addColorStop(0.6, mix([28, 34, 86], [150, 140, 190], d));
+  g.addColorStop(1, mix([58, 52, 110], [250, 180, 140], d));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, top, viewW, 760 - top);
+  // the Milky Way: a soft band
+  ctx.save();
+  ctx.globalAlpha = 0.16 * (1 - d);
+  const mg = ctx.createLinearGradient(-offX, top + 80, viewW - offX, 520);
+  mg.addColorStop(0, 'rgba(200,210,255,0)'); mg.addColorStop(0.5, 'rgba(220,225,255,1)'); mg.addColorStop(1, 'rgba(200,210,255,0)');
+  ctx.fillStyle = mg;
+  ctx.beginPath(); ctx.moveTo(-offX, top + 40); ctx.lineTo(viewW - offX, 300); ctx.lineTo(viewW - offX, 460); ctx.lineTo(-offX, top + 200); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // little background stars (not tappable)
+  ctx.fillStyle = '#ffffff';
+  for (const s of skyDots) {
+    ctx.globalAlpha = (0.45 + 0.4 * Math.sin(t * 1.7 + s.ph)) * (1 - d);
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // the moon travels across the sky as the night goes by
+  const f = state === 'play' || state === 'pause' ? 1 - timeLeft / cfg.time : state === 'fail' ? 1 : 0.15;
+  const mx = lerp(W * 0.9, W * 0.3, f), my = top + 84 - Math.sin(f * Math.PI) * 14 + (state === 'fail' ? failT * 40 : 0);
+  ctx.save();
+  ctx.globalAlpha = 1 - d * 0.6;
+  const mgl = ctx.createRadialGradient(mx, my, 10, mx, my, 70);
+  mgl.addColorStop(0, 'rgba(255,250,220,0.35)'); mgl.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = mgl; ctx.beginPath(); ctx.arc(mx, my, 70, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff6d6'; ctx.beginPath(); ctx.arc(mx, my, 22, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(200,190,150,0.35)';
+  ctx.beginPath(); ctx.arc(mx - 8, my - 6, 5, 0, TAU); ctx.arc(mx + 7, my + 7, 4, 0, TAU); ctx.arc(mx + 9, my - 9, 2.5, 0, TAU); ctx.fill();
+  ctx.restore();
+  if (d > 0.3) {
+    // the sun peeps over the hills
+    const sy = 700 - (d - 0.3) * 160;
+    const sg = ctx.createRadialGradient(W * 0.75, sy, 10, W * 0.75, sy, 160);
+    sg.addColorStop(0, 'rgba(255,220,120,0.9)'); sg.addColorStop(1, 'rgba(255,200,120,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.75, sy, 160, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(W * 0.75, sy, 40, 0, TAU); ctx.fill();
+  }
+}
+
+function drawGround() {
+  const d = dawnF();
+  // far hills
+  ctx.fillStyle = mix([34, 30, 70], [120, 90, 110], d);
+  ctx.beginPath(); ctx.moveTo(-offX, 720);
+  for (let x = -offX; x <= viewW - offX + 40; x += 40) ctx.lineTo(x, 690 - Math.sin(x * 0.006 + 1) * 26 - Math.sin(x * 0.017) * 10);
+  ctx.lineTo(viewW - offX + 40, H); ctx.lineTo(-offX, H); ctx.closePath(); ctx.fill();
+  // near ground
+  ctx.fillStyle = mix([52, 42, 62], [176, 138, 100], d);
+  ctx.beginPath(); ctx.moveTo(-offX, 760);
+  for (let x = -offX; x <= viewW - offX + 40; x += 40) ctx.lineTo(x, 752 - Math.sin(x * 0.01 + 2) * 12);
+  ctx.lineTo(viewW - offX + 40, H); ctx.lineTo(-offX, H); ctx.closePath(); ctx.fill();
+  // Abram's tent
+  const tx = W * 0.78, ty = 800;
+  ctx.fillStyle = '#2e2420';
+  ctx.beginPath(); ctx.moveTo(tx - 110, ty + 20); ctx.lineTo(tx - 70, ty - 70); ctx.lineTo(tx + 70, ty - 70); ctx.lineTo(tx + 110, ty + 20); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,170,120,0.35)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(tx - 95, ty - 10); ctx.lineTo(tx + 95, ty - 10); ctx.moveTo(tx - 82, ty - 40); ctx.lineTo(tx + 82, ty - 40); ctx.stroke();
+  ctx.fillStyle = '#ffcf70';
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath(); ctx.moveTo(tx - 18, ty + 20); ctx.lineTo(tx - 12, ty - 30); ctx.lineTo(tx + 12, ty - 30); ctx.lineTo(tx + 18, ty + 20); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#5a4030'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(tx - 110, ty + 20); ctx.lineTo(tx - 140, ty + 34); ctx.moveTo(tx + 110, ty + 20); ctx.lineTo(tx + 140, ty + 34); ctx.stroke();
+  // sleeping sheep
+  for (const [sx, sy, s] of [[W * 0.5, 846, 1], [W * 0.6, 868, 0.85], [W * 0.95, 860, 0.9]]) drawSheep(sx, sy, s);
+  // campfire
+  const fx = W * 0.44, fy = 812;
+  const fg = ctx.createRadialGradient(fx, fy, 4, fx, fy, 70);
+  fg.addColorStop(0, 'rgba(255,180,80,0.45)'); fg.addColorStop(1, 'rgba(255,180,80,0)');
+  ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(fx, fy, 70, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(fx - 16, fy + 8); ctx.lineTo(fx + 16, fy + 2); ctx.moveTo(fx + 16, fy + 8); ctx.lineTo(fx - 16, fy + 2); ctx.stroke();
+  for (let k = 0; k < 3; k++) {
+    const fl = 14 + Math.sin(t * 9 + k * 2) * 4;
+    ctx.fillStyle = ['#ff8a2a', '#ffb040', '#ffe080'][k];
+    ctx.beginPath(); ctx.moveTo(fx - 9 + k * 3, fy + 2); ctx.quadraticCurveTo(fx - 6 + k * 3, fy - fl * (1 - k * 0.2), fx + k * 1.5 - 1, fy - fl - 6 + k * 4); ctx.quadraticCurveTo(fx + 8 - k * 3, fy - fl * 0.5, fx + 9 - k * 3, fy + 2); ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawSheep(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#e8e4f0';
+  ctx.beginPath();
+  for (const [dx, dy, r] of [[-14, 0, 11], [0, -5, 13], [14, 0, 11], [-6, 4, 11], [8, 4, 11]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = '#4a4050'; ctx.beginPath(); ctx.ellipse(-24, 2, 8, 6, 0.2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#e8e4f0'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(-26, 1, 2, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+  const zt = (t * 0.6 + x * 0.01) % 1;
+  ctx.globalAlpha = 1 - zt; ctx.fillStyle = '#cfd8ff'; ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillText('z', -28 + zt * 6, -14 - zt * 18);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// Abram, sitting on a rock and looking up
+function drawAbram() {
+  const x = Math.max(70, W * 0.2), y = 842;
+  const s = 1.45;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  const skin = '#d39a66', robe = '#4b6fa5', stripe = '#e8d5a8', hair = '#cfcfcf';
+  ctx.fillStyle = '#6a6070'; ctx.beginPath(); ctx.ellipse(0, 6, 32, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#857a8c'; ctx.beginPath(); ctx.ellipse(-4, 0, 26, 9, 0, 0, TAU); ctx.fill();
+  // robe
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-20, 0); ctx.quadraticCurveTo(-20, -34, -11, -40); ctx.quadraticCurveTo(0, -44, 11, -40); ctx.quadraticCurveTo(20, -34, 22, 0); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = stripe; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-6, -40); ctx.lineTo(-7, 0); ctx.moveTo(6, -40); ctx.lineTo(7, 0); ctx.stroke();
+  // staff
+  ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-30, 4); ctx.lineTo(-22, -70); ctx.quadraticCurveTo(-20, -80, -28, -80); ctx.stroke();
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  arm(-11, -34, -22, -40);
+  if (abram.mood === 'joy') { const w = Math.sin(t * 8) * 4; arm(11, -34, 24 + w, -68); }
+  else if (abram.point > 0 || state === 'title') arm(11, -34, 26, -66);
+  else arm(11, -34, 16, -14);
+  // head looking up
+  const hy = -56;
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  // head cloth
+  ctx.fillStyle = '#e8dcc0';
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 0.95, Math.PI * 2.05); ctx.lineTo(17, hy + 12); ctx.lineTo(12, hy + 4); ctx.lineTo(12, hy - 6); ctx.quadraticCurveTo(0, hy - 12, -12, hy - 6); ctx.lineTo(-12, hy + 4); ctx.lineTo(-17, hy + 12); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, hy - 1, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  // beard
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.moveTo(-13, hy + 1); ctx.quadraticCurveTo(-13, hy + 24, 0, hy + 27); ctx.quadraticCurveTo(13, hy + 24, 13, hy + 1); ctx.quadraticCurveTo(8, hy + 7, 0, hy + 7); ctx.quadraticCurveTo(-8, hy + 7, -13, hy + 1); ctx.fill();
+  const ey = hy - 3;
+  const dark = '#2b1d12';
+  for (const sx of [-5.5, 5.5]) {
+    if (abram.mood === 'joy') { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, ey + 1.5, 3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+    else if (abram.blink > 0) { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke(); }
+    else {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, ey, 3.4, 4.4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx + 0.8, ey - 2, 2, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 2;
+  const by = abram.mood === 'oops' || abram.mood === 'sad' ? 1 : 0;
+  ctx.beginPath(); ctx.moveTo(-9, ey - 7 - by); ctx.lineTo(-3, ey - 8 + by); ctx.moveTo(3, ey - 8 + by); ctx.lineTo(9, ey - 7 - by); ctx.stroke();
+  ctx.fillStyle = '#7a2e22';
+  if (abram.mood === 'joy') { ctx.beginPath(); ctx.moveTo(-5, hy + 8); ctx.arc(0, hy + 8, 5, 0, Math.PI); ctx.closePath(); ctx.fill(); }
+  else if (abram.mood === 'oops' || abram.mood === 'sad') { ctx.beginPath(); ctx.ellipse(0, hy + 10, 2.6, 3.2, 0, 0, TAU); ctx.fill(); }
+  else { ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, hy + 6, 3.5, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,120,120,0.35)'; ctx.beginPath(); ctx.arc(-9, hy + 3, 2.6, 0, TAU); ctx.arc(9, hy + 3, 2.6, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// "Find 7": the next number, in a speech bubble by Abram
+function drawNextBubble() {
+  if (state !== 'play' || !pic || between > 0) return;
+  const want = pic.labels[pic.next];
+  const x = Math.max(70, W * 0.2) + 58, y = 700;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,252,240,0.95)';
+  roundRect(x, y - 30, 118, 56, 18); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x + 10, y + 18); ctx.lineTo(x - 8, y + 44); ctx.lineTo(x + 30, y + 22); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5a4210'; ctx.textAlign = 'center';
+  ctx.font = '600 14px Fredoka, sans-serif';
+  ctx.fillText(pic.mode === 'back' ? 'Down to 1:' : pic.mode === 'two' ? 'By twos:' : pic.mode === 'five' ? 'By fives:' : 'Find star', x + 59, y - 10);
+  ctx.font = '700 28px Fredoka, sans-serif';
+  ctx.fillStyle = '#c47a10';
+  ctx.fillText(String(want), x + 59, y + 18);
+  ctx.restore();
+}
+
+// ============================================================
+//  Drawing: the star picture
+// ============================================================
+function drawLinks() {
+  if (!pic) return;
+  const lit = stars.filter((s) => !s.decoy).sort((a, b) => a.idx - b.idx);
+  const n = pic.next;
+  const finished = n >= pic.pts.length;
+  const glow = finished ? clamp(pic.doneT / 0.4, 0, 1) : 0;
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (finished) {
+    // the picture fills with a soft golden light
+    ctx.beginPath();
+    lit.forEach((s, i) => (i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y)));
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255,220,120,${0.22 * glow})`;
+    ctx.fill();
+  }
+  ctx.shadowColor = 'rgba(255,230,150,0.9)'; ctx.shadowBlur = 10 + glow * 10;
+  ctx.strokeStyle = finished ? '#ffe9a0' : 'rgba(255,240,190,0.9)';
+  ctx.lineWidth = 4 + glow * 2;
+  ctx.beginPath();
+  for (let i = 1; i < n; i++) { ctx.moveTo(lit[i - 1].x, lit[i - 1].y); ctx.lineTo(lit[i].x, lit[i].y); }
+  if (finished) { ctx.moveTo(lit[n - 1].x, lit[n - 1].y); ctx.lineTo(lit[0].x, lit[0].y); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStar(st) {
+  const sh = st.shake > 0 ? Math.sin(st.shake * 60) * 5 : 0;
+  const x = st.x + sh, y = st.y;
+  const pop = 1 - ease(clamp(st.pop / 0.4, 0, 1));
+  const tw = 1 + Math.sin(t * 3 + st.ph) * 0.08;
+  const r = (st.lit ? 13 : 11) * tw * pop;
+  // soft glow
+  const g = ctx.createRadialGradient(x, y, 1, x, y, r * 2.6);
+  g.addColorStop(0, st.lit ? 'rgba(255,236,150,0.8)' : 'rgba(220,230,255,0.55)'); g.addColorStop(1, 'rgba(220,230,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, TAU); ctx.fill();
+  // hint: the next star glows on easy levels, or after waiting a while
+  const isNext = !st.decoy && pic && st.idx === pic.next && between <= 0;
+  if (isNext && state === 'play' && (level <= 1 && picIndex === 0 || cfg.glow && idleT > cfg.glow)) {
+    ctx.strokeStyle = `rgba(255,230,120,${0.5 + 0.4 * Math.sin(t * 6)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 24 + Math.sin(t * 6) * 3, 0, TAU); ctx.stroke();
+  }
+  ctx.fillStyle = st.lit ? '#ffe27a' : '#f4f6ff';
+  starPath(x, y, r, r * 0.45, 4, 0);
+  ctx.fill();
+  ctx.fillStyle = st.lit ? '#fffbe0' : '#ffffff';
+  ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, TAU); ctx.fill();
+  if (!st.lit && pop > 0.5) {
+    // the number, in a little badge beside the star
+    const lx = x + 17, ly = y - 15;
+    const txt = String(st.label);
+    ctx.font = '700 18px Fredoka, sans-serif';
+    const tw2 = Math.max(24, ctx.measureText(txt).width + 12);
+    ctx.fillStyle = 'rgba(14,18,50,0.78)';
+    roundRect(lx - tw2 / 2, ly - 12, tw2, 24, 12); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+    ctx.fillText(txt, lx, ly + 6);
+  }
+  if (cursor >= 0 && stars[cursor] === st) {
+    ctx.strokeStyle = '#7ad0ff'; ctx.lineWidth = 3; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.arc(x, y, 26, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function drawTwinkle(tw) {
+  const a = clamp(tw.life / 0.4, 0, 1) * clamp((tw.max - tw.life) / 0.25, 0, 1);
+  const r = 15 + Math.sin(t * 10 + tw.ph) * 3;
+  ctx.save();
+  ctx.globalAlpha = a;
+  const g = ctx.createRadialGradient(tw.x, tw.y, 2, tw.x, tw.y, r * 3);
+  g.addColorStop(0, 'rgba(255,215,80,0.85)'); g.addColorStop(1, 'rgba(255,215,80,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tw.x, tw.y, r * 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffd23a';
+  starPath(tw.x, tw.y, r, r * 0.45, 5, -Math.PI / 2 + Math.sin(t * 3 + tw.ph) * 0.3);
+  ctx.fill();
+  ctx.strokeStyle = '#fff3b0'; ctx.lineWidth = 2; ctx.stroke();
+  // a shrinking ring shows how long it will stay
+  ctx.strokeStyle = 'rgba(255,240,170,0.8)'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(tw.x, tw.y, r + 9, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(tw.life / tw.max, 0, 1)); ctx.stroke();
+  ctx.restore();
+}
+
+// Finished pictures shine on in a row near the top
+function drawDone() {
+  const n = cfg.pics.length;
+  const size = 54, gap = 12;
+  const rowW = n * size + (n - 1) * gap;
+  const x0 = W / 2 - rowW / 2, y0 = 104 + Math.max(0, -offY);
+  for (let i = 0; i < n; i++) {
+    const x = x0 + i * (size + gap);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]); roundRect(x, y0 - size / 2, size, size, 10); ctx.stroke(); ctx.setLineDash([]);
+    const d = done[i];
+    if (!d) continue;
+    const f = ease(clamp(d.t / 0.5, 0, 1));
+    ctx.save();
+    ctx.globalAlpha = f;
+    ctx.shadowColor = 'rgba(255,230,150,0.9)'; ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.fillStyle = 'rgba(255,220,120,0.2)';
+    ctx.beginPath();
+    d.pts.forEach(([u, v], k) => { const px = x + 5 + u * (size - 10), py = y0 - size / 2 + 5 + v * (size - 10); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawFinale() {
+  if (state !== 'win') return;
+  for (const s of finaleStars) {
+    const a = clamp((winT - s.d) / 0.4, 0, 1);
+    if (a <= 0) continue;
+    ctx.globalAlpha = a * (0.6 + 0.4 * Math.sin(t * 4 + s.ph));
+    ctx.fillStyle = '#fff8d8';
+    starPath(s.x, s.y, s.r * 1.8, s.r * 0.6, 4, 0); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Abram's count races up: far too many to count!
+  const shown = Math.floor(clamp(winT / 2.2, 0, 1) * finaleStars.length) + counted;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '700 30px Fredoka, sans-serif';
+  ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(10,14,40,0.9)';
+  const txt = winT > 2.4 ? 'Too many to count!' : `${shown} stars…`;
+  ctx.strokeText(txt, W / 2, 420); ctx.fillStyle = '#ffe9a0'; ctx.fillText(txt, W / 2, 420);
+  ctx.restore();
+}
+
+function drawScene() {
+  drawSky();
+  if (state === 'play' || state === 'pause' || state === 'fail' || state === 'win') drawDone();
+  drawFinale();
+  if (pic) {
+    drawLinks();
+    for (const st of stars) drawStar(st);
+  }
+  for (const tw of twinkles) drawTwinkle(tw);
+  drawGround();
+  drawAbram();
+  drawNextBubble();
+  drawParticles();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  const inGame = state !== 'title' && state !== 'card';
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(inGame ? `Level ${level} · ${cfg.name}` : 'Count the Stars', 12, 26);
+  if (inGame) {
+    // night left: a bar from moon to sun
+    const px = 34, pw = Math.min(200, viewW - 190);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff6d6'; ctx.beginPath(); ctx.arc(20, 47, 7, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,233,168,0.22)';
+    roundRect(px, 40, pw, 13, 6.5); ctx.fill();
+    const f = clamp(timeLeft / cfg.time, 0, 1);
+    const g = ctx.createLinearGradient(px, 0, px + pw, 0);
+    g.addColorStop(0, '#7a8cff'); g.addColorStop(1, '#c8d4ff');
+    ctx.fillStyle = f < 0.2 && Math.sin(t * 10) > 0 ? '#ffb070' : g;
+    if (f > 0) { roundRect(px, 40, Math.max(13, pw * f), 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(`${Math.ceil(timeLeft)} s`, px + pw + 8, 51);
+    ctx.textAlign = 'right';
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`${totalScore + levelScore}`, viewW - 12, 26);
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillStyle = '#ffd36a';
+    ctx.fillText(`★ counted: ${counted}`, viewW - 12, 46);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 600));
+  const y0 = offY + 652 - (lines.length - 1) * 27;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 27;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(10,14,40,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0;
+  if (shakeT > 0) sx = rand(-4, 4);
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, offY * scale);
+  drawScene();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  updateCommon(dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') winT += dt;
+  else if (state === 'fail') failT += dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

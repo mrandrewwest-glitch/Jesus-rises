@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d2a">
+<title>Jacob's Flock</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2f5d2a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 60, 40, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  .legend { display: flex; justify-content: center; gap: 14px; margin: 6px 0 2px; font-weight: 600; font-size: 0.9rem; }
+  .legend span { padding: 3px 10px; border-radius: 999px; }
+  .legend .j { background: #d8efe9; color: #1f6b5c; }
+  .legend .l { background: #f1e3f3; color: #7a3b86; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Jacob's Flock</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  wages: { ref: 'Genesis 30:32', KJV: 'removing from thence all the speckled and spotted cattle, and all the brown cattle among the sheep, and the spotted and speckled among the goats: and of such shall be my hire.', NKJV: 'removing from there all the speckled and spotted sheep, and all the brown ones among the lambs, and the spotted and speckled among the goats; and these shall be my wages.', NIV: 'remove from them every speckled or spotted sheep, every dark-colored lamb and every spotted or speckled goat. They will be my wages.', NLT: 'remove all the sheep and goats that are speckled or spotted, along with all the black sheep. Give these to me as my wages.' },
+  // Level cards
+  passFlock: { ref: 'Genesis 30:32', KJV: 'I will pass through all thy flock to day', NKJV: 'Let me pass through all your flock today', NIV: 'Let me go through all your flocks today', NLT: 'Let me inspect your flocks today' },
+  // Fail card
+  myWages: { ref: 'Genesis 30:32', KJV: 'the spotted and speckled among the goats: and of such shall be my hire.', NKJV: 'the spotted and speckled among the goats; and these shall be my wages.', NIV: 'every spotted or speckled goat. They will be my wages.', NLT: 'speckled or spotted, along with all the black sheep. Give these to me as my wages.' },
+  // Win card
+  increased: { ref: 'Genesis 30:43', KJV: 'And the man increased exceedingly, and had much cattle, and maidservants, and menservants, and camels, and asses.', NKJV: 'Thus the man became exceedingly prosperous, and had large flocks, female and male servants, and camels and donkeys.', NIV: 'In this way the man grew exceedingly prosperous and came to own large flocks, and female and male servants, and camels and donkeys.', NLT: 'As a result, Jacob became very wealthy, with large flocks of sheep and goats, female and male servants, and many camels and donkeys.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  layout();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+// Small seeded random so each animal keeps its own spots
+function srand(seed) {
+  let s = seed % 2147483647; if (s <= 0) s += 2147483646;
+  return () => (s = s * 16807 % 2147483647) / 2147483647;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip
+const HIT_R = 52;          // how close a tap must be to an animal
+const LEVELS = [
+  // rows, animals, seconds to cross, seconds between animals, hearts, kinds that may appear
+  { name: 'Spotted Sheep',          rows: 1, n: 10, cross: 7.0, gap: 1.7,  hearts: 4, kinds: ['spots'],                                 goats: 0,   decoy: 0,    frisky: 0 },
+  { name: 'Dark Lambs and Goats',   rows: 1, n: 14, cross: 5.8, gap: 1.25, hearts: 3, kinds: ['spots', 'dark'],                         goats: 0.4, decoy: 0,    frisky: 0 },
+  { name: 'Speckles and Stripes',   rows: 2, n: 18, cross: 5.6, gap: 0.95, hearts: 3, kinds: ['spots', 'dark', 'speckles', 'stripes'],  goats: 0.5, decoy: 0,    frisky: 0 },
+  { name: 'Busy Butterflies',       rows: 2, n: 22, cross: 4.8, gap: 0.8,  hearts: 3, kinds: ['spots', 'dark', 'speckles', 'stripes'],  goats: 0.5, decoy: 0.3,  frisky: 0.15 },
+  { name: 'Three Paths',            rows: 3, n: 26, cross: 4.6, gap: 0.68, hearts: 3, kinds: ['spots', 'dark', 'speckles', 'stripes'],  goats: 0.5, decoy: 0.3,  frisky: 0.2 },
+  { name: 'The Great Flock',        rows: 3, n: 32, cross: 4.0, gap: 0.56, hearts: 3, kinds: ['spots', 'dark', 'speckles', 'stripes'],  goats: 0.5, decoy: 0.35, frisky: 0.25, tiny: true },
+];
+const NLEV = LEVELS.length;
+
+function makeConfig(n) { return LEVELS[clamp(n, 1, NLEV) - 1]; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('jacobFlockBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let introduced = 0;       // the level whose card was last shown
+let t = 0;
+let animals = [];
+let spawned = 0, spawnT = 0, sorted = 0;
+let hearts = 3, mistakes = 0, streak = 0, bestStreak = 0;
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0;
+let lastScore = null;
+let playT = 0, winT = 0, failT = 0;
+let told = {};
+let seenKinds = {};
+let keyCursor = 0;          // >0 while the keyboard cursor is shown
+let nextId = 1;
+
+// Field layout (playfield coordinates)
+const L = { gateX: 340, rowsY: [], jPen: null, lPen: null };
+function layout() {
+  const pw = clamp(W * 0.28, 134, 300);
+  L.gateX = W - pw;
+  L.jPen = { x0: L.gateX + 16, x1: W - 12, y0: 176, y1: 318 };
+  L.lPen = { x0: L.gateX + 16, x1: W - 12, y0: 692, y1: 842 };
+  const rows = cfg ? cfg.rows : 1;
+  L.rowsY = rows === 1 ? [500] : rows === 2 ? [432, 578] : [392, 506, 620];
+}
+
+// ============================================================
+//  The flock
+// ============================================================
+function jacobs(a) { return a.mark !== 'plain'; }
+
+function makeAnimal(row) {
+  const goat = Math.random() < cfg.goats;
+  let mark = 'plain';
+  if (Math.random() < 0.5) {
+    let kinds = cfg.kinds.filter((k) => (goat ? k !== 'dark' : k !== 'stripes'));
+    // brand-new kinds turn up a little more often so the hint makes sense
+    mark = pick(kinds);
+  }
+  const a = {
+    id: nextId++, row, goat, mark,
+    x: -60, y: L.rowsY[row], vx: 0,
+    speed: (L.gateX + 60) / cfg.cross * rand(0.93, 1.07),
+    frisky: false, tagged: false, judged: false, ok: null, inPen: false,
+    tx: 0, ty: 0, wander: 0, phase: rand(0, TAU), seed: Math.floor(rand(1, 1e6)),
+    decoy: null, s: 1, tagT: 0, flip: 1, blink: 0, blinkT: rand(1, 4),
+  };
+  if (Math.random() < cfg.frisky) { a.frisky = true; a.speed *= 1.35; }
+  if (mark === 'plain' && Math.random() < cfg.decoy * 2) a.decoy = pick(['butterfly', 'bird', 'flower']);
+  if (cfg.tiny && mark === 'speckles') a.tiny = true;
+  a.spots = makeMarks(a);
+  return a;
+}
+
+function makeMarks(a) {
+  const r = srand(a.seed);
+  const out = [];
+  if (a.mark === 'spots') {
+    const n = 3 + Math.floor(r() * 3);
+    for (let i = 0; i < n; i++) out.push({ x: -22 + r() * 44, y: -14 + r() * 24, r: 6 + r() * 5, c: r() < 0.5 ? '#3a2a20' : '#7a4a2a' });
+  } else if (a.mark === 'speckles') {
+    const n = a.tiny ? 14 : 18;
+    for (let i = 0; i < n; i++) out.push({ x: -26 + r() * 52, y: -16 + r() * 30, r: a.tiny ? 2.2 + r() * 1 : 2.8 + r() * 1.4, c: r() < 0.5 ? '#3a2a20' : '#6b4226' });
+  } else if (a.mark === 'stripes') {
+    for (let i = 0; i < 3; i++) out.push({ x: -16 + i * 14 + r() * 3, w: 6 + r() * 2 });
+  }
+  return out;
+}
+
+function spawnAnimal() {
+  // pick a row whose entrance is clear
+  const rows = [...Array(cfg.rows).keys()].sort(() => Math.random() - 0.5);
+  for (const row of rows) {
+    const crowd = animals.some((a) => a.row === row && !a.judged && a.x < 40);
+    if (!crowd) {
+      const a = makeAnimal(row);
+      animals.push(a);
+      spawned++;
+      if (!seenKinds[a.mark]) { seenKinds[a.mark] = true; firstSight(a); }
+      if (a.decoy && !seenKinds.decoy) { seenKinds.decoy = true; showMessage(`A ${a.decoy} is not a spot! That one is plain.`, 3); }
+      if (a.frisky && !seenKinds.frisky) { seenKinds.frisky = true; showMessage('Frisky lambs run fast!', 2.4); }
+      return true;
+    }
+  }
+  return false;
+}
+
+function firstSight(a) {
+  const tips = {
+    spots: 'Spotted ones are Jacob’s — tap them!',
+    dark: 'Dark lambs are Jacob’s too — tap them!',
+    speckles: 'Little speckles count too — tap them!',
+    stripes: 'Stripy goats are Jacob’s — tap them!',
+  };
+  if (tips[a.mark] && level > 1 || (a.mark === 'spots' && level === 1)) showMessage(tips[a.mark], 2.8);
+}
+
+function tapAnimal(a) {
+  a.tagged = !a.tagged;
+  a.tagT = 0.35;
+  if (a.tagged) { sfx.baa(a.goat); sparkleBurst(a.x, a.y - 40, 8, false, ['#7fe0c8', '#ffffff', '#ffe27a']); }
+  else sfx.untag();
+}
+
+function judge(a) {
+  a.judged = true;
+  const right = a.tagged === jacobs(a);
+  a.ok = right;
+  const pen = a.tagged ? L.jPen : L.lPen;
+  a.tx = rand(pen.x0 + 24, pen.x1 - 24);
+  a.ty = rand(pen.y0 + 40, pen.y1 - 8);
+  if (right) {
+    streak++; bestStreak = Math.max(bestStreak, streak);
+    const pts = 50 + Math.min(streak, 10) * 10;
+    levelScore += pts;
+    popups.push({ x: a.x, y: a.y - 70, text: `+${pts}`, t: 1, col: '#fff6c0' });
+    sfx.good(a.tagged);
+    if (streak > 0 && streak % 5 === 0) { showMessage(`${streak} in a row!`, 1.4); sparkleBurst(a.x, a.y - 30, 18); }
+    (a.tagged ? JACOB : LABAN).happyT = 0.9;
+  } else {
+    streak = 0;
+    mistakes++;
+    hearts--;
+    shakeT = 0.3;
+    popups.push({ x: a.x, y: a.y - 70, text: '?', t: 1.2, col: '#ffb0a0' });
+    sfx.oops();
+    showMessage(jacobs(a) ? 'Oops! That one was Jacob’s.' : 'Oops! A plain one is Laban’s.', 2.2);
+    JACOB.sadT = 1.1;
+    if (hearts <= 0) { fail(); return; }
+  }
+  sorted++;
+}
+
+// ============================================================
+//  People
+// ============================================================
+const JACOB = { robe: '#2f8a7a', hair: '#4a2f1a', beard: true, skin: '#d9a066', stripe: '#e8d9a0', i: 0, happyT: 0, sadT: 0, blinkT: 2, blink: 0, phase: 0, staff: true };
+const LABAN = { robe: '#8a4f9e', hair: '#b8b2a8', beard: true, skin: '#d39a66', stripe: '#f0c96a', i: 1, happyT: 0, sadT: 0, blinkT: 3, blink: 0, phase: 1, turban: '#e8dcc0' };
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  if (mood === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+    ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+    ctx.fillStyle = 'rgba(255,120,120,0.45)';
+    ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  } else if (mood === 'doubt') {
+    eyes(3.5, 3.5, 2);
+    brows(-7, -6, -10, -12);
+    mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+  } else if (mood === 'wow') {
+    eyes(4, 5.5, 2.1);
+    brows(-10, -9, -10, -9);
+    mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+  } else {
+    eyes(3.5, 4.5, 2);
+    brows(-7, -7, -7, -7);
+    mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+  }
+}
+
+function personMood(d) {
+  if (state === 'win' || state === 'done') return d === JACOB ? 'joy' : 'watch';
+  if (state === 'fail') return 'doubt';
+  if (d.sadT > 0) return 'doubt';
+  if (d.happyT > 0) return 'joy';
+  return 'watch';
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = personMood(d);
+  let jump = mood === 'joy' ? Math.abs(Math.sin(t * 7 + d.phase)) * 8 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 7 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  if (d.staff) {
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-22, 2); ctx.lineTo(-22, -78); ctx.arc(-15, -78, 7, Math.PI, 0); ctx.stroke();
+  }
+  // robe
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0); ctx.quadraticCurveTo(-17, -30, -11, -37); ctx.quadraticCurveTo(0, -41, 11, -37); ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.stripe; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-6, -38); ctx.lineTo(-8, 0); ctx.moveTo(6, -38); ctx.lineTo(8, 0); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, d.staff ? -21 : -24 + wave, d.staff ? -50 : -66);
+    arm(11, -32, 24 - wave, -66);
+  } else if (mood === 'doubt') {
+    arm(-11, -32, d.staff ? -21 : -15, d.staff ? -45 : -12);
+    arm(11, -32, 12, -55);
+  } else {
+    arm(-11, -32, d.staff ? -21 : -15, d.staff ? -45 : -12);
+    arm(11, -32, 15, -12);
+  }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // head cloth
+  ctx.fillStyle = d.turban || d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+  ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+  ctx.closePath(); ctx.fill();
+  if (d.turban) { ctx.strokeStyle = shade(d.turban, -40); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, hy - 2, 15, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2); ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22); ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8); ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+  ctx.restore();
+}
+
+function updatePerson(d, dt) {
+  d.happyT = Math.max(0, d.happyT - dt);
+  d.sadT = Math.max(0, d.sadT - dt);
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+// ============================================================
+//  Drawing the animals
+// ============================================================
+function drawAnimal(a, sc = 1, small = false) {
+  const moving = !a.inPen && state !== 'fail';
+  const step = moving ? t * (a.frisky ? 16 : 11) + a.phase : a.phase;
+  const bob = moving ? Math.abs(Math.sin(step)) * 3 : 0;
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.scale(sc * a.flip, sc);
+  // ground glow for tagged animals
+  if (a.tagged && !small) {
+    ctx.fillStyle = 'rgba(80,220,190,0.35)';
+    ctx.beginPath(); ctx.ellipse(0, 2, 40, 11, 0, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 32, 7, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -bob);
+  const dark = a.mark === 'dark';
+  const legC = a.goat ? '#8c7b6a' : dark ? '#2e2018' : '#4a3a30';
+  // legs
+  ctx.strokeStyle = legC; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  const sw = Math.sin(step) * 6;
+  for (const [lx, ph] of [[-18, 1], [-10, -1], [12, -1], [20, 1]]) {
+    ctx.beginPath(); ctx.moveTo(lx, -18); ctx.lineTo(lx + sw * ph, 0); ctx.stroke();
+  }
+  const body = a.goat ? '#f3efe6' : dark ? '#5b4030' : '#f8f5ec';
+  const edge = a.goat ? '#cfc6b6' : dark ? '#3c2a1f' : '#d8d0bf';
+  // tail
+  if (a.goat) {
+    ctx.strokeStyle = body; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-28, -36); ctx.lineTo(-34, -46 + Math.sin(t * 9 + a.phase) * 2); ctx.stroke();
+  }
+  // body shape
+  const bodyPath = () => {
+    ctx.beginPath();
+    if (a.goat) ctx.ellipse(0, -30, 30, 16, 0, 0, TAU);
+    else {
+      for (let k = 0; k < 10; k++) {
+        const an = k / 10 * TAU;
+        ctx.moveTo(Math.cos(an) * 24 + 9, -31 + Math.sin(an) * 14);
+        ctx.arc(Math.cos(an) * 24, -31 + Math.sin(an) * 14, 9, 0, TAU);
+      }
+      ctx.ellipse(0, -31, 26, 16, 0, 0, TAU);
+    }
+  };
+  ctx.fillStyle = body; ctx.strokeStyle = edge; ctx.lineWidth = 2;
+  bodyPath(); ctx.stroke(); ctx.fill();
+  // marks, clipped to the body
+  if (a.spots.length) {
+    ctx.save();
+    bodyPath(); ctx.clip();
+    if (a.mark === 'stripes') {
+      ctx.fillStyle = '#6b4226';
+      for (const s of a.spots) { ctx.beginPath(); ctx.ellipse(s.x, -30, s.w / 2, 20, 0.15, 0, TAU); ctx.fill(); }
+    } else {
+      for (const s of a.spots) {
+        ctx.fillStyle = s.c;
+        ctx.beginPath(); ctx.ellipse(s.x, -30 + s.y, s.r, s.r * 0.85, 0, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  // head
+  const hx = 30, hy = -40;
+  const face = a.goat ? body : dark ? '#3a281d' : '#f0d8be';
+  if (a.goat) {
+    // horns
+    ctx.strokeStyle = '#a89270'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(hx - 3, hy - 9); ctx.quadraticCurveTo(hx - 12, hy - 24, hx - 18, hy - 14); ctx.stroke();
+  }
+  ctx.fillStyle = a.goat ? edge : dark ? '#2a1c14' : '#e2c6a6';
+  ctx.beginPath(); ctx.ellipse(hx - 9, hy - 2, 8, 4, -0.5 + Math.sin(t * 3 + a.phase) * 0.1, 0, TAU); ctx.fill();   // ear
+  ctx.fillStyle = face; ctx.strokeStyle = a.goat ? edge : 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(hx, hy, a.goat ? 11 : 12, a.goat ? 13 : 12, 0.35, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(hx + 7, hy + 6, 7, 6, 0.3, 0, TAU); ctx.fill();   // muzzle
+  if (!a.goat) {   // woolly top-knot
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(hx - 3, hy - 11, 6, 0, TAU); ctx.arc(hx + 4, hy - 12, 5, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = '#d8d0c0';   // little beard
+    ctx.beginPath(); ctx.moveTo(hx + 4, hy + 10); ctx.lineTo(hx + 8, hy + 22); ctx.lineTo(hx + 11, hy + 10); ctx.fill();
+  }
+  // eye
+  if (a.blink > 0) {
+    ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hx + 1, hy - 2); ctx.lineTo(hx + 7, hy - 2); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(hx + 4, hy - 2, 4.2, 5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12';
+    ctx.beginPath(); ctx.arc(hx + 5, hy - 1.5, 2.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(hx + 5.8, hy - 2.6, 0.9, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = dark ? '#d8b49a' : '#6a3a2a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(hx + 10, hy + 7, 3, 0.1 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  // decoys that are NOT spots
+  if (a.decoy === 'butterfly') {
+    const fl = Math.abs(Math.sin(t * 14 + a.phase));
+    ctx.save(); ctx.translate(-4, -50);
+    ctx.fillStyle = '#ff9a3c';
+    ctx.beginPath(); ctx.ellipse(-5, 0, 7 * fl + 1, 6, -0.4, 0, TAU); ctx.ellipse(5, 0, 7 * fl + 1, 6, 0.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3a2a20'; ctx.fillRect(-1, -5, 2, 10);
+    ctx.restore();
+  } else if (a.decoy === 'bird') {
+    ctx.save(); ctx.translate(-6, -50);
+    ctx.fillStyle = '#4a8fd8';
+    ctx.beginPath(); ctx.ellipse(0, 0, 8, 6, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(7, -5, 4.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f2b33d'; ctx.beginPath(); ctx.moveTo(11, -5); ctx.lineTo(15, -4); ctx.lineTo(11, -3); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(8, -6, 1.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(8.4, -6, 0.9, 0, TAU); ctx.fill();
+    ctx.restore();
+  } else if (a.decoy === 'flower') {
+    ctx.save(); ctx.translate(hx + 14, hy + 8);
+    ctx.strokeStyle = '#4a9a3a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(8, -6); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    for (let k = 0; k < 6; k++) { const an = k / 6 * TAU; ctx.beginPath(); ctx.arc(8 + Math.cos(an) * 4, -8 + Math.sin(an) * 4, 3, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.arc(8, -8, 2.6, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // Jacob's ribbon
+  if (a.tagged) {
+    const pop = 1 + a.tagT * 1.2;
+    ctx.save(); ctx.translate(hx - 10, hy + 8); ctx.scale(pop, pop);
+    ctx.fillStyle = '#1fb39a'; ctx.strokeStyle = '#0d6b5b'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 0, 4, 9, 0.5, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-1, 3); ctx.lineTo(-6, 15); ctx.lineTo(0, 12); ctx.lineTo(3, 16); ctx.lineTo(2, 3); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  // little arrow above tagged animals that still walk, showing where they will go
+  if (a.tagged && !a.judged && !small) {
+    ctx.save();
+    ctx.translate(a.x, a.y - 82 - Math.sin(t * 6) * 3);
+    ctx.fillStyle = '#1fb39a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(10, 2); ctx.lineTo(4, 2); ctx.lineTo(4, 10); ctx.lineTo(-4, 10); ctx.lineTo(-4, 2); ctx.lineTo(-10, 2); ctx.closePath();
+    ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Particles and popups
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, _scr = false, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#e0e8f0']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 60, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; popups[i].y -= 40 * dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t * 2, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(40,30,10,0.8)'; ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+const LEGEND = '<div class="legend"><span class="j">Jacob: spots &middot; speckles &middot; stripes &middot; dark lambs</span></div><div class="legend"><span class="l">Laban: plain white</span></div>';
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1; cfg = makeConfig(1); layout();
+  animals = demoFlock();
+  showOverlay('Jacob\'s Flock', 'Sort the sheep and goats',
+    `${verseHTML('wages')}
+     <ul>
+       <li>Jacob's wages are the <b>spotted, speckled and striped</b> animals and the <b>dark lambs</b>.</li>
+       <li>The flock trots to the gate. <b>Tap</b> each of Jacob's animals <b>before it reaches the gate</b> to give it a green ribbon. It goes into <b>Jacob's pen</b>.</li>
+       <li>Leave the <b>plain white</b> ones alone: they go to <b>Laban's pen</b>. Tapped the wrong one? <b>Tap it again</b>.</li>
+       <li>Each mix-up costs a heart. The flock gets <b>bigger and faster</b> every level!</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> marks the animal nearest the gate.</li>
+     </ul>
+     ${LEGEND}
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start', () => { level = 1; totalScore = 0; introduced = 0; startLevel(); });
+}
+
+// a few animals standing about behind the title card
+function demoFlock() {
+  const list = [];
+  const marks = ['spots', 'plain', 'speckles', 'plain', 'dark'];
+  marks.forEach((m, i) => {
+    const a = makeAnimal(0);
+    a.mark = m; a.goat = i === 2; a.spots = makeMarks(a); a.decoy = null; a.frisky = false;
+    a.x = W * (0.12 + i * 0.16); a.y = 470 + (i % 2) * 70; a.inPen = true;
+    list.push(a);
+  });
+  return list;
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  layout();
+  animals = []; particles = []; popups = [];
+  spawned = 0; spawnT = 0.6; sorted = 0;
+  hearts = cfg.hearts; mistakes = 0; streak = 0; bestStreak = 0;
+  levelScore = 0;
+  playT = 0; winT = 0; failT = 0;
+  flashT = shakeT = 0; endTimer = 0;
+  told = {}; seenKinds = {};
+  keyCursor = 0;
+  JACOB.happyT = JACOB.sadT = LABAN.happyT = LABAN.sadT = 0;
+}
+
+const LEVEL_TIPS = [
+  'Tap the <b>spotted</b> sheep. Leave the plain white ones.',
+  'Now <b>dark lambs</b> and <b>goats</b> come too. Dark lambs are Jacob\'s!',
+  'Two paths now! Look for <b>little speckles</b> and <b>stripy goats</b>.',
+  'Butterflies and birds like to ride on sheep. <b>They are not spots!</b> Watch out for <b>frisky lambs</b>.',
+  'Three paths! Keep your eyes moving.',
+  'The biggest, fastest flock. Tiny speckles too. Good shepherding!',
+];
+
+function startLevel(retry = false) {
+  resetLevel();
+  sfx.levelStart();
+  if (retry || introduced === level) { beginPlay(); return; }
+  introduced = level;   // the level card shows once; retries go straight in
+  state = 'intro';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML('passFlock')}
+     <p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     <p class="score">${cfg.n} animals &middot; ${cfg.rows} path${cfg.rows > 1 ? 's' : ''} &middot; ${cfg.hearts} hearts</p>
+     ${level === 1 ? LEGEND : ''}`,
+    'Go!', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(`Level ${level}: ${cfg.name}`, 2);
+}
+
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const levelBonus = level * 200;
+  const heartBonus = hearts * 150;
+  const perfect = mistakes === 0 ? 300 : 0;
+  const score = levelScore + levelBonus + heartBonus + perfect;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('jacobFlockBest', best); } catch (e) {} }
+  lastScore = { sortPts: levelScore, levelBonus, heartBonus, perfect, score };
+  flashT = 0.3;
+  sparkleBurst((L.jPen.x0 + L.jPen.x1) / 2, (L.jPen.y0 + L.jPen.y1) / 2, 50);
+  showMessage(mistakes === 0 ? 'Perfect sorting!' : 'All sorted!', 2);
+  sfx.win();
+  endTimer = 2.6;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  showMessage('Too many mix-ups…', 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NLEV;
+    const jCount = animals.filter((a) => a.tagged).length;
+    if (last) state = 'done';
+    showOverlay(last ? 'Jacob\'s great flock!' : 'Well sorted!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('increased')}
+       <p style="text-align:center">${jCount} animals went into Jacob's pen. God blessed Jacob and his flock grew and grew!</p>
+       <p class="score">Sorting: <b>${s.sortPts}</b> (best run ${bestStreak})<br>Hearts left: <b>${s.heartBonus}</b><br>${s.perfect ? `No mix-ups: <b>${s.perfect}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${last ? '<p style="text-align:center"><b>You sorted every flock. Great shepherding!</b></p>' : ''}
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', last ? () => { level = 1; totalScore = 0; introduced = 0; startLevel(); } : () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh… mixed up!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The flocks got muddled. Look closely: <b>any spot, speckle, stripe or dark wool</b> means Jacob's. <b>Plain white</b> means Laban's.</p>
+       ${verseHTML('myWages', '…')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Updating the flock
+// ============================================================
+function updateFlock(dt) {
+  // new animals arrive
+  if (spawned < cfg.n) {
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      if (spawnAnimal()) spawnT = cfg.gap * rand(0.85, 1.2) * (cfg.rows === 1 ? 1 : 1);
+      else spawnT = 0.15;
+    }
+  }
+  for (const a of animals) {
+    a.tagT = Math.max(0, a.tagT - dt);
+    a.blinkT -= dt;
+    if (a.blinkT <= 0) { a.blink = 0.12; a.blinkT = rand(1.5, 5); }
+    if (a.blink > 0) a.blink -= dt;
+    if (a.inPen) {
+      a.wander -= dt;
+      if (a.wander <= 0) { a.wander = rand(2, 5); a.flip = Math.random() < 0.5 ? -1 : 1; }
+      continue;
+    }
+    if (!a.judged) {
+      // don't walk into the animal in front
+      let sp = a.speed;
+      for (const b of animals) {
+        if (b !== a && !b.judged && b.row === a.row && b.x > a.x && b.x - a.x < 74) { sp = Math.min(sp, b.speed * 0.9); }
+      }
+      a.x += sp * dt;
+      if (a.x >= L.gateX) judge(a);
+      if (state !== 'play') return;
+    } else {
+      const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
+      const sp = 260;
+      if (d < sp * dt) { a.x = a.tx; a.y = a.ty; a.inPen = true; a.phase = rand(0, TAU); }
+      else { a.x += dx / d * sp * dt; a.y += dy / d * sp * dt; a.flip = dx < -4 ? -1 : 1; }
+    }
+  }
+  if (spawned >= cfg.n && animals.every((a) => a.inPen)) win();
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'play' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
+    const a = frontAnimal();
+    if (a) { tapAnimal(a); keyCursor = 4; }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+// The walking animal nearest the gate (for the keyboard)
+function frontAnimal() {
+  let bestA = null;
+  for (const a of animals) if (!a.judged && a.x > -20 && a.x < L.gateX - 8 && (!bestA || a.x > bestA.x)) bestA = a;
+  return bestA;
+}
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  const x = p.vx - offX, y = p.vy - offY;
+  // the closest walking animal (aim at its middle)
+  let hit = null, hd = HIT_R;
+  for (const a of animals) {
+    if (a.judged || a.x > L.gateX - 6) continue;
+    const d = Math.hypot(x - (a.x + 4), y - (a.y - 30));
+    if (d < hd) { hd = d; hit = a; }
+  }
+  if (hit) tapAnimal(hit);
+  else sfx.tick();
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  // A wobbly little bleat
+  baa(goat) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), lfo = this.ctx.createOscillator(), ld = this.ctx.createGain();
+    const f = goat ? 520 : 400;
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t0); o.frequency.linearRampToValueAtTime(f * 0.9, t0 + 0.35);
+    lfo.frequency.value = goat ? 26 : 18; ld.gain.value = f * 0.06;
+    lfo.connect(ld); ld.connect(o.frequency);
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.38);
+    o.connect(lp); lp.connect(g); g.connect(this.master);
+    o.start(t0); lfo.start(t0); o.stop(t0 + 0.42); lfo.stop(t0 + 0.42);
+  },
+  untag() { this.tone(500, 0.12, 'triangle', 0.15, 0, 300); },
+  tick() { this.tone(900, 0.05, 'triangle', 0.05); },
+  good(toJacob) { if (this.ctx) Music.tap(toJacob ? 0.75 : 0.4); },
+  oops() { this.tone(260, 0.2, 'triangle', 0.25, 0, 180); this.tone(200, 0.3, 'triangle', 0.2, 0.15, 140); },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: the field
+// ============================================================
+function drawCloud(cx, cy, w, h) {
+  ctx.fillStyle = '#ffffff';
+  for (const [dx, dy, rx, ry] of [[0, 0, 0.5, 0.42], [-0.28, 0.08, 0.3, 0.34], [0.3, 0.06, 0.32, 0.36], [0.05, -0.25, 0.28, 0.36]]) {
+    ctx.beginPath(); ctx.ellipse(cx + w * dx, cy + h * dy, w * rx, h * ry, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function drawTent(x, y, s, col) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0, 2, 62, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(-60, 0); ctx.lineTo(-40, -50); ctx.lineTo(40, -50); ctx.lineTo(60, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = shade(col, -30);
+  ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(0, -40); ctx.lineTo(12, 0); ctx.fill();
+  ctx.strokeStyle = shade(col, -45); ctx.lineWidth = 3;
+  for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(-40 + (k + 2) * 20, -50); ctx.lineTo(-56 + (k + 2) * 28, 0); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawTree(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0, 2, 34, 8, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a5230'; roundRect(-6, -50, 12, 52, 4); ctx.fill();
+  ctx.fillStyle = '#4f8a3a';
+  ctx.beginPath(); ctx.arc(-16, -60, 22, 0, TAU); ctx.arc(16, -62, 22, 0, TAU); ctx.arc(0, -82, 26, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#62a046';
+  ctx.beginPath(); ctx.arc(-8, -78, 12, 0, TAU); ctx.arc(10, -66, 10, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function fence(x0, y0, x1, y1, gapFrom = null, gapTo = null) {
+  // a simple wooden rail fence along a straight line, optionally with a gap (the gate)
+  const len = Math.hypot(x1 - x0, y1 - y0), n = Math.max(2, Math.round(len / 34));
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  const seg = (a, b) => {
+    const ax = lerp(x0, x1, a), ay = lerp(y0, y1, a), bx = lerp(x0, x1, b), by = lerp(y0, y1, b);
+    ctx.beginPath(); ctx.moveTo(ax, ay - 10); ctx.lineTo(bx, by - 10); ctx.moveTo(ax, ay - 22); ctx.lineTo(bx, by - 22); ctx.stroke();
+  };
+  if (gapFrom === null) seg(0, 1); else { seg(0, gapFrom); seg(gapTo, 1); }
+  ctx.fillStyle = '#6b4220';
+  for (let i = 0; i <= n; i++) {
+    const f = i / n;
+    if (gapFrom !== null && f > gapFrom + 0.01 && f < gapTo - 0.01) continue;
+    const x = lerp(x0, x1, f), y = lerp(y0, y1, f);
+    roundRect(x - 3, y - 30, 6, 32, 2); ctx.fill();
+  }
+}
+
+function drawPen(P, label, plain, gateTop) {
+  ctx.fillStyle = '#c9b27a';
+  roundRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0, 16); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  roundRect(P.x0 + 8, P.y0 + 8, P.x1 - P.x0 - 16, P.y1 - P.y0 - 16, 12); ctx.fill();
+  // back fence (top) and sides; the front fence is drawn after the animals
+  fence(P.x0, P.y0 + 6, P.x1, P.y0 + 6, gateTop ? 0.0 : null, gateTop ? 0.38 : null);
+  fence(P.x1, P.y0 + 6, P.x1, P.y1);
+}
+function drawPenFront(P, label, plain, gateTop, col) {
+  fence(P.x0, P.y1, P.x1, P.y1, gateTop ? null : 0.0, gateTop ? null : 0.38);
+  fence(P.x0, P.y0 + 6, P.x0, P.y1);
+  // sign with the owner's name and a picture
+  const sw = Math.min(124, P.x1 - P.x0), sx = (P.x0 + P.x1) / 2, sy = gateTop ? P.y1 + 30 : P.y0 - 26;
+  ctx.fillStyle = '#6b4220'; ctx.fillRect(sx - 3, sy - (gateTop ? 34 : -10), 6, 24);
+  ctx.fillStyle = col; ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 2.5;
+  roundRect(sx - sw / 2, sy - 18, sw, 32, 9); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(label, sx - sw / 2 + 40, sy + 4);
+  const mini = { x: sx - sw / 2 + 20, y: sy + 8, goat: false, mark: plain ? 'plain' : 'spots', spots: [], phase: 0, flip: 1, inPen: true, tagged: false, decoy: null, blink: 0, tagT: 0 };
+  mini.seed = 77; mini.spots = makeMarks(mini);
+  drawAnimal(mini, 0.42, true);
+}
+
+function drawField() {
+  const top = -offY, left = -offX, right = W + offX;
+  // sky
+  const sky = ctx.createLinearGradient(0, top, 0, 200);
+  sky.addColorStop(0, '#8fd0f5'); sky.addColorStop(1, '#d9f0fb');
+  ctx.fillStyle = sky; ctx.fillRect(left, top, right - left, 220 - top);
+  ctx.fillStyle = '#fff3b0';
+  ctx.beginPath(); ctx.arc(W * 0.62, Math.min(70, top + 90), 34, 0, TAU); ctx.fill();
+  drawCloud(W * 0.3 + Math.sin(t * 0.05) * 30, Math.max(top + 70, 40), 120, 40);
+  if (offY > 60) drawCloud(W * 0.8, top + offY * 0.4, 140, 44);
+  // far hills
+  ctx.fillStyle = '#9cc96a';
+  ctx.beginPath(); ctx.moveTo(left, 190);
+  for (let x = left; x <= right + 40; x += 40) ctx.lineTo(x, 150 + Math.sin(x * 0.008) * 24 + Math.sin(x * 0.021) * 10);
+  ctx.lineTo(right, 260); ctx.lineTo(left, 260); ctx.fill();
+  // meadow
+  const g = ctx.createLinearGradient(0, 160, 0, H);
+  g.addColorStop(0, '#86bf55'); g.addColorStop(1, '#5f9e3c');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(left, 200);
+  for (let x = left; x <= right + 40; x += 40) ctx.lineTo(x, 182 + Math.sin(x * 0.012 + 1) * 12);
+  ctx.lineTo(right, H + 10); ctx.lineTo(left, H + 10); ctx.fill();
+  // grass tufts
+  ctx.strokeStyle = 'rgba(40,90,30,0.35)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 40; i++) {
+    const x = left + ((i * 137.3) % (right - left)), y = 240 + ((i * 251.7) % (H - 260));
+    ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 6, y - 7); ctx.moveTo(x, y); ctx.lineTo(x, y - 9); ctx.moveTo(x + 4, y); ctx.lineTo(x + 6, y - 7); ctx.stroke();
+  }
+  // decoration: Jacob's tents and a tree on the left
+  drawTent(Math.max(80, W * 0.12), 268, 0.8, '#7a5a3a');
+  if (W > 700) drawTent(W * 0.3, 252, 0.6, '#8a6a4a');
+  drawTree(L.gateX - 150 > 200 ? L.gateX - 150 : W * 0.4, 860, 0.9);
+  // the paths
+  for (const y of L.rowsY) {
+    ctx.fillStyle = '#d8c08a';
+    roundRect(-offX - 20, y - 30, L.gateX + offX + 40, 44, 22); ctx.fill();
+    ctx.fillStyle = 'rgba(160,120,60,0.18)';
+    for (let x = 20; x < L.gateX; x += 46) { ctx.beginPath(); ctx.ellipse(x, y - 4, 5, 2.5, 0, 0, TAU); ctx.fill(); }
+  }
+  // the sorting yard beside the pens
+  ctx.fillStyle = '#d8c08a';
+  roundRect(L.gateX - 6, L.jPen.y1 - 10, W - L.gateX - 6, L.lPen.y0 - L.jPen.y1 + 20, 18); ctx.fill();
+}
+
+function drawGates() {
+  // a little wooden arch over every path marks the gate
+  for (const y of L.rowsY) {
+    const x = L.gateX;
+    ctx.fillStyle = '#6b4220';
+    roundRect(x - 4, y - 96, 8, 92, 3); ctx.fill();
+    roundRect(x - 4, y - 96 + 92, 8, 26, 3); ctx.fill();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(x, y + 16); ctx.lineTo(x, y - 96); ctx.stroke();
+    // up/down arrows: green up to Jacob, purple down to Laban
+    ctx.fillStyle = '#1fb39a';
+    ctx.beginPath(); ctx.moveTo(x + 18, y - 92); ctx.lineTo(x + 30, y - 74); ctx.lineTo(x + 6, y - 74); ctx.fill();
+    ctx.fillStyle = '#9a5aae';
+    ctx.beginPath(); ctx.moveTo(x + 18, y + 18); ctx.lineTo(x + 30, y); ctx.lineTo(x + 6, y); ctx.fill();
+  }
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawField();
+  drawPen(L.jPen, 'Jacob', false, false);
+  drawPen(L.lPen, 'Laban', true, true);
+  // pen animals first, then walking ones sorted by y
+  const inJ = animals.filter((a) => a.inPen && a.ty < 400), inL = animals.filter((a) => a.inPen && a.ty >= 400);
+  if (state !== 'title') {
+    inJ.sort((a, b) => a.y - b.y).forEach((a) => drawAnimal(a, 0.62, true));
+    inL.sort((a, b) => a.y - b.y).forEach((a) => drawAnimal(a, 0.62, true));
+  }
+  drawPenFront(L.jPen, 'Jacob', false, false, '#1f9a85');
+  drawPenFront(L.lPen, 'Laban', true, true, '#9a5aae');
+  drawGates();
+  // the two men by their pens
+  const jx = L.gateX - 46, lx = L.gateX - 46;
+  drawPerson(JACOB, jx, Math.min(L.rowsY[0] - 72, 318), 1.05, L.gateX, L.rowsY[0]);
+  drawPerson(LABAN, lx, 868, 1.05, L.gateX, L.rowsY[L.rowsY.length - 1]);
+  const walking = animals.filter((a) => !a.inPen || state === 'title').sort((a, b) => a.y - b.y);
+  for (const a of walking) drawAnimal(a, 1);
+  // keyboard cursor
+  if (keyCursor > 0 && state === 'play') {
+    const a = frontAnimal();
+    if (a) { ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.arc(a.x + 4, a.y - 30, 46, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+  }
+  drawParticles();
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(40,30,20,${Math.min(0.3, failT * 0.3)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHeart(x, y, s, full) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath();
+  ctx.moveTo(0, 6); ctx.bezierCurveTo(-11, -2, -6, -12, 0, -5); ctx.bezierCurveTo(6, -12, 11, -2, 0, 6);
+  ctx.fillStyle = full ? '#e8505b' : 'rgba(255,255,255,0.35)'; ctx.fill();
+  ctx.strokeStyle = full ? '#a8242f' : 'rgba(90,66,16,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  const bar = ctx.createLinearGradient(0, 0, 0, 110);
+  bar.addColorStop(0, 'rgba(255,255,255,0.55)'); bar.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = bar; ctx.fillRect(0, 0, viewW, 110);
+  ctx.fillStyle = '#4a3410';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Jacob\'s Flock' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < cfg.hearts; i++) drawHeart(20 + i * 24, 50, 1.1, i < hearts);
+    ctx.textAlign = 'right';
+    ctx.font = '700 18px Fredoka, sans-serif';
+    ctx.fillStyle = '#4a3410';
+    ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+    ctx.fillText(`Score ${totalScore + levelScore}`, viewW - 12, 26);
+    ctx.font = '600 15px Fredoka, sans-serif';
+    ctx.fillText(`Sorted ${sorted} / ${cfg.n}`, viewW - 12, 48);
+    if (streak >= 3) { ctx.fillStyle = '#1f7a6a'; ctx.fillText(`Run ×${streak}`, viewW - 12, 68); }
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  // over the meadow, left of the pens, between the hills and the first path
+  const cx = offX + L.gateX / 2;
+  const lines = wrapText(message.text, Math.min(L.gateX - 24, 560));
+  const y0 = offY + (lines.length > 1 ? 136 : 150);
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, cx, y);
+    ctx.fillStyle = '#5a3a00';
+    ctx.fillText(l, cx, y);
+  });
+  ctx.restore();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePerson(JACOB, dt); updatePerson(LABAN, dt);
+  keyCursor = Math.max(0, keyCursor - dt);
+  if (state === 'play') {
+    playT += dt;
+    updateFlock(dt);
+  } else if (state === 'win' || state === 'done') {
+    winT += dt;
+    if (Math.random() < dt * 6) sparkleBurst(rand(L.jPen.x0, L.jPen.x1), rand(L.jPen.y0, L.jPen.y1), 3);
+  } else if (state === 'fail') {
+    failT += dt;
+  }
+  if (state === 'title') for (const a of animals) { a.blinkT -= dt; if (a.blinkT <= 0) { a.blink = 0.12; a.blinkT = rand(1.5, 5); } if (a.blink > 0) a.blink -= dt; }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

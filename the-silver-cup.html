@@ -1,0 +1,1325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4a5a7a">
+<title>The Silver Cup</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #4a5a7a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(40, 50, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  .card .tip { text-align: center; margin: 8px 0; }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Silver Cup</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'strings', ambience: 'market', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  silverCup: { ref: 'Genesis 44:1–2', KJV: 'Fill the men\'s sacks with food, as much as they can carry... And put my cup, the silver cup, in the sack\'s mouth of the youngest', NKJV: 'Fill the men’s sacks with food, as much as they can carry... Also put my cup, the silver cup, in the mouth of the sack of the youngest', NIV: 'Fill the men’s sacks with as much food as they can carry... Then put my cup, the silver one, in the mouth of the youngest one’s sack', NLT: 'Fill each of their sacks with as much grain as they can carry... Then put my personal silver cup at the top of the youngest brother’s sack' },
+  // Level cards
+  bowed: { ref: 'Genesis 42:6', KJV: 'And Joseph\'s brethren came, and bowed down themselves before him with their faces to the earth.', NKJV: 'And Joseph’s brothers came and bowed down before him with their faces to the earth.', NIV: 'So when Joseph’s brothers arrived, they bowed down to him with their faces to the ground.', NLT: 'When they arrived, they bowed before him with their faces to the ground.' },
+  money: { ref: 'Genesis 44:1', KJV: 'Fill the men\'s sacks with food, as much as they can carry, and put every man\'s money in his sack\'s mouth.', NKJV: 'Fill the men’s sacks with food, as much as they can carry, and put each man’s money in the mouth of his sack.', NIV: 'Fill the men’s sacks with as much food as they can carry, and put each man’s silver in the mouth of his sack.', NLT: 'Fill each of their sacks with as much grain as they can carry, and put each man’s money back into his sack.' },
+  searched: { ref: 'Genesis 44:12', KJV: 'And he searched, and began at the eldest, and left at the youngest: and the cup was found in Benjamin\'s sack.', NKJV: 'So he searched. He began with the oldest and left off with the youngest; and the cup was found in Benjamin’s sack.', NIV: 'Then the steward proceeded to search, beginning with the oldest and ending with the youngest. And the cup was found in Benjamin’s sack.', NLT: 'The palace manager searched the brothers’ sacks, from the oldest to the youngest. And the cup was found in Benjamin’s sack!' },
+  iAmJoseph: { ref: 'Genesis 45:3', KJV: 'And Joseph said unto his brethren, I am Joseph; doth my father yet live?', NKJV: 'Then Joseph said to his brothers, “I am Joseph; does my father still live?”', NIV: 'Joseph said to his brothers, “I am Joseph! Is my father still living?”', NLT: 'I am Joseph!” he said to his brothers. “Is my father still alive?' },
+  comeNear: { ref: 'Genesis 45:4', KJV: 'Come near to me, I pray you. And they came near.', NKJV: 'Please come near to me.” So they came near.', NIV: 'Come close to me.” When they had done so', NLT: 'Please, come closer,” he said to them. So they came closer.' },
+  sentMe: { ref: 'Genesis 45:5', KJV: 'Now therefore be not grieved, nor angry with yourselves, that ye sold me hither: for God did send me before you to preserve life.', NKJV: 'But now, do not therefore be grieved or angry with yourselves because you sold me here; for God sent me before you to preserve life.', NIV: 'And now, do not be distressed and do not be angry with yourselves for selling me here, because it was to save lives that God sent me ahead of you.', NLT: 'But don’t be upset, and don’t be angry with yourselves for selling me to this place. It was God who sent me here ahead of you to preserve your lives.' },
+  // Win card
+  embraced: { ref: 'Genesis 45:14–15', KJV: 'And he fell upon his brother Benjamin\'s neck, and wept; and Benjamin wept upon his neck. Moreover he kissed all his brethren', NKJV: 'Then he fell on his brother Benjamin’s neck and wept, and Benjamin wept on his neck. Moreover he kissed all his brothers', NIV: 'Then he threw his arms around his brother Benjamin and wept, and Benjamin embraced him, weeping. And he kissed all his brothers', NLT: 'Weeping with joy, he embraced Benjamin, and Benjamin did the same. Then Joseph kissed each of his brothers' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  layoutSlots();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;
+const GROUND_Y = 430;     // where the road begins
+const ROUNDS = 3;         // cups to find in each level
+
+const LEVELS = [
+  { name: 'Three Sacks',          sacks: 3, swaps: 3,  swapT: 0.95, pairs: 1, decoys: 0, answerT: 9, verse: 'bowed',
+    tip: 'Watch the <b>silver cup</b> go into a sack. Follow that sack with your eyes while they are mixed up, then <b>tap it</b>!' },
+  { name: 'Four Brothers’ Sacks', sacks: 4, swaps: 5,  swapT: 0.75, pairs: 1, decoys: 0, answerT: 8, verse: 'silverCup',
+    tip: 'Four sacks now, and a little quicker.' },
+  { name: 'Money in Every Sack',  sacks: 5, swaps: 7,  swapT: 0.6,  pairs: 1, decoys: 2, answerT: 7, verse: 'money',
+    tip: 'The steward puts <b>silver coins</b> in some sacks too. Don’t be fooled: follow the <b>cup</b>!' },
+  { name: 'Two at Once',          sacks: 6, swaps: 8,  swapT: 0.55, pairs: 2, decoys: 3, answerT: 6.5, verse: 'searched',
+    tip: 'Now <b>two pairs</b> of sacks can swap at the same time!' },
+  { name: 'The Search',           sacks: 7, swaps: 10, swapT: 0.47, pairs: 2, decoys: 4, answerT: 6, verse: 'iAmJoseph',
+    tip: 'Seven sacks, faster swaps. Keep your eyes on the cup!' },
+  { name: 'Benjamin’s Sack',      sacks: 8, swaps: 12, swapT: 0.4,  pairs: 3, decoys: 5, answerT: 5.5, verse: 'comeNear',
+    tip: 'The hardest search of all: eight sacks and lots of swaps!' },
+];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | pause | win | fail | done
+let phase = 'show';       // show | tie | shuffle | guess | reveal  (inside play)
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('silverCupBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0;
+let sacks = [];           // { slot, x, y, open, cup, coin, fromX, fromY, toX, toY, arc, moving }
+let slots = [];           // slot positions
+let sackS = 1;            // drawing scale for sacks
+let round = 0, found = 0, hearts = 3;
+let phaseT = 0;
+let swapsLeft = 0, swapping = [];
+let chosen = null, guessT = 0;
+let cupFly = null;
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;
+let shakeT = 0;
+let endTimer = 0;
+let winT = 0, failT = 0;
+let told = {};
+let attempted = 0;
+let lastBonus = null;
+let steward = { x: 0, look: 0 };
+
+const sfx = {};
+
+function saveBest() {
+  if (totalScore > best) {
+    best = totalScore;
+    try { localStorage.setItem('silverCupBest', String(best)); } catch (e) {}
+  }
+}
+
+// ============================================================
+//  Sacks and slots
+// ============================================================
+function layoutSlots() {
+  const n = cfg ? cfg.sacks : 3;
+  const maxCols = Math.max(3, Math.floor((W - 30) / 108));
+  const rows = n > maxCols ? 2 : 1;
+  const cols = Math.ceil(n / rows);
+  const sp = Math.min(150, (W - 30) / cols);
+  sackS = clamp(sp / 118, 0.7, 1.12);
+  slots = [];
+  for (let i = 0; i < n; i++) {
+    const r = rows === 2 ? (i < cols ? 0 : 1) : 0;
+    const inRow = rows === 2 ? (r === 0 ? cols : n - cols) : n;
+    const c = r === 0 ? i : i - cols;
+    const x = W / 2 + (c - (inRow - 1) / 2) * sp + (rows === 2 && r === 1 && inRow < cols ? 0 : 0);
+    const y = rows === 2 ? (r === 0 ? 610 : 790) : 720;
+    slots.push({ x, y });
+  }
+  if (typeof sacks !== 'undefined') for (const s of sacks) if (!s.moving && slots[s.slot]) { s.x = slots[s.slot].x; s.y = slots[s.slot].y; }
+}
+
+function setupRound() {
+  layoutSlots();
+  sacks = [];
+  const cupAt = Math.floor(Math.random() * cfg.sacks);
+  const others = [...Array(cfg.sacks).keys()].filter((i) => i !== cupAt).sort(() => Math.random() - 0.5);
+  const coins = new Set(others.slice(0, Math.min(cfg.decoys, others.length)));
+  for (let i = 0; i < cfg.sacks; i++) {
+    sacks.push({ id: i, slot: i, x: slots[i].x, y: slots[i].y, open: 1, cup: i === cupAt, coin: coins.has(i), moving: false, f: 0, arc: 0, wob: rand(0, TAU), opened: 0, lift: 0 });
+  }
+  phase = 'show'; phaseT = 0;
+  chosen = null; guessT = 0;
+  cupFly = { from: { x: W / 2, y: GROUND_Y - 30 }, to: sacks[cupAt], f: 0 };
+  steward.x = slots[cupAt].x;
+  swapsLeft = cfg.swaps + (round === ROUNDS - 1 ? 1 : 0);
+  swapping = [];
+}
+
+function cupSack() { return sacks.find((s) => s.cup); }
+
+function startSwaps() {
+  // choose up to cfg.pairs disjoint pairs of slots and swap the sacks in them
+  const free = [...Array(cfg.sacks).keys()].sort(() => Math.random() - 0.5);
+  const n = Math.min(cfg.pairs, swapsLeft, Math.floor(cfg.sacks / 2));
+  // keep the cup sack busy: in most swaps the cup moves, so the player has to follow it
+  const cs = cupSack();
+  if (Math.random() < 0.7) { free.splice(free.indexOf(cs.slot), 1); free.unshift(cs.slot); }
+  swapping = [];
+  for (let k = 0; k < n; k++) {
+    const a = free.shift(), b = free.shift();
+    const sa = sacks.find((s) => s.slot === a), sb = sacks.find((s) => s.slot === b);
+    const up = k % 2 === 0 ? 1 : -1;
+    for (const [s, to, dir] of [[sa, b, up], [sb, a, -up]]) {
+      s.fromX = s.x; s.fromY = s.y; s.toX = slots[to].x; s.toY = slots[to].y; s.slot = to; s.moving = true; s.f = 0; s.arc = dir;
+    }
+    swapping.push(sa, sb);
+  }
+  swapsLeft -= n;
+  sfx.swish();
+}
+
+function updateSwaps(dt) {
+  let done = true;
+  for (const s of swapping) {
+    s.f += dt / cfg.swapT;
+    if (s.f >= 1) { s.f = 1; s.moving = false; }
+    else done = false;
+    const e = ease(s.f);
+    const dist = Math.hypot(s.toX - s.fromX, s.toY - s.fromY);
+    s.x = lerp(s.fromX, s.toX, e);
+    s.y = lerp(s.fromY, s.toY, e) - s.arc * Math.sin(e * Math.PI) * Math.min(70, dist * 0.3 + 20);
+  }
+  if (done) {
+    swapping = [];
+    if (swapsLeft > 0) startSwaps();
+    else { phase = 'guess'; phaseT = 0; guessT = cfg.answerT; if (!told.guess) { told.guess = true; say('Which sack has the silver cup? Tap it!'); } }
+  }
+}
+
+function sackAt(px, py) {
+  if (phase !== 'guess') return null;
+  let bestS = null, bd = 1e9;
+  for (const s of sacks) {
+    const dx = px - s.x, dy = py - (s.y - 50 * sackS);
+    if (Math.abs(dx) < 56 * sackS + 6 && Math.abs(dy) < 66 * sackS + 10) {
+      const d = Math.hypot(dx, dy);
+      if (d < bd) { bd = d; bestS = s; }
+    }
+  }
+  return bestS;
+}
+
+function guess(s) {
+  if (state !== 'play' || phase !== 'guess' || !s) return;
+  chosen = s;
+  phase = 'reveal'; phaseT = 0;
+  s.opened = 0.001;
+  sfx.untie();
+  if (s.cup) {
+    found++;
+    const quick = Math.round(clamp(guessT / cfg.answerT, 0, 1) * 60);
+    const pts = 100 + level * 20 + quick;
+    levelScore += pts; totalScore += pts;
+    floatText(s.x + offX, s.y - 150 * sackS + offY, `Found it! +${pts}`, '#fff3b0');
+    sparkle(s.x, s.y - 90 * sackS, 22);
+    sfx.found();
+    say(round === ROUNDS - 1 && level === LEVELS.length ? 'The cup was in Benjamin’s sack!' : pick(['There it is!', 'Well followed!', 'Sharp eyes!']));
+  } else {
+    sfx.wrong();
+    floatText(s.x + offX, s.y - 150 * sackS + offY, s.coin ? 'Just silver coins!' : 'Only grain!', '#ffd0d0');
+    say('Not that one. Look, the cup was over here!');
+    loseHeart();
+  }
+}
+
+function timeUp() {
+  phase = 'reveal'; phaseT = 0;
+  chosen = null;
+  const c = cupSack(); c.opened = 0.001;
+  sfx.wrong();
+  floatText(c.x + offX, c.y - 150 * sackS + offY, 'Too slow!', '#ffd0d0');
+  say('Be quick! Tap a sack before the sand runs out.');
+  loseHeart();
+}
+
+function loseHeart() {
+  hearts--;
+  shakeT = 0.35;
+  if (hearts <= 0) { hearts = 0; fail(); }
+}
+
+function updateRound(dt) {
+  phaseT += dt;
+  for (const s of sacks) {
+    s.wob += dt * 3;
+    if (s.opened > 0) s.opened = Math.min(1, s.opened + dt * 3);
+  }
+  const showDur = level === 1 ? 2.4 : 1.9;
+  if (phase === 'show') {
+    if (cupFly) {
+      cupFly.f = clamp((phaseT - 0.35) / (showDur * 0.45), 0, 1);
+      if (cupFly.f >= 1 && !cupFly.landed) { cupFly.landed = true; sfx.clink(); sparkle(cupFly.to.x, cupFly.to.y - 95 * sackS, 10); }
+    }
+    if (phaseT > showDur) { phase = 'tie'; phaseT = 0; sfx.tie(); }
+  } else if (phase === 'tie') {
+    for (const s of sacks) s.open = Math.max(0, 1 - phaseT / 0.45);
+    if (phaseT > 0.75) {
+      phase = 'shuffle'; phaseT = 0; cupFly = null;
+      if (!told.watch) { told.watch = true; showMessage('Keep your eyes on the cup’s sack!', 1.8); }
+      startSwaps();
+    }
+  } else if (phase === 'shuffle') {
+    updateSwaps(dt);
+  } else if (phase === 'guess') {
+    guessT -= dt;
+    if (guessT <= 0) timeUp();
+  } else if (phase === 'reveal') {
+    // also show where the cup really was
+    if (phaseT > 0.5) { const c = cupSack(); if (!c.opened) c.opened = 0.001; }
+    if (phaseT > 1.9 && state === 'play') {
+      round++;
+      if (round >= ROUNDS) win();
+      else setupRound();
+    }
+  }
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot', text = '') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, text });
+}
+function sparkle(x, y, n) {
+  for (let k = 0; k < n; k++) {
+    const a = rand(0, TAU), v = rand(60, 220);
+    spawn(x + offX, y + offY, Math.cos(a) * v, Math.sin(a) * v, rand(0.4, 0.9), pick(['#ffffff', '#e0e8f0', '#fff6d0']), rand(2, 4), 120, 'star');
+  }
+}
+function floatText(x, y, text, color) { spawn(x, y, 0, -60, 1.3, color, 22, 0, 'text', text); }
+function updateParticles(dt) {
+  for (const p of particles) { p.life -= dt; p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  particles = particles.filter((p) => p.life > 0);
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max * 1.5, 0, 1);
+    if (p.kind === 'text') {
+      ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(60,35,10,0.85)';
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+    } else if (p.kind === 'star') {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const r = k % 2 ? p.size * 0.4 : p.size * 1.4, an = k * Math.PI / 4;
+        ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r);
+      }
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * 100, perfect = found === ROUNDS ? 200 : 0, levelBonus = level * 100;
+  const add = heartBonus + perfect + levelBonus;
+  levelScore += add; totalScore += add;
+  lastBonus = { heartBonus, perfect, levelBonus };
+  saveBest();
+  if (level === LEVELS.length) say('I am Joseph, your brother!', 3.2);
+  sfx.win();
+  endTimer = level === LEVELS.length ? 3.4 : 2.2;
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  saveBest();
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+function say(text, dur = 2.4) { bubble = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('The Silver Cup', 'Follow the sack with Joseph’s cup',
+    `${verseHTML('silverCup')}
+     <ul>
+       <li>Joseph’s brothers came to Egypt for grain. They didn’t know the great ruler was Joseph! He told his steward to hide his <b>silver cup</b> in a sack.</li>
+       <li><b>Watch</b> which sack the cup goes into. The sacks are tied up and <b>mixed around</b>.</li>
+       <li>Keep your eyes on that sack, then <b>tap it</b> before the time runs out!</li>
+       <li>Find the cup <b>${ROUNDS} times</b> to finish a level. A wrong sack or running out of time costs a <b>heart</b>.</li>
+       <li><b>Keys:</b> <kbd>1</kbd>–<kbd>8</kbd> pick a sack, <kbd>P</kbd> pauses.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; attempted = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = LEVELS[level - 1];
+  particles = [];
+  round = 0; found = 0; hearts = 3;
+  winT = 0; failT = 0; endTimer = 0; shakeT = 0;
+  bubble = null; told = {};
+  setupRound();
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  if (retry || attempted > 0) { beginPlay(); return; }
+  attempted++;
+  levelCard();
+}
+
+function levelCard() {
+  state = 'intro';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p class="tip">${cfg.tip}</p>
+     <p class="tip">Sacks: <b>${cfg.sacks}</b> &middot; Find the cup <b>${ROUNDS}</b> times &middot; Hearts: <b>♥♥♥</b></p>`,
+    'Go!', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  attempted = Math.max(attempted, 1);
+  setupRound();
+  showMessage(`Level ${level}: ${cfg.name}`, 2);
+  if (level === 1) say('Watch the silver cup!', 2.4);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const b = lastBonus;
+    const last = level === LEVELS.length;
+    showOverlay(last ? 'I am Joseph!' : 'Well found!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'embraced' : 'searched')}
+       ${last ? `<p style="text-align:center">Joseph forgave his brothers and hugged them all. God had a plan all along!</p>${verseHTML('sentMe')}` : ''}
+       <p class="score">Cups found: <b>${found} / ${ROUNDS}</b><br>Hearts left: <b>${b.heartBonus}</b>${b.perfect ? `<br>Found every time!: <b>${b.perfect}</b>` : ''}<br>Level bonus: <b>${b.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', last
+        ? () => { level = 1; totalScore = 0; attempted = 0; startLevel(); }
+        : () => { level++; attempted = 0; startLevel(); });
+    if (last) state = 'done';
+  } else if (state === 'fail') {
+    showOverlay('Lost the cup!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Keep your eyes on the <b>sack with the cup</b> the whole time it moves. Don't look at the coins!</p>
+       ${verseHTML('searched')}
+       <p class="score">Score so far: <b>${totalScore - levelScore}</b></p>`,
+      'Try Again', () => { totalScore -= levelScore; levelScore = 0; startLevel(true); });
+  }
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'intro') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => { totalScore -= levelScore; levelScore = 0; startLevel(true); });
+  } else if (state === 'pause') {
+    if (pausedFrom === 'intro') { levelCard(); return; }
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { totalScore -= levelScore; levelScore = 0; startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && winT > 1.2) { endTimer = Math.min(endTimer, 0.01); return; }
+  const m = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+  if (m && state === 'play' && phase === 'guess') guess(sacks.find((s) => s.slot === +m[2] - 1));
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const s = sackAt(p.vx - offX, p.vy - offY);
+  if (s) guess(s);
+  else if (phase === 'shuffle' && !told.wait) { told.wait = true; showMessage('Wait until they stop moving…', 1.4); }
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+Object.assign(sfx, {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  swish() { this.noiseBurst(1600, 0.22, 0.1, 0.8, 600); },
+  clink() { this.tone(2093, 0.4, 'triangle', 0.12); this.tone(3136, 0.5, 'sine', 0.08, 0.06); },
+  tie() { this.noiseBurst(700, 0.2, 0.12, 0.8, 300); },
+  untie() { this.noiseBurst(900, 0.2, 0.12, 0.8, 1800); },
+  found() { if (this.ctx) { Music.tap(0.95); [1568, 2093, 2637, 3136].forEach((f, i) => this.tone(f, 0.45, 'sine', 0.1, i * 0.07)); } },
+  wrong() { this.tone(260, 0.22, 'triangle', 0.25, 0, 150); this.tone(200, 0.3, 'triangle', 0.2, 0.12, 110); },
+  tick() { this.tone(1200, 0.05, 'square', 0.04); },
+});
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing: people
+// ============================================================
+function drawFace(mood, hy, d) {
+  const ex = 6, ey = hy - 1, dark = '#2b1d12', mouthY = hy + 9;
+  ctx.lineCap = 'round';
+  const blink = Math.sin(t * 1.6 + d.phase * 3) > 0.985 && mood !== 'joy';
+  for (const sx of [-ex, ex]) {
+    if (mood === 'joy') {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(sx, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      continue;
+    }
+    if (blink) { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke(); continue; }
+    const big = mood === 'wow' || mood === 'shock';
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, ey, big ? 4.3 : 3.7, big ? 5.6 : 4.7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx + (d.look || 0) * 1.4, ey + 0.8, 2.1, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = '#6a2a1e'; ctx.fillStyle = '#7a2e22'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (mood === 'joy') { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); ctx.fill(); }
+  else if (mood === 'wow' || mood === 'shock') { ctx.ellipse(0, mouthY, 3.2, mood === 'shock' ? 5.5 : 4.2, 0, 0, TAU); ctx.fill(); }
+  else if (mood === 'worried') { ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke(); }
+  else { ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+  if (mood === 'joy') {
+    ctx.fillStyle = 'rgba(255,120,120,0.45)';
+    ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  }
+}
+
+function drawPerson(d, x, y, s, mood, opts = {}) {
+  const jump = mood === 'joy' ? Math.abs(Math.sin(t * 7 + d.phase)) * 10 : 0;
+  if (d.kid) s *= 0.82;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  if (mood === 'joy' && !opts.hug) { const w = Math.sin(t * 9 + d.phase) * 4; arm(-11, -32, -24 + w, -66); arm(11, -32, 24 - w, -66); }
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -50); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0); ctx.quadraticCurveTo(-17, -30, -11, -37); ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (d.sash) {
+    ['#c0392b', '#e0a526', '#3c8f86', '#7a4fa0'].forEach((c, k) => { ctx.strokeStyle = c; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(-12 + k * 2.4, -36); ctx.lineTo(10 + k * 2.4, -8); ctx.stroke(); });
+  } else {
+    ctx.strokeStyle = d.belt || '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (d.collar) {
+    ctx.fillStyle = d.collar; ctx.beginPath(); ctx.ellipse(0, -37, 13, 5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.ellipse(0, -37, 9, 2.5, 0, 0, TAU); ctx.fill();
+  }
+  if (opts.hug) { arm(-11, -32, -26, -30); arm(11, -32, 26, -30); }
+  else if (mood !== 'joy') {
+    if (opts.point) arm(11, -32, 11 + opts.point * 20, -48);
+    else arm(11, -32, 15, -12);
+    arm(-11, -32, -15, -12);
+  }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.headcloth) {
+    ctx.fillStyle = d.headcloth;
+    ctx.beginPath();
+    ctx.moveTo(-17, hy + 14); ctx.lineTo(-19, hy - 2); ctx.quadraticCurveTo(-17, hy - 21, 0, hy - 21);
+    ctx.quadraticCurveTo(17, hy - 21, 19, hy - 2); ctx.lineTo(17, hy + 14); ctx.lineTo(12, hy + 14); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-12, hy + 14); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.headcloth, -40); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, hy - 6, 15, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2); ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2); ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2); ctx.fill();
+  }
+  drawFace(mood, hy, d);
+  ctx.restore();
+}
+
+const JOSEPH = { robe: '#f8f4ea', skin: '#d39a66', hair: '#3a2515', sash: true, collar: '#e0a526', headcloth: '#f0d070', phase: 0 };
+const STEWARD = { robe: '#eae2cc', skin: '#c08050', hair: '#2a1a0e', collar: '#3a7fb8', headcloth: '#e8e0c8', phase: 1, belt: '#3a7fb8' };
+const BROTHERS = [
+  { robe: '#8a5a33', skin: '#c98d56', hair: '#4a2f1a', beard: true, phase: 2 },
+  { robe: '#3f6fb5', skin: '#d7a070', hair: '#2e1d10', beard: true, phase: 3 },
+  { robe: '#6b8e3a', skin: '#c88e5a', hair: '#3a2716', beard: true, phase: 4 },
+  { robe: '#b5503f', skin: '#d9a066', hair: '#1f140c', beard: true, phase: 5 },
+  { robe: '#7a4fa0', skin: '#b87a48', hair: '#2a1a0e', beard: true, phase: 6 },
+  { robe: '#d9a13a', skin: '#e3b184', hair: '#6b3f1d', beard: false, phase: 7, kid: true, name: 'Benjamin' },
+];
+
+// ============================================================
+//  Drawing: the sacks and the cup
+// ============================================================
+function drawCup(x, y, s, glint = 1) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  const g = ctx.createLinearGradient(-14, 0, 14, 0);
+  g.addColorStop(0, '#9aa6b2'); g.addColorStop(0.4, '#ffffff'); g.addColorStop(1, '#8a96a2');
+  ctx.fillStyle = g; ctx.strokeStyle = '#5f6b78'; ctx.lineWidth = 1.5;
+  // bowl
+  ctx.beginPath();
+  ctx.moveTo(-15, -26); ctx.lineTo(15, -26); ctx.quadraticCurveTo(14, -6, 0, -4); ctx.quadraticCurveTo(-14, -6, -15, -26);
+  ctx.fill(); ctx.stroke();
+  // stem and foot
+  ctx.fillRect(-3, -6, 6, 12); ctx.strokeRect(-3, -6, 6, 12);
+  ctx.beginPath(); ctx.ellipse(0, 7, 11, 4, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e8eef4';
+  ctx.beginPath(); ctx.ellipse(0, -26, 15, 4, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  // a little gold band
+  ctx.strokeStyle = '#e0b040'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-14, -19); ctx.quadraticCurveTo(0, -16, 14, -19); ctx.stroke();
+  ctx.restore();
+  if (glint > 0) star(x + 10 * s, y - 28 * s, 7 * s * (0.7 + 0.3 * Math.sin(t * 8)), glint);
+}
+
+function drawCoins(x, y, s) {
+  for (let k = 0; k < 3; k++) {
+    const cx = x + (k - 1) * 9 * s, cy = y - Math.abs(k - 1) * 2 * s;
+    const g = ctx.createRadialGradient(cx - 2, cy - 2, 0.5, cx, cy, 7 * s);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#9aa6b2');
+    ctx.fillStyle = g; ctx.strokeStyle = '#5f6b78'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(cx, cy, 6.5 * s, 4.5 * s, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  star(x + 8 * s, y - 6 * s, 5 * s * (0.7 + 0.3 * Math.sin(t * 7 + x)), 0.9);
+}
+
+function star(x, y, r, a) {
+  ctx.save();
+  ctx.globalAlpha *= a;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const rr = k % 2 ? r * 0.25 : r, an = k * Math.PI / 4;
+    ctx.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr);
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSack(s) {
+  const sc = sackS;
+  const x = s.x, y = s.y;
+  const open = Math.max(s.open, s.opened);
+  const squash = s.moving ? Math.sin(s.f * Math.PI) * 0.06 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  // shadow stays on the ground while the sack hops
+  ctx.fillStyle = 'rgba(60,35,10,0.22)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 44 * sc, 10 * sc, 0, 0, TAU); ctx.fill();
+  ctx.scale(sc * (1 + squash), sc * (1 - squash));
+  const body = '#d9bf88', dark = '#a88a52';
+  // body
+  ctx.fillStyle = body; ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-40, -6);
+  ctx.quadraticCurveTo(-50, -60, -30, -88);
+  ctx.lineTo(30, -88);
+  ctx.quadraticCurveTo(50, -60, 40, -6);
+  ctx.quadraticCurveTo(0, 6, -40, -6);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // stitching and patches
+  ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(-30, -20); ctx.quadraticCurveTo(0, -12, 30, -20); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.ellipse(-18, -55, 8, 22, 0.2, 0, TAU); ctx.fill();
+  if (open > 0.02) {
+    // the open mouth, full of grain
+    const mw = lerp(18, 34, open);
+    ctx.fillStyle = body; ctx.strokeStyle = '#8a6a3a';
+    ctx.beginPath();
+    ctx.moveTo(-30, -88); ctx.lineTo(-mw - 4, -100 - 6 * open); ctx.lineTo(mw + 4, -100 - 6 * open); ctx.lineTo(30, -88);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e9c45a';
+    ctx.beginPath(); ctx.ellipse(0, -100 - 6 * open, mw + 2, 8 * open + 2, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#8a6a3a'; ctx.stroke();
+    ctx.fillStyle = '#d9a83a';
+    for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.ellipse(k * mw / 4, -100 - 6 * open + Math.abs(k) % 2, 2.4, 1.6, 0, 0, TAU); ctx.fill(); }
+    // what's inside, peeking out
+    if (s.cup && (phase === 'show' && cupFly && cupFly.landed || s.opened > 0)) {
+      const rise = s.opened > 0 ? ease(s.opened) * 34 : 0;
+      ctx.restore();
+      drawCup(x, y + (-102 - 2 - rise) * sc, sc * 0.9, 1);
+      return;
+    }
+    if (s.coin) drawCoins(0, -104, 1);
+  } else {
+    // tied shut with a cord
+    ctx.fillStyle = body; ctx.strokeStyle = '#8a6a3a';
+    ctx.beginPath();
+    ctx.moveTo(-30, -88); ctx.quadraticCurveTo(-8, -92, -10, -100); ctx.lineTo(-14, -114); ctx.lineTo(14, -114); ctx.lineTo(10, -100); ctx.quadraticCurveTo(8, -92, 30, -88);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#b5503f'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-12, -98); ctx.lineTo(12, -98); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-6, -103, 5, 3, -0.5, 0, TAU); ctx.ellipse(6, -103, 5, 3, 0.5, 0, TAU); ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSackLabels() {
+  if (phase !== 'guess') return;
+  for (const s of sacks) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6 + s.slot);
+    ctx.strokeStyle = `rgba(255,240,150,${0.35 + 0.35 * pulse})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, 48 * sackS, 13 * sackS, 0, 0, TAU); ctx.stroke();
+    ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(90,60,20,0.75)';
+    ctx.fillText(String(s.slot + 1), s.x, s.y + 22 * sackS);
+  }
+}
+
+function drawCupFly() {
+  if (!cupFly || state !== 'play' || phase !== 'show' || cupFly.landed) return;
+  const to = cupFly.to;
+  const f = ease(cupFly.f);
+  const x = lerp(W / 2 - 34, to.x, f), y0 = GROUND_Y + 20;
+  const y = lerp(y0, to.y - 130 * sackS, f) - Math.sin(f * Math.PI) * 40;
+  drawCup(x, y, sackS * 0.95, 1);
+}
+
+// ============================================================
+//  Drawing: the scene
+// ============================================================
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, offY + GROUND_Y);
+  g.addColorStop(0, '#78bfe8'); g.addColorStop(1, '#f4e2b8');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, viewW, offY + GROUND_Y + 2);
+  ctx.fillStyle = 'rgba(255,240,170,0.9)';
+  ctx.beginPath(); ctx.arc(viewW * 0.15, offY + 150 - Math.min(offY, 70), 34, 0, TAU); ctx.fill();
+}
+
+function drawCity() {
+  // playfield coordinates: Joseph's house and the city wall
+  const wallTop = GROUND_Y - 150;
+  ctx.fillStyle = '#e2c792';
+  ctx.fillRect(-offX, wallTop, viewW, GROUND_Y - wallTop);
+  ctx.fillStyle = '#d4b680';
+  for (let k = 0; k < Math.ceil(viewW / 40) + 1; k++) ctx.fillRect(-offX + k * 40, wallTop - 14, 24, 16);
+  ctx.strokeStyle = 'rgba(150,110,60,0.3)'; ctx.lineWidth = 1.5;
+  for (let r = 0; r < 5; r++) {
+    for (let k = 0; k < Math.ceil(viewW / 60) + 1; k++) {
+      const x = -offX + k * 60 + (r % 2) * 30, y = wallTop + 12 + r * 28;
+      ctx.strokeRect(x, y, 60, 28);
+    }
+  }
+  // Joseph's house with columns in the middle
+  const hx = W / 2, hw = Math.min(360, W * 0.7);
+  ctx.fillStyle = '#f2e6cc';
+  ctx.fillRect(hx - hw / 2, wallTop - 70, hw, 220);
+  ctx.fillStyle = '#c0392b';
+  ctx.fillRect(hx - hw / 2 - 10, wallTop - 84, hw + 20, 16);
+  ctx.fillStyle = '#3a7fb8';
+  ctx.fillRect(hx - hw / 2 - 10, wallTop - 68, hw + 20, 6);
+  for (let k = 0; k < 5; k++) {
+    const cx = hx - hw / 2 + 24 + k * (hw - 48) / 4;
+    ctx.fillStyle = '#e8d8b0';
+    ctx.fillRect(cx - 9, wallTop - 62, 18, 200);
+    ctx.fillStyle = '#4f8f5a';
+    ctx.beginPath(); ctx.ellipse(cx, wallTop - 62, 16, 7, 0, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#6a4424';
+  roundRect(hx - 34, wallTop + 40, 68, 98, [30, 30, 0, 0]); ctx.fill();
+  // palms
+  for (const px of [W * 0.04, W * 0.96]) palm(px, GROUND_Y + 8, 1);
+  // road
+  const rg = ctx.createLinearGradient(0, GROUND_Y, 0, H);
+  rg.addColorStop(0, '#e8cf9c'); rg.addColorStop(1, '#d6b47a');
+  ctx.fillStyle = rg;
+  ctx.fillRect(-offX, GROUND_Y, viewW, H - GROUND_Y);
+  ctx.fillStyle = 'rgba(160,120,70,0.25)';
+  for (let k = 0; k < 40; k++) {
+    const x = -offX + hash(k, 1) * viewW, y = GROUND_Y + 20 + hash(k, 2) * (H - GROUND_Y - 20);
+    ctx.beginPath(); ctx.ellipse(x, y, 5 + hash(k, 3) * 6, 2.5, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function palm(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, -70, 2, -140); ctx.stroke();
+  ctx.fillStyle = '#3f8f4a';
+  for (let k = 0; k < 6; k++) {
+    const a = -Math.PI / 2 + (k - 2.5) * 0.55 + Math.sin(t * 1.2 + x) * 0.05;
+    ctx.save(); ctx.translate(2, -140); ctx.rotate(a);
+    ctx.beginPath(); ctx.ellipse(32, 0, 36, 9, 0.25, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawPeople() {
+  // the brothers watch from the left and right, Joseph and the steward in the middle
+  const reveal = state === 'win' || state === 'done';
+  const hug = reveal && level === LEVELS.length;
+  const by = GROUND_Y + 66;
+  const n = BROTHERS.length;
+  const span = Math.min(W - 60, 720);
+  BROTHERS.forEach((d, k) => {
+    const side = k < 3 ? -1 : 1;
+    const j = k < 3 ? k : k - 3;
+    let x = W / 2 + side * (span / 2 - j * Math.min(58, span * 0.09));
+    if (hug) x = lerp(x, W / 2 + side * (50 + j * 34), clamp(winT / 1.2, 0, 1));
+    const c = cupSack();
+    d.look = c ? clamp((c.x - x) / 120, -1, 1) : 0;
+    let mood = 'watch';
+    if (state === 'fail') mood = 'worried';
+    else if (reveal) mood = 'joy';
+    else if (phase === 'reveal' && chosen && chosen.cup) mood = d.kid ? 'shock' : 'wow';
+    else if (phase === 'shuffle') mood = 'wow';
+    drawPerson(d, x, by + (j % 2) * 8, 0.9, mood);
+  });
+  const jy = by - 6;
+  if (hug) {
+    drawPerson(JOSEPH, W / 2, jy + 10, 1.05, 'joy', { hug: true });
+  } else {
+    drawPerson(JOSEPH, W / 2 + 34, jy, 1, state === 'fail' ? 'worried' : phase === 'reveal' && chosen && chosen.cup ? 'joy' : 'watch');
+    const sx = phase === 'show' ? lerp(W / 2 - 34, clamp(steward.x, 40, W - 40), 0) : W / 2 - 34;
+    drawPerson(STEWARD, sx, jy, 0.95, 'watch', { point: phase === 'show' ? (steward.x > W / 2 ? 1 : -1) : 0 });
+  }
+}
+
+function drawTimer() {
+  if (phase !== 'guess' || state !== 'play') return;
+  // an hourglass-like bar under the sacks
+  const f = clamp(guessT / cfg.answerT, 0, 1);
+  const w = Math.min(W - 80, 360), x = W / 2 - w / 2, y = H - 34;
+  ctx.fillStyle = 'rgba(60,35,10,0.25)';
+  roundRect(x, y, w, 16, 8); ctx.fill();
+  ctx.fillStyle = f > 0.5 ? '#6cc24a' : f > 0.25 ? '#f2b33d' : '#e8505b';
+  roundRect(x, y, w * f, 16, 8); ctx.fill();
+  ctx.font = '600 14px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#5a3a14'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Tap the sack with the cup!', W / 2, y - 4);
+}
+
+function drawBubble() {
+  if (!bubble) return;
+  const a = clamp(bubble.t / 0.3, 0, 1);
+  const jx = W / 2 + 34, jy = GROUND_Y - 20;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = '600 17px Fredoka, sans-serif';
+  const lines = wrapText(bubble.text, Math.min(260, W * 0.6));
+  const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 26, bh = lines.length * 21 + 16;
+  const bx = clamp(jx - bw / 2 + 30, 8 - offX, W + offX - bw - 8), by = jy - bh - 14;
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  roundRect(bx, by, bw, bh, 14); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(jx - 8, by + bh - 1); ctx.lineTo(jx, by + bh + 12); ctx.lineTo(jx + 8, by + bh - 1); ctx.fill();
+  ctx.fillStyle = '#4a3418'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 13, by + 9 + i * 21));
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(50,60,90,0.75)'); hg.addColorStop(1, 'rgba(50,60,90,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Silver Cup' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.font = '600 15px Fredoka, sans-serif';
+    ctx.fillText(`Round ${Math.min(round + 1, ROUNDS)} of ${ROUNDS} · found ${found}`, 12, 50);
+    for (let k = 0; k < 3; k++) heart(viewW - 24 - k * 30, 44, k < hearts);
+    ctx.textAlign = 'right';
+    ctx.font = '700 18px Fredoka, sans-serif';
+    ctx.fillText(`${totalScore}`, viewW - 12, 84);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function heart(x, y, full) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = full ? '#e8505b' : 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(0, 8);
+  ctx.bezierCurveTo(-14, -2, -8, -14, 0, -6);
+  ctx.bezierCurveTo(8, -14, 14, -2, 0, 8);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = Math.max(TOPH + 30, offY + GROUND_Y - 200);
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(70,40,10,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff3c4';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawBackground();
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawCity();
+  drawPeople();
+  // sacks: the moving ones on top so a swap is easy to follow
+  const order = [...sacks].sort((a, b) => (a.moving - b.moving) || (a.y - b.y));
+  for (const s of order) drawSack(s);
+  drawSackLabels();
+  drawCupFly();
+  drawTimer();
+  drawBubble();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawParticles();
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(60,35,10,${clamp(failT / 1.5, 0, 0.35)})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') {
+    updateRound(dt);
+  } else if (state === 'win' || state === 'done') {
+    winT += dt;
+    for (const s of sacks) if (s.opened > 0) s.opened = Math.min(1, s.opened + dt * 3);
+    if (Math.random() < dt * 8) spawn(rand(0, viewW), rand(TOPH, viewH * 0.5), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'fail') {
+    failT += dt;
+    for (const s of sacks) if (s.opened > 0) s.opened = Math.min(1, s.opened + dt * 3);
+  }
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
