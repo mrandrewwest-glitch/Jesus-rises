@@ -1,0 +1,1325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3d6e3a">
+<title>Name the Animals</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3d6e3a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Name the Animals</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  brought: { ref: 'Genesis 2:19', KJV: 'and brought them unto Adam to see what he would call them: and whatsoever Adam called every living creature, that was the name thereof.', NKJV: 'and brought them to Adam to see what he would call them. And whatever Adam called each living creature, that was its name.', NIV: 'He brought them to the man to see what he would name them; and whatever the man called each living creature, that was its name.', NLT: 'He brought them to the man to see what he would call them, and the man chose a name for each one.' },
+  // Level cards
+  formed: { ref: 'Genesis 2:19', KJV: 'And out of the ground the Lord God formed every beast of the field, and every fowl of the air', NKJV: 'Out of the ground the Lord God formed every beast of the field and every bird of the air', NIV: 'Now the Lord God had formed out of the ground all the wild animals and all the birds in the sky.', NLT: 'So the Lord God formed from the ground all the wild animals and all the birds of the sky.' },
+  kinds: { ref: 'Genesis 1:25', KJV: 'And God made the beast of the earth after his kind, and cattle after their kind', NKJV: 'And God made the beast of the earth according to its kind, cattle according to its kind', NIV: 'God made the wild animals according to their kinds, the livestock according to their kinds', NLT: 'God made all sorts of wild animals, livestock, and small animals' },
+  good: { ref: 'Genesis 1:25', KJV: 'and God saw that it was good.', NKJV: 'And God saw that it was good.', NIV: 'And God saw that it was good.', NLT: 'And God saw that it was good.' },
+  creatures: { ref: 'Genesis 1:24', KJV: 'Let the earth bring forth the living creature after his kind, cattle, and creeping thing, and beast of the earth', NKJV: 'Let the earth bring forth the living creature according to its kind: cattle and creeping thing and beast of the earth', NIV: 'Let the land produce living creatures according to their kinds: the livestock, the creatures that move along the ground, and the wild animals', NLT: 'Let the earth produce every sort of animal, each producing offspring of the same kind—livestock, small animals that scurry along the ground, and wild animals.' },
+  name: { ref: 'Genesis 2:19', KJV: 'whatsoever Adam called every living creature, that was the name thereof.', NKJV: 'whatever Adam called each living creature, that was its name.', NIV: 'whatever the man called each living creature, that was its name.', NLT: 'the man chose a name for each one.' },
+  // Win card
+  gaveNames: { ref: 'Genesis 2:20', KJV: 'And Adam gave names to all cattle, and to the fowl of the air, and to every beast of the field', NKJV: 'So Adam gave names to all cattle, to the birds of the air, and to every beast of the field.', NIV: 'So the man gave names to all the livestock, the birds in the sky and all the wild animals.', NLT: 'He gave names to all the livestock, all the birds of the sky, and all the wild animals.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+
+// ============================================================
+//  The animals (drawn facing left, standing on 0,0)
+// ============================================================
+// body colour, body half-size, legs, neck, head, ears, tail and extras
+const ANIMALS = {
+  lion:     { name: 'Lion',     size: 1.0,  body: '#e8b24a', bw: 42, bh: 21, legH: 26, legW: 9,  neck: 6,  headR: 17, snout: 7,  ears: 'round',  tail: 'tuft', mane: '#b8642a' },
+  cat:      { name: 'Cat',      size: 0.78, body: '#f0a35a', bw: 30, bh: 14, legH: 20, legW: 7,  neck: 6,  headR: 14, snout: 4,  ears: 'pointy', tail: 'up', stripes: '#d0823a' },
+  dog:      { name: 'Dog',      size: 0.9,  body: '#c98d56', bw: 34, bh: 16, legH: 24, legW: 8,  neck: 8,  headR: 15, snout: 9,  ears: 'floppy', tail: 'up', patch: '#8a5a32' },
+  bear:     { name: 'Bear',     size: 1.1,  body: '#7a5236', bw: 46, bh: 27, legH: 22, legW: 13, neck: 4,  headR: 18, snout: 8,  ears: 'round',  tail: 'short' },
+  fox:      { name: 'Fox',      size: 0.85, body: '#e0702a', bw: 34, bh: 15, legH: 20, legW: 7,  neck: 8,  headR: 14, snout: 11, ears: 'pointy', tail: 'bushy', belly: '#fff3e0' },
+  sheep:    { name: 'Sheep',    size: 0.95, body: '#ffffff', bw: 36, bh: 22, legH: 20, legW: 7,  neck: 6,  headR: 13, snout: 7,  ears: 'side',   tail: 'short', wool: true, head: '#4a3a30', legC: '#4a3a30' },
+  goat:     { name: 'Goat',     size: 0.95, body: '#e6dfd0', bw: 34, bh: 17, legH: 28, legW: 7,  neck: 12, headR: 13, snout: 9,  ears: 'side',   tail: 'up', horns: 'back', beard: true, patch: '#9a7a5a' },
+  cow:      { name: 'Cow',      size: 1.15, body: '#f4efe6', bw: 46, bh: 25, legH: 26, legW: 10, neck: 6,  headR: 15, snout: 9,  ears: 'side',   tail: 'tuft', horns: 'small', spots: '#3b2f2a', nose: '#f2b8b0' },
+  pig:      { name: 'Pig',      size: 0.9,  body: '#f5a8b5', bw: 38, bh: 23, legH: 14, legW: 9,  neck: 2,  headR: 16, snout: 7,  ears: 'pointy', tail: 'curly', disk: true },
+  horse:    { name: 'Horse',    size: 1.15, body: '#9a5b34', bw: 44, bh: 20, legH: 42, legW: 8,  neck: 30, headR: 12, snout: 16, ears: 'pointy', tail: 'long', mane: '#4a2a18' },
+  donkey:   { name: 'Donkey',   size: 1.0,  body: '#9c968e', bw: 40, bh: 21, legH: 32, legW: 8,  neck: 22, headR: 12, snout: 14, ears: 'long',   tail: 'tuft', nose: '#d8d2c8', mane: '#5a5450' },
+  zebra:    { name: 'Zebra',    size: 1.1,  body: '#f8f8f4', bw: 42, bh: 20, legH: 40, legW: 8,  neck: 28, headR: 12, snout: 15, ears: 'pointy', tail: 'tuft', mane: '#222222', zstripes: true },
+  deer:     { name: 'Deer',     size: 1.0,  body: '#b8794a', bw: 36, bh: 17, legH: 40, legW: 6,  neck: 24, headR: 12, snout: 10, ears: 'side',   tail: 'short', antlers: true, dots: '#f3e2c8' },
+  camel:    { name: 'Camel',    size: 1.2,  body: '#d9b06a', bw: 42, bh: 19, legH: 46, legW: 8,  neck: 34, headR: 11, snout: 13, ears: 'round',  tail: 'tuft', hump: true },
+  elephant: { name: 'Elephant', size: 1.3,  body: '#9aa3ad', bw: 52, bh: 33, legH: 30, legW: 16, neck: 0,  headR: 22, snout: 0,  ears: 'big',    tail: 'thin', trunk: true },
+  giraffe:  { name: 'Giraffe',  size: 1.15, body: '#f2c45a', bw: 36, bh: 18, legH: 52, legW: 7,  neck: 78, headR: 11, snout: 12, ears: 'pointy', tail: 'tuft', blotch: '#b8642a', ossicones: true },
+  hippo:    { name: 'Hippo',    size: 1.15, body: '#8e7f9a', bw: 50, bh: 28, legH: 16, legW: 13, neck: 2,  headR: 20, snout: 14, ears: 'round',  tail: 'short', nose: '#b9a8c4' },
+  rabbit:   { name: 'Rabbit',   size: 0.7,  body: '#b9aca0', bw: 26, bh: 17, legH: 10, legW: 9,  neck: 2,  headR: 13, snout: 3,  ears: 'tall',   tail: 'puff' },
+  mouse:    { name: 'Mouse',    size: 0.55, body: '#a8a29c', bw: 24, bh: 14, legH: 8,  legW: 6,  neck: 2,  headR: 12, snout: 8,  ears: 'mouse',  tail: 'string' },
+};
+// Animals that look alike, for the harder levels
+const GROUPS = [
+  ['horse', 'donkey', 'zebra', 'deer', 'camel'],
+  ['sheep', 'goat', 'cow', 'pig'],
+  ['lion', 'cat', 'dog', 'bear', 'fox'],
+  ['elephant', 'hippo', 'giraffe', 'camel', 'cow'],
+  ['rabbit', 'mouse', 'cat', 'fox', 'dog'],
+];
+
+function drawAnimal(k, ph, mood = 'normal', sc = 1) {
+  const A = ANIMALS[k];
+  ctx.save();
+  ctx.scale(A.size * sc, A.size * sc);
+  const by = -A.legH - A.bh * 0.55;                // body centre
+  const dark = shade(A.body, -35);
+  const legC = A.legC || A.body;
+  // back legs (darker), then front legs
+  const legAt = (x, off, col) => {
+    const sw = Math.sin(ph + off) * 0.38;
+    ctx.save(); ctx.translate(x, by + A.bh * 0.4); ctx.rotate(sw);
+    ctx.fillStyle = col; roundRect(-A.legW / 2, 0, A.legW, A.legH + A.bh * 0.15, A.legW / 2); ctx.fill();
+    ctx.fillStyle = shade(col === A.body ? A.body : col, -50); roundRect(-A.legW / 2, A.legH + A.bh * 0.15 - 5, A.legW, 6, 3); ctx.fill();
+    ctx.restore();
+  };
+  legAt(-A.bw * 0.55, Math.PI, A.legC ? shade(A.legC, -10) : dark);
+  legAt(A.bw * 0.55, 0, A.legC ? shade(A.legC, -10) : dark);
+  // tail
+  ctx.strokeStyle = A.tail === 'bushy' ? A.body : dark; ctx.lineCap = 'round';
+  const tx = A.bw * 0.95, ty = by - A.bh * 0.2, wag = Math.sin(t * 5 + ph) * 0.2;
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(wag);
+  switch (A.tail) {
+    case 'tuft': ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(14, 6, 12, 26); ctx.stroke(); ctx.fillStyle = A.mane || shade(A.body, -60); ctx.beginPath(); ctx.ellipse(12, 28, 4, 7, 0, 0, TAU); ctx.fill(); break;
+    case 'up': ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(16, -4, 18, -22); ctx.stroke(); break;
+    case 'long': ctx.strokeStyle = A.mane; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(14, 6, 10, 34); ctx.stroke(); break;
+    case 'bushy': ctx.fillStyle = A.body; ctx.beginPath(); ctx.ellipse(16, -4, 18, 8, -0.4, 0, TAU); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(29, -11, 6, 5, -0.4, 0, TAU); ctx.fill(); break;
+    case 'curly': ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(6, 0, 5, Math.PI, Math.PI * 2.6); ctx.stroke(); break;
+    case 'puff': ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(2, 0, 7, 0, TAU); ctx.fill(); break;
+    case 'string': ctx.strokeStyle = '#e8a0a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, 10, 30, -6); ctx.stroke(); break;
+    case 'thin': ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, 8, 8, 22); ctx.stroke(); break;
+    default: ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(2, 0, 4, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  // body
+  if (A.wool) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = i * TAU / 10; ctx.moveTo(Math.cos(a) * A.bw * 0.8 + 10, by + Math.sin(a) * A.bh * 0.75); ctx.arc(Math.cos(a) * A.bw * 0.8, by + Math.sin(a) * A.bh * 0.75, 10, 0, TAU); }
+    ctx.fill();
+  }
+  ctx.fillStyle = A.body;
+  ctx.beginPath(); ctx.ellipse(0, by, A.bw, A.bh, 0, 0, TAU); ctx.fill();
+  if (A.body === '#ffffff' || A.body === '#f8f8f4' || A.body === '#f4efe6') { ctx.strokeStyle = '#d8d2c4'; ctx.lineWidth = 1.5; ctx.stroke(); }
+  ctx.save(); ctx.beginPath(); ctx.ellipse(0, by, A.bw, A.bh, 0, 0, TAU); ctx.clip();
+  if (A.belly) { ctx.fillStyle = A.belly; ctx.beginPath(); ctx.ellipse(-4, by + A.bh * 0.7, A.bw * 0.7, A.bh * 0.5, 0, 0, TAU); ctx.fill(); }
+  if (A.spots) { ctx.fillStyle = A.spots; for (const [x, y, r] of [[-12, -6, 9], [14, 4, 8], [26, -10, 6], [-26, 8, 5]]) { ctx.beginPath(); ctx.ellipse(x, by + y, r * 1.2, r, 0.4, 0, TAU); ctx.fill(); } }
+  if (A.patch) { ctx.fillStyle = A.patch; ctx.beginPath(); ctx.ellipse(10, by - 6, 12, 9, 0.3, 0, TAU); ctx.fill(); }
+  if (A.stripes) { ctx.strokeStyle = A.stripes; ctx.lineWidth = 3; for (let x = -16; x <= 20; x += 9) { ctx.beginPath(); ctx.moveTo(x, by - A.bh); ctx.lineTo(x + 3, by); ctx.stroke(); } }
+  if (A.zstripes) { ctx.strokeStyle = '#222'; ctx.lineWidth = 4; for (let x = -36; x <= 40; x += 10) { ctx.beginPath(); ctx.moveTo(x, by - A.bh); ctx.quadraticCurveTo(x + 6, by, x - 2, by + A.bh); ctx.stroke(); } }
+  if (A.blotch) { ctx.fillStyle = A.blotch; for (let i = 0; i < 8; i++) { const x = -30 + (i % 4) * 18 + (i > 3 ? 8 : 0), y = by - 10 + Math.floor(i / 4) * 14; roundRect(x, y, 12, 10, 3); ctx.fill(); } }
+  if (A.dots) { ctx.fillStyle = A.dots; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.arc(-20 + i * 7, by - 8 + (i % 2) * 6, 2.5, 0, TAU); ctx.fill(); } }
+  ctx.restore();
+  if (A.hump) { ctx.fillStyle = A.body; ctx.beginPath(); ctx.ellipse(4, by - A.bh * 0.8, 20, 16, 0, Math.PI, TAU); ctx.fill(); }
+  // front legs over the body
+  legAt(-A.bw * 0.7, 0, legC);
+  legAt(A.bw * 0.4, Math.PI, legC);
+  // neck and head
+  const nx0 = -A.bw * 0.72, ny0 = by - A.bh * 0.35;
+  const ang = A.neck > 20 ? -1.25 : -0.9;
+  const hx = nx0 + Math.cos(ang) * A.neck - (A.neck > 20 ? 6 : 4), hy = ny0 + Math.sin(ang) * A.neck - 4;
+  const nod = Math.sin(ph * 2) * 1.5;
+  if (A.neck > 4) {
+    ctx.strokeStyle = A.body; ctx.lineWidth = A.neck > 50 ? 14 : A.headR * 1.3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(nx0 + 6, ny0 + 4); ctx.lineTo(hx, hy + nod); ctx.stroke();
+    if (A.blotch) { ctx.fillStyle = A.blotch; for (let i = 1; i < 6; i++) { const f = i / 6; ctx.fillRect(lerp(nx0 + 6, hx, f) - 4, lerp(ny0 + 4, hy, f) - 3, 7, 6); } }
+    if (A.zstripes) { ctx.strokeStyle = '#222'; ctx.lineWidth = 3; for (let i = 1; i < 4; i++) { const f = i / 4; const x = lerp(nx0 + 6, hx, f), y = lerp(ny0 + 4, hy, f); ctx.beginPath(); ctx.moveTo(x - 7, y - 3); ctx.lineTo(x + 7, y + 3); ctx.stroke(); } }
+    if (A.mane && k !== 'lion') { ctx.strokeStyle = A.mane; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(nx0 + 14, ny0 - 2); ctx.lineTo(hx + 6, hy - A.headR * 0.6 + nod); ctx.stroke(); }
+  }
+  ctx.save(); ctx.translate(hx, hy + nod);
+  if (k === 'lion') { ctx.fillStyle = A.mane; ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ctx.moveTo(Math.cos(a) * 15 + 8, Math.sin(a) * 15); ctx.arc(Math.cos(a) * 15, Math.sin(a) * 15, 8, 0, TAU); } ctx.fill(); }
+  const hc = A.head || A.body;
+  // ears behind the head
+  ctx.fillStyle = shade(hc, -20);
+  const R = A.headR;
+  switch (A.ears) {
+    case 'pointy': ctx.beginPath(); ctx.moveTo(-2, -R * 0.6); ctx.lineTo(2, -R * 1.6); ctx.lineTo(R * 0.7, -R * 0.5); ctx.moveTo(-R * 0.6, -R * 0.6); ctx.lineTo(-R * 0.6, -R * 1.5); ctx.lineTo(R * 0.05, -R * 0.7); ctx.fill(); break;
+    case 'round': ctx.beginPath(); ctx.arc(R * 0.5, -R * 0.8, R * 0.38, 0, TAU); ctx.arc(-R * 0.4, -R * 0.85, R * 0.34, 0, TAU); ctx.fill(); break;
+    case 'floppy': ctx.beginPath(); ctx.ellipse(R * 0.6, -R * 0.1, R * 0.32, R * 0.8, -0.3, 0, TAU); ctx.fill(); break;
+    case 'side': ctx.beginPath(); ctx.ellipse(R * 0.8, -R * 0.55, R * 0.55, R * 0.22, -0.4, 0, TAU); ctx.fill(); break;
+    case 'long': ctx.beginPath(); ctx.ellipse(R * 0.4, -R * 1.5, R * 0.28, R * 1.05, 0.25, 0, TAU); ctx.ellipse(-R * 0.15, -R * 1.5, R * 0.28, R * 1.05, -0.1, 0, TAU); ctx.fill(); break;
+    case 'tall': ctx.fillStyle = hc; ctx.beginPath(); ctx.ellipse(R * 0.35, -R * 1.6, R * 0.3, R * 1.0, 0.2, 0, TAU); ctx.ellipse(-R * 0.25, -R * 1.6, R * 0.3, R * 1.0, -0.15, 0, TAU); ctx.fill(); ctx.fillStyle = '#f2b8b0'; ctx.beginPath(); ctx.ellipse(R * 0.35, -R * 1.6, R * 0.13, R * 0.75, 0.2, 0, TAU); ctx.ellipse(-R * 0.25, -R * 1.6, R * 0.13, R * 0.75, -0.15, 0, TAU); ctx.fill(); break;
+    case 'mouse': ctx.fillStyle = '#c8c0b8'; ctx.beginPath(); ctx.arc(R * 0.4, -R * 0.9, R * 0.55, 0, TAU); ctx.fill(); ctx.fillStyle = '#f2b8b0'; ctx.beginPath(); ctx.arc(R * 0.4, -R * 0.9, R * 0.32, 0, TAU); ctx.fill(); break;
+    case 'big': ctx.fillStyle = shade(hc, -12); ctx.beginPath(); ctx.ellipse(R * 0.7, R * 0.1, R * 0.75, R * 1.0, 0.1, 0, TAU); ctx.fill(); break;
+  }
+  if (A.horns === 'back') { ctx.strokeStyle = '#8a7a62'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -R * 0.8); ctx.quadraticCurveTo(R * 0.8, -R * 2, R * 1.4, -R * 1.1); ctx.stroke(); }
+  if (A.horns === 'small') { ctx.fillStyle = '#d8c7a0'; ctx.beginPath(); ctx.moveTo(-R * 0.5, -R * 0.7); ctx.lineTo(-R * 0.8, -R * 1.4); ctx.lineTo(-R * 0.1, -R * 0.9); ctx.moveTo(R * 0.3, -R * 0.8); ctx.lineTo(R * 0.4, -R * 1.5); ctx.lineTo(R * 0.7, -R * 0.7); ctx.fill(); }
+  if (A.antlers) { ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -R * 0.8); ctx.lineTo(-4, -R * 2.4); ctx.moveTo(-2, -R * 1.6); ctx.lineTo(-10, -R * 2.1); ctx.moveTo(4, -R * 0.8); ctx.lineTo(10, -R * 2.2); ctx.moveTo(8, -R * 1.6); ctx.lineTo(16, -R * 1.9); ctx.stroke(); }
+  if (A.ossicones) { ctx.strokeStyle = '#b8642a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-2, -R * 0.8); ctx.lineTo(-3, -R * 1.7); ctx.moveTo(5, -R * 0.8); ctx.lineTo(6, -R * 1.7); ctx.stroke(); ctx.fillStyle = '#7a3a1e'; ctx.beginPath(); ctx.arc(-3, -R * 1.75, 2.5, 0, TAU); ctx.arc(6, -R * 1.75, 2.5, 0, TAU); ctx.fill(); }
+  // head and muzzle
+  ctx.fillStyle = hc;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+  if (A.snout > 0) {
+    ctx.fillStyle = A.nose || (A.disk ? '#f08a9c' : shade(hc, 12));
+    ctx.beginPath(); ctx.ellipse(-R * 0.6 - A.snout * 0.5, R * 0.25, A.snout * 0.7 + 4, R * 0.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = A.disk ? '#c0566a' : '#3b2a20';
+    ctx.beginPath(); ctx.ellipse(-R * 0.6 - A.snout * 1.05, R * 0.15, A.disk ? 2 : 3, A.disk ? 3 : 2.4, 0, 0, TAU); ctx.fill();
+    if (A.disk) { ctx.beginPath(); ctx.ellipse(-R * 0.6 - A.snout * 0.6, R * 0.15, 2, 3, 0, 0, TAU); ctx.fill(); }
+  }
+  if (A.trunk) {
+    ctx.strokeStyle = hc; ctx.lineWidth = 11; ctx.lineCap = 'round';
+    const sw = Math.sin(t * 2 + ph) * 6;
+    ctx.beginPath(); ctx.moveTo(-R * 0.7, R * 0.2); ctx.quadraticCurveTo(-R * 1.4, R * 0.9, -R * 1.1 + sw, R * 1.9); ctx.stroke();
+    ctx.fillStyle = '#f4f0e6'; ctx.beginPath(); ctx.moveTo(-R * 0.6, R * 0.5); ctx.lineTo(-R * 0.95, R * 0.9); ctx.lineTo(-R * 0.45, R * 0.7); ctx.fill();
+  }
+  if (A.beard) { ctx.fillStyle = '#f4f0e6'; ctx.beginPath(); ctx.moveTo(-R * 0.6, R * 0.6); ctx.lineTo(-R * 0.55, R * 1.4); ctx.lineTo(-R * 0.2, R * 0.7); ctx.fill(); }
+  if (A.wool) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(R * 0.1, -R * 0.85, R * 0.5, 0, TAU); ctx.fill(); }
+  eyes(R * 0.32, -R * 0.2, R * 0.2 + 1.2, R * 0.25 + 1.4, mood, -0.6, 0);
+  if (!A.trunk) { ctx.save(); ctx.translate(-R * 0.45, R * 0.5); mouth(1, 3, mood === 'dizzy' ? 'dizzy' : mood === 'happy' ? 'happy' : 'normal'); ctx.restore(); }
+  if (mood === 'happy') cheeks(R * 0.55, R * 0.25, 0.5);
+  ctx.restore();
+  ctx.restore();
+}
+
+// ============================================================
+//  Adam
+// ============================================================
+function drawAdam(x, y, s, mood) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  const jump = mood === 'happy' ? Math.abs(Math.sin(t * 8)) * 6 : 0;
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const skin = '#d39a66', robe = '#c8a46a', hair = '#4a2f1a';
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = skin; ctx.lineWidth = 6.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  if (mood === 'happy') arm(11, -32, 26, -64);
+  else if (mood === 'point') arm(11, -32, 34, -40);
+  // a simple tunic
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-17, 0); ctx.quadraticCurveTo(-16, -30, -11, -38); ctx.quadraticCurveTo(0, -42, 11, -38); ctx.quadraticCurveTo(16, -30, 17, 0); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#7a8a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-15, -18); ctx.quadraticCurveTo(0, -15, 15, -18); ctx.stroke();
+  ctx.fillStyle = '#5fae47';
+  for (const [lx, ly] of [[-6, -18], [4, -17]]) { ctx.beginPath(); ctx.ellipse(lx, ly + 3, 4, 7, 0.3, 0, TAU); ctx.fill(); }
+  arm(-11, -32, -15, -12);
+  if (mood !== 'happy' && mood !== 'point') arm(11, -32, 15, -12);
+  const hy = -53;
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05); ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10); ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-15, hy + 2); ctx.quadraticCurveTo(-14, hy + 18, 0, hy + 19); ctx.quadraticCurveTo(14, hy + 18, 15, hy + 2); ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8); ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2); ctx.fill();
+  ctx.save(); ctx.translate(0, hy);
+  eyes(6, -1, 3.5, 4.5, mood === 'happy' ? 'happy' : mood === 'oops' ? 'dizzy' : 'normal', 0.5, 0);
+  if (mood === 'happy') { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.moveTo(-6, 6); ctx.arc(0, 6, 6, 0, Math.PI); ctx.closePath(); ctx.fill(); }
+  else if (mood === 'oops') { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 12, 4, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke(); }
+  else { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 6, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+  ctx.restore();
+  ctx.restore();
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const LEVELS = [
+  { name: 'The First Animals',  count: 8,  walk: 11,  hearts: 5, choices: 2, pics: true,  similar: 0,   grass: false, gap: 1.0, pool: ['lion', 'sheep', 'cow', 'elephant', 'giraffe', 'rabbit', 'pig', 'horse'] },
+  { name: 'Here Come More',     count: 10, walk: 8.5, hearts: 4, choices: 3, pics: true,  similar: 0.2, grass: false, gap: 0.9, pool: ['lion', 'sheep', 'cow', 'elephant', 'giraffe', 'rabbit', 'pig', 'horse', 'cat', 'dog', 'bear', 'camel', 'mouse'] },
+  { name: 'Look-alikes',        count: 12, walk: 7,   hearts: 4, choices: 4, pics: true,  similar: 0.7, grass: false, gap: 0.8, pool: Object.keys(ANIMALS) },
+  { name: 'In the Tall Grass',  count: 14, walk: 6,   hearts: 3, choices: 4, pics: true,  similar: 0.8, grass: true,  gap: 0.7, pool: Object.keys(ANIMALS) },
+  { name: 'Read the Names',     count: 16, walk: 5.2, hearts: 3, choices: 4, pics: false, similar: 0.85, grass: true, gap: 0.6, pool: Object.keys(ANIMALS) },
+  { name: 'The Great Parade',   count: 18, walk: 4.4, hearts: 3, choices: 6, pics: false, similar: 0.9, grass: true,  gap: 0.5, pool: Object.keys(ANIMALS) },
+];
+const LEVEL_TEXT = [
+  'God brings the animals to Adam. <b>Tap the right name</b> before each animal walks past!',
+  'Three names to choose from now, and the animals walk a bit faster.',
+  'Look closely! A <b>horse</b> or a <b>donkey</b>? A <b>sheep</b> or a <b>goat</b>?',
+  'Some animals walk through the <b>tall grass</b>. Look at their heads and ears!',
+  'No more pictures on the name tags: <b>read the names</b>!',
+  'Six names, fast feet. The great parade of all the animals!',
+];
+const LEVEL_VERSE = ['formed', 'creatures', 'kinds', 'name', 'formed', 'kinds'];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('nameAnimalsBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0;
+let queue = [], animal = null, tags = [], nextT = 0;
+let done = 0, rightCount = 0, hearts = 3, combo = 0, bestCombo = 0;
+let leaving = [];         // named animals trotting off
+let adamMood = 'normal', adamT = 0, speech = null;
+let particles = [], floaters = [], bursts = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0, heartFx = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastScore = null;
+
+// ============================================================
+//  Layout
+// ============================================================
+function layout(n = cfg.choices) {
+  const m = 12, g = 10;
+  let cols, rows;
+  if (W < 760) { cols = n <= 3 ? n : n === 4 ? 2 : 3; }
+  else cols = n;
+  rows = Math.ceil(n / cols);
+  const th = rows > 1 ? 100 : 112;
+  const tw = Math.min(260, (W - 2 * m - (cols - 1) * g) / cols);
+  const totalW = cols * tw + (cols - 1) * g;
+  const x0 = (W - totalW) / 2;
+  const tagTop = H - m - rows * th - (rows - 1) * g;
+  const rects = [];
+  for (let i = 0; i < n; i++) rects.push({ x: x0 + (i % cols) * (tw + g), y: tagTop + Math.floor(i / cols) * (th + g), w: tw, h: th, i });
+  const groundY = tagTop - 34;
+  return { rects, tagTop, groundY, adamX: Math.max(70, W * 0.14) };
+}
+
+// ============================================================
+//  Level setup
+// ============================================================
+function resetLevel() {
+  cfg = LEVELS[level - 1];
+  queue = [];
+  let last = null;
+  for (let i = 0; i < cfg.count; i++) {
+    let k;
+    do { k = pick(cfg.pool); } while (k === last);
+    queue.push(k); last = k;
+  }
+  animal = null; tags = []; nextT = 1.2;
+  leaving = [];
+  done = 0; rightCount = 0; hearts = cfg.hearts; combo = 0; bestCombo = 0;
+  levelScore = 0;
+  adamMood = 'normal'; adamT = 0; speech = null;
+  particles = []; floaters = []; bursts = [];
+  flashT = shakeT = heartFx = 0;
+  endTimer = 0; winT = 0; failT = 0;
+  message.t = 0;
+  keys.clear();
+}
+
+function makeChoices(kind) {
+  const set = [kind];
+  const similar = GROUPS.filter((g) => g.includes(kind)).flat().filter((k) => k !== kind);
+  while (set.length < cfg.choices) {
+    const useSim = similar.length && Math.random() < cfg.similar;
+    const k = useSim ? pick(similar) : pick(Object.keys(ANIMALS));
+    if (!set.includes(k)) set.push(k);
+  }
+  set.sort(() => Math.random() - 0.5);
+  return set.map((k) => ({ kind: k, bad: 0, off: false, good: 0 }));
+}
+
+function sendNext() {
+  if (!queue.length) return;
+  const kind = queue.shift();
+  animal = { kind, prog: 0, ph: 0, born: t, wob: 0 };
+  tags = makeChoices(kind);
+  if (level === 1 && !told.first) { told.first = true; showMessage('Here comes an animal! Tap its name.', 3); }
+  if (cfg.grass && !told.grass) { told.grass = true; showMessage('Tall grass! Look at the heads and ears.', 3); }
+}
+
+function animalX(L) { return lerp(W + 110, -110, animal.prog); }
+
+function tapTag(i) {
+  if (state !== 'play' || !animal || !tags[i] || tags[i].off) return;
+  const L = layout();
+  const tg = tags[i];
+  if (tg.kind === animal.kind) {
+    combo++; rightCount++; done++;
+    bestCombo = Math.max(bestCombo, combo);
+    const pts = 100 + Math.round(100 * (1 - animal.prog)) + 15 * Math.min(combo - 1, 10);
+    levelScore += pts;
+    tg.good = 0.8;
+    const ax = animalX(L);
+    floaters.push({ x: ax, y: L.groundY - 150, text: combo >= 3 ? `+${pts} ×${combo}` : `+${pts}`, t: 1.2, col: '#7a4a00' });
+    sparkleBurst(ax, L.groundY - 60, 22, ['#ffe27a', '#ffffff', '#ff9ab0']);
+    for (let k = 0; k < 4; k++) spawn(ax + rand(-20, 20), L.groundY - 90, rand(-40, 40), rand(-90, -50), 1.2, '#ff7a90', 6, 20, 'heart');
+    speech = { text: `${ANIMALS[animal.kind].name}!`, t: 1.6 };
+    adamMood = 'happy'; adamT = 1.4;
+    sfx.good(combo);
+    if (combo === 5 || combo === 10) showMessage(combo === 5 ? 'Five in a row!' : 'Ten in a row! Wonderful!', 1.6);
+    leaving.push({ kind: animal.kind, x: ax, ph: animal.ph, hop: 0 });
+    animal = null; tags = tags.map((q) => ({ ...q, off: q !== tg }));
+    nextT = cfg.gap;
+    if (done >= cfg.count) win();
+  } else {
+    tg.bad = 0.5; tg.off = true;
+    adamMood = 'oops'; adamT = 1;
+    loseHeart(`That's not a ${ANIMALS[tg.kind].name.toLowerCase()}!`);
+  }
+}
+
+function loseHeart(msg) {
+  combo = 0;
+  hearts--;
+  heartFx = 0.6; shakeT = 0.25;
+  showMessage(msg, 2);
+  sfx.bad();
+  if (hearts <= 0) fail();
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * 150;
+  const levelBonus = level * 200;
+  const score = levelScore + heartBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('nameAnimalsBest', best); } catch (e) {} }
+  lastScore = { namePts: levelScore, heartBonus, levelBonus, score };
+  showMessage('Every animal has a name!', 2.4);
+  flashT = 0.25;
+  sfx.win();
+  endTimer = 3.2;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  adamMood = 'oops'; adamT = 5;
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function puff(x, y, n) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-14, 14), y + rand(-8, 8), rand(-50, 50), rand(-60, -10), rand(0.5, 1), 'rgba(200,200,215,0.8)', rand(5, 10), -10, 'puff');
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'puff') { p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.3, dt); p.size += dt * 8; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 40 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+  for (let i = bursts.length - 1; i >= 0; i--) { bursts[i].t += dt; if (bursts[i].t > 1.2) bursts.splice(i, 1); }
+}
+function drawStar5(x, y, R, r, rot = -Math.PI / 2) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = rot + k * Math.PI / 5, rr = k % 2 ? r : R;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = p.kind === 'puff' ? a * 0.7 : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'heart') {
+      const s = p.size;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y + s * 0.9);
+      ctx.bezierCurveTo(p.x - s * 1.4, p.y - s * 0.2, p.x - s * 0.5, p.y - s * 1.3, p.x, p.y - s * 0.4);
+      ctx.bezierCurveTo(p.x + s * 0.5, p.y - s * 1.3, p.x + s * 1.4, p.y - s * 0.2, p.x, p.y + s * 0.9);
+      ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = f.col === '#7a4a00' ? 'rgba(255,255,255,0.85)' : 'rgba(10,14,40,0.7)';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+
+function eyes(sep, y, rx, ry, mood, lookX = 0, lookY = 0.2) {
+  const dark = '#2b1d12';
+  for (const sx of [-sep, sep]) {
+    if (mood === 'happy') {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(sx, y + 1.5, rx * 0.9, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      continue;
+    }
+    if (mood === 'dizzy') {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx - 3, y - 3); ctx.lineTo(sx + 3, y + 3); ctx.moveTo(sx + 3, y - 3); ctx.lineTo(sx - 3, y + 3); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(sx, y, rx, ry, 0, 0, TAU); ctx.fill();
+    const pr = Math.min(rx, ry) * 0.55;
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(sx + lookX * (rx - pr), y + lookY * (ry - pr), pr, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(sx + lookX * (rx - pr) - pr * 0.35, y + lookY * (ry - pr) - pr * 0.4, pr * 0.35, 0, TAU); ctx.fill();
+  }
+}
+function mouth(y, w, mood) {
+  ctx.lineCap = 'round';
+  if (mood === 'dizzy') {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-w, y + 2); ctx.quadraticCurveTo(-w / 2, y - 2, 0, y + 2); ctx.quadraticCurveTo(w / 2, y + 5, w, y + 1); ctx.stroke();
+  } else if (mood === 'happy') {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.moveTo(-w, y - 1); ctx.arc(0, y - 1, w, 0, Math.PI); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, y - w * 0.6, w, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+function cheeks(sep, y, a = 0.4) {
+  ctx.fillStyle = `rgba(255,120,120,${a})`;
+  ctx.beginPath(); ctx.arc(-sep, y, 3.2, 0, TAU); ctx.arc(sep, y, 3.2, 0, TAU); ctx.fill();
+}
+
+
+
+// ============================================================
+//  Rendering: the garden
+// ============================================================
+function drawScene(L) {
+  // sky (view coordinates)
+  const g = ctx.createLinearGradient(0, 0, 0, offY + L.groundY);
+  g.addColorStop(0, '#7cc4f0'); g.addColorStop(1, '#dff3ff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, viewH);
+  ctx.save(); ctx.translate(offX, offY);
+  const left = -offX, right = W + offX;
+  // sun and clouds
+  ctx.fillStyle = 'rgba(255,240,170,0.6)'; ctx.beginPath(); ctx.arc(W * 0.82, 170, 70, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffe680'; ctx.beginPath(); ctx.arc(W * 0.82, 170, 42, 0, TAU); ctx.fill();
+  for (let i = 0; i < 4; i++) {
+    const x = ((i * 0.3 + t * 0.006) % 1.3) * (W + 200) - 100, y = 140 + i * 50 + (i % 2) * 40;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.ellipse(x, y, 50, 18, 0, 0, TAU); ctx.ellipse(x - 18, y - 10, 22, 16, 0, 0, TAU); ctx.ellipse(x + 14, y - 14, 26, 20, 0, 0, TAU); ctx.fill();
+  }
+  // distant hills
+  const hill = (top, col, f) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(left, L.groundY + 10);
+    for (let x = left; x <= right + 30; x += 30) ctx.lineTo(x, top + Math.sin(x * f + top) * 22);
+    ctx.lineTo(right, L.groundY + 10); ctx.closePath(); ctx.fill();
+  };
+  hill(L.groundY - 170, '#a8d88a', 0.006);
+  hill(L.groundY - 110, '#8cc96f', 0.009);
+  // trees of the garden
+  for (let i = 0; i < 6; i++) {
+    const x = left + (i + 0.5) * (right - left) / 6 + Math.sin(i * 3) * 30, y = L.groundY - 70 - (i % 2) * 20;
+    ctx.fillStyle = '#8a5a32'; ctx.fillRect(x - 6, y, 12, 50);
+    ctx.fillStyle = i % 2 ? '#4f9a3a' : '#5aa845';
+    ctx.beginPath(); ctx.arc(x, y - 10, 34, 0, TAU); ctx.arc(x - 24, y + 4, 22, 0, TAU); ctx.arc(x + 24, y + 4, 22, 0, TAU); ctx.fill();
+    ctx.fillStyle = i % 3 ? '#e0453a' : '#ffb020';
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x - 20 + k * 13, y - 4 + (k % 2) * 12, 4.5, 0, TAU); ctx.fill(); }
+  }
+  // the path the animals walk along
+  ctx.fillStyle = '#7cc56b'; ctx.fillRect(left, L.groundY - 20, right - left, H - L.groundY + 20);
+  ctx.fillStyle = '#d9c38a'; roundRect(left - 10, L.groundY - 14, right - left + 20, 30, 14); ctx.fill();
+  ctx.fillStyle = '#5fae55'; ctx.fillRect(left, L.groundY + 16, right - left, H);
+  // flowers in the grass
+  for (let i = 0; i < 14; i++) {
+    const x = left + hash(i, 3) * (right - left), y = L.groundY + 22 + hash(i, 5) * 10;
+    ctx.fillStyle = ['#ff9ab0', '#ffe066', '#ffffff', '#b98cf0'][i % 4];
+    ctx.beginPath(); for (let k = 0; k < 5; k++) { const a = k * TAU / 5; ctx.moveTo(x + Math.cos(a) * 4 + 3, y + Math.sin(a) * 4); ctx.arc(x + Math.cos(a) * 4, y + Math.sin(a) * 4, 3, 0, TAU); } ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGrass(L) {
+  // tall grass hides the lower half of the animals walking through the middle of the path
+  const x0 = W * 0.38, x1 = W * 0.9;
+  ctx.save();
+  for (let x = x0; x < x1; x += 9) {
+    const h = 70 + hash(x, 1) * 36;
+    const sway = Math.sin(t * 2 + x * 0.05) * 6;
+    ctx.fillStyle = hash(x, 2) > 0.5 ? '#4f9a3a' : '#62b04a';
+    ctx.beginPath(); ctx.moveTo(x - 7, L.groundY + 16); ctx.quadraticCurveTo(x + sway * 0.5, L.groundY - h * 0.5, x + sway, L.groundY - h); ctx.quadraticCurveTo(x + 3 + sway * 0.5, L.groundY - h * 0.5, x + 8, L.groundY + 16); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSpeech(x, y, text) {
+  ctx.save();
+  ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  const w = ctx.measureText(text).width + 28;
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(x - w / 2, y - 40, w, 40, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 12, y - 1); ctx.lineTo(x - 22, y + 14); ctx.lineTo(x, y - 1); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5a3a00'; ctx.fillText(text, x, y - 13);
+  ctx.restore();
+}
+
+function drawTags(L) {
+  for (const R of L.rects) {
+    const tg = tags[R.i];
+    if (!tg) continue;
+    let dx = tg.bad > 0 ? Math.sin(tg.bad * 40) * 6 * tg.bad : 0;
+    ctx.save(); ctx.translate(R.x + dx, R.y - tg.good * 8);
+    ctx.globalAlpha = tg.off && !tg.good ? 0.4 : 1;
+    if (tg.good > 0) { ctx.shadowColor = 'rgba(255,220,100,0.9)'; ctx.shadowBlur = 24; }
+    ctx.fillStyle = tg.good > 0 ? '#fff1b8' : tg.bad > 0 ? '#f7c6c0' : '#fff8e6';
+    roundRect(0, 0, R.w, R.h, 18); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#c8963a'; ctx.lineWidth = 3.5; ctx.stroke();
+    // the little string hole of a name tag
+    ctx.fillStyle = '#c8963a'; ctx.beginPath(); ctx.arc(16, 16, 5, 0, TAU); ctx.fill();
+    const name = ANIMALS[tg.kind].name;
+    if (cfg.pics) {
+      const s = Math.min(R.h / 130, R.w / 150) * 0.95;
+      ctx.save(); ctx.beginPath(); ctx.rect(4, 4, R.w - 8, R.h - 30); ctx.clip();
+      const A = ANIMALS[tg.kind];
+      const fit = Math.min(1, 1.05 / A.size);
+      ctx.translate(R.w / 2 + 6, R.h - 32); ctx.scale(s * fit, s * fit);
+      const tall = A.neck > 30 ? 0.62 : 1;
+      ctx.scale(tall, tall);
+      drawAnimal(tg.kind, 0, 'normal');
+      ctx.restore();
+      ctx.font = '700 19px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#5a3a00'; ctx.fillText(name, R.w / 2, R.h - 9);
+    } else {
+      ctx.font = `700 ${R.w < 140 ? 24 : 28}px Fredoka, sans-serif`; ctx.textAlign = 'center';
+      ctx.fillStyle = '#5a3a00'; ctx.fillText(name, R.w / 2, R.h / 2 + 10);
+    }
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = LEVELS[0];
+  animal = null; tags = []; leaving = [];
+  showOverlay('Name the Animals', 'Adam gives every animal its name',
+    `${verseHTML('brought')}
+     <ul>
+       <li>God brings the animals to Adam one by one, and Adam gives each one a <b>name</b>.</li>
+       <li>When an animal walks by, <b>tap its name tag</b> before it walks away!</li>
+       <li>Quick answers score more, and a <b>run</b> of right answers scores even more.</li>
+       <li>A wrong name, or an animal that walks off without a name, costs a <b>heart</b>.</li>
+       <li><b>Keys:</b> <kbd>1</kbd> to <kbd>6</kbd> choose a name tag.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  if (retry) { beginPlay(); return; }
+  state = 'intro';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TEXT[level - 1]}</p>
+     ${verseHTML(LEVEL_VERSE[level - 1])}
+     <p class="score"><b>${cfg.count}</b> animals &middot; ${cfg.choices} names &middot; ${cfg.hearts} hearts</p>`,
+    'Go!', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LEVELS.length;
+    showOverlay(last ? 'Every name given!' : 'Well named!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'gaveNames' : 'good')}
+       <p class="score">Names (${rightCount}/${cfg.count}, best run ${bestCombo}): <b>${s.namePts}</b><br>Hearts left: <b>${s.heartBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${last ? '<p style="text-align:center">Adam named every one of God\'s animals. What a wonderful parade!</p>' : ''}
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', () => {
+        if (last) titleScreen();
+        else { level++; startLevel(); }
+      });
+  } else if (state === 'fail') {
+    showOverlay('Oh no!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Out of hearts! Look carefully at each animal, then <b>tap its name</b> before it walks away.</p>
+       ${verseHTML('name')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The animals will wait. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating play
+// ============================================================
+function updatePlay(dt) {
+  if (!animal) {
+    nextT -= dt;
+    if (nextT <= 0 && queue.length) sendNext();
+    return;
+  }
+  animal.prog += dt / cfg.walk;
+  animal.ph += dt * 9;
+  if (animal.prog >= 1) {
+    const k = animal.kind;
+    animal = null; tags = [];
+    done++;
+    nextT = cfg.gap;
+    adamMood = 'oops'; adamT = 1;
+    loseHeart(`The ${ANIMALS[k].name.toLowerCase()} walked away without a name!`);
+    if (state === 'play' && done >= cfg.count) win();
+  }
+}
+
+function updateFx(dt) {
+  for (const tg of tags) { tg.bad = Math.max(0, tg.bad - dt); tg.good = Math.max(0, tg.good - dt); }
+  if (animal || state !== 'play') { /* tags stay */ } else if (tags.length && !tags.some((q) => q.good > 0)) tags = [];
+  for (let i = leaving.length - 1; i >= 0; i--) {
+    const a = leaving[i];
+    a.x -= dt * 260; a.ph += dt * 14; a.hop += dt;
+    if (a.x < -160) leaving.splice(i, 1);
+  }
+  adamT -= dt; if (adamT <= 0) adamMood = animal ? 'point' : 'normal';
+  if (speech) { speech.t -= dt; if (speech.t <= 0) speech = null; }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && !e.repeat) {
+    const m = /^(Digit|Numpad)([1-6])$/.exec(e.code);
+    if (m) tapTag(+m[2] - 1);
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const x = p.vx - offX, y = p.vy - offY;
+  const L = layout();
+  for (const R of L.rects) {
+    if (x > R.x - 4 && x < R.x + R.w + 4 && y > R.y - 4 && y < R.y + R.h + 4) { tapTag(R.i); return; }
+  }
+  if (animal && y < L.groundY + 10 && y > L.groundY - 200 && Math.abs(x - animalX(L)) < 80) showMessage('Tap its NAME below!', 1.4);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+
+  good(c) { if (this.ctx) { Music.tap(clamp(0.2 + c * 0.07, 0, 1)); this.tone(990, 0.15, 'sine', 0.08, 0.06); this.tone(1320, 0.2, 'sine', 0.07, 0.12); } },
+  bad() { this.tone(240, 0.3, 'triangle', 0.25, 0, 130); this.noiseBurst(400, 0.25, 0.2, 0.7, 200, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function heartPath(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+}
+
+function pill(x, y, w, h) {
+  ctx.fillStyle = 'rgba(255,250,232,0.85)';
+  roundRect(x, y, w, h, h / 2); ctx.fill();
+}
+
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const inPlay = state === 'play' || state === 'win' || state === 'fail' || state === 'pause';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const title = state === 'title' ? 'Name the Animals' : `Level ${level} · ${cfg.name}`;
+  const tw = ctx.measureText(title).width;
+  pill(4, 8, tw + 18, 26);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.fillText(title, 13, 27);
+  if (inPlay) {
+    ctx.textAlign = 'right';
+    const sc = `Score ${totalScore + levelScore}`;
+    const sw = ctx.measureText(sc).width;
+    pill(viewW - sw - 22, 8, sw + 18, 26);
+    ctx.fillStyle = '#5a4210';
+    ctx.fillText(sc, viewW - 13, 27);
+    const gap = 27, n = cfg.hearts;
+    pill(viewW - n * gap - 16, 40, n * gap + 12, 28);
+    for (let i = 0; i < n; i++) {
+      const x = viewW - 24 - i * gap, y = 54;
+      const full = i < hearts;
+      const pop = !full && i === hearts && heartFx > 0 ? 1 + heartFx : 1;
+      heartPath(x, y, 11 * pop);
+      ctx.fillStyle = full ? '#e8505b' : 'rgba(120,100,100,0.35)';
+      ctx.fill();
+    }
+    const pw = Math.min(170, viewW - 200), px = viewW - pw - 10, py = 76;
+    pill(px - 50, py - 2, pw + 54, 18);
+    ctx.fillStyle = 'rgba(90,66,16,0.18)';
+    roundRect(px, py + 2, pw, 10, 5); ctx.fill();
+    ctx.fillStyle = '#f2b33a';
+    if (done > 0) { roundRect(px, py + 2, pw * done / cfg.count, 10, 5); ctx.fill(); }
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillStyle = '#5a4210'; ctx.textAlign = 'right';
+    ctx.fillText(`${done} / ${cfg.count}`, px - 8, py + 12);
+    if (combo >= 2 && state === 'play') {
+      ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'left';
+      const ct = `Run ×${combo}`;
+      pill(126, 72, ctx.measureText(ct).width + 18, 24);
+      ctx.fillStyle = '#b5503f'; ctx.fillText(ct, 135, 89);
+    }
+  }
+  ctx.restore();
+  drawHudButtons();
+}
+function drawHudButtons() {
+  ctx.save();
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  const y0 = Math.max(138, offY + 132);
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 6; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#6a4200';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  const L = layout();
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, sy * scale);
+  drawScene(L);
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  const adamS = 1.7;
+  if (state === 'title' || state === 'intro') {
+    // a little parade on the title card
+    const kinds = ['elephant', 'giraffe', 'lion', 'sheep', 'rabbit'];
+    kinds.forEach((k, i) => {
+      const x = ((W + 300) - ((t * 50 + i * (W + 300) / kinds.length) % (W + 300))) - 150;
+      ctx.save(); ctx.translate(x, L.groundY); drawAnimal(k, t * 9 + i, 'normal'); ctx.restore();
+    });
+    drawAdam(L.adamX, L.groundY + 6, adamS, 'happy');
+  } else {
+    drawAdam(L.adamX, L.groundY + 6, adamS, state === 'win' ? 'happy' : adamMood);
+    for (const a of leaving) {
+      ctx.save(); ctx.translate(a.x, L.groundY - Math.abs(Math.sin(a.hop * 9)) * 14);
+      drawAnimal(a.kind, a.ph, 'happy'); ctx.restore();
+    }
+    if (animal) {
+      const x = animalX(L);
+      ctx.save(); ctx.translate(x, L.groundY);
+      const sc = Math.min(1, (t - animal.born) / 0.2);
+      drawAnimal(animal.kind, animal.ph, 'normal', sc);
+      ctx.restore();
+    }
+    if (cfg.grass) drawGrass(L);
+    if (speech) drawSpeech(L.adamX + 40, L.groundY - adamS * 80, speech.text);
+    drawTags(L);
+  }
+  drawParticles();
+  if (state === 'win') {
+    const f = clamp(winT / 1.2, 0, 1);
+    const g = ctx.createRadialGradient(W / 2, 250, 10, W / 2, 250, W);
+    g.addColorStop(0, `rgba(255,240,180,${0.4 * f})`); g.addColorStop(1, 'rgba(255,240,180,0)');
+    ctx.fillStyle = g; ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (flashT > 0) {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') updatePlay(dt);
+  updateFx(dt);
+  if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, W), rand(200, 500), 0, -20, 1.2, pick(['#ff9ab0', '#ffe27a']), 5, 0, 'heart');
+  }
+  if (state === 'fail') failT += dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  heartFx = Math.max(0, heartFx - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

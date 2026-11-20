@@ -6,15 +6,17 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const out = path.join(root, 'www');
 
-// Pages that are for the website only (App Store support and privacy pages) stay out of the app.
-const WEB_ONLY = new Set(['privacy.html', 'support.html']);
+// The app gets the menu and every game the menu links to. Games still being built
+// (in the repo but not on the menu yet) and the website-only pages stay out.
+const menu = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const pages = new Set(['index.html', ...[...menu.matchAll(/<a class="game" href="([^"#?]+\.html)"/g)].map((m) => m[1])]);
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out);
 
 let count = 0;
 for (const name of fs.readdirSync(root)) {
-  if ((name.endsWith('.html') && !WEB_ONLY.has(name)) || name.endsWith('.js') && !name.includes('config')) {
+  if (pages.has(name) || (name.endsWith('.js') && !name.includes('config'))) {
     fs.copyFileSync(path.join(root, name), path.join(out, name));
     count++;
   }

@@ -847,7 +847,7 @@ function inPlay() {
 function fillTray() {
   if (phase !== 'build') return;
   for (let i = 0; i < cfg.tray; i++) {
-    if (tray[i]) continue;
+    if (tray[i] || flying.some((f) => f.slot === i)) continue;   // a blown-away piece will land back here
     const have = {};
     for (const p of inPlay()) if (!p.decoy) have[p.kind] = (have[p.kind] || 0) + 1;
     const need = remainingNeed();
@@ -1091,8 +1091,8 @@ function updateWind(dt) {
     if (cand.length) {
       const [p, i] = pick(cand);
       tray[i] = null;
+      // its place in the pile stays free, so it can always land back there
       flying.push({ piece: p, slot: i, t: 0, dur: 3.2 + rand(0, 0.8), x0: p.x, y0: p.y, dir: gustDir });
-      setTimeout(fillTray, 1200);
     }
   }
   if (gustT > 0) { gustT -= dt; gust = Math.min(1, gust + dt * 3); } else gust = Math.max(0, gust - dt * 1.5);
@@ -1108,11 +1108,16 @@ function updateWind(dt) {
   for (const f of flying.slice()) {
     if (f.t < f.dur) continue;
     flying.splice(flying.indexOf(f), 1);
-    const free = tray.findIndex((p, i) => !p && i < cfg.tray);
-    if (free >= 0 || tray.length < cfg.tray) tray[free >= 0 ? free : tray.length] = f.piece;
-    else if (!f.piece.decoy) { const di = tray.findIndex((p) => p && p.decoy); if (di >= 0) tray[di] = f.piece; }
+    putBack(f);
     f.piece.spin = 0;
   }
+}
+
+function putBack(f) {
+  let i = !tray[f.slot] ? f.slot : tray.findIndex((p, k) => !p && k < cfg.tray);
+  if (i < 0 && !f.piece.decoy) i = tray.findIndex((p) => p && p.decoy);
+  if (i < 0 && !f.piece.decoy) i = f.slot;     // never lose a part the ark still needs
+  if (i >= 0) tray[i] = f.piece;
 }
 
 function catchFlying(f) {
@@ -1121,10 +1126,7 @@ function catchFlying(f) {
   if (!f.piece.decoy) catches++;
   sparkleBurst(f.piece.x, f.piece.y, 14);
   sfx.pop();
-  const free = tray.findIndex((p) => !p);
-  if (free >= 0) tray[free] = f.piece;
-  else if (tray.length < cfg.tray) tray.push(f.piece);
-  else if (!f.piece.decoy) { const di = tray.findIndex((p) => p && p.decoy); if (di >= 0) tray[di] = f.piece; }
+  putBack(f);
   showMessage(f.piece.decoy ? 'Caught! (But that one won’t fit.)' : 'Caught it!', 1.4);
 }
 
