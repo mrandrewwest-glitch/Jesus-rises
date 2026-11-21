@@ -2,10 +2,11 @@
 #
 # Run it from the Actions tab (Run workflow), push a tag starting with "ios-", e.g. ios-1.0-1,
 # or push a commit whose message contains [testflight].
-# It needs three repository secrets (Settings → Secrets and variables → Actions):
-#   APP_STORE_CONNECT_KEY_ID     the API key's Key ID
-#   APP_STORE_CONNECT_ISSUER_ID  the Issuer ID shown above the keys list
-#   APP_STORE_CONNECT_KEY        the full text of the downloaded AuthKey_XXXX.p8 file
+# It needs these repository secrets (Settings → Secrets and variables → Actions):
+#   ASC_KEY_ID        the App Store Connect API key's Key ID
+#   ASC_ISSUER_ID     the Issuer ID shown above the keys list
+#   ASC_PRIVATE_KEY   the full text of the downloaded AuthKey_XXXX.p8 file
+#   APPLE_TEAM_ID     optional; the Team ID (5MPWZAYMTK is used if it isn't set)
 # The key needs the Admin role so Xcode can create the signing certificate in the cloud.
 name: iOS → TestFlight
 
@@ -26,19 +27,19 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     env:
-      TEAM_ID: 5MPWZAYMTK
-      KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-      ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID || '5MPWZAYMTK' }}
+      KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - name: Check the App Store Connect secrets are set
         env:
-          KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           missing=""
-          [ -n "$KEY_ID" ] || missing="$missing APP_STORE_CONNECT_KEY_ID"
-          [ -n "$ISSUER_ID" ] || missing="$missing APP_STORE_CONNECT_ISSUER_ID"
-          [ -n "$KEY" ] || missing="$missing APP_STORE_CONNECT_KEY"
+          [ -n "$KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$KEY" ] || missing="$missing ASC_PRIVATE_KEY"
           if [ -n "$missing" ]; then
             echo "::error::Add these repository secrets first:$missing"
             exit 1
@@ -63,7 +64,7 @@ jobs:
 
       - name: Save the API key
         env:
-          KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"

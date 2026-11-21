@@ -54,9 +54,9 @@ One-time setup:
 1. In [App Store Connect](https://appstoreconnect.apple.com), go to **Users and Access → Integrations → App Store Connect API → Team Keys** and click **+**. Name it "GitHub build", give it **Admin** access (needed so Xcode can create the signing certificate in the cloud), and click **Generate**.
 2. Note the **Key ID** and the **Issuer ID** (shown above the list of keys), then **Download** the key file `AuthKey_XXXXXXXXXX.p8`. Apple only lets you download it once.
 3. In GitHub, open the repository's **Settings → Secrets and variables → Actions → New repository secret** and add:
-   - `APP_STORE_CONNECT_KEY_ID`: the Key ID
-   - `APP_STORE_CONNECT_ISSUER_ID`: the Issuer ID
-   - `APP_STORE_CONNECT_KEY`: open the `.p8` file in a text editor and paste everything, including the `BEGIN` and `END` lines
+   - `ASC_KEY_ID`: the Key ID
+   - `ASC_ISSUER_ID`: the Issuer ID
+   - `ASC_PRIVATE_KEY`: open the `.p8` file in a text editor and paste everything, including the `BEGIN` and `END` lines
 
 To build: **Actions → iOS → TestFlight → Run workflow** (the workflow shows there once it is on `main`), or push a tag starting with `ios-`, such as `ios-1.0-1`. When it finishes, the build appears under **TestFlight** in App Store Connect after Apple has processed it.
 
