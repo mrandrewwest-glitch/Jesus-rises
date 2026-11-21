@@ -13,7 +13,7 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | E | 1, 2, 3, 4 | Creation | DONE |
 | F | 9, 10, 11 | Noah + Abraham | DONE |
 | G | 12, 13, 14 | Abraham + Jacob | DONE |
-| H | 15, 16, 17 | Jacob | BUILDING (all three files exist) |
+| H | 15, 16, 17 | Jacob | DONE |
 | I | 25, 28, 30, 31 | Moses | BUILDING (burning-bush exists) |
 | J | 32, 33, 34, 35 | Joshua | BUILDING |
 | K | 36, 37, 38 | Gideon | BUILDING |
@@ -32,4 +32,4 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | X | 93, 94, 95, 96 | Early Church + Paul | TODO |
 | Y | 97, 98, 99, 100 | Paul | TODO |
 
-Already on the menu: Daniel (3), David D1–D6, Joseph 18–23, Moses M1–M4, Noah N1–N4, Jonah J1–J3, Creation 1–4, 9–14.
+Already on the menu: Daniel (3), David D1–D6, Joseph 18–23, Moses M1–M4, Noah N1–N4, Jonah J1–J3, Creation 1–4, 9–17.
