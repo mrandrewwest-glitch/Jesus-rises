@@ -57,3 +57,7 @@ For each game: filename, best key, theme, a short description of how it plays an
 ## Addendum: cards on small screens
 
 lost-coin.html now ends its <style> with a `/* card-fit */` rule that keeps `#ovBtn` sticky at the bottom of the card (`position: sticky; bottom: 4px; z-index: 2;`). Keep it in your game, so Begin is always visible when the instructions are long (small phones, iPad mini in landscape). Check your title card at 1133×744 and 375×667 too.
+
+## Addendum: level-to-level transitions
+
+A real bug shipped once: a game froze after the first level because the next level's card changed the level settings (more rows) while the old data was still being drawn behind the card. In your Playwright tests, go through the real cards for every level in order (win card → next level card → next level start → … → final card → play again) and check that the game keeps animating and there are no page errors at each step. When a level card changes the config, rebuild that level's data at the same time, and make drawing code tolerate data that isn't ready yet.
