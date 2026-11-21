@@ -15,8 +15,8 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | G | 12, 13, 14 | Abraham + Jacob | DONE |
 | H | 15, 16, 17 | Jacob | BUILDING (all three files exist) |
 | I | 25, 28, 30, 31 | Moses | BUILDING (burning-bush exists) |
-| J | 32, 33, 34, 35 | Joshua | TODO |
-| K | 36, 37, 38 | Gideon | TODO |
+| J | 32, 33, 34, 35 | Joshua | BUILDING |
+| K | 36, 37, 38 | Gideon | BUILDING |
 | L | 39, 40, 41, 42 | Samson + Ruth | TODO |
 | M | 43, 44, 45 | Samuel | TODO |
 | N | 52, 53, 54, 55 | David + Solomon | TODO |
