@@ -8,4 +8,4 @@
 5. Add each passing game's menu card (title, ref, description from the report, plus an emoji `art` and a gradient `bg`) to its group in `scripts/menu-groups.json`, then run `node scripts/build-menu.js` and `npm run build`.
 6. Update `build-plan/QUEUE.md`, commit (with the session's attribution lines) and push to `claude/jesus-ascension-game-2rolnh`.
 7. Finish with a short summary for the user: which games went on the menu, what they play like in a line each, and how many batches are left. If a usage limit stops a builder, say so and leave the batch `PARTIAL` for the next run.
-8. When every batch is `DONE`, say so and delete this routine (its trigger id is in the session).
+8. When every batch is `DONE`, say so and delete this routine (trigger id `trig_01BsZj1gG8UmVHQMp4zNWcoQ`).
