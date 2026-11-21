@@ -9,7 +9,7 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | A | D1, D2, D3 | David | DONE |
 | B | M1, M2, M3, M4 | Moses | DONE |
 | C | N1, N2, N3, N4 | Noah | DONE |
-| D | J1, J2, J3 | Jonah | BUILDING |
+| D | J1, J2, J3 | Jonah | DONE |
 | E | 1, 2, 3, 4 | Creation | BUILDING (let-there-be-light, seven-days, name-the-animals exist) |
 | F | 9, 10, 11 | Noah + Abraham | PARTIAL (all three files exist) |
 | G | 12, 13, 14 | Abraham + Jacob | PARTIAL (all three files exist) |
@@ -32,4 +32,4 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | X | 93, 94, 95, 96 | Early Church + Paul | TODO |
 | Y | 97, 98, 99, 100 | Paul | TODO |
 
-Already on the menu: Daniel (3), David D1–D6, Joseph 18–23, Moses M1–M4, Noah N1–N4.
+Already on the menu: Daniel (3), David D1–D6, Joseph 18–23, Moses M1–M4, Noah N1–N4, Jonah J1–J3.
