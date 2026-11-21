@@ -7,7 +7,7 @@ Status: `TODO` (not started) · `PARTIAL` (some files exist from an earlier inte
 | Batch | Games (numbers in GAMES.md) | Group | Status |
 |---|---|---|---|
 | A | D1, D2, D3 | David | DONE |
-| B | M1, M2, M3, M4 | Moses | PARTIAL (baby-moses, plagues-egypt exist; red-sea, manna not started) |
+| B | M1, M2, M3, M4 | Moses | DONE |
 | C | N1, N2, N3, N4 | Noah | PARTIAL (all four files exist) |
 | D | J1, J2, J3 | Jonah | PARTIAL (all three files exist) |
 | E | 1, 2, 3, 4 | Creation | PARTIAL (let-there-be-light, seven-days, name-the-animals exist) |
@@ -32,4 +32,4 @@ Status: `TODO` (not started) · `PARTIAL` (some files exist from an earlier inte
 | X | 93, 94, 95, 96 | Early Church + Paul | TODO |
 | Y | 97, 98, 99, 100 | Paul | TODO |
 
-Already on the menu: Daniel (3), David D1–D6, Joseph 18–23.
+Already on the menu: Daniel (3), David D1–D6, Joseph 18–23, Moses M1–M4.
