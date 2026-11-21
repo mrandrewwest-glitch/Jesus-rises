@@ -1,0 +1,1753 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f73">
+<title>Through the Red Sea</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1f5f73;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 60, 80, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Through the Red Sea</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'harp', accent: 'pipe', ambience: 'sea', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  divided: { ref: 'Exodus 14:21', KJV: 'And Moses stretched out his hand over the sea; and the Lord caused the sea to go back by a strong east wind all that night, and made the sea dry land, and the waters were divided.', NKJV: 'Then Moses stretched out his hand over the sea; and the Lord caused the sea to go back by a strong east wind all that night, and made the sea into dry land, and the waters were divided.', NIV: 'Then Moses stretched out his hand over the sea, and all that night the Lord drove the sea back with a strong east wind and turned it into dry land. The waters were divided', NLT: 'Then Moses raised his hand over the sea, and the Lord opened up a path through the water with a strong east wind. The wind blew all that night, turning the seabed into dry land.' },
+  // Level cards
+  forward: { ref: 'Exodus 14:15', KJV: 'Speak unto the children of Israel, that they go forward', NKJV: 'Tell the children of Israel to go forward.', NIV: 'Tell the Israelites to move on.', NLT: 'Tell the people to get moving!' },
+  wall: { ref: 'Exodus 14:22', KJV: 'And the children of Israel went into the midst of the sea upon the dry ground: and the waters were a wall unto them on their right hand, and on their left.', NKJV: 'So the children of Israel went into the midst of the sea on the dry ground, and the waters were a wall to them on their right hand and on their left.', NIV: 'and the Israelites went through the sea on dry ground, with a wall of water on their right and on their left.', NLT: 'So the people of Israel walked through the middle of the sea on dry ground, with walls of water on each side!' },
+  // Fail card
+  fight: { ref: 'Exodus 14:14', KJV: 'The Lord shall fight for you, and ye shall hold your peace.', NKJV: 'The Lord will fight for you, and you shall hold your peace.', NIV: 'The Lord will fight for you; you need only to be still.', NLT: 'The Lord himself will fight for you. Just stay calm.' },
+  // Win cards
+  dryLand: { ref: 'Exodus 14:29', KJV: 'But the children of Israel walked upon dry land in the midst of the sea; and the waters were a wall unto them on their right hand, and on their left.', NKJV: 'But the children of Israel had walked on dry land in the midst of the sea, and the waters were a wall to them on their right hand and on their left.', NIV: 'But the Israelites went through the sea on dry ground, with a wall of water on their right and on their left.', NLT: 'But the people of Israel had walked through the middle of the sea on dry ground, as the water stood up like a wall on both sides.' },
+  song: { ref: 'Exodus 15:2', KJV: 'The Lord is my strength and song, and he is become my salvation', NKJV: 'The Lord is my strength and song, And He has become my salvation', NIV: 'The Lord is my strength and my defense; he has become my salvation.', NLT: 'The Lord is my strength and my song; he has given me victory.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes more far shore and sky above the playfield
+  if (travellers) for (const p of travellers) p.x = laneX(p.lane);
+}
+window.addEventListener('resize', () => resize());
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip at the top of the screen
+const SEA_TOP = 222;       // where the far shore meets the sea path
+const SEA_BOT = 788;       // where the near shore meets the sea path
+const START_Y = 940;       // travellers come in from below the screen
+const SHORE_Y = 196;       // ...and walk up onto the far shore
+const GAP_Y = 50;          // how close travellers walk behind each other
+const HURRY_R = 56;        // how close a tap must be to hurry a straggler
+const CROSS_PTS = 100;
+const HEART_PTS = 150;
+const DRY_PTS = 300;       // no wall ever spilled
+
+const LEVEL_NAMES = [
+  'The Sea Opens',
+  'Families and Flocks',
+  'Stubborn Camels',
+  'Big Waves',
+  'All Through the Night',
+  'Everyone Across!',
+];
+const LAST = LEVEL_NAMES.length;
+
+function makeConfig(n) {
+  const k = Math.min(n, 8) - 1;
+  return {
+    name: LEVEL_NAMES[n - 1] || `Across Again ${n}`,
+    segs: [2, 3, 3, 4, 4, 5, 5, 5][k],                     // wall pieces on each side
+    fall: [17, 13, 11, 10, 8.6, 7.6, 7, 6.5][k],          // seconds for a wall piece to sag right down
+    count: [6, 9, 12, 14, 16, 20, 22, 24][k],             // travellers to bring across
+    every: [2.3, 1.9, 1.7, 1.55, 1.45, 1.3, 1.25, 1.2][k], // seconds between travellers setting off
+    stopP: [0.3, 0.35, 0.4, 0.42, 0.45, 0.5, 0.52, 0.55][k], // chance a traveller stops to dawdle
+    auto: [4, 7, 0, 0, 0, 0, 0, 0][k],                    // dawdlers walk on by themselves after this long (0 = never)
+    kinds: [['person', 'kid', 'sheep'], ['person', 'kid', 'sheep', 'goat'], ['person', 'kid', 'sheep', 'camel', 'goat']][Math.min(k, 2)],
+    surge: [0, 0, 0, 8, 6, 4.6, 4.2, 3.8][k],             // seconds between big waves (0 = none)
+    slack: [1.9, 1.6, 1.42, 1.32, 1.25, 1.2, 1.17, 1.14][k], // how generous the chariot timer is
+    night: [0.85, 0.8, 0.7, 0.55, 0.4, 0.2, 0.1, 0][k],   // darkness of the sky (morning comes)
+    hearts: 3,
+  };
+}
+
+const SPEED = { person: 62, kid: 66, sheep: 58, goat: 64, camel: 44 };
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('redSeaBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let walls = [];            // wall pieces, both sides
+let travellers = null;
+let arrived = [];          // people safe on the far shore
+let waves = [];            // big waves rolling in toward a wall piece
+let particles = [], floaters = [];
+let fish = [];
+let message = { text: '', t: 0 };
+let hearts = 3, spills = 0, crossed = 0, sent = 0, fixPts = 0, hurryPts = 0;
+let timeLeft = 60, timeMax = 60;
+let sendT = 0, surgeT = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0;
+let closeF = 0;            // 0..1 the sea closing again after everyone is across
+let lastScore = null;
+let failWhy = '';
+let told = {};
+let flashT = 0, shakeT = 0;
+
+// ============================================================
+//  Layout
+// ============================================================
+function cx() { return viewW / 2; }
+function pathHalf() { return clamp(W * 0.2, 92, 150); }
+function laneX(l) { return cx() + (l - 1) * pathHalf() * 0.52; }
+function segH() { return (SEA_BOT - SEA_TOP) / cfg.segs; }
+function segAt(side, y) {
+  const k = clamp(Math.floor((y - SEA_TOP) / segH()), 0, cfg.segs - 1);
+  return walls.find((w) => w.side === side && w.k === k);
+}
+// How far a wall has sagged in toward the path at height y
+function bulgeAt(side, y) {
+  let b = 0;
+  const sh = segH();
+  for (const w of walls) {
+    if (w.side !== side) continue;
+    const c = SEA_TOP + (w.k + 0.5) * sh;
+    const d = (y - c) / (sh * 0.5);
+    if (Math.abs(d) > 1.6) continue;
+    const f = Math.exp(-d * d * 1.6);
+    let amt = Math.pow(1 - w.s, 1.4) * pathHalf() * 0.55;
+    if (w.s < 0.35) amt += Math.sin(t * 13 + w.k * 2) * 4 * (1 - w.s / 0.35);
+    if (w.spill > 0) amt += Math.sin(clamp(w.spill / 1.8, 0, 1) * Math.PI) * pathHalf() * 1.1;
+    amt -= w.glow * 6;
+    b += amt * f;
+  }
+  return b;
+}
+function edgeX(side, y) {
+  const closing = closeF > 0 ? ease(closeF) * pathHalf() * 1.05 : 0;
+  return cx() + side * (pathHalf() - bulgeAt(side, y) - closing);
+}
+
+// ============================================================
+//  People and animals
+// ============================================================
+function blinkTick(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+      if (d.egypt) { ctx.strokeStyle = '#1b130c'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(sx + (sx < 0 ? -rx - 2 : rx + 2), ey - 1); ctx.lineTo(sx + (sx < 0 ? -rx : rx), ey); ctx.stroke(); }
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'grumpy':
+      eyes(3.5, 3.5, 2);
+      brows(-5, -9, -5, -9);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+function drawBob(d, hy) {
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-19, hy + 12); ctx.lineTo(-19, hy - 4);
+  ctx.arc(0, hy - 3, 19, Math.PI, 0);
+  ctx.lineTo(19, hy + 12); ctx.lineTo(12, hy + 12); ctx.lineTo(12, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 13, -12, hy - 6);
+  ctx.lineTo(-12, hy + 12);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e8b53a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 3, 18.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+}
+
+// Pharaoh's striped royal head-cloth
+function drawNemes(hy) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-14, hy - 10);
+  ctx.quadraticCurveTo(0, hy - 30, 14, hy - 10);
+  ctx.lineTo(22, hy + 22); ctx.lineTo(13, hy + 22); ctx.lineTo(13, hy - 4);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 4);
+  ctx.lineTo(-13, hy + 22); ctx.lineTo(-22, hy + 22);
+  ctx.closePath();
+  ctx.fillStyle = '#e8b53a'; ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = '#2f5fa8'; ctx.lineWidth = 3;
+  for (let k = -30; k < 40; k += 7) { ctx.beginPath(); ctx.moveTo(-30, hy + k); ctx.lineTo(30, hy + k + 4); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = '#e8b53a';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 3.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 1.6, 0, TAU); ctx.fill();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.walk) jump = Math.abs(Math.sin(t * 8 + d.phase)) * 5;
+  if (d.kid) s *= 0.78;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.egypt ? d.skin : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = d.egypt ? 6 : 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // the staff stands beside Moses
+  if (d.staff) {
+    const up = d.pose === 'stretch';
+    ctx.strokeStyle = '#7a5226'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (up) { ctx.moveTo(22, -40); ctx.lineTo(34, -112); }
+    else { ctx.moveTo(22, 0); ctx.lineTo(22, -92); ctx.quadraticCurveTo(22, -100, 15, -98); }
+    ctx.stroke();
+  }
+  if (mood === 'joy' && !d.timbrel) {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (d.collar) {
+    ctx.fillStyle = '#e8b53a';
+    ctx.beginPath(); ctx.ellipse(0, -36, 13, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3c8fc0';
+    ctx.beginPath(); ctx.ellipse(0, -35, 9, 3.5, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = d.egypt ? '#e8b53a' : '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (d.timbrel) {
+    // a timbrel shaken high
+    const sh = Math.sin(t * 14 + d.phase) * 3;
+    arm(11, -32, 20, -64 + sh);
+    arm(-11, -32, -15, -12);
+    ctx.fillStyle = '#e9c36e'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(24, -72 + sh, 8, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c0392b';
+    for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + t * 3; ctx.beginPath(); ctx.arc(24 + Math.cos(a) * 8, -72 + sh + Math.sin(a) * 8, 1.8, 0, TAU); ctx.fill(); }
+  } else if (d.pose === 'cross') { arm(-11, -32, 6, -24); arm(11, -32, -6, -22); }
+  else if (d.pose === 'point') { arm(-11, -32, -15, -12); arm(11, -32, 34, -50); }
+  else if (d.pose === 'stretch') { arm(-11, -32, -15, -12); arm(11, -32, 30, -46); }
+  else if (d.staff && mood !== 'joy') { arm(-11, -32, -15, -12); arm(11, -32, 20, -50); }
+  else if (mood === 'watch' || mood === 'wow' || mood === 'grumpy') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.nemes) drawNemes(hy);
+  else if (d.egypt) drawBob(d, hy);
+  else if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  if (d.nemes) { ctx.fillStyle = '#8a5a2a'; roundRect(-3, hy + 14, 6, 12, 2); ctx.fill(); }
+  drawFace(d, mood, hy, lx, ly);
+  if (mood === 'shock') { arm(-11, -32, -15, hy + 4); arm(11, -32, 15, hy + 4); }
+  ctx.restore();
+}
+
+
+const MOSES = { robe: '#9c5a3c', hair: '#d8d2c4', beard: true, skin: '#c98d56', i: 0, mood: 'watch', blinkT: 2, blink: 0, phase: 0, staff: true, pose: 'stretch' };
+const MIRIAM = { robe: '#7a4fa0', hair: '#3a2716', skin: '#c58a55', scarf: '#e8a13a', i: 1, mood: 'watch', blinkT: 3, blink: 0, phase: 1 };
+const LOOKS = [
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#f0c9a0' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true, skin: '#c98d56' },
+  { robe: '#3c8f86', hair: '#1f140c', skin: '#b87a48', scarf: '#d8c7a0' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070' },
+  { robe: '#5a6475', hair: '#2a1a0e', beard: true, skin: '#c88e5a' },
+  { robe: '#b08a2e', hair: '#1c120b', skin: '#c78f5c', scarf: '#c0392b' },
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true, skin: '#d9a066' },
+];
+const KIDS = [
+  { robe: '#d9a13a', hair: '#6b3f1d', skin: '#e3b184', kid: true },
+  { robe: '#e07a5f', hair: '#5c3a1c', skin: '#dca678', kid: true },
+  { robe: '#4b7f4b', hair: '#2d1b0f', skin: '#bf8150', kid: true },
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', kid: true, scarf: '#f6d27a' },
+];
+
+function drawSheep(x, y, s, walking, nibble, goat) {
+  const b = walking ? Math.abs(Math.sin(t * 9 + x)) * 4 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.scale(s, s);
+  ctx.translate(0, -b);
+  const legs = goat ? '#5a4030' : '#4a3a2a';
+  ctx.fillStyle = legs;
+  ctx.fillRect(-13, -8, 4, 10); ctx.fillRect(9, -8, 4, 10);
+  if (goat) {
+    ctx.fillStyle = '#c9a47a';
+    ctx.beginPath(); ctx.ellipse(0, -16, 19, 11, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a8845a';
+    ctx.beginPath(); ctx.ellipse(-16, -20, 5, 3, -0.6, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = '#fbf7ec';
+    for (const [dx, dy, r] of [[-10, -16, 10], [0, -21, 11], [10, -16, 10], [0, -11, 12], [-4, -18, 9]]) { ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+  }
+  // head
+  const hx = 20, hy = nibble ? -6 + Math.sin(t * 10) * 2 : -22;
+  ctx.fillStyle = goat ? '#b8916a' : '#4a3a2a';
+  ctx.beginPath(); ctx.ellipse(hx, hy, 7, 8.5, 0.3, 0, TAU); ctx.fill();
+  if (goat) {
+    ctx.strokeStyle = '#6b5640'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx - 2, hy - 7); ctx.quadraticCurveTo(hx - 8, hy - 16, hx - 12, hy - 12); ctx.stroke();
+    ctx.fillStyle = '#f2ead8'; ctx.beginPath(); ctx.moveTo(hx + 2, hy + 7); ctx.lineTo(hx + 5, hy + 14); ctx.lineTo(hx + 7, hy + 6); ctx.fill();
+  }
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx + 2, hy - 2, 2.6, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1b130c'; ctx.beginPath(); ctx.arc(hx + 2.6, hy - 1.6, 1.3, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawCamel(x, y, s, walking, sitting, load) {
+  const b = walking ? Math.abs(Math.sin(t * 6 + x)) * 3 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 34 * s, 8 * s, 0, 0, TAU); ctx.fill();
+  ctx.scale(s, s);
+  const body = '#d4a865', dark = '#b5884a';
+  const sit = sitting ? 24 : 0;
+  ctx.translate(0, -b + sit);
+  // legs
+  ctx.strokeStyle = dark; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  if (!sitting) {
+    const sw = walking ? Math.sin(t * 6) * 5 : 0;
+    for (const [lx, d] of [[-18, sw], [-10, -sw], [12, -sw], [20, sw]]) { ctx.beginPath(); ctx.moveTo(lx, -34); ctx.lineTo(lx + d, -2); ctx.stroke(); }
+  } else {
+    ctx.beginPath(); ctx.moveTo(-22, -26); ctx.lineTo(-6, -26); ctx.moveTo(10, -26); ctx.lineTo(26, -26); ctx.stroke();
+  }
+  // body with hump
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-28, -34);
+  ctx.quadraticCurveTo(-30, -52, -16, -54);
+  ctx.quadraticCurveTo(-4, -76, 10, -56);
+  ctx.quadraticCurveTo(24, -54, 26, -38);
+  ctx.quadraticCurveTo(0, -26, -28, -34);
+  ctx.fill();
+  // a bright saddle blanket and bundles
+  ctx.fillStyle = load || '#c0392b';
+  roundRect(-14, -62, 22, 12, 4); ctx.fill();
+  ctx.fillStyle = '#e8dcc0';
+  roundRect(-24, -50, 10, 14, 3); ctx.fill();
+  roundRect(8, -50, 10, 14, 3); ctx.fill();
+  // neck and head
+  ctx.strokeStyle = body; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(22, -44); ctx.quadraticCurveTo(36, -52, 34, -70); ctx.stroke();
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(39, -74, 11, 7, 0.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(33, -82, 3, 4, -0.3, 0, TAU); ctx.fill();
+  // sleepy, stubborn eye
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(39, -77, 3.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1b130c'; ctx.beginPath(); ctx.arc(40, -76.5, 1.6, 0, TAU); ctx.fill();
+  ctx.fillStyle = body; ctx.fillRect(35.5, sitting ? -80.6 : -81.5, 7, sitting ? 3.4 : 2.2);
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(46, -72, 3, 0.3, 1.6); ctx.stroke();
+  ctx.restore();
+}
+
+function drawFish(f, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(f.x, f.y);
+  ctx.scale(f.dir * f.s, f.s);
+  ctx.fillStyle = f.col;
+  ctx.beginPath(); ctx.ellipse(0, 0, 14, 8, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-22, -7 + Math.sin(t * 8 + f.ph) * 2); ctx.lineTo(-22, 7 + Math.sin(t * 8 + f.ph) * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(6, -2, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1b130c'; ctx.beginPath(); ctx.arc(7, -2, 1.5, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  The scene
+// ============================================================
+function drawSky() {
+  const top = -offY;
+  const n = cfg.night;
+  const g = ctx.createLinearGradient(0, top, 0, SHORE_Y - 40);
+  g.addColorStop(0, `rgb(${lerp(124, 22, n)},${lerp(196, 34, n)},${lerp(242, 78, n)})`);
+  g.addColorStop(1, `rgb(${lerp(255, 104, n)},${lerp(214, 92, n)},${lerp(150, 140, n)})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, viewW, SHORE_Y - 40 - top + 2);
+  // stars fade as the morning comes
+  if (n > 0.2) {
+    for (let i = 0; i < 40; i++) {
+      const x = hash(i, 3) * viewW, y = top + hash(i, 7) * (SHORE_Y - 60 - top);
+      ctx.fillStyle = `rgba(255,255,230,${(n - 0.2) * (0.5 + 0.5 * Math.sin(t * 2 + i))})`;
+      ctx.beginPath(); ctx.arc(x, y, 1.6, 0, TAU); ctx.fill();
+    }
+  }
+  // far hills of the other side
+  ctx.fillStyle = `rgb(${lerp(214, 92, n)},${lerp(170, 76, n)},${lerp(110, 84, n)})`;
+  ctx.beginPath(); ctx.moveTo(0, SHORE_Y - 30);
+  for (let x = 0; x <= viewW + 40; x += 40) ctx.lineTo(x, SHORE_Y - 52 - Math.sin(x * 0.012) * 18 - Math.sin(x * 0.031) * 8);
+  ctx.lineTo(viewW, SHORE_Y - 20); ctx.lineTo(0, SHORE_Y - 20); ctx.fill();
+}
+
+function drawShores() {
+  // far shore
+  const n = cfg.night * 0.5;
+  ctx.fillStyle = `rgb(${lerp(240, 170, n)},${lerp(214, 150, n)},${lerp(160, 120, n)})`;
+  ctx.fillRect(0, SHORE_Y - 46, viewW, SEA_TOP - SHORE_Y + 60);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath(); ctx.moveTo(0, SEA_TOP + 4);
+  for (let x = 0; x <= viewW + 30; x += 30) ctx.lineTo(x, SEA_TOP + 2 + Math.sin(x * 0.05 + t * 2) * 3);
+  ctx.lineTo(viewW, SEA_TOP + 12); ctx.lineTo(0, SEA_TOP + 12); ctx.fill();
+  // palms on the far shore
+  drawPalm(viewW * 0.08, SHORE_Y - 20, 0.9);
+  drawPalm(viewW * 0.93, SHORE_Y - 14, 1);
+  // near shore (Egypt side)
+  ctx.fillStyle = `rgb(${lerp(226, 150, n)},${lerp(196, 130, n)},${lerp(140, 104, n)})`;
+  ctx.fillRect(0, SEA_BOT - 8, viewW, H - SEA_BOT + 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.moveTo(0, SEA_BOT - 10);
+  for (let x = 0; x <= viewW + 30; x += 30) ctx.lineTo(x, SEA_BOT - 6 + Math.sin(x * 0.05 - t * 2) * 3);
+  ctx.lineTo(viewW, SEA_BOT + 2); ctx.lineTo(0, SEA_BOT + 2); ctx.fill();
+  // footprints leading to the path
+  ctx.fillStyle = 'rgba(120,90,50,0.25)';
+  for (let k = 0; k < 7; k++) {
+    for (const l of [0, 2]) { ctx.beginPath(); ctx.ellipse(laneX(l) + (k % 2 ? 6 : -6), SEA_BOT + 14 + k * 14, 3, 5, 0, 0, TAU); ctx.fill(); }
+  }
+}
+
+function drawPalm(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = '#8a6236'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(6, -36, 2, -70); ctx.stroke();
+  ctx.fillStyle = '#3f8f4a';
+  for (let k = 0; k < 6; k++) {
+    const a = -Math.PI / 2 + (k - 2.5) * 0.55 + Math.sin(t * 1.5 + k) * 0.04;
+    ctx.save(); ctx.translate(2, -70); ctx.rotate(a);
+    ctx.beginPath(); ctx.ellipse(22, 0, 24, 6, 0.2, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// The pillar of cloud stands guard on the Egypt side, glowing with God's light
+function drawPillar() {
+  const x = viewW - Math.max(46, (viewW / 2 - pathHalf()) * 0.4), y = H + 10;
+  const g = ctx.createRadialGradient(x, y - 120, 10, x, y - 120, 150);
+  g.addColorStop(0, 'rgba(255,240,190,0.55)'); g.addColorStop(1, 'rgba(255,240,190,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 150, y - 280, 300, 300);
+  for (let k = 0; k < 7; k++) {
+    const yy = y - k * 24 - 10, r = 26 + Math.sin(t * 1.3 + k) * 3 + (k > 4 ? 6 : 0);
+    ctx.fillStyle = k % 2 ? 'rgba(255,255,255,0.85)' : 'rgba(248,244,232,0.9)';
+    ctx.beginPath(); ctx.arc(x + Math.sin(t * 0.9 + k * 1.3) * 6, yy, r, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,230,150,0.35)';
+  ctx.beginPath(); ctx.arc(x, y - 90, 18 + Math.sin(t * 3) * 2, 0, TAU); ctx.fill();
+}
+
+function drawSea() {
+  const n = cfg.night;
+  // the deep sea on both sides
+  const g = ctx.createLinearGradient(0, SEA_TOP, 0, SEA_BOT);
+  g.addColorStop(0, `rgb(${lerp(46, 20, n)},${lerp(132, 70, n)},${lerp(196, 130, n)})`);
+  g.addColorStop(1, `rgb(${lerp(30, 14, n)},${lerp(104, 54, n)},${lerp(170, 110, n)})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, SEA_TOP, viewW, SEA_BOT - SEA_TOP);
+  // gentle wave lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.13)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let r = 0; r < 12; r++) {
+    const y = SEA_TOP + 24 + r * 48;
+    for (let k = 0; k < 8; k++) {
+      const x = ((hash(r, k) * viewW + t * 14 * (r % 2 ? 1 : -1)) % (viewW + 60) + viewW + 60) % (viewW + 60) - 30;
+      ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.quadraticCurveTo(x, y - 6, x + 12, y); ctx.stroke();
+    }
+  }
+  for (const f of fish) drawFish(f, 0.75);
+  // the dry path through the middle
+  const step = 8;
+  ctx.beginPath();
+  ctx.moveTo(edgeX(-1, SEA_TOP - 10), SEA_TOP - 10);
+  for (let y = SEA_TOP; y <= SEA_BOT + 10; y += step) ctx.lineTo(edgeX(-1, y), y);
+  for (let y = SEA_BOT + 10; y >= SEA_TOP - 10; y -= step) ctx.lineTo(edgeX(1, y), y);
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = `rgb(${lerp(214, 140, n * 0.6)},${lerp(184, 122, n * 0.6)},${lerp(130, 96, n * 0.6)})`;
+  ctx.fillRect(0, SEA_TOP - 12, viewW, SEA_BOT - SEA_TOP + 24);
+  // shells, pebbles and seaweed on the seabed
+  for (let i = 0; i < 46; i++) {
+    const x = cx() + (hash(i, 11) * 2 - 1) * pathHalf() * 0.95, y = SEA_TOP + hash(i, 13) * (SEA_BOT - SEA_TOP);
+    const kind = i % 5;
+    if (kind === 0) { ctx.fillStyle = '#f6c7b0'; ctx.beginPath(); ctx.arc(x, y, 5, Math.PI, TAU); ctx.fill(); ctx.strokeStyle = '#d99a80'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y - 4); ctx.moveTo(x, y); ctx.lineTo(x + 3, y - 4); ctx.stroke(); }
+    else if (kind === 1) { ctx.strokeStyle = '#4f8f4a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 5, y - 8, x, y - 14); ctx.stroke(); }
+    else { ctx.fillStyle = 'rgba(140,110,70,0.35)'; ctx.beginPath(); ctx.ellipse(x, y, 4 + kind, 3, 0, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+  // the standing walls of water: glassy faces with foam on top
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(edgeX(side, SEA_TOP - 6), SEA_TOP - 6);
+    for (let y = SEA_TOP; y <= SEA_BOT + 6; y += step) ctx.lineTo(edgeX(side, y), y);
+    for (let y = SEA_BOT + 6; y >= SEA_TOP - 6; y -= step) ctx.lineTo(edgeX(side, y) + side * 30, y);
+    ctx.closePath();
+    const wg = ctx.createLinearGradient(cx() + side * pathHalf(), 0, cx() + side * (pathHalf() + 30), 0);
+    wg.addColorStop(0, 'rgba(170,232,255,0.95)'); wg.addColorStop(1, 'rgba(70,160,220,0.9)');
+    ctx.fillStyle = wg;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let y = SEA_TOP - 6; y <= SEA_BOT + 6; y += step) {
+      const x = edgeX(side, y) + Math.sin(y * 0.12 + t * 5) * 1.5;
+      if (y === SEA_TOP - 6) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // shimmer streaks running down the faces
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
+    for (let k = 0; k < 14; k++) {
+      const y = SEA_TOP + ((k * 47 + t * 40) % (SEA_BOT - SEA_TOP));
+      const x = edgeX(side, y) + side * (8 + (k % 3) * 6);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 16); ctx.stroke();
+    }
+  }
+  // each wall piece: God's light when it is strong; a warning when it sags
+  for (const w of walls) {
+    const sh = segH(), c = SEA_TOP + (w.k + 0.5) * sh;
+    const ex = edgeX(w.side, c);
+    if (w.glow > 0) {
+      const gg = ctx.createRadialGradient(ex, c, 4, ex, c, sh * 0.6);
+      gg.addColorStop(0, `rgba(255,246,200,${0.7 * w.glow})`); gg.addColorStop(1, 'rgba(255,246,200,0)');
+      ctx.fillStyle = gg;
+      ctx.fillRect(ex - sh * 0.6, c - sh * 0.6, sh * 1.2, sh * 1.2);
+    }
+    // a little strength bar out in the sea beside each piece
+    const bx = cx() + w.side * (pathHalf() + 52), bw = 12, bh = Math.min(sh - 30, 80);
+    ctx.fillStyle = 'rgba(10,40,70,0.45)';
+    roundRect(bx - bw / 2, c - bh / 2, bw, bh, 6); ctx.fill();
+    const col = w.s > 0.6 ? '#9ff0ff' : w.s > 0.33 ? '#ffd34d' : '#ff8a5c';
+    ctx.fillStyle = col;
+    const fh = Math.max(0, (bh - 4) * w.s);
+    roundRect(bx - bw / 2 + 2, c + bh / 2 - 2 - fh, bw - 4, fh, 4); ctx.fill();
+    if (w.s < 0.33 && w.spill <= 0 && state === 'play') {
+      const pulse = 0.6 + 0.4 * Math.sin(t * 12);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ff8a5c';
+      ctx.beginPath(); ctx.arc(bx, c - bh / 2 - 16, 13, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('!', bx, c - bh / 2 - 15);
+      ctx.restore();
+    }
+  }
+  // big waves rolling in toward a wall piece
+  for (const wv of waves) {
+    const c = SEA_TOP + (wv.k + 0.5) * segH();
+    const far = wv.side < 0 ? 0 : viewW, near = cx() + wv.side * (pathHalf() + 26);
+    const x = lerp(far, near, ease(clamp(wv.f, 0, 1)));
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(x, c, 16, segH() * 0.32, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(160,220,255,0.8)';
+    ctx.beginPath(); ctx.ellipse(x - wv.side * 12, c, 12, segH() * 0.26, 0, 0, TAU); ctx.fill();
+  }
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#bff3ff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function splash(x, y, n = 14) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-20, 20), y + rand(-10, 10), rand(-140, 140), rand(-260, -80), rand(0.5, 1), pick(['#bfeaff', '#ffffff', '#7fd0e8']), rand(3, 6), 600);
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 40 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px Fredoka, sans-serif';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(14,40,70,0.8)'; ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.col || '#ffe9a8'; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Travellers
+// ============================================================
+function makeTraveller() {
+  const kinds = cfg.kinds;
+  let kind = pick(kinds);
+  if (sent === 0) kind = 'person';
+  const p = { kind, lane: 1, x: 0, y: START_Y, speed: SPEED[kind] * rand(0.92, 1.08), state: 'walk', stopAt: null, stopT: 0, hurry: 0, wet: 0, push: 0, ph: rand(0, TAU), look: null, done: false };
+  if (kind === 'person') p.look = { ...pick(LOOKS), i: sent + 3, mood: 'watch', blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) };
+  if (kind === 'kid') p.look = { ...pick(KIDS), i: sent + 3, mood: 'watch', blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) };
+  if (kind === 'camel') p.load = pick(['#c0392b', '#3c8fc0', '#7a4fa0', '#e8a13a']);
+  // Some dawdle somewhere along the way
+  const firstHint = level === 1 && sent === 1;
+  if (firstHint || Math.random() < cfg.stopP) p.stopAt = rand(SEA_TOP + 90, SEA_BOT - 70);
+  if (kind === 'camel' && level >= 3 && Math.random() < 0.6) p.stopAt = rand(SEA_TOP + 90, SEA_BOT - 70);
+  return p;
+}
+
+function laneClear(l) {
+  return !travellers.some((q) => q.lane === l && !q.done && q.y > START_Y - GAP_Y - 10);
+}
+
+function sendTraveller() {
+  // set off in the emptiest lane
+  const lanes = [0, 1, 2].filter(laneClear);
+  if (!lanes.length) return false;
+  const p = makeTraveller();
+  lanes.sort((a, b) => travellers.filter((q) => q.lane === a && !q.done).length - travellers.filter((q) => q.lane === b && !q.done).length || Math.random() - 0.5);
+  p.lane = lanes[0];
+  p.x = laneX(p.lane);
+  travellers.push(p);
+  sent++;
+  return true;
+}
+
+const DAWDLE = {
+  person: 'Wow… fish!',
+  kid: 'A shell!',
+  sheep: 'Munch…',
+  goat: 'Munch…',
+  camel: 'Hmph!',
+};
+
+function updateTravellers(dt) {
+  const order = travellers.filter((p) => !p.done).sort((a, b) => a.y - b.y);
+  for (const p of order) {
+    if (p.look) blinkTick(p.look, dt);
+    p.hurry = Math.max(0, p.hurry - dt);
+    p.wet = Math.max(0, p.wet - dt);
+    if (p.push > 0) {
+      // swept back a little by spilled water
+      const m = Math.min(p.push, 260 * dt);
+      p.y += m; p.push -= m;
+      continue;
+    }
+    if (p.state === 'stop') {
+      p.stopT += dt;
+      if (cfg.auto && p.stopT > cfg.auto) walkOn(p, false);
+      continue;
+    }
+    if (p.stopAt !== null && p.y <= p.stopAt) {
+      p.state = 'stop'; p.stopT = 0; p.stopAt = null;
+      if (p.kind === 'sheep' || p.kind === 'goat') sfx.baa(); else if (p.kind === 'camel') sfx.grumble();
+      if (!told.stop) { told.stop = true; showMessage('Someone stopped! Tap them to hurry along', 2.6); }
+      continue;
+    }
+    // queue politely behind whoever is ahead in the same lane
+    const ahead = order.find((q) => q !== p && q.lane === p.lane && q.y < p.y && p.y - q.y < GAP_Y + 6);
+    let v = p.speed * (p.hurry > 0 ? 1.8 : 1);
+    if (ahead) v = Math.min(v, Math.max(0, (p.y - ahead.y - GAP_Y) * 4));
+    p.y -= v * dt;
+    p.x = lerp(p.x, laneX(p.lane), 1 - Math.pow(0.02, dt));
+    if (p.y <= SHORE_Y) arrive(p);
+  }
+}
+
+function walkOn(p, tapped) {
+  p.state = 'walk';
+  p.hurry = tapped ? 2.5 : 0;
+  if (tapped) {
+    const pts = p.stopT < 1.2 ? 30 : p.stopT < 3 ? 20 : 10;
+    hurryPts += pts;
+    floaters.push({ x: p.x, y: p.y - 80, text: `+${pts}`, t: 0.9 });
+    sparkleBurst(p.x, p.y - 30, 10);
+    sfx.hup();
+  }
+}
+
+function arrive(p) {
+  p.done = true;
+  crossed++;
+  const spot = { x: 0, y: 0 };
+  // gather on the far shore around Moses and Miriam
+  const span = Math.min(viewW - 80, 900);
+  spot.x = cx() + (crossed % 2 ? -1 : 1) * (60 + ((crossed * 37) % Math.max(60, span / 2 - 70)));
+  spot.y = SHORE_Y - 26 + ((crossed * 13) % 26);
+  arrived.push({ ...p, tx: spot.x, ty: spot.y, f: 0, x0: p.x, y0: p.y });
+  sfx.cross(crossed);
+  sparkleBurst(p.x, p.y - 20, 8);
+  floaters.push({ x: p.x, y: p.y - 70, text: `+${CROSS_PTS}`, t: 0.9 });
+  if (crossed >= cfg.count) win();
+}
+
+// ============================================================
+//  The walls of water
+// ============================================================
+function makeWalls() {
+  walls = [];
+  for (const side of [-1, 1]) for (let k = 0; k < cfg.segs; k++) {
+    walls.push({ side, k, s: rand(0.8, 1), mul: rand(0.75, 1.25), glow: 0, spill: 0, cool: 0 });
+  }
+}
+
+function fixWall(w) {
+  if (!w || w.spill > 0) return false;
+  if (w.s > 0.82) {
+    w.glow = Math.max(w.glow, 0.25);
+    if (!told.strong) { told.strong = true; showMessage('That wall is still strong. Tap the ones that sag!', 2.2); }
+    return false;
+  }
+  const pts = w.s < 0.33 ? 25 : w.s < 0.6 ? 15 : 5;
+  fixPts += pts;
+  w.s = 1; w.glow = 1; w.mul = rand(0.75, 1.25);
+  const c = SEA_TOP + (w.k + 0.5) * segH();
+  sparkleBurst(edgeX(w.side, c), c, 14);
+  floaters.push({ x: edgeX(w.side, c) + w.side * 30, y: c - 20, text: `+${pts}`, t: 0.8, col: '#bff3ff' });
+  sfx.fix(w);
+  MOSES.lift = 0.5;
+  return true;
+}
+
+function spillWall(w) {
+  w.spill = 1.8; w.s = 0.55; w.glow = 0;
+  hearts--; spills++;
+  shakeT = 0.3;
+  const sh = segH(), c = SEA_TOP + (w.k + 0.5) * sh;
+  splash(edgeX(w.side, c), c, 22);
+  sfx.splash();
+  // anyone there is gently swept back a little (and gets very wet)
+  for (const p of travellers) {
+    if (p.done) continue;
+    if (Math.abs(p.y - c) < sh * 0.6) { p.push = 90; p.wet = 3; if (p.state === 'stop') p.state = 'walk'; }
+  }
+  showMessage(hearts > 0 ? 'Splash! Tap the walls before they sag right down' : 'Splash!', 2);
+  if (hearts <= 0) { failWhy = 'water'; fail(); }
+}
+
+function updateWalls(dt) {
+  for (const w of walls) {
+    w.glow = Math.max(0, w.glow - dt * 1.5);
+    if (w.spill > 0) { w.spill -= dt; continue; }
+    w.s -= dt / cfg.fall * w.mul * (1 + playT / 240);
+    if (w.s < 0.55 && !told.sag) { told.sag = true; showMessage('A wall is sagging! Tap it to make it strong', 2.6); }
+    if (w.s <= 0) spillWall(w);
+    else if (w.s < 0.33 && Math.random() < dt * 6) {
+      const c = SEA_TOP + (w.k + 0.5) * segH();
+      spawn(edgeX(w.side, c + rand(-30, 30)), c + rand(-30, 30), -w.side * rand(20, 60), rand(-40, 0), 0.6, '#bfeaff', 3, 300);
+    }
+  }
+  // big waves
+  if (cfg.surge) {
+    surgeT -= dt;
+    if (surgeT <= 0 && sent > 1) {
+      surgeT = cfg.surge * rand(0.8, 1.2);
+      const w = pick(walls.filter((w) => w.spill <= 0));
+      if (w) {
+        waves.push({ side: w.side, k: w.k, f: 0 });
+        if (!told.wave) { told.wave = true; showMessage('A big wave is coming! Make that wall strong', 2.6); }
+        sfx.wave();
+      }
+    }
+  }
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const wv = waves[i];
+    wv.f += dt / 1.6;
+    if (wv.f >= 1) {
+      waves.splice(i, 1);
+      const w = walls.find((q) => q.side === wv.side && q.k === wv.k);
+      if (w && w.spill <= 0) {
+        w.s -= 0.45;
+        const c = SEA_TOP + (w.k + 0.5) * segH();
+        splash(edgeX(w.side, c) + w.side * 20, c, 10);
+        sfx.thump();
+        if (w.s <= 0) spillWall(w);
+      }
+    }
+  }
+}
+
+function updateFish(dt) {
+  for (const f of fish) {
+    f.x += f.dir * f.v * dt;
+    f.y += Math.sin(t * 1.3 + f.ph) * 10 * dt;
+    const inner = cx() + f.side * (pathHalf() + 40), outer = f.side < 0 ? 10 : viewW - 10;
+    const lo = Math.min(inner, outer), hi = Math.max(inner, outer);
+    if (f.x < lo) { f.x = lo; f.dir = 1; }
+    if (f.x > hi) { f.x = hi; f.dir = -1; }
+  }
+}
+function makeFish() {
+  fish = [];
+  const n = Math.round(clamp(viewW / 90, 4, 12));
+  for (let i = 0; i < n; i++) {
+    const side = i % 2 ? 1 : -1;
+    fish.push({ side, x: cx() + side * (pathHalf() + 60 + rand(0, Math.max(10, viewW / 2 - pathHalf() - 90))), y: rand(SEA_TOP + 30, SEA_BOT - 30), dir: pick([-1, 1]), v: rand(14, 34), s: rand(0.7, 1.1), ph: rand(0, 5), col: pick(['#ffb347', '#ff7a9a', '#ffe27a', '#9ff0b0', '#c9a0ff']) });
+  }
+}
+
+// ============================================================
+//  Updating
+// ============================================================
+function updatePlay(dt) {
+  playT += dt;
+  timeLeft -= dt;
+  sendT -= dt;
+  if (sent < cfg.count && sendT <= 0) {
+    if (sendTraveller()) sendT = cfg.every * rand(0.85, 1.15);
+    else sendT = 0.3;
+  }
+  updateWalls(dt);
+  if (state !== 'play') return;
+  updateTravellers(dt);
+  if (state !== 'play') return;
+  if (timeLeft < timeMax * 0.25 && !told.hurry) { told.hurry = true; showMessage('Hurry! The chariots are getting closer', 2.2); }
+  if (timeLeft <= 0) { failWhy = 'time'; fail(); }
+}
+
+function updateArrived(dt) {
+  for (const a of arrived) {
+    a.f = Math.min(1, a.f + dt * 1.4);
+    a.x = lerp(a.x0, a.tx, ease(a.f)); a.y = lerp(a.y0, a.ty, ease(a.f));
+    if (a.look) { blinkTick(a.look, dt); a.look.mood = 'joy'; }
+  }
+}
+
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const crossPts = crossed * CROSS_PTS;
+  const timeBonus = Math.round(Math.max(0, timeLeft) * 10);
+  const heartBonus = hearts * HEART_PTS;
+  const dry = spills === 0 ? DRY_PTS : 0;
+  const levelBonus = 100 * level;
+  const sum = crossPts + fixPts + hurryPts + timeBonus + heartBonus + dry + levelBonus;
+  totalScore += sum;
+  saveBest();
+  lastScore = { crossPts, fixPts, hurryPts, timeBonus, heartBonus, dry, levelBonus, sum };
+  waves = [];
+  sfx.win();
+  endTimer = 4;
+}
+function saveBest() {
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('redSeaBest', String(best)); } catch (e) {} }
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  saveBest();
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('Through the Red Sea', 'God makes a path through the water',
+    `${verseHTML('divided')}
+     <ul>
+       <li>God has pushed back the sea! Help all of God's people <b>walk across on dry ground</b> to the far shore.</li>
+       <li>When a wall of water starts to <b>sag</b> (its bar goes yellow or red), <b>tap that wall</b> to make it stand strong again.</li>
+       <li>Some people and animals <b>stop to dawdle</b>. <b>Tap them</b> to hurry them along!</li>
+       <li>Get everyone across before the little <b>chariots</b> on the timer reach the sea. Three splashes and you must start again.</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> helps where it's most needed.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Go forward!', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+// A short card before each level, with the verse for it
+function levelCard() {
+  state = 'intro';
+  syncAmbience();
+  resetLevel();
+  const c = cfg;
+  const what = [
+    'Tap a <b>sagging wall</b> to make it strong. Tap anyone who <b>stops</b>.',
+    'More families and their flocks are coming. Keep the walls standing!',
+    '<b>Camels</b> are slow and stubborn. They often sit down — tap them!',
+    '<b>Big waves</b> roll in from the sea. Make that wall strong before the wave hits!',
+    'More walls, more people, more waves. You can do it!',
+    'Everyone must get across. This is the biggest crossing of all!',
+  ][Math.min(level, LAST) - 1];
+  showOverlay(`Level ${level}`, c.name,
+    `<p style="text-align:center">${what}</p>
+     <p class="score">Bring <b>${c.count}</b> across &nbsp;&middot;&nbsp; <b>${c.segs * 2}</b> walls</p>
+     ${verseHTML(level % 2 ? 'forward' : 'wall')}`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  travellers = []; arrived = []; waves = []; particles = []; floaters = [];
+  makeWalls(); makeFish();
+  hearts = cfg.hearts; spills = 0; crossed = 0; sent = 0; fixPts = 0; hurryPts = 0;
+  timeMax = Math.round(((cfg.count - 1) * cfg.every + (START_Y - SHORE_Y) / 46) * cfg.slack + 6);
+  timeLeft = timeMax;
+  sendT = 0.6; surgeT = cfg.surge ? cfg.surge * 0.8 : 0;
+  playT = 0; winT = 0; failT = 0; endTimer = 0; closeF = 0;
+  told = {};
+  failWhy = '';
+  flashT = shakeT = 0;
+  MOSES.mood = 'watch'; MOSES.lift = 0;
+  MIRIAM.mood = 'watch'; MIRIAM.timbrel = false;
+  down = null;
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  sfx.levelStart();
+  state = 'play';
+  syncAmbience();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.2);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const scoreHTML = `<p class="score">Across safely (${crossed}): <b>${s.crossPts}</b><br>Walls made strong: <b>${s.fixPts}</b><br>Hurried along: <b>${s.hurryPts}</b><br>Time to spare: <b>${s.timeBonus}</b><br>Hearts left: <b>${s.heartBonus}</b><br>${s.dry ? `Not one splash: <b>${s.dry}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level >= LAST) {
+      showOverlay('Safe on the other side!', 'Everyone crossed the Red Sea',
+        `${verseHTML('dryLand')}
+         ${verseHTML('song')}
+         <p style="text-align:center">God made a way where there was no way! Miriam and all the people sang and danced to thank Him.</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; levelCard(); });
+      return;
+    }
+    showOverlay('Everyone is across!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(level % 2 ? 'dryLand' : 'song')}
+       ${scoreHTML}
+       ${creditHTML()}`,
+      'Next crossing', () => { level++; levelCard(); });
+  } else if (state === 'fail') {
+    const why = failWhy === 'time'
+      ? `Not everyone got across in time. <b>Tap the dawdlers</b> quickly so nobody holds up the line!`
+      : `The water splashed down three times. Watch the bars and <b>tap a wall as soon as it turns yellow</b>.`;
+    showOverlay(failWhy === 'time' ? 'Hurry, hurry!' : 'Splash!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${why}</p>
+       ${verseHTML('fight')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">God holds the waters still while you rest. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+let down = null;
+
+// The thing that most needs help right now (keyboard players)
+function mostUrgent() {
+  const stopped = travellers.filter((p) => !p.done && p.state === 'stop').sort((a, b) => b.stopT - a.stopT)[0];
+  const weak = walls.filter((w) => w.spill <= 0).sort((a, b) => a.s - b.s)[0];
+  if (weak && weak.s < 0.4) return { wall: weak };
+  if (stopped) return { p: stopped };
+  if (weak && weak.s < 0.7) return { wall: weak };
+  return null;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && e.code === 'Space' && !e.repeat) {
+    const u = mostUrgent();
+    if (u && u.wall) fixWall(u.wall);
+    else if (u && u.p) walkOn(u.p, true);
+  }
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function tapAt(x, y) {
+  // a dawdler near the tap? hurry them along
+  let bestP = null, bestD = HURRY_R;
+  for (const p of travellers) {
+    if (p.done || p.state !== 'stop') continue;
+    const d = Math.hypot(p.x - x, p.y - 30 - y);
+    if (d < bestD) { bestD = d; bestP = p; }
+  }
+  if (bestP) { walkOn(bestP, true); return; }
+  // otherwise: the wall on that side of the path, at that height
+  if (y < SEA_TOP - 30 || y > SEA_BOT + 30) return;
+  const side = x < cx() ? -1 : 1;
+  const w = segAt(side, y);
+  fixWall(w);
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  // Tap-first: act at once on touch
+  tapAt(p.vx, p.vy - offY);
+  down = { id: e.pointerId };
+});
+const endPress = () => { down = null; };
+canvas.addEventListener('pointerup', endPress);
+canvas.addEventListener('pointercancel', endPress);
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fix(w) { if (this.ctx) Music.tap(clamp(1 - (w.k + 0.5) / cfg.segs, 0, 1) * 0.8 + 0.1); this.noiseBurst(900, 0.35, 0.12, 0.7, 2400); },
+  hup() { this.tone(660, 0.12, 'triangle', 0.18, 0, 880); this.tone(880, 0.14, 'triangle', 0.14, 0.1, 990); },
+  baa() { this.tone(420, 0.4, 'sawtooth', 0.06, 0, 380); this.tone(430, 0.3, 'triangle', 0.1, 0.05, 390); },
+  grumble() { this.tone(120, 0.45, 'sawtooth', 0.1, 0, 90); this.tone(100, 0.35, 'triangle', 0.16, 0.1, 80); },
+  cross(n) { if (this.ctx) Music.tap(0.2 + (n % 7) * 0.11); },
+  splash() { this.noiseBurst(700, 0.7, 0.4, 0.6, 200, 'lowpass'); this.tone(200, 0.3, 'sine', 0.25, 0, 90); },
+  wave() { this.noiseBurst(300, 1.2, 0.18, 0.6, 900); },
+  thump() { this.noiseBurst(500, 0.4, 0.3, 0.7, 150, 'lowpass'); },
+  close() { this.noiseBurst(400, 2.2, 0.3, 0.5, 120, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHeart(x, y, s, full) {
+  ctx.fillStyle = full ? '#e8506a' : 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.7, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.7, y - s * 1.3, x + s * 1.6, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill();
+}
+
+function drawChariot(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  // a tiny, far-away chariot: horse and wheel, nothing scary
+  ctx.fillStyle = '#7a5a3a';
+  ctx.beginPath(); ctx.ellipse(-8, -6, 7, 4, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(-2, -11, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8b53a';
+  roundRect(1, -10, 10, 7, 2); ctx.fill();
+  ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(6, -2, 4, 0, TAU); ctx.stroke();
+  ctx.restore();
+}
+
+function drawHUD() {
+  const playing = state !== 'title' && state !== 'intro';
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(14,30,60,0.85)'); hg.addColorStop(1, 'rgba(14,30,60,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffe9a8';
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(!playing ? 'Through the Red Sea' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (playing) {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore}`, viewW - 12, 26);
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < cfg.hearts; k++) drawHeart(22 + k * 24, 48, 8, k < hearts);
+    // the chariot timer: little chariots creep toward the sea
+    const x0 = 100, x1 = viewW - 46, y = 48;
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(x0, y - 5, x1 - x0, 10, 5); ctx.fill();
+    const f = clamp(1 - timeLeft / timeMax, 0, 1);
+    ctx.fillStyle = f > 0.75 ? '#ff9a6a' : '#e9c36e';
+    roundRect(x0, y - 5, (x1 - x0) * f, 10, 5); ctx.fill();
+    drawChariot(x0 + (x1 - x0) * f - 6, y + 4, 1.1);
+    ctx.fillStyle = '#7fd0e8';
+    ctx.beginPath(); ctx.ellipse(x1 + 20, y, 14, 7, 0, 0, TAU); ctx.fill();
+    // people across
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.textAlign = 'right';
+    ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.fillText(`Across ${crossed} / ${cfg.count}`, viewW - 12, 90);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = viewH - 30 - (lines.length - 1) * 28;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(14,30,60,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function drawTag(text, x, y) {
+  ctx.save();
+  ctx.font = '700 14px Fredoka, sans-serif';
+  const w = ctx.measureText(text).width + 18, h = 24;
+  const bx = clamp(x - w / 2, 6, viewW - w - 6), by = y - h;
+  const pulse = 1 + Math.sin(t * 8) * 0.05;
+  ctx.translate(x, by + h / 2); ctx.scale(pulse, pulse); ctx.translate(-x, -(by + h / 2));
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  roundRect(bx, by, w, h, 10); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 6, by + h); ctx.lineTo(x, by + h + 8); ctx.lineTo(x + 6, by + h); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, bx + w / 2, by + h / 2 + 1);
+  ctx.restore();
+}
+
+function drawTraveller(p, s = 0.78) {
+  const walking = p.state === 'walk' && !p.done;
+  const stopped = p.state === 'stop';
+  if (p.kind === 'sheep' || p.kind === 'goat') drawSheep(p.x, p.y, s * 1.05, walking, stopped, p.kind === 'goat');
+  else if (p.kind === 'camel') drawCamel(p.x, p.y, s * 0.95, walking, stopped, p.load);
+  else {
+    const d = p.look;
+    d.walk = walking;
+    if (!p.done) d.mood = p.wet > 0 ? 'shock' : stopped ? 'wow' : 'watch';
+    drawPerson(d, p.x, p.y, s, stopped ? cx() + (p.x < cx() ? -300 : 300) : p.x, p.y - 200);
+  }
+  if (p.wet > 0) {
+    ctx.fillStyle = 'rgba(160,220,255,0.8)';
+    for (let k = 0; k < 3; k++) { const yy = p.y - 60 + ((t * 80 + k * 20) % 50); ctx.beginPath(); ctx.arc(p.x - 14 + k * 14, yy, 2.5, 0, TAU); ctx.fill(); }
+  }
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, (sy + offY) * scale);
+  drawSky();
+  drawShores();
+  drawSea();
+  drawPillar();
+  // Moses on the far shore, his hand stretched out over the sea; Miriam beside him
+  const mX = cx() + Math.min(pathHalf() + 40, viewW / 2 - 40), mY = SHORE_Y - 8;
+  ctx.save();
+  const glow = ctx.createRadialGradient(mX + 30, mY - 100, 4, mX + 30, mY - 100, 60);
+  glow.addColorStop(0, `rgba(255,240,180,${0.5 + 0.3 * (MOSES.lift || 0)})`); glow.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = glow; ctx.fillRect(mX - 40, mY - 170, 140, 140);
+  ctx.restore();
+  // people already across, at the back of the shore
+  const back = arrived.slice().sort((a, b) => a.y - b.y);
+  for (const a of back) drawTraveller(a, 0.62);
+  drawPerson(MOSES, mX, mY, 0.9, cx(), SEA_TOP + 200);
+  drawPerson(MIRIAM, cx() - Math.min(pathHalf() + 40, viewW / 2 - 40), mY, 0.85, cx(), SEA_TOP + 200);
+  // travellers on the path, front-most drawn last
+  if (travellers) {
+    const list = travellers.filter((p) => !p.done).sort((a, b) => a.y - b.y);
+    for (const p of list) drawTraveller(p);
+    for (const p of list) if (p.state === 'stop') drawTag(DAWDLE[p.kind], p.x, p.y - (p.kind === 'camel' ? 86 : p.kind === 'sheep' || p.kind === 'goat' ? 46 : 70));
+  }
+  drawParticles();
+  if (state === 'play' && playT < 0.5) {
+    ctx.fillStyle = `rgba(14,30,60,${1 - playT / 0.5})`;
+    ctx.fillRect(0, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updateFish(dt);
+  updateArrived(dt);
+  blinkTick(MOSES, dt); blinkTick(MIRIAM, dt);
+  MOSES.lift = Math.max(0, (MOSES.lift || 0) - dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') {
+    winT += dt;
+    // the sea closes up again behind them
+    if (winT > 0.8 && closeF === 0) sfx.close();
+    if (winT > 0.8) closeF = Math.min(1, closeF + dt / 1.6);
+    MOSES.mood = 'joy'; MIRIAM.mood = 'joy'; MIRIAM.timbrel = true;
+    for (const w of walls) w.glow = Math.max(w.glow, 0.5);
+    if (winT > 1 && Math.random() < dt * 8) spawn(rand(0, viewW), rand(SHORE_Y - 120, SHORE_Y - 20), rand(-20, 20), -40, 1.4, pick(['#ffe27a', '#f6a6c4', '#7fd0e8', '#ffffff']), rand(3, 5), 10, 'star');
+  } else if (state === 'fail') {
+    failT += dt;
+    MOSES.mood = 'worried';
+  }
+  for (const w of walls) if (state !== 'play') w.glow = Math.max(0, w.glow - dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
