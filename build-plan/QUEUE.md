@@ -2,15 +2,15 @@
 
 Work top to bottom. A scheduled run every 5 hours builds the next **two** batches that aren't done. Mark a batch `DONE` here once its games are on the menu.
 
-Status: `TODO` (not started) · `PARTIAL` (some files exist from an earlier interrupted build: read them first and finish them rather than starting over) · `DONE`.
+Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip it, and if it's still BUILDING at the next run with no builder running, treat it as PARTIAL) · `PARTIAL` (some files exist from an earlier interrupted build: read them first and finish them rather than starting over) · `DONE`.
 
 | Batch | Games (numbers in GAMES.md) | Group | Status |
 |---|---|---|---|
 | A | D1, D2, D3 | David | DONE |
 | B | M1, M2, M3, M4 | Moses | DONE |
-| C | N1, N2, N3, N4 | Noah | PARTIAL (all four files exist) |
-| D | J1, J2, J3 | Jonah | PARTIAL (all three files exist) |
-| E | 1, 2, 3, 4 | Creation | PARTIAL (let-there-be-light, seven-days, name-the-animals exist) |
+| C | N1, N2, N3, N4 | Noah | BUILDING |
+| D | J1, J2, J3 | Jonah | BUILDING |
+| E | 1, 2, 3, 4 | Creation | BUILDING (let-there-be-light, seven-days, name-the-animals exist) |
 | F | 9, 10, 11 | Noah + Abraham | PARTIAL (all three files exist) |
 | G | 12, 13, 14 | Abraham + Jacob | PARTIAL (all three files exist) |
 | H | 15, 16, 17 | Jacob | PARTIAL (all three files exist) |
