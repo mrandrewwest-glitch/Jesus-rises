@@ -42,7 +42,15 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   await p.waitForTimeout(1500);
   res.stateAfterPlaying = await p.evaluate(() => state);
   // If the random taps lost the level, start it again so pause can be tested.
-  if (res.stateAfterPlaying !== 'play') { await p.evaluate(() => startLevel()); await p.waitForTimeout(800); }
+  if (res.stateAfterPlaying !== 'play') {
+    await p.evaluate(() => startLevel()); await p.waitForTimeout(800);
+    // Some games show a level card or intro first: tap through it again.
+    for (let k = 0; k < 10 && (await p.evaluate(() => state)) !== 'play'; k++) {
+      const box = await p.evaluate(() => { const b = document.getElementById('ovBtn'); if (!b) return null; const r = b.getBoundingClientRect(); if (!r.width) return null; const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return t === b || b.contains(t) ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null; });
+      if (box) await p.touchscreen.tap(box.x, box.y); else await p.touchscreen.tap(195, 500);
+      await p.waitForTimeout(600);
+    }
+  }
   await p.keyboard.press('KeyP'); await p.waitForTimeout(300);
   res.paused = await p.evaluate(() => state);
   need(res.paused === 'pause', 'P should pause (state "pause")');
