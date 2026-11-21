@@ -189,7 +189,7 @@ const VERSES = {
   pitch: { ref: 'Genesis 6:14', KJV: 'pitch it within and without with pitch', NKJV: 'cover it inside and outside with pitch', NIV: 'coat it with pitch inside and out', NLT: 'waterproof it with tar, inside and out' },
 };
 
-let state = 'title';      // title | play | pause | win | fail
+let state = 'title';      // title | intro (level card) | play | pause | win | fail
 let level = 1;
 let totalScore = 0;
 let best = 0;
@@ -436,17 +436,26 @@ function drawPerson(d, x, y, s, mood, lookX = 0, lookY = 0.2, extra = 0) {
 
 // A friendly pointing hand (for first-time hints)
 function drawHand(x, y, ang = -Math.PI / 2) {
+  // a cartoon pointing hand: index finger out, thumb at the side, the other fingers curled into the fist
   const bob = Math.sin(t * 6) * 6;
   ctx.save();
   ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.translate(0, 18 + bob);
-  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // fist (sits to the right of the finger)
+  roundRect(-6, 18, 26, 30, 9); ctx.fill(); ctx.stroke();
+  // curled fingers: knuckle creases across the front of the fist
   ctx.beginPath();
-  ctx.moveTo(-5, 0); ctx.lineTo(-5, 20); ctx.quadraticCurveTo(-15, 18, -14, 28);
-  ctx.lineTo(-12, 44); ctx.quadraticCurveTo(0, 54, 14, 44); ctx.lineTo(16, 26);
-  ctx.quadraticCurveTo(16, 20, 9, 20); ctx.lineTo(5, 20); ctx.lineTo(5, 0);
-  ctx.quadraticCurveTo(0, -6, -5, 0); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-1, 22); ctx.lineTo(-1, 30); ctx.moveTo(6, 22); ctx.lineTo(6, 30); ctx.stroke();
+  for (const ky of [26, 33, 40]) { ctx.moveTo(7, ky); ctx.quadraticCurveTo(13, ky + 2.5, 19, ky); }
+  ctx.stroke();
+  // thumb, tucked along the left side
+  ctx.beginPath(); ctx.ellipse(-8, 32, 5, 9, 0.35, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // pointing index finger
+  ctx.beginPath();
+  ctx.moveTo(-5, 26); ctx.lineTo(-5, 4); ctx.quadraticCurveTo(-5, -2, 0, -2); ctx.quadraticCurveTo(5, -2, 5, 4); ctx.lineTo(5, 26);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffe0bd'; ctx.fillRect(-3.5, 18, 7, 9);   // join finger and fist smoothly
+  ctx.strokeStyle = 'rgba(160,100,58,0.6)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-2.5, 11); ctx.lineTo(2.5, 11); ctx.stroke();   // finger crease
   ctx.restore();
 }
 
@@ -577,7 +586,7 @@ const sfx = {
 
 // Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
 function syncAmbience() {
-  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
 }
 document.addEventListener('visibilitychange', syncAmbience);
 window.addEventListener('pageshow', syncAmbience);
@@ -994,10 +1003,30 @@ function titleScreen() {
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
-    'Start building', () => { level = 1; totalScore = 0; attempted = 0; startLevel(); });
+    'Start building', () => { level = 1; totalScore = 0; attempted = 0; levelCard(); });
 }
 
-function startLevel(retry = false) {
+// The card before each level: what's new, and what to build
+const LEVEL_TIPS = [
+  'Tap the <b>glowing piece</b> in the timber pile, then tap the <b>glowing spot</b> on the ark. The little hand shows you how!',
+  'Now the ark has <b>rooms</b>. Watch out: some pieces <b>don’t fit</b> (a wheel, a twig, a bent plank). Leave them alone!',
+  'A bigger ark with <b>three decks</b> and two floors of rooms. No more name labels: look closely at each piece!',
+  'The <b>wind</b> lifts pieces into the sky: <b>tap a flying piece</b> to catch it. Every gap now needs <b>two coats</b> of pitch.',
+  'The biggest ark of all, and the wind is getting stronger. Work quickly and carefully!',
+  'The whole great ark, with lots of odd pieces in the pile, before the rain comes. Can you do it?',
+];
+function levelCard() {
+  state = 'intro';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[Math.min(level, LEVEL_TIPS.length) - 1]}</p>
+     <p class="score">Parts to fit: <b>${slots.length}</b> &middot; Gaps to seal: <b>${gaps.length}</b><br>Rain in: <b>${cfg.time}s</b></p>
+     ${verseHTML(level % 2 ? 'make' : 'door')}`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
   cfg = makeConfig(level);
   buildSlots();
   phase = 'build';
@@ -1011,12 +1040,16 @@ function startLevel(retry = false) {
   told = {};
   hammerT = 0; shakeT = 0;
   keys.clear();
+  fillTray();
+  for (let i = 0; i < tray.length; i++) if (tray[i]) tray[i].y = trayLayout(i).y + 80 + i * 40;
+}
+
+function startLevel(retry = false) {
+  if (retry || state !== 'intro') resetLevel();
   hideOverlay();
   state = 'play';
   syncAmbience();
   sfx.levelStart();
-  fillTray();
-  for (let i = 0; i < tray.length; i++) if (tray[i]) tray[i].y = trayLayout(i).y + 80 + i * 40;
   showMessage(`Level ${level}: ${cfg.name}`, 2.2);
   attempted++;
   const hint = level === 1 ? 'Tap the glowing piece of wood!' : level === 2 ? 'Watch out: some pieces don’t fit!' : level === 3 ? 'A bigger ark: two floors of rooms!' : level === 4 ? 'Wind! Tap a flying piece to catch it.' : null;
@@ -1036,7 +1069,7 @@ function endScreens(dt) {
        <p class="score">Time left: <b>${s.timeBonus}</b><br>Careful building (${wrongs} wrong): <b>${s.careBonus}</b><br>${catches ? `Pieces caught: <b>${s.catchBonus}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
-      level < LEVELS.length ? 'Next level' : 'Build again, faster!', () => { level++; startLevel(); });
+      level < LEVELS.length ? 'Next level' : 'Build again, faster!', () => { level++; levelCard(); });
   } else if (state === 'fail') {
     const left = slots.length - nextSlot, open = gaps.filter((g) => g.coats < g.need).length;
     showOverlay('Drip, drip…', `Level ${level} — ${cfg.name}`,
@@ -1677,7 +1710,7 @@ function drawHint() {
       drawHand(c.x, c.y + 6, -Math.PI / 2);
     } else {
       const i = tray.findIndex((p) => p && !p.decoy && p.kind === next.kind);
-      if (i >= 0 && !drag) drawHand(tray[i].x, tray[i].y + 18, -Math.PI / 2);
+      if (i >= 0 && !drag) drawHand(tray[i].x, tray[i].y - 30, Math.PI / 2);   // from above, so it never hangs off the screen
     }
   } else {
     const g = gaps.find((q) => q.coats < q.need);

@@ -184,11 +184,13 @@ const VERSES = {
   // Win card
   oliveLeaf: { ref: 'Genesis 8:11', KJV: 'And the dove came in to him in the evening; and, lo, in her mouth was an olive leaf pluckt off: so Noah knew that the waters were abated from off the earth.', NKJV: 'Then the dove came to him in the evening, and behold, a freshly plucked olive leaf was in her mouth; and Noah knew that the waters had receded from the earth.', NIV: 'When the dove returned to him in the evening, there in its beak was a freshly plucked olive leaf! Then Noah knew that the water had receded from the earth.', NLT: 'This time the dove returned to him in the evening with a fresh olive leaf in its beak. Then Noah knew that the floodwaters were almost gone.' },
   window: { ref: 'Genesis 8:6', KJV: 'And it came to pass at the end of forty days, that Noah opened the window of the ark which he had made:', NKJV: 'So it came to pass, at the end of forty days, that Noah opened the window of the ark which he had made.', NIV: 'After forty days Noah opened a window he had made in the ark', NLT: 'After another forty days, Noah opened the window he had made in the boat' },
+  // Level card (the raven)
+  raven: { ref: 'Genesis 8:7', KJV: 'And he sent forth a raven, which went forth to and fro, until the waters were dried up from off the earth.', NKJV: 'Then he sent out a raven, which kept going to and fro until the waters had dried up from the earth.', NIV: 'And sent out a raven, and it kept flying back and forth until the water had dried up from the earth.', NLT: 'And released a raven. The bird flew back and forth until the floodwaters on the earth had dried up.' },
   // Fail card
   noRest: { ref: 'Genesis 8:9', KJV: 'But the dove found no rest for the sole of her foot, and she returned unto him into the ark', NKJV: 'But the dove found no resting place for the sole of her foot, and she returned into the ark to him', NIV: 'But the dove could find nowhere to perch... so it returned to Noah in the ark.', NLT: 'But the dove could find no place to land... So it returned to the boat' },
 };
 
-let state = 'title';      // title | play | pause | win | fail
+let state = 'title';      // title | intro (level card) | play | pause | win | fail
 let level = 1;
 let totalScore = 0;
 let best = 0;
@@ -435,17 +437,26 @@ function drawPerson(d, x, y, s, mood, lookX = 0, lookY = 0.2, extra = 0) {
 
 // A friendly pointing hand (for first-time hints)
 function drawHand(x, y, ang = -Math.PI / 2) {
+  // a cartoon pointing hand: index finger out, thumb at the side, the other fingers curled into the fist
   const bob = Math.sin(t * 6) * 6;
   ctx.save();
   ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.translate(0, 18 + bob);
-  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // fist (sits to the right of the finger)
+  roundRect(-6, 18, 26, 30, 9); ctx.fill(); ctx.stroke();
+  // curled fingers: knuckle creases across the front of the fist
   ctx.beginPath();
-  ctx.moveTo(-5, 0); ctx.lineTo(-5, 20); ctx.quadraticCurveTo(-15, 18, -14, 28);
-  ctx.lineTo(-12, 44); ctx.quadraticCurveTo(0, 54, 14, 44); ctx.lineTo(16, 26);
-  ctx.quadraticCurveTo(16, 20, 9, 20); ctx.lineTo(5, 20); ctx.lineTo(5, 0);
-  ctx.quadraticCurveTo(0, -6, -5, 0); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-1, 22); ctx.lineTo(-1, 30); ctx.moveTo(6, 22); ctx.lineTo(6, 30); ctx.stroke();
+  for (const ky of [26, 33, 40]) { ctx.moveTo(7, ky); ctx.quadraticCurveTo(13, ky + 2.5, 19, ky); }
+  ctx.stroke();
+  // thumb, tucked along the left side
+  ctx.beginPath(); ctx.ellipse(-8, 32, 5, 9, 0.35, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // pointing index finger
+  ctx.beginPath();
+  ctx.moveTo(-5, 26); ctx.lineTo(-5, 4); ctx.quadraticCurveTo(-5, -2, 0, -2); ctx.quadraticCurveTo(5, -2, 5, 4); ctx.lineTo(5, 26);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffe0bd'; ctx.fillRect(-3.5, 18, 7, 9);   // join finger and fist smoothly
+  ctx.strokeStyle = 'rgba(160,100,58,0.6)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-2.5, 11); ctx.lineTo(2.5, 11); ctx.stroke();   // finger crease
   ctx.restore();
 }
 
@@ -576,7 +587,7 @@ const sfx = {
 
 // Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
 function syncAmbience() {
-  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
 }
 document.addEventListener('visibilitychange', syncAmbience);
 window.addEventListener('pageshow', syncAmbience);
@@ -802,6 +813,8 @@ function updateDove(dt) {
   if (dove.ready) {
     dove.y = arkWin().y + Math.sin(t * 3) * 8;
     dove.flapT = (t * 4) % 0.28;
+    // she can't wait for ever: after a few seconds she sets off by herself
+    if (playT > (level === 1 ? 7 : 4.5)) { flap(); showMessage('Off she goes! Tap to flap!', 2.2); }
     return;
   }
   // wind in a gust column
@@ -815,7 +828,7 @@ function updateDove(dt) {
   dove.hurtT = Math.max(0, dove.hurtT - dt);
   if (dove.y < ceilY() + DOVE_R) {
     dove.y = ceilY() + DOVE_R; dove.vy = Math.max(dove.vy, 120);
-    if (cfg.n >= 2) hurt('sky');     // from level 2 a band of storm clouds hangs along the top
+    hurt('sky');     // a band of storm clouds hangs along the top of the sky
   }
   // the water (or the land)
   const gy = groundAt(dove.x);
@@ -938,10 +951,30 @@ function titleScreen() {
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
-    'Open the window', () => { level = 1; totalScore = 0; startLevel(); });
+    'Open the window', () => { level = 1; totalScore = 0; levelCard(); });
 }
 
-function startLevel(retry = false) {
+// The card before each level: what's new
+const LEVEL_TIPS = [
+  '<b>Tap</b> to flap and fly over the water. Find the <b>olive leaf</b> on the dry land, then fly home through the <b>ark window</b>.',
+  '<b>Swirly wind</b> pushes you up or down. Watch for the white swirls and tap a little more, or a little less!',
+  'A <b>cheeky raven</b> flies to and fro. Dodge him, and keep away from the storm clouds!',
+  'Now it is <b>raining</b>: wet wings feel heavier, so flap a little more often.',
+  '<b>Strong winds</b> and more ravens. Short taps keep the dove steady.',
+  'The long way home, with only <b>three feathers</b>. Fly carefully!',
+];
+function levelCard() {
+  state = 'intro';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[Math.min(level, LEVEL_TIPS.length) - 1]}</p>
+     <p class="score">Feathers: <b>${cfg.feathers}</b>${cfg.gusts ? ' &middot; Wind!' : ''}${cfg.ravens ? ' &middot; Ravens' : ''}${cfg.rain ? ' &middot; Rain' : ''}</p>
+     ${verseHTML(level === 3 ? 'raven' : level % 2 ? 'sentDove' : 'window')}`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
   cfg = makeConfig(level);
   buildCourse();
   const w = arkWin();
@@ -950,8 +983,13 @@ function startLevel(retry = false) {
   camX = dove.x - W * 0.3;
   playT = 0; winT = 0; failT = 0; endTimer = 0;
   ravenT = 4; rain = []; splashes = []; particles = [];
-  told = retry ? { go: true } : (level > 1 ? { go: true } : {});
+  told = level > 1 ? { go: true } : {};
   shakeT = 0;
+}
+
+function startLevel(retry = false) {
+  if (retry || state !== 'intro') resetLevel();
+  if (retry) told.go = true;
   hideOverlay();
   state = 'play';
   syncAmbience();
@@ -974,7 +1012,7 @@ function endScreens(dt) {
        <p class="score">Feathers kept (${feathers}): <b>${s.featherBonus}</b><br>Sparkles (${sparklesGot}): <b>${s.sparkleBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
-      level < LEVELS.length ? 'Fly again' : 'Fly once more!', () => { level++; startLevel(); });
+      level < LEVELS.length ? 'Next flight' : 'Fly once more!', () => { level++; levelCard(); });
   } else if (state === 'fail') {
     showOverlay('Back to the ark', `Level ${level} — ${cfg.name}`,
       `${verseHTML('noRest')}
@@ -1372,7 +1410,7 @@ function render() {
   ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
   drawSky();
   for (const g of gusts) drawGust(g);
-  if (cfg.n >= 2) drawStormBand();
+  drawStormBand();
   drawLand();
   for (const o of obstacles) if (o.kind === 'tree') drawTree(o);
   drawWater();

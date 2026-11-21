@@ -185,7 +185,7 @@ const VERSES = {
   seasons: { ref: 'Genesis 8:22', KJV: 'While the earth remaineth, seedtime and harvest, and cold and heat, and summer and winter, and day and night shall not cease.', NKJV: 'While the earth remains, Seedtime and harvest, Cold and heat, Winter and summer, And day and night Shall not cease.', NIV: 'As long as the earth endures, seedtime and harvest, cold and heat, summer and winter, day and night will never cease.', NLT: 'As long as the earth remains, there will be planting and harvest, cold and heat, summer and winter, day and night.' },
 };
 
-let state = 'title';      // title | play | pause | win | fail
+let state = 'title';      // title | intro (level card) | play | pause | win | fail
 let level = 1;
 let totalScore = 0;
 let best = 0;
@@ -432,17 +432,26 @@ function drawPerson(d, x, y, s, mood, lookX = 0, lookY = 0.2, extra = 0) {
 
 // A friendly pointing hand (for first-time hints)
 function drawHand(x, y, ang = -Math.PI / 2) {
+  // a cartoon pointing hand: index finger out, thumb at the side, the other fingers curled into the fist
   const bob = Math.sin(t * 6) * 6;
   ctx.save();
   ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.translate(0, 18 + bob);
-  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#ffe0bd'; ctx.strokeStyle = '#a0643a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // fist (sits to the right of the finger)
+  roundRect(-6, 18, 26, 30, 9); ctx.fill(); ctx.stroke();
+  // curled fingers: knuckle creases across the front of the fist
   ctx.beginPath();
-  ctx.moveTo(-5, 0); ctx.lineTo(-5, 20); ctx.quadraticCurveTo(-15, 18, -14, 28);
-  ctx.lineTo(-12, 44); ctx.quadraticCurveTo(0, 54, 14, 44); ctx.lineTo(16, 26);
-  ctx.quadraticCurveTo(16, 20, 9, 20); ctx.lineTo(5, 20); ctx.lineTo(5, 0);
-  ctx.quadraticCurveTo(0, -6, -5, 0); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-1, 22); ctx.lineTo(-1, 30); ctx.moveTo(6, 22); ctx.lineTo(6, 30); ctx.stroke();
+  for (const ky of [26, 33, 40]) { ctx.moveTo(7, ky); ctx.quadraticCurveTo(13, ky + 2.5, 19, ky); }
+  ctx.stroke();
+  // thumb, tucked along the left side
+  ctx.beginPath(); ctx.ellipse(-8, 32, 5, 9, 0.35, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // pointing index finger
+  ctx.beginPath();
+  ctx.moveTo(-5, 26); ctx.lineTo(-5, 4); ctx.quadraticCurveTo(-5, -2, 0, -2); ctx.quadraticCurveTo(5, -2, 5, 4); ctx.lineTo(5, 26);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffe0bd'; ctx.fillRect(-3.5, 18, 7, 9);   // join finger and fist smoothly
+  ctx.strokeStyle = 'rgba(160,100,58,0.6)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-2.5, 11); ctx.lineTo(2.5, 11); ctx.stroke();   // finger crease
   ctx.restore();
 }
 
@@ -573,7 +582,7 @@ const sfx = {
 
 // Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
 function syncAmbience() {
-  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
 }
 document.addEventListener('visibilitychange', syncAmbience);
 window.addEventListener('pageshow', syncAmbience);
@@ -924,6 +933,7 @@ let lastScore = null;
 let shakeT = 0;
 let cheerT = 0;
 let idSeq = 0;
+let winDelay = 0;         // counts down after the last band, then the level is won
 
 const FAMILY = [
   { robe: '#8a6a45', hair: '#f4f1ea', skin: '#d9a066', beard: true, longBeard: true, scarf: '#e8dcc0', phase: 0 },
@@ -1006,7 +1016,7 @@ function tapDrop(d) {
       cur++;
       sfx.tap(cur / bands.length);
       cheerT = 1;
-      if (cur >= bands.length) setTimeout(() => { if (state === 'play') win(); }, 700);
+      if (cur >= bands.length) winDelay = 0.7;   // game time: let the last drop land first
       else {
         const nx = need();
         if (cfg.double && cur === 7) showMessage('A second rainbow! Paint it too, starting with red.', 2.6);
@@ -1080,16 +1090,40 @@ function titleScreen() {
      </ul>
      ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
      ${creditHTML()}`,
-    'Paint the rainbow', () => { level = 1; totalScore = 0; startLevel(); });
+    'Paint the rainbow', () => { level = 1; totalScore = 0; levelCard(); });
 }
 
-function startLevel(retry = false) {
+// The card before each level: what's new
+const LEVEL_TIPS = [
+  'Paint the rainbow from the outside in: <b>red, orange, yellow, green, blue, indigo, violet</b>. The <b>colour box</b> at the top shows which colour is next. Tap only that colour!',
+  'Each colour needs <b>two drops</b> now, and they float a little faster.',
+  'Drops come from <b>above</b> as well as below. Look all over the sky!',
+  'Some drops <b>change colour</b> as they float. Wait for the right colour, then tap!',
+  'Three drops for every colour, and grey <b>raindrops</b> too. Leave the raindrops alone!',
+  'A <b>double rainbow</b>! Paint the big one, then the second one inside it.',
+];
+function levelCard() {
+  state = 'intro';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[Math.min(level, LEVEL_TIPS.length) - 1]}</p>
+     <p class="score">Drops per colour: <b>${cfg.per}</b> &middot; Smudges allowed: <b>${cfg.smudges - 1}</b><br>Sunset in: <b>${cfg.time}s</b></p>
+     ${verseHTML(level % 2 ? 'seasons' : 'remember')}`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
   cfg = makeConfig(level);
   buildBands();
   drops = []; flyers = []; smudges = []; particles = [];
   wrong = 0; timeLeft = cfg.time; spawnT = 0.3;
   playT = 0; winT = 0; failT = 0; endTimer = 0;
-  told = {}; shakeT = 0; cheerT = 0; hilite = -1;
+  told = {}; shakeT = 0; cheerT = 0; hilite = -1; winDelay = 0;
+}
+
+function startLevel(retry = false) {
+  if (retry || state !== 'intro') resetLevel();
   hideOverlay();
   state = 'play';
   syncAmbience();
@@ -1112,7 +1146,7 @@ function endScreens(dt) {
        <p class="score">Time left: <b>${s.timeBonus}</b><br>Careful painting (${wrong} smudge${wrong === 1 ? '' : 's'}): <b>${s.careBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
        <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
        ${creditHTML()}`,
-      level < LEVELS.length ? 'Next rainbow' : 'Paint again, faster!', () => { level++; startLevel(); });
+      level < LEVELS.length ? 'Next rainbow' : 'Paint again, faster!', () => { level++; levelCard(); });
   } else if (state === 'fail') {
     showOverlay(wrong >= cfg.smudges ? 'Smudgy rainbow' : 'Sunset', `Level ${level} — ${cfg.name}`,
       `<p style="text-align:center">${wrong >= cfg.smudges ? 'Too many wrong colours went on the rainbow.' : 'The sun set before the rainbow was finished.'} Look at the <b>colour box</b> at the top: tap only drops of <b>that</b> colour.</p>
@@ -1155,6 +1189,7 @@ function update(dt) {
   for (const b of bands) b.glow = Math.max(0, b.glow - dt * 1.5);
   if (state === 'play') {
     playT += dt;
+    if (winDelay > 0) { winDelay -= dt; if (winDelay <= 0) { winDelay = 0; win(); return; } }
     timeLeft -= dt;
     if (timeLeft <= 0) { timeLeft = 0; if (cur < bands.length) fail(); }
     spawnT -= dt;

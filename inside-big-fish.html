@@ -947,7 +947,7 @@ function drawBigFish(x, y, s, mouth = 0, wink = 0, tailT = 0) {
 // ============================================================
 const TOPH = 112;
 const SPEED = 5.2;         // cells per second
-const BUMP_COST = 3;       // seconds of daylight lost when a little fish bumps Jonah
+const BUMP_COST = 2.5;     // seconds of daylight lost when a little fish bumps Jonah
 const WEED_COST = 2;
 const BEST_KEY = 'bigFishBest';
 const N = 1, E = 2, S = 4, Wd = 8;
@@ -972,11 +972,11 @@ function makeConfig(n) {
     lights: [3, 3, 4, 4, 5, 5, 6, 6][k],
     weeds: [1, 2, 3, 3, 4, 5, 6, 6][k],
     fish: [0, 1, 2, 3, 3, 4, 5, 6][k],
-    fishSpeed: 1.4 + k * 0.18,
+    fishSpeed: 1.4 + k * 0.14,
     loops: [1, 2, 3, 4, 5, 6, 7, 8][k],
     dark: [0, 0, 2.7, 2.4, 2.1, 1.9, 1.8, 1.7][k],   // light radius in cells (0 = no darkness)
     hints: [Infinity, 3, 2, 1, 0, 0, 0, 0][k],
-    secPerCell: [1.0, 0.75, 0.62, 0.55, 0.5, 0.46, 0.43, 0.41][k],
+    secPerCell: [1.0, 0.78, 0.66, 0.6, 0.56, 0.53, 0.5, 0.48][k],
   };
 }
 
@@ -1222,7 +1222,7 @@ function arrive() {
   // a seaweed tangle?
   const w = weeds.find((q) => q.c === c && q.r === r);
   if (w && !w.cool) {
-    jonah.tangle = 1.1; dayLeft = Math.max(0.5, dayLeft - WEED_COST); w.cool = 2.5;
+    jonah.tangle = 1.1; dayLeft = Math.max(0.5, dayLeft - WEED_COST); w.cool = 9;   // squashed flat for a while, so the way back is free
     sfx.bump(); showMessage('Tangled in seaweed!', 1.4);
     if (!told.weed) { told.weed = true; setTimeout(() => showMessage('Go around the seaweed if you can', 2.2), 1500); }
     jonah.want = 0; jonah.dir = 0;
@@ -1280,29 +1280,38 @@ function updateSwimmers(dt) {
   for (const s of swimmers) {
     s.cool = Math.max(0, s.cool - dt);
     s.dart = Math.max(0, (s.dart || 0) - dt);
+    s.pass = Math.max(0, (s.pass || 0) - dt);
     s.f += s.speed * (s.dart > 0 ? 2.2 : 1) * dt;
     if (s.f >= 1) {
       s.c = s.tc; s.r = s.tr; s.f = 0;
-      // little fish never swim into the cell where Jonah is standing (they swim round him)
-      const jc = moving() ? null : { c: jonah.c, r: jonah.r };
-      const outs = [N, E, S, Wd].filter((d) => {
+      // little fish never swim into the cell where Jonah is (or is walking to): they swim round him
+      const jonahAt = (c, r) => (c === jonah.tc && r === jonah.tr) || (moving() && c === jonah.c && r === jonah.r);
+      const ways = [N, E, S, Wd].filter((d) => {
         if (!canGo(s.c, s.r, d)) return false;
         const nc = s.c + DIRS[d][0], nr = s.r + DIRS[d][1];
-        if (maze.exit.c === nc && maze.exit.r === nr) return false;
-        return !(jc && jc.c === nc && jc.r === nr);
+        return !(maze.exit.c === nc && maze.exit.r === nr);
       });
+      let outs = ways.filter((d) => !jonahAt(s.c + DIRS[d][0], s.r + DIRS[d][1]));
+      // cornered in a dead end by Jonah: the little fish slips quietly past him (no bump),
+      // so it can never block a prayer light for good
+      if (!outs.length && ways.length) { outs = ways; s.pass = 1.6 / s.speed; }
       let ch = outs.filter((d) => d !== OPP[s.dir]);
       if (!ch.length) ch = outs;
       const d = ch.length ? pick(ch) : OPP[s.dir];
       s.dir = d; s.tc = s.c + DIRS[d][0]; s.tr = s.r + DIRS[d][1];
       if (d === E) s.flip = 1; if (d === Wd) s.flip = -1;
     }
-    // Jonah has stopped right where this little fish was heading: it turns back
-    if (!moving() && s.tc === jonah.c && s.tr === jonah.r && s.f < 0.45) {
+    // Jonah is in (or walking into) the cell this little fish was heading for: it turns back
+    if (!s.pass && s.cool <= 0 && s.tc === jonah.tc && s.tr === jonah.tr && s.f < 0.45) {
       const c = s.tc, r = s.tr; s.tc = s.c; s.tr = s.r; s.c = c; s.r = r; s.f = 1 - s.f; s.dir = OPP[s.dir] || s.dir; s.flip *= -1;
     }
+    // nose to nose in a narrow tunnel (it can't get out of the way): the little fish slips over Jonah
+    if (!s.pass && moving() && s.c === jonah.tc && s.r === jonah.tr && s.tc === jonah.c && s.tr === jonah.r) s.pass = (1 - s.f) / s.speed + 0.3;
     const sx = lerp(s.c, s.tc, s.f), sy = lerp(s.r, s.tr, s.f);
-    if (state === 'play' && s.cool <= 0 && jonah.stun <= 0 && Math.hypot(sx - jp.x, sy - jp.y) < 0.55) {
+    // Jonah catching up with a little fish from behind or the side: it just wriggles past him.
+    // Only a fish swimming straight AT Jonah bumps him.
+    if (!s.pass && Math.hypot(sx - jp.x, sy - jp.y) < 0.48 && (s.tc - s.c) * (jp.x - sx) + (s.tr - s.r) * (jp.y - sy) <= 0) s.pass = 0.6;
+    if (state === 'play' && s.cool <= 0 && !s.pass && jonah.stun <= 0 && Math.hypot(sx - jp.x, sy - jp.y) < 0.48) {
       // bump! Jonah bounces back to where he came from
       bumps++;
       s.cool = 1.5;
@@ -1661,6 +1670,10 @@ function drawWeed(w) {
   const p = cellXY(w.c, w.r), c = L.cell;
   ctx.save();
   ctx.translate(p.x, p.y + c * 0.32);
+  // squashed flat after Jonah pushed through (it slowly springs back up)
+  const flat = w.cool > 0 ? clamp(w.cool / 2, 0.25, 1) : 0;
+  ctx.scale(1, 1 - flat * 0.65);
+  ctx.globalAlpha = 1 - flat * 0.4;
   ctx.lineCap = 'round';
   for (let k = -2; k <= 2; k++) {
     const sway = Math.sin(t * 2 + w.ph + k) * c * 0.1;
@@ -1679,7 +1692,8 @@ function drawSwimmer(s) {
   const x = lerp(s.c, s.tc, s.f), y = lerp(s.r, s.tr, s.f);
   const p = cellXY(x, y), c = L.cell;
   ctx.save();
-  ctx.translate(p.x, p.y + Math.sin(t * 5 + x) * 2);
+  ctx.translate(p.x, p.y + Math.sin(t * 5 + x) * 2 - (s.pass > 0 ? c * 0.28 : 0));
+  if (s.pass > 0) ctx.globalAlpha = 0.7;   // slipping quietly past Jonah
   ctx.scale(s.flip, 1);
   const k = c / 70;
   ctx.scale(k, k);
