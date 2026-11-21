@@ -1,0 +1,1440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#7a2e1a">
+<title>Standing Firm</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #7a2e1a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Standing Firm</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'pipe', accent: 'harp', ambience: 'fire', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // The king's command (bowing part)
+  music: { ref: 'Daniel 3:5', KJV: 'at what time ye hear the sound of the cornet, flute, harp, sackbut, psaltery, dulcimer, and all kinds of musick, ye fall down and worship the golden image', NKJV: 'at the time you hear the sound of the horn, flute, harp, lyre, and psaltery, in symphony with all kinds of music, you shall fall down and worship the gold image', NIV: 'As soon as you hear the sound of the horn, flute, zither, lyre, harp, pipe and all kinds of music, you must fall down and worship the image of gold', NLT: 'When you hear the sound of the horn, flute, zither, lyre, harp, pipes, and other musical instruments, bow to the ground to worship King Nebuchadnezzar’s gold statue.' },
+  // Title card and the friends' answer
+  ifNot: { ref: 'Daniel 3:18', KJV: 'But if not, be it known unto thee, O king, that we will not serve thy gods, nor worship the golden image which thou hast set up.', NKJV: 'But if not, let it be known to you, O king, that we do not serve your gods, nor will we worship the gold image which you have set up.', NIV: 'But even if he does not, we want you to know, Your Majesty, that we will not serve your gods or worship the image of gold you have set up.', NLT: 'But even if he doesn’t, we want to make it clear to you, Your Majesty, that we will never serve your gods or worship the gold statue you have set up.' },
+  // Speech bubble before the furnace, and the fail card
+  able: { ref: 'Daniel 3:17', KJV: 'our God whom we serve is able to deliver us from the burning fiery furnace', NKJV: 'our God whom we serve is able to deliver us from the burning fiery furnace', NIV: 'the God we serve is able to deliver us from it', NLT: 'the God whom we serve is able to save us.' },
+  // The king looks into the furnace
+  four: { ref: 'Daniel 3:25', KJV: 'Lo, I see four men loose, walking in the midst of the fire, and they have no hurt', NKJV: 'I see four men loose, walking in the midst of the fire; and they are not hurt', NIV: 'Look! I see four men walking around in the fire, unbound and unharmed', NLT: 'I see four men, unbound, walking around in the fire unharmed!' },
+  fourth: { ref: 'Daniel 3:25', KJV: 'the form of the fourth is like the Son of God.', NKJV: 'the form of the fourth is like the Son of God.', NIV: 'the fourth looks like a son of the gods.', NLT: 'And the fourth looks like a god!' },
+  // Win card
+  smoke: { ref: 'Daniel 3:27', KJV: 'nor was an hair of their head singed, neither were their coats changed, nor the smell of fire had passed on them.', NKJV: 'the hair of their head was not singed nor were their garments affected, and the smell of fire was not on them.', NIV: 'nor was a hair of their heads singed; their robes were not scorched, and there was no smell of fire on them.', NLT: 'Not a hair on their heads was singed, and their clothing was not scorched. They didn’t even smell of smoke!' },
+  // Last win card
+  blessed: { ref: 'Daniel 3:28', KJV: 'Blessed be the God of Shadrach, Meshach, and Abednego, who hath sent his angel, and delivered his servants that trusted in him', NKJV: 'Blessed be the God of Shadrach, Meshach, and Abed-Nego, who sent His Angel and delivered His servants who trusted in Him', NIV: 'Praise be to the God of Shadrach, Meshach and Abednego, who has sent his angel and rescued his servants! They trusted in him', NLT: 'Praise to the God of Shadrach, Meshach, and Abednego! He sent his angel to rescue his servants who trusted in him.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function bubbleText(key) {
+  return Bible.verse(VERSES[key]).text.replace(/\.\.\.\s*/g, '… ');
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const bump = (v, a, b) => Math.max(0, Math.sin(clamp((v - a) / (b - a), 0, 1) * Math.PI));
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function mix(c1, c2, f) {
+  const a = parseInt(c1.slice(1), 16), b = parseInt(c2.slice(1), 16);
+  const r = Math.round(lerp(a >> 16, b >> 16, f)), g = Math.round(lerp((a >> 8) & 255, (b >> 8) & 255, f)), bl = Math.round(lerp(a & 255, b & 255, f));
+  return `rgb(${r},${g},${bl})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Levels
+// ============================================================
+const TOPH = 110;
+const MAX_SLIPS = 3;      // wobbles that get away before the level is lost
+const MAX_SMOKE = 3;      // sparks that reach the friends
+
+const LEVELS = [
+  { name: 'The Band Begins',     swells: 6,  win: 2.4,  simul: 1, decoys: 0, gap: 2.7,  rows: 3, fdur: 18, every: 1.3,  speed: 70,  zig: 0,  big: 0 },
+  { name: 'Louder and Louder',   swells: 8,  win: 2.0,  simul: 1, decoys: 0, gap: 2.2,  rows: 4, fdur: 22, every: 1.0,  speed: 85,  zig: 0,  big: 0 },
+  { name: 'The Crowd Pushes',    swells: 10, win: 1.7,  simul: 2, decoys: 2, gap: 1.9,  rows: 4, fdur: 24, every: 0.82, speed: 100, zig: 30, big: 0 },
+  { name: 'Seven Times Hotter',  swells: 12, win: 1.45, simul: 2, decoys: 3, gap: 1.65, rows: 5, fdur: 26, every: 0.68, speed: 112, zig: 40, big: 0.15 },
+  { name: 'Standing Firm',       swells: 14, win: 1.2,  simul: 3, decoys: 4, gap: 1.4,  rows: 5, fdur: 28, every: 0.56, speed: 125, zig: 50, big: 0.25 },
+];
+const NEXT_TIPS = [
+  'Next time the band plays <b>more songs</b> and the friends wobble <b>faster</b>!',
+  'Next time the crowd pushes on <b>two friends at once</b>, and <b>other people sway too</b>. Only tap the three friends with the <b>golden glow</b>!',
+  'Next time the furnace is <b>seven times hotter</b>: watch for <b>big sparks</b> that need two taps.',
+  'The last time is the hardest. <b>Stand firm!</b>',
+];
+const FRIENDS = [
+  { name: 'Shadrach', robe: '#c0392b', skin: '#d39a66', hair: '#3a2716', beard: true },
+  { name: 'Meshach',  robe: '#2f8a4a', skin: '#c98d56', hair: '#2a1a0e', beard: false },
+  { name: 'Abednego', robe: '#2f6fb5', skin: '#b87a48', hair: '#1f140c', beard: true },
+];
+const CROWD_ROBES = ['#8a7a5c', '#9a6a4a', '#7a6a8a', '#6a7a6a', '#a08060', '#806a5a', '#9a8a6a', '#6a6a7a'];
+const SKINS = ['#d9a066', '#c98d56', '#e3b184', '#b87a48', '#d7a070', '#c58a55'];
+const HAIRS = ['#3a2716', '#2e1d10', '#4a2f1a', '#1f140c', '#6b3f1d', '#8a8a8a'];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | pause | win | fail | done
+let phase = 'bow';        // bow | walk | furnace | out
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0, furnaceScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('fieryFurnaceBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0, phaseT = 0, winT = 0, failT = 0;
+let friends = [], crowd = [], band = [], walkers = [], embers = [];
+let particles = [];
+let slips = 0, smoke = 0, steadies = 0, mistakes = 0, popped = 0;
+let swellsDone = 0, nextSwell = 2, swellT = 0;
+let lockT = 0;              // a short fumble after tapping the wrong person
+let nextEmber = 1;
+let crowdBow = 0;           // how low the crowd is bowing (0..1)
+let message = { text: '', t: 0 };
+let bubble = null;
+let shakeT = 0, flashT = 0, fadeT = 0, endTimer = 0;
+let told = {};
+let lastScore = null;
+
+const L = { span: 600, fs: 1, statue: { x: 500, y: 560 }, frontY: 828 };
+function layout() {
+  L.span = Math.min(W, 820);
+  L.fs = clamp(L.span / 560, 0.95, 1.3);
+  L.statue = { x: W - clamp(W * 0.16, 70, 190), y: 520, s: clamp(W / 700, 0.75, 1.0) };
+  L.frontY = 830;
+  // front row: the three friends in the middle, crowd (and decoys) beside them
+  const sp = 66 * L.fs;
+  for (const p of crowd) if (p.front) { p.x = W / 2 - 30 * (W > 700) + p.k * sp; p.y = L.frontY + (p.k % 2 ? 6 : 0); p.s = L.fs * 0.92; }
+  friends.forEach((f, i) => { f.x = W / 2 - 30 * (W > 700) + (i - 1) * sp; f.y = L.frontY + 4; f.s = L.fs; });
+  // back rows fill the plain to the left of the statue
+  const right = L.statue.x - 70 * L.statue.s;
+  for (const p of crowd) if (!p.front) {
+    const rs = lerp(0.5, 0.85, p.row / Math.max(1, cfg.rows - 1));
+    const n = p.rowN;
+    p.x = lerp(14, right, (p.col + 0.5 + (p.row % 2) * 0.3) / (n + 0.3));
+    p.y = lerp(470, 720, p.row / Math.max(1, cfg.rows - 1));
+    p.s = rs;
+  }
+  band.forEach((b, i) => { b.x = clamp(W * 0.05, 26, 90) + i * 44 * clamp(W / 700, 0.8, 1.15); b.y = 410; b.s = 0.72 * clamp(W / 700, 0.85, 1.1); });
+  // the furnace: three friends and the fourth in shining light
+  const ws = Math.min(W * 0.2, 135);
+  walkers.forEach((w, i) => {
+    w.s = clamp(W / 600, 1, 1.35);
+    w.x = W / 2 + (w.slot - 1.5) * ws + Math.sin(t * 0.45 + w.slot * 0.3) * 30;
+    w.y = (w.fourth ? 640 : 668) + Math.sin(t * 3 + w.slot) * 2;
+  });
+}
+
+function makePeople() {
+  friends = FRIENDS.map((f, i) => ({ ...f, i, x: 0, y: 0, s: 1, wob: 0, wobbling: false, steadyT: 0, slipT: 0, nudge: 0, phase: rand(0, TAU), blink: 0, blinkT: rand(1, 4) }));
+  crowd = [];
+  for (let r = 0; r < cfg.rows; r++) {
+    const n = 5 + r;
+    for (let c = 0; c < n; c++) crowd.push(person({ row: r, col: c, rowN: n }));
+  }
+  for (const k of [-3, -2, 2, 3]) crowd.push(person({ front: true, k }));
+  // decoys: front-row people (in look-alike robes) who also sway
+  const fr = crowd.filter((p) => p.front).sort(() => Math.random() - 0.5);
+  fr.slice(0, Math.min(cfg.decoys, 4)).forEach((p) => { p.decoy = true; p.robe = pick(['#a8463b', '#3f8a5a', '#3f75b0']); });
+  band = ['horn', 'flute', 'harp', 'lyre'].map((inst, i) => ({ inst, i, x: 0, y: 0, s: 1, robe: pick(CROWD_ROBES), skin: pick(SKINS), hair: pick(HAIRS), beard: i % 2 === 0, phase: rand(0, TAU) }));
+  walkers = [0, 1, 2, 3].map((slot) => slot === 2
+    ? { slot, fourth: true, x: 0, y: 0, s: 1 }
+    : { slot, fourth: false, f: friends[slot < 2 ? slot : 2], x: 0, y: 0, s: 1 });
+  layout();
+}
+function person(o) {
+  return { ...o, x: 0, y: 0, s: 1, robe: pick(CROWD_ROBES), skin: pick(SKINS), hair: pick(HAIRS), beard: Math.random() < 0.45, kid: !o.front && Math.random() < 0.15, phase: rand(0, TAU), delay: rand(0, 0.25), bow: 0, sway: 0, swayT: 0, turban: Math.random() < 0.5 };
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot', text = '') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, text });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffd27a']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 30, i % 3 ? 'dot' : 'star');
+  }
+}
+function floatText(x, y, text, color = '#fff6d0', size = 22, life = 1.2) {
+  spawn(x, y, rand(-8, 8), -45, life, color, size, 0, 'text', text);
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'z') p.vx = Math.sin(p.life * 3) * 14;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = p.kind === 'text' || p.kind === 'z' ? Math.min(1, a * 2) : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'text' || p.kind === 'z') {
+      ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(30,20,50,0.75)';
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillText(p.text, p.x, p.y);
+    } else if (p.kind === 'drop') {
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.size * 0.7, p.size, 0, 0, TAU); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Part 1: the band plays and everybody bows
+// ============================================================
+function swell() {
+  swellsDone++;
+  swellT = 1.4;
+  sfx.swell(swellsDone);
+  for (const b of band) spawn(b.x + 12, b.y - 60 * b.s, rand(-20, 20), -60, 1.4, pick(['#ffe27a', '#fff6d0', '#ffd27a']), 18, 0, 'text', pick(['♪', '♫']));
+  // the crowd leans on some of the friends
+  const free = friends.filter((f) => !f.wobbling && f.slipT <= 0);
+  free.sort(() => Math.random() - 0.5);
+  const n = Math.min(free.length, 1 + Math.floor(Math.random() * cfg.simul));
+  for (let k = 0; k < n; k++) startWobble(free[k], k * 0.25);
+  // and some of the crowd sway too
+  const dec = crowd.filter((p) => p.decoy && p.swayT <= 0);
+  if (dec.length && Math.random() < 0.8) { const d = pick(dec); d.swayT = cfg.win * rand(0.8, 1.2); }
+  if (dec.length > 2 && Math.random() < 0.5) { const d = pick(dec); d.swayT = cfg.win * rand(0.8, 1.2); }
+  if (!told.wobble) { told.wobble = true; showMessage(isTouch() ? 'The crowd leans on him! Tap the wobbling friend' : 'The crowd leans on him! Click the wobbling friend (or press 1, 2, 3)', 3); }
+  if (cfg.decoys && !told.decoy) { told.decoy = true; setTimeout(() => { if (state === 'play' && phase === 'bow') showMessage('Only tap the three friends with the golden glow!', 2.6); }, 1600); }
+}
+function startWobble(f, delay = 0) {
+  f.wobbling = true;
+  f.wob = -delay / cfg.win;
+}
+function steady(f) {
+  if (state !== 'play' || phase !== 'bow' || lockT > 0 || f.slipT > 0) return;
+  const hx = f.x, hy = f.y - 120 * f.s;
+  if (f.steadyT > 0.4) return;   // a double tap
+  if (!f.wobbling || f.wob <= 0) {
+    // pushing a friend who is already standing firm makes him wobble!
+    f.nudge = 0.4;
+    startWobble(f);
+    f.wob = 0.3;
+    floatText(hx, hy - 10, 'Whoa!', '#ffcf8a', 20);
+    sfx.bonk();
+    if (!told.nudge) { told.nudge = true; showMessage('Careful! Only tap a friend when he wobbles.', 2.6); }
+    return;
+  }
+  const pts = 10 + Math.round(20 * clamp(1 - f.wob, 0, 1));
+  levelScore += pts;
+  steadies++;
+  f.wobbling = false; f.wob = 0; f.steadyT = 0.9;
+  sparkleBurst(hx, hy + 30, 12);
+  floatText(hx, hy - 6, pick(['I won’t bow!', 'Stand firm!', 'Only God!']), '#fff6d0', 19);
+  floatText(hx + 34, hy + 18, '+' + pts, '#ffe27a', 16, 0.9);
+  sfx.steady();
+}
+function tapDecoy(p) {
+  if (lockT > 0) return;
+  lockT = 0.7;
+  mistakes++;
+  levelScore = Math.max(0, levelScore - 30);
+  floatText(p.x, p.y - 110 * p.s, 'Not a friend! −30', '#ffb0a0', 18);
+  sfx.buzz();
+}
+function slip(f) {
+  slips++;
+  f.wobbling = false; f.wob = 0; f.slipT = 1.3;
+  shakeT = 0.3;
+  for (let k = 0; k < 5; k++) spawn(f.x + rand(-20, 20), f.y - 130 * f.s, rand(-40, 40), rand(-40, -10), 1, '#ffe27a', 4, 0, 'star');
+  sfx.boing();
+  if (slips >= MAX_SLIPS) { failLevel(); return; }
+  showMessage(slips === MAX_SLIPS - 1 ? 'Whoops! He nearly bowed. One more and you must try again!' : 'Whoops! He nearly bowed! Be quick!', 2.4);
+}
+function updateBow(dt) {
+  nextSwell -= dt;
+  swellT = Math.max(0, swellT - dt);
+  if (swellsDone < cfg.swells && nextSwell <= 0) { swell(); nextSwell = cfg.gap * rand(0.85, 1.15); }
+  // everyone bows while the band plays
+  crowdBow = lerp(crowdBow, swellsDone > 0 ? (swellT > 0 ? 1 : 0.8) : 0, 1 - Math.pow(0.02, dt));
+  for (const f of friends) {
+    f.steadyT -= dt; f.slipT -= dt; f.nudge = Math.max(0, f.nudge - dt);
+    if (f.wobbling) {
+      f.wob += dt / cfg.win;
+      if (f.wob >= 1) slip(f);
+      if (state !== 'play') return;
+    }
+  }
+  for (const p of crowd) p.swayT -= dt;
+  // all the songs played and nobody bowed: on to the furnace
+  if (swellsDone >= cfg.swells && nextSwell < cfg.gap * 0.4 && !friends.some((f) => f.wobbling || f.slipT > 0)) {
+    phase = 'walk'; phaseT = 0;
+    crowdBow = 0.4;
+    bubble = { who: 'friends', key: 'able', t: 3.6 };
+    showMessage('They would not bow! The king is very angry…', 2.6);
+    sfx.levelStart();
+  }
+}
+
+// ============================================================
+//  Part 2: in the furnace
+// ============================================================
+function startFurnace() {
+  phase = 'furnace'; phaseT = 0;
+  embers = [];
+  smoke = 0;
+  nextEmber = 1.2;
+  furnaceScore = levelScore;
+  bubble = { who: 'king', key: 'four', t: 3.2 };
+  syncAmbience();
+  showMessage(isTouch() ? 'Tap the sparks to put them out!' : 'Click the sparks (or press Space) to put them out!', 3);
+}
+function spawnEmber() {
+  const targets = walkers.filter((w) => !w.fourth);
+  const tg = pick(targets);
+  const side = Math.random();
+  let x, y;
+  if (side < 0.35) { x = -offX - 20; y = rand(440, 860); }
+  else if (side < 0.7) { x = W + offX + 20; y = rand(440, 860); }
+  else { x = rand(-offX, W + offX); y = H + 20; }
+  const big = Math.random() < cfg.big;
+  embers.push({ x, y, tg, hp: big ? 2 : 1, big, speed: cfg.speed * rand(0.9, 1.12) * (big ? 0.85 : 1), zig: cfg.zig * rand(0.6, 1.2), ph: rand(0, TAU), t: 0 });
+  if (big && !told.big) { told.big = true; showMessage('A big spark! Tap it twice', 2.4); }
+}
+function updateFurnace(dt) {
+  if (phaseT >= cfg.fdur) { winLevel(); return; }
+  nextEmber -= dt;
+  const ramp = lerp(1.25, 0.85, phaseT / cfg.fdur);   // a little busier toward the end
+  if (nextEmber <= 0 && phaseT < cfg.fdur - 1.5) { spawnEmber(); nextEmber = cfg.every * ramp * rand(0.7, 1.3); }
+  for (let i = embers.length - 1; i >= 0; i--) {
+    const e = embers[i];
+    e.t += dt;
+    const tx = e.tg.x, ty = e.tg.y - 70 * e.tg.s;
+    const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy) || 1;
+    const nx = dx / d, ny = dy / d;
+    const side = Math.cos(e.t * 4 + e.ph) * e.zig;
+    e.x += (nx * e.speed - ny * side) * dt;
+    e.y += (ny * e.speed + nx * side) * dt;
+    if (state === 'play') for (let k = 0; k < (e.big ? 2 : 1); k++) if (Math.random() < dt * 14) spawn(e.x + rand(-5, 5), e.y + rand(-5, 5), rand(-15, 15), rand(-30, -5), 0.4, pick(['#ffb33b', '#ffd27a']), 2.5);
+    if (d < 34 * e.tg.s) {
+      embers.splice(i, 1);
+      smoke++;
+      for (let k = 0; k < 8; k++) spawn(e.x + rand(-10, 10), e.y + rand(-10, 10), rand(-30, 30), rand(-60, -20), rand(0.8, 1.4), 'rgba(150,140,150,0.7)', rand(6, 11), -10, 'puff');
+      floatText(e.x, e.y - 24, 'Puff!', '#e0e0e8', 19);
+      sfx.puffSmoke();
+      if (smoke >= MAX_SMOKE) { failLevel(); return; }
+      showMessage(smoke === MAX_SMOKE - 1 ? 'A spark got through! One more and you must try again.' : 'A spark got through! Keep them away!', 2.2);
+    }
+  }
+}
+function popEmber(e) {
+  if (state !== 'play' || phase !== 'furnace') return;
+  e.hp--;
+  sparkleBurst(e.x, e.y, 8, ['#fff6d0', '#ffe9a8', '#ffffff']);
+  if (e.hp > 0) { floatText(e.x, e.y - 22, 'Again!', '#ffe9a8', 17, 0.7); sfx.sizzle(0.5); e.speed *= 0.7; return; }
+  embers.splice(embers.indexOf(e), 1);
+  const pts = e.big ? 25 : 15;
+  levelScore += pts;
+  popped++;
+  for (let k = 0; k < 4; k++) spawn(e.x, e.y, rand(-20, 20), rand(-50, -20), 0.8, 'rgba(230,235,245,0.6)', rand(5, 8), -10, 'puff');
+  floatText(e.x, e.y - 20, '+' + pts, '#ffe27a', 16, 0.8);
+  sfx.sizzle(1);
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function winLevel() {
+  state = 'win';
+  phase = 'out';
+  syncAmbience();
+  winT = 0;
+  for (const e of embers) sparkleBurst(e.x, e.y, 6);
+  embers = [];
+  const firmBonus = (MAX_SLIPS - slips) * 200;
+  const smokeBonus = (MAX_SMOKE - smoke) * 200;
+  const levelBonus = level * 250;
+  const score = levelScore + firmBonus + smokeBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('fieryFurnaceBest', best); } catch (e) {} }
+  lastScore = { play: levelScore, firmBonus, smokeBonus, levelBonus, score };
+  bubble = { who: 'king', key: 'fourth', t: 3.4 };
+  showMessage('Not even the smell of smoke!', 2.6);
+  sfx.win();
+  endTimer = 6;
+}
+function failLevel() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  showMessage(phase === 'furnace' ? 'Too many sparks got through!' : 'Oh no, they nearly bowed!', 2.4);
+  sfx.fail();
+  endTimer = 2.4;
+}
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+function titleScreen() {
+  state = 'title';
+  phase = 'bow';
+  syncAmbience();
+  level = 1;
+  cfg = LEVELS[0];
+  makePeople();
+  crowdBow = 0;
+  showOverlay('Standing Firm', 'The golden statue and the fiery furnace',
+    `${verseHTML('ifNot')}
+     <ul>
+       <li>The king set up a huge <b>gold statue</b>. When the band plays, <b>everyone must bow down</b> to it.</li>
+       <li>But Shadrach, Meshach and Abednego will only worship God! Help them <b>stand firm</b>.</li>
+       <li>When the music swells and a friend <b>wobbles</b>, <b>tap him</b> to steady him. Don’t push the ones standing still!</li>
+       <li>Then, in the <b>fiery furnace</b>, someone shining is walking with them. <b>Tap the sparks</b> before they reach the friends.</li>
+       <li><b>Keys:</b> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> steady a friend; <kbd>Space</kbd> puts out the nearest spark.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function resetLevel(furnace = false) {
+  cfg = LEVELS[level - 1];
+  particles = []; embers = [];
+  if (!furnace) {
+    makePeople();
+    slips = 0; steadies = 0; mistakes = 0; levelScore = 0;
+    swellsDone = 0; nextSwell = level === 1 ? 2.2 : 1.6; swellT = 0; crowdBow = 0;
+  } else {
+    levelScore = furnaceScore;
+  }
+  smoke = 0; popped = 0;
+  phaseT = 0; winT = 0; failT = 0; lockT = 0;
+  shakeT = flashT = 0; endTimer = 0; fadeT = 0;
+  bubble = null;
+}
+
+function startLevel(furnace = false) {
+  resetLevel(furnace);
+  hideOverlay();
+  state = 'play';
+  told = { wobble: level > 1, decoy: level > 3, nudge: level > 1, big: false };
+  if (furnace) { startFurnace(); fadeT = 0.6; sfx.levelStart(); return; }
+  phase = 'bow';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 ? 'Listen… the band is about to play!' : `Level ${level}: ${cfg.name}`, 2.4);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const scoreHTML = `<p class="score">Steady friends &amp; sparks out: <b>${s.play}</b><br>Standing firm (${slips} wobble${slips === 1 ? '' : 's'} got away): <b>${s.firmBonus}</b><br>No smoke (${smoke} spark${smoke === 1 ? '' : 's'} got through): <b>${s.smokeBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level >= LEVELS.length) {
+      state = 'done';
+      showOverlay('They stood firm!', 'Every level complete!',
+        `${verseHTML('blessed')}
+         <p style="text-align:center">The three friends trusted God even when it was hard, and God was right there with them in the fire.</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; startLevel(); });
+    } else {
+      showOverlay('Not even a whiff of smoke!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML('smoke', '…')}
+         ${scoreHTML}
+         <p style="text-align:center">${NEXT_TIPS[level - 1]}</p>
+         ${creditHTML()}`,
+        'Next level', () => { level++; startLevel(); });
+    }
+  } else if (state === 'fail') {
+    const inFurnace = phase === 'furnace';
+    showOverlay(inFurnace ? 'Too many sparks!' : 'They nearly bowed!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${inFurnace
+        ? 'The friends are safe, because God is with them! But try again and <b>tap every spark</b> before it gets close.'
+        : 'The friends want to stand firm for God. Try again and <b>tap each friend as soon as he wobbles</b>.'}</p>
+       ${verseHTML('able', '…')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      inFurnace ? 'Try the furnace again' : 'Try Again', () => startLevel(inFurnace));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating
+// ============================================================
+function update(dt) {
+  t += dt;
+  layout();
+  updateParticles(dt);
+  for (const f of friends) {
+    f.blinkT -= dt;
+    if (f.blinkT <= 0) { f.blink = 0.13; f.blinkT = rand(1.5, 4.5); }
+    f.blink -= dt;
+  }
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  if (state === 'pause') return;
+  lockT = Math.max(0, lockT - dt);
+  fadeT = Math.max(0, fadeT - dt);
+  if (state === 'play') {
+    phaseT += dt;
+    if (phase === 'bow') updateBow(dt);
+    else if (phase === 'walk') {
+      crowdBow = lerp(crowdBow, 0.6, 1 - Math.pow(0.1, dt));
+      if (phaseT > 4.2 && fadeT <= 0) fadeT = 1.2;
+      if (phaseT > 5.35 && phase === 'walk') startFurnace();
+    } else if (phase === 'furnace') updateFurnace(dt);
+  } else if (state === 'win' || state === 'done') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, W), rand(TOPH, 600), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'fail') {
+    failT += dt;
+  } else if (state === 'title') {
+    crowdBow = 0.5 + 0.5 * Math.sin(t * 0.8);
+  }
+  shakeT = Math.max(0, shakeT - dt);
+  flashT = Math.max(0, flashT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+// Is (x, y) on this person? (feet at p.y, about 130 tall at scale 1)
+function onPerson(p, x, y, pad = 0) {
+  const s = p.s;
+  return Math.abs(x - p.x) < 30 * s + pad && y < p.y + 12 && y > p.y - 140 * s - pad;
+}
+function tapAt(x, y) {
+  if (phase === 'bow') {
+    // the friends first (they are in front), generously
+    let bestF = null, bd = Infinity;
+    for (const f of friends) {
+      if (!onPerson(f, x, y, 12)) continue;
+      const d = Math.abs(x - f.x);
+      if (d < bd) { bd = d; bestF = f; }
+    }
+    if (bestF) { steady(bestF); return; }
+    const p = crowd.find((q) => q.front && onPerson(q, x, y));
+    if (p && p.decoy && p.swayT > 0) tapDecoy(p);
+  } else if (phase === 'furnace') {
+    let bestE = null, bd = Infinity;
+    for (const e of embers) {
+      const d = Math.hypot(x - e.x, y - e.y);
+      if (d < (e.big ? 56 : 48) && d < bd) { bd = d; bestE = e; }
+    }
+    if (bestE) popEmber(bestE);
+  }
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  if (phase === 'walk' && phaseT > 1) { phaseT = Math.max(phaseT, 4.2); return; }
+  tapAt(p.vx - offX, p.vy - offY);
+});
+
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (phase === 'walk' && (e.code === 'Space' || e.code === 'Enter')) { phaseT = Math.max(phaseT, 4.2); return; }
+  const m = e.code.match(/^(?:Digit|Numpad)([1-3])$/);
+  const k = m ? +m[1] - 1 : { ArrowLeft: 0, KeyA: 0, ArrowDown: 1, ArrowUp: 1, KeyS: 1, ArrowRight: 2, KeyD: 2 }[e.code];
+  if (phase === 'bow' && k !== undefined) { steady(friends[k]); return; }
+  if (phase === 'furnace' && (e.code === 'Space' || e.code === 'Enter')) {
+    // the spark nearest to the friends
+    let bestE = null, bd = Infinity;
+    for (const em of embers) { const d = Math.hypot(em.x - em.tg.x, em.y - (em.tg.y - 70 * em.tg.s)); if (d < bd) { bd = d; bestE = em; } }
+    if (bestE) popEmber(bestE);
+  }
+});
+
+function goHome() { location.href = 'index.html'; }
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  // the band swells: a rising run on the pipe and harp
+  swell(n) {
+    if (!this.ctx) return;
+    for (let k = 0; k < 4; k++) setTimeout(() => Music.tap(0.2 + k * 0.2), k * 110);
+    this.tone(196, 0.9, 'sawtooth', 0.05, 0, 262);
+    this.tone(294, 0.9, 'triangle', 0.08, 0.05, 392);
+  },
+  steady() { [784, 1175].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.14, i * 0.07)); },
+  bonk() { this.tone(330, 0.15, 'triangle', 0.18, 0, 220); },
+  buzz() { this.tone(150, 0.25, 'square', 0.06, 0, 120); },
+  boing() { this.tone(260, 0.45, 'sine', 0.25, 0, 90); },
+  sizzle(v) { this.noiseBurst(5200, 0.25, 0.18 * v, 0.8, 2400, 'highpass'); this.tone(1400 + Math.random() * 400, 0.12, 'sine', 0.06 * v); },
+  puffSmoke() { this.noiseBurst(500, 0.5, 0.25, 0.6, 200, 'lowpass'); },
+};
+
+// Fire crackle only while in the furnace
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play' && phase === 'furnace');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing people
+// ============================================================
+// p: { robe, skin, hair, beard, turban }, bow: 0..1 (bending toward the statue), tilt: whole-body lean
+function drawPerson(p, x, y, s, bow, tilt, mood, opts = {}) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(60,40,10,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  if (opts.glow) {
+    ctx.fillStyle = `rgba(255,226,120,${0.35 + 0.15 * Math.sin(t * 4 + p.i)})`;
+    ctx.beginPath(); ctx.ellipse(0, 0, 32 * s, 9 * s, 0, 0, TAU); ctx.fill();
+  }
+  ctx.rotate(tilt);
+  ctx.scale(s * (p.kid ? 0.8 : 1), s * (p.kid ? 0.8 : 1));
+  const sleeve = shade(p.robe, -25);
+  // feet and lower robe
+  ctx.fillStyle = '#5a3a1e';
+  ctx.beginPath(); ctx.ellipse(-6, -2, 7, 4, 0, 0, TAU); ctx.ellipse(10, -2, 7, 4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = p.robe;
+  ctx.beginPath(); ctx.moveTo(-15, -46); ctx.lineTo(-19, -3); ctx.quadraticCurveTo(0, 2, 19, -3); ctx.lineTo(15, -46); ctx.closePath(); ctx.fill();
+  // upper body bends at the waist
+  ctx.save();
+  ctx.translate(0, -46);
+  ctx.rotate(bow * 1.15);
+  ctx.fillStyle = p.robe;
+  roundRect(-15, -38, 30, 42, 10); ctx.fill();
+  ctx.fillStyle = opts.sash || shade(p.robe, 40);
+  ctx.fillRect(-15, -4, 30, 6);
+  // arms
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(x2, y2, 4.5, 0, TAU); ctx.fill();
+  };
+  if (opts.arms === 'up') { const w = Math.sin(t * 9 + (p.i || 0)) * 4; arm(-11, -32, -24 + w, -64); arm(11, -32, 24 - w, -64); }
+  else if (opts.arms === 'cross') { arm(-11, -30, 9, -18); arm(11, -30, -9, -16); }
+  else if (opts.arms === 'flail') { const w = Math.sin(t * 16) * 10; arm(-11, -32, -28, -40 + w); arm(11, -32, 30, -44 - w); }
+  else { arm(-11, -32, -14 + bow * 10, -6); arm(11, -32, 16 + bow * 6, -6); }
+  // head
+  const hy = -54;
+  ctx.fillStyle = p.skin;
+  ctx.beginPath(); ctx.arc(2, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = p.hair;
+  if (p.beard) { ctx.beginPath(); ctx.moveTo(-10, hy + 4); ctx.quadraticCurveTo(4, hy + 28, 17, hy + 4); ctx.quadraticCurveTo(4, hy + 13, -10, hy + 4); ctx.fill(); }
+  if (p.turban || opts.turban) {
+    ctx.fillStyle = opts.turbanCol || '#f2ead6';
+    ctx.beginPath(); ctx.ellipse(1, hy - 10, 18, 11, 0, Math.PI, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(1, hy - 9, 17, 5, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = shade(opts.turbanCol || '#f2ead6', -30); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-14, hy - 12); ctx.quadraticCurveTo(1, hy - 18, 16, hy - 12); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(2, hy - 3, 16, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+  }
+  drawFace(p, mood, hy);
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawFace(p, mood, hy) {
+  const dark = '#2b1d12';
+  const ex = [-3, 9], ey = hy - 1;   // looking a little to the right (toward the statue)
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr, lx = 0.5) => {
+    for (const x of ex) {
+      if (p.blink > 0 && mood !== 'joy') { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 3, ey); ctx.lineTo(x + 3, ey); ctx.stroke(); continue; }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(x + lx * (rx - pr), ey, pr, 0, TAU); ctx.fill();
+    }
+  };
+  const mouth = (fn, fill) => { ctx.beginPath(); fn(); if (fill) { ctx.fillStyle = '#7a2e22'; ctx.fill(); } else { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.stroke(); } };
+  const brows = (a, b) => {
+    ctx.strokeStyle = shade(p.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(ex[0] - 4, ey - 7 + a); ctx.lineTo(ex[0] + 3, ey - 7 + b); ctx.moveTo(ex[1] - 3, ey - 7 + b); ctx.lineTo(ex[1] + 4, ey - 7 + a); ctx.stroke();
+  };
+  if (mood === 'bow') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2;
+    for (const x of ex) { ctx.beginPath(); ctx.arc(x, ey, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+    mouth(() => ctx.arc(4, hy + 9, 3, 0.2 * Math.PI, 0.8 * Math.PI));
+  } else if (mood === 'firm') {
+    eyes(3.5, 4.5, 2.1, 0.2);
+    brows(-1, 0);
+    mouth(() => ctx.arc(4, hy + 6, 5, 0.2 * Math.PI, 0.8 * Math.PI));
+  } else if (mood === 'worry') {
+    eyes(4.5, 5.5, 1.8, 0.6);
+    brows(2, -2);
+    mouth(() => { ctx.moveTo(-1, hy + 10); ctx.quadraticCurveTo(2, hy + 7, 4, hy + 10); ctx.quadraticCurveTo(7, hy + 13, 9, hy + 10); });
+  } else if (mood === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    for (const x of ex) { ctx.beginPath(); ctx.arc(x, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+    mouth(() => { ctx.moveTo(-2, hy + 6); ctx.arc(4, hy + 6, 6, 0, Math.PI); ctx.closePath(); }, true);
+    ctx.fillStyle = 'rgba(255,120,120,0.4)'; ctx.beginPath(); ctx.arc(-8, hy + 4, 3, 0, TAU); ctx.arc(15, hy + 4, 3, 0, TAU); ctx.fill();
+  } else if (mood === 'dizzy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2;
+    for (const x of ex) { ctx.beginPath(); ctx.arc(x, ey, 3, t * 10, t * 10 + 4.5); ctx.stroke(); }
+    mouth(() => ctx.ellipse(4, hy + 9, 3, 4, 0, 0, TAU), true);
+  } else {
+    eyes(3.5, 4.5, 2, 0.5);
+    mouth(() => ctx.arc(4, hy + 6, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+  }
+}
+
+// ============================================================
+//  Part 1 scene: the plain of Dura
+// ============================================================
+function drawPlain() {
+  const x0 = -offX, x1 = W + offX, y0 = -offY;
+  const g = ctx.createLinearGradient(0, y0, 0, 470);
+  g.addColorStop(0, '#6fb6ea'); g.addColorStop(1, '#cfe9f7');
+  ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, 480 - y0);
+  // sun and clouds
+  ctx.fillStyle = 'rgba(255,240,170,0.5)'; ctx.beginPath(); ctx.arc(x0 + 80, 170, 60, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffe58a'; ctx.beginPath(); ctx.arc(x0 + 80, 170, 38, 0, TAU); ctx.fill();
+  for (const [cx, cy, w] of [[0.3, 190, 150], [0.62, 140, 120], [0.9, 230, 110]]) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    const X = x0 + (x1 - x0) * cx + Math.sin(t * 0.05 + cx * 10) * 20;
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(X - w / 2 + k * w / 3, cy - Math.sin(k / 3 * Math.PI) * 14, 22 + Math.sin(k / 3 * Math.PI) * 10, 0, TAU); ctx.fill(); }
+  }
+  // distant hills and the city
+  ctx.fillStyle = '#d9c58e';
+  ctx.beginPath(); ctx.moveTo(x0, 430);
+  for (let i = 0; i <= 10; i++) ctx.lineTo(x0 + (x1 - x0) * i / 10, 410 + Math.sin(i * 1.9) * 16);
+  ctx.lineTo(x1, 480); ctx.lineTo(x0, 480); ctx.fill();
+  // the plain
+  const pg = ctx.createLinearGradient(0, 440, 0, H);
+  pg.addColorStop(0, '#e8cf92'); pg.addColorStop(1, '#d9b06a');
+  ctx.fillStyle = pg; ctx.fillRect(x0, 440, x1 - x0, H - 440 + 10);
+}
+
+function drawStatue() {
+  const S = L.statue, s = S.s;
+  ctx.save();
+  ctx.translate(S.x, S.y);
+  ctx.scale(s, s);
+  // stepped base
+  ctx.fillStyle = '#c9a96a'; roundRect(-80, -30, 160, 34, 6); ctx.fill();
+  ctx.fillStyle = '#b8955a'; roundRect(-60, -60, 120, 32, 6); ctx.fill();
+  // the gold statue: tall, shiny, a bit silly-looking
+  const gg = ctx.createLinearGradient(-40, 0, 40, 0);
+  gg.addColorStop(0, '#d4a020'); gg.addColorStop(0.45, '#ffe680'); gg.addColorStop(1, '#c08a10');
+  ctx.fillStyle = gg;
+  ctx.beginPath(); ctx.moveTo(-38, -60); ctx.lineTo(-30, -300); ctx.lineTo(30, -300); ctx.lineTo(38, -60); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -330, 32, 0, TAU); ctx.fill();
+  ctx.fillRect(-46, -300, 92, 26);
+  // crown
+  ctx.beginPath(); ctx.moveTo(-28, -352); ctx.lineTo(-28, -378); ctx.lineTo(-14, -362); ctx.lineTo(0, -384); ctx.lineTo(14, -362); ctx.lineTo(28, -378); ctx.lineTo(28, -352); ctx.closePath(); ctx.fill();
+  // blank, staring face (a statue can't see or hear)
+  ctx.fillStyle = '#b07d10';
+  ctx.beginPath(); ctx.ellipse(-11, -334, 5, 3, 0, 0, TAU); ctx.ellipse(11, -334, 5, 3, 0, 0, TAU); ctx.fill();
+  ctx.fillRect(-8, -316, 16, 3);
+  // shine
+  ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.2 * Math.sin(t * 2)})`;
+  ctx.beginPath(); ctx.ellipse(-10, -200, 5, 60, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawInstrument(kind, s) {
+  ctx.lineCap = 'round';
+  if (kind === 'horn') {
+    ctx.fillStyle = '#e0a526';
+    ctx.beginPath(); ctx.moveTo(6, -76); ctx.lineTo(34, -88); ctx.lineTo(38, -70); ctx.closePath(); ctx.fill();
+  } else if (kind === 'flute') {
+    ctx.strokeStyle = '#a0703a'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(6, -70); ctx.lineTo(36, -62); ctx.stroke();
+  } else if (kind === 'harp') {
+    ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(14, -30); ctx.lineTo(14, -84); ctx.quadraticCurveTo(34, -80, 36, -40); ctx.lineTo(14, -30); ctx.stroke();
+    ctx.strokeStyle = '#f0e0b0'; ctx.lineWidth = 1;
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(18 + k * 4, -76 + k * 3); ctx.lineTo(18 + k * 4, -36 - k * 1); ctx.stroke(); }
+  } else {
+    ctx.strokeStyle = '#a0703a'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(10, -78); ctx.quadraticCurveTo(8, -40, 22, -40); ctx.quadraticCurveTo(36, -40, 34, -78); ctx.stroke();
+    ctx.strokeStyle = '#f0e0b0'; ctx.lineWidth = 1;
+    for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(16 + k * 6, -70); ctx.lineTo(16 + k * 6, -44); ctx.stroke(); }
+  }
+}
+
+function drawBand() {
+  if (!band.length) return;
+  const x0 = band[0].x - 30, x1 = band[band.length - 1].x + 40;
+  // a little stage
+  ctx.fillStyle = '#a0703a'; roundRect(x0, band[0].y - 4, x1 - x0, 16, 4); ctx.fill();
+  ctx.fillStyle = '#7a5226'; ctx.fillRect(x0 + 6, band[0].y + 12, 6, 20); ctx.fillRect(x1 - 12, band[0].y + 12, 6, 20);
+  const playing = state === 'play' && phase === 'bow' && swellsDone > 0;
+  for (const b of band) {
+    const bob = playing ? Math.abs(Math.sin(t * 5 + b.phase)) * 3 : 0;
+    drawPerson(b, b.x, b.y - bob, b.s, 0, 0, 'calm', { turban: true, turbanCol: '#e8d090', arms: 'none' });
+    ctx.save(); ctx.translate(b.x, b.y - bob); ctx.scale(b.s, b.s);
+    drawInstrument(b.inst, b.s);
+    ctx.restore();
+  }
+}
+
+function drawCrowdAndFriends() {
+  const list = [];
+  for (const p of crowd) list.push({ y: p.y, draw: () => {
+    // the crowd bows down while the band plays; decoys sway as if pushed
+    const b = clamp(crowdBow - p.delay * (swellT > 0 ? 1 : 0), 0, 1) * (p.decoy && p.swayT > 0 ? 0.5 : 1);
+    const tilt = p.decoy && p.swayT > 0 ? Math.sin(t * 10 + p.phase) * 0.18 + 0.15 : 0;
+    drawPerson(p, p.x, p.y, p.s, b * 0.95, tilt, b > 0.4 ? 'bow' : 'calm');
+  } });
+  for (const f of friends) list.push({ y: f.y + 1, draw: () => drawFriend(f) });
+  list.sort((a, b) => a.y - b.y);
+  for (const it of list) it.draw();
+}
+
+function drawFriend(f) {
+  let tilt = 0, bow = 0, mood = 'firm', arms = 'cross';
+  if (state === 'title') mood = 'calm';
+  if (f.wobbling && f.wob > 0) {
+    const w = f.wob;
+    tilt = w * 0.4 + Math.sin(t * (10 + w * 8) + f.phase) * (0.06 + w * 0.12);
+    bow = w * 0.35;
+    mood = 'worry'; arms = 'flail';
+  } else if (f.slipT > 0) {
+    tilt = Math.sin(f.slipT * 12) * 0.25 * f.slipT; mood = 'dizzy'; arms = 'flail';
+  }
+  if (state === 'win' || state === 'done') { mood = 'joy'; arms = 'up'; }
+  // a soft glow when he is steadied
+  if (f.steadyT > 0) {
+    const a = clamp(f.steadyT / 0.9, 0, 1);
+    const g = ctx.createRadialGradient(f.x, f.y - 70 * f.s, 0, f.x, f.y - 70 * f.s, 90 * f.s);
+    g.addColorStop(0, `rgba(255,244,190,${0.6 * a})`); g.addColorStop(1, 'rgba(255,244,190,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y - 70 * f.s, 90 * f.s, 0, TAU); ctx.fill();
+  }
+  drawPerson(f, f.x, f.y, f.s, bow, tilt, mood, { glow: true, turban: true, turbanCol: '#fff4d6', sash: '#e0a526', arms });
+  // wobble warning
+  if (f.wobbling && f.wob > 0 && state === 'play') {
+    const mx = f.x, my = f.y - 150 * f.s;
+    ctx.fillStyle = 'rgba(60,30,10,0.55)'; roundRect(mx - 24, my - 6, 48, 12, 6); ctx.fill();
+    ctx.fillStyle = f.wob < 0.5 ? '#ffc94a' : '#ff7a5c';
+    roundRect(mx - 22, my - 4, 44 * clamp(f.wob, 0, 1), 8, 4); ctx.fill();
+  }
+  // name label
+  ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.fillStyle = '#5a3a10';
+  ctx.strokeText(f.name, f.x, f.y + 22); ctx.fillText(f.name, f.x, f.y + 22);
+}
+
+// ============================================================
+//  Part 2 scene: the furnace (cartoon fire, warm and bright)
+// ============================================================
+function flame(x, y, w, h, ph) {
+  const sway = Math.sin(t * 4 + ph) * w * 0.25;
+  const hh = h * (0.85 + 0.15 * Math.sin(t * 6 + ph * 2));
+  for (const [col, k] of [['#ff7a2a', 1], ['#ffb33b', 0.7], ['#ffe27a', 0.42]]) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x - w * k / 2, y);
+    ctx.quadraticCurveTo(x - w * k / 2, y - hh * k * 0.6, x + sway * k, y - hh * k);
+    ctx.quadraticCurveTo(x + w * k / 2, y - hh * k * 0.6, x + w * k / 2, y);
+    ctx.closePath(); ctx.fill();
+  }
+}
+function drawFurnace() {
+  const x0 = -offX, x1 = W + offX, y0 = -offY;
+  const out = phase === 'out' ? clamp(winT / 2, 0, 1) : 0;
+  const g = ctx.createLinearGradient(0, y0, 0, H);
+  g.addColorStop(0, mix('#a8361e', '#c86a3a', out)); g.addColorStop(0.5, mix('#e8702a', '#f0a050', out)); g.addColorStop(1, mix('#ffb04a', '#ffd890', out));
+  ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, H - y0);
+  // brick vault
+  ctx.fillStyle = 'rgba(90,30,15,0.35)';
+  for (let r = 0; r < 8; r++) {
+    const yy = y0 + r * 36;
+    if (yy > 330) break;
+    for (let c = -1; c < (x1 - x0) / 70 + 1; c++) { roundRect(x0 + c * 70 + (r % 2) * 35 + 3, yy + 3, 64, 30, 5); ctx.fill(); }
+  }
+  // the door at the top, where the king looks in
+  const dx = W / 2, dy = 230;
+  ctx.fillStyle = '#5a2a1a';
+  ctx.beginPath(); ctx.moveTo(dx - 90, dy + 40); ctx.lineTo(dx - 90, dy - 30); ctx.arc(dx, dy - 30, 90, Math.PI, TAU); ctx.lineTo(dx + 90, dy + 40); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = mix('#7fb8e0', '#a8d8f0', out);
+  ctx.beginPath(); ctx.moveTo(dx - 74, dy + 40); ctx.lineTo(dx - 74, dy - 30); ctx.arc(dx, dy - 30, 74, Math.PI, TAU); ctx.lineTo(dx + 74, dy + 40); ctx.closePath(); ctx.fill();
+  drawKingHead(dx, dy + 6, 1);
+  ctx.fillStyle = '#5a2a1a'; ctx.fillRect(dx - 96, dy + 38, 192, 14);
+  // floor glow
+  ctx.fillStyle = 'rgba(255,240,180,0.35)';
+  ctx.beginPath(); ctx.ellipse(W / 2, 700, Math.min(W * 0.45, 380), 110, 0, 0, TAU); ctx.fill();
+  // flames around the edges
+  const fh = 1 - out * 0.8;
+  const n = Math.ceil((x1 - x0) / 60) + 1;
+  for (let i = 0; i < n; i++) flame(x0 + i * 60, H + 10, 80, (120 + 40 * Math.sin(i * 2.3)) * fh, i);
+  for (let i = 0; i < 9; i++) {
+    const yy = 380 + i * 60;
+    flame(x0 + 10, yy + 30, 60, 90 * fh, i * 1.3);
+    flame(x1 - 10, yy + 30, 60, 90 * fh, i * 1.7 + 1);
+  }
+}
+function drawKingHead(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#7a3fa0'; ctx.beginPath(); ctx.ellipse(0, 40, 40, 22, 0, Math.PI, TAU); ctx.fill();
+  ctx.fillStyle = '#d7a070'; ctx.beginPath(); ctx.arc(0, 0, 20, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3a2716'; ctx.beginPath(); ctx.moveTo(-18, 2); ctx.quadraticCurveTo(0, 40, 18, 2); ctx.quadraticCurveTo(0, 16, -18, 2); ctx.fill();
+  ctx.fillStyle = '#f2c230'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-18, -14); ctx.lineTo(-18, -32); ctx.lineTo(-9, -22); ctx.lineTo(0, -36); ctx.lineTo(9, -22); ctx.lineTo(18, -32); ctx.lineTo(18, -14); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // amazed!
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-7, -1, 4.5, 5.5, 0, 0, TAU); ctx.ellipse(7, -1, 4.5, 5.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(-7, 1, 2.2, 0, TAU); ctx.arc(7, 1, 2.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(0, 12, 4, 5, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawFourth(w) {
+  const s = w.s;
+  // shining light all around
+  const r = 120 * s * (1 + 0.05 * Math.sin(t * 3));
+  const g = ctx.createRadialGradient(w.x, w.y - 70 * s, 0, w.x, w.y - 70 * s, r);
+  g.addColorStop(0, 'rgba(255,255,240,0.95)'); g.addColorStop(0.35, 'rgba(255,250,220,0.6)'); g.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(w.x, w.y - 70 * s, r, 0, TAU); ctx.fill();
+  ctx.save(); ctx.translate(w.x, w.y); ctx.scale(s, s);
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.moveTo(-16, -96); ctx.quadraticCurveTo(-26, -40, -22, 0); ctx.lineTo(22, 0); ctx.quadraticCurveTo(26, -40, 16, -96); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#fff4c8'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-12, -84); ctx.lineTo(-28, -56); ctx.moveTo(12, -84); ctx.lineTo(28, -56); ctx.stroke();
+  ctx.fillStyle = '#fffbe8'; ctx.beginPath(); ctx.arc(0, -110, 16, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,190,90,0.8)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -110, 21, 0, TAU); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawWalkers() {
+  const list = walkers.slice().sort((a, b) => a.y - b.y);
+  for (const w of list) {
+    if (w.fourth) { drawFourth(w); continue; }
+    const f = w.f;
+    const walk = Math.sin(t * 4 + w.slot) * 0.05;
+    drawPerson(f, w.x, w.y, w.s, 0, walk, phase === 'out' || state === 'win' || state === 'done' ? 'joy' : 'firm', { turban: true, turbanCol: '#fff4d6', sash: '#e0a526', arms: phase === 'out' ? 'up' : 'none' });
+  }
+}
+function drawEmber(e) {
+  const r = e.big ? 18 : 12;
+  const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r * 2.4);
+  g.addColorStop(0, 'rgba(255,220,120,0.7)'); g.addColorStop(1, 'rgba(255,160,60,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, r * 2.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ff6a1a';
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5 + t * 3, rr = k % 2 ? r * 0.6 : r; ctx.lineTo(e.x + Math.cos(a) * rr, e.y + Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(e.x, e.y, r * 0.45, 0, TAU); ctx.fill();
+  if (e.big) { ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, r + 6, 0, TAU * e.hp / 2); ctx.stroke(); }
+}
+
+function drawBubble() {
+  if (!bubble) return;
+  const text = bubbleText(bubble.key);
+  ctx.save();
+  ctx.font = '600 19px Fredoka, sans-serif';
+  const maxW = Math.min(W - 40, 420);
+  const lines = wrapText(text, maxW - 28);
+  const bw = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28);
+  const bh = lines.length * 24 + 18;
+  let ax, ay, bx, by;
+  if (bubble.who === 'king') { ax = W / 2 + 10; ay = 270; bx = clamp(W / 2 - bw / 2, 12, W - bw - 12); by = 300; }
+  else { const f = friends[1]; ax = f.x; ay = f.y - 150 * f.s; bx = clamp(ax - bw / 2, 12, W - bw - 12); by = ay - bh - 22; }
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.fillStyle = 'rgba(255,252,240,0.96)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+  const up = bubble.who === 'king';
+  const tipBase = clamp(ax, bx + 20, bx + bw - 20);
+  ctx.beginPath();
+  ctx.moveTo(tipBase - 10, up ? by : by + bh); ctx.lineTo(ax, ay); ctx.lineTo(tipBase + 10, up ? by : by + bh); ctx.fill();
+  ctx.fillStyle = '#3b2f1e'; ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 30 + i * 24));
+  ctx.restore();
+}
+
+function drawScene() {
+  const inFurnace = phase === 'furnace' || phase === 'out';
+  if (!inFurnace) {
+    drawPlain();
+    drawStatue();
+    drawBand();
+    drawCrowdAndFriends();
+  } else {
+    drawFurnace();
+    drawWalkers();
+    for (const e of embers) drawEmber(e);
+  }
+  drawParticles();
+  drawBubble();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  const inFurnace = phase === 'furnace' || phase === 'out';
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  const base = inFurnace ? '90,30,10' : '40,60,100';
+  hg.addColorStop(0, `rgba(${base},0.75)`); hg.addColorStop(1, `rgba(${base},0)`);
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff3c8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Standing Firm' : `Level ${level} · ${inFurnace ? 'The Fiery Furnace' : cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore + (state === 'win' || state === 'done' ? 0 : levelScore)}`, viewW - 12, 26);
+    // misses left: wobbles (part 1) or sparks (part 2)
+    const used = inFurnace ? smoke : slips, max = inFurnace ? MAX_SMOKE : MAX_SLIPS;
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(inFurnace ? 'SPARKS' : 'WOBBLES', viewW - 12 - max * 24 - 4, 52);
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < max; k++) {
+      const x = viewW - 22 - (max - 1 - k) * 24, y = 47;
+      ctx.fillStyle = k < used ? (inFurnace ? '#9a9aa8' : '#ff8a5c') : 'rgba(255,243,200,0.3)';
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.fill();
+    }
+    // progress: songs played, then time left in the furnace
+    const bx0 = 134, bx1 = viewW - 30, y = 84;
+    const f = inFurnace ? (phase === 'out' ? 1 : clamp(phaseT / cfg.fdur, 0, 1)) : clamp(swellsDone / cfg.swells, 0, 1);
+    ctx.fillStyle = 'rgba(255,243,200,0.25)'; roundRect(bx0, y - 7, bx1 - bx0, 14, 7); ctx.fill();
+    ctx.fillStyle = inFurnace ? '#ffd27a' : '#9fd0ff';
+    if (f > 0) { roundRect(bx0, y - 7, Math.max(14, (bx1 - bx0) * f), 14, 7); ctx.fill(); }
+    ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#4a2a10';
+    ctx.fillText(inFurnace ? 'In the furnace' : `Songs ${Math.min(swellsDone, cfg.swells)} / ${cfg.swells}`, (bx0 + bx1) / 2, y + 4.5);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#4a3a60'; ctx.strokeStyle = '#4a3a60'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0 || state === 'title') return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  const y0 = TOPH + 32;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(60,30,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff3c8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawScene();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  // fade between the plain and the furnace
+  let fa = 0;
+  if (phase === 'walk' && fadeT > 0) fa = 1 - fadeT / 1.2;
+  else if (phase === 'furnace' && phaseT < 0.6) fa = 1 - phaseT / 0.6;
+  if (fa > 0) { ctx.fillStyle = `rgba(255,140,40,${clamp(fa, 0, 1)})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

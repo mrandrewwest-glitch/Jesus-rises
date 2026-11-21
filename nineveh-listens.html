@@ -1,0 +1,1731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3c2410">
+<title>Nineveh Listens</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3c2410;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Nineveh Listens</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'market', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+// Bible.verse() falls back to the KJV (labelled KJV) when a version is missing.
+const VERSES = {
+  // Title card and intro: Jonah goes to Nineveh this time
+  go: { ref: 'Jonah 3:3', KJV: 'So Jonah arose, and went unto Nineveh, according to the word of the Lord. Now Nineveh was an exceeding great city of three days\' journey.', NKJV: 'So Jonah arose and went to Nineveh, according to the word of the Lord. Now Nineveh was an exceedingly great city, a three-day journey in extent.', NIV: 'Jonah obeyed the word of the Lord and went to Nineveh. Now Nineveh was a very large city; it took three days to go through it.', NLT: 'This time Jonah obeyed the Lord’s command and went to Nineveh, a city so large that it took three days to see it all.' },
+  // Intro and fail card: Jonah calls out to the city
+  cry: { ref: 'Jonah 3:4', KJV: 'And Jonah began to enter into the city a day\'s journey, and he cried', NKJV: 'And Jonah began to enter the city on the first day’s walk. Then he cried out', NIV: 'Jonah began by going a day’s journey into the city, proclaiming', NLT: 'On the day Jonah entered the city, he shouted to the crowds' },
+  // Title card and later intros: the people believe
+  believed: { ref: 'Jonah 3:5', KJV: 'So the people of Nineveh believed God, and proclaimed a fast, and put on sackcloth, from the greatest of them even to the least of them.', NKJV: 'So the people of Nineveh believed God, proclaimed a fast, and put on sackcloth, from the greatest to the least of them.', NIV: 'The Ninevites believed God. A fast was proclaimed, and all of them, from the greatest to the least, put on sackcloth.', NLT: 'The people of Nineveh believed God’s message, and from the greatest to the least, they declared a fast and put on burlap to show their sorrow.' },
+  // When the king listens
+  king: { ref: 'Jonah 3:6', KJV: 'For word came unto the king of Nineveh, and he arose from his throne, and he laid his robe from him, and covered him with sackcloth', NKJV: 'Then word came to the king of Nineveh; and he arose from his throne and laid aside his robe, covered himself with sackcloth', NIV: 'When Jonah’s warning reached the king of Nineveh, he rose from his throne, took off his royal robes, covered himself with sackcloth', NLT: 'When the king of Nineveh heard what Jonah was saying, he stepped down from his throne and took off his royal robes. He dressed himself in burlap' },
+  // Win card: God sees them turn
+  turned: { ref: 'Jonah 3:10', KJV: 'And God saw their works, that they turned from their evil way; and God repented of the evil, that he had said that he would do unto them; and he did it not.', NKJV: 'Then God saw their works, that they turned from their evil way; and God relented from the disaster that He had said He would bring upon them, and He did not do it.', NIV: 'When God saw what they did and how they turned from their evil ways, he relented and did not bring on them the destruction he had threatened.', NLT: 'When God saw what they had done and how they had put a stop to their evil ways, he changed his mind and did not carry out the destruction he had threatened.' },
+  // The leafy vine
+  vine: { ref: 'Jonah 4:6', KJV: 'And the Lord God prepared a gourd, and made it to come up over Jonah, that it might be a shadow over his head', NKJV: 'And the Lord God prepared a plant and made it come up over Jonah, that it might be shade for his head', NIV: 'Then the Lord God provided a leafy plant and made it grow up over Jonah to give shade for his head', NLT: 'And the Lord God arranged for a leafy plant to grow there, and soon it spread its broad leaves over Jonah’s head, shading him from the sun.' },
+  // Win card: God cares for the great city
+  spare: { ref: 'Jonah 4:11', KJV: 'And should not I spare Nineveh, that great city', NKJV: 'And should I not pity Nineveh, that great city', NIV: 'And should I not have concern for the great city of Nineveh', NLT: 'Shouldn’t I feel sorry for such a great city?' },
+};
+
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function verseText(key) { return Bible.verse(VERSES[key]).text; }
+function verseCite(key) { return Bible.verse(VERSES[key]).cite; }
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  if (typeof onResize === 'function') onResize();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function mix(a, b, f) {
+  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(na >> 16, nb >> 16, f)), g = Math.round(lerp((na >> 8) & 255, (nb >> 8) & 255, f)), bl = Math.round(lerp(na & 255, nb & 255, f));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#e6eef6') {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  People (the house cartoon style)
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const closed = () => {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(-ex, ey - 1, 3.2, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.moveTo(ex + 3.2 * Math.cos(0.15 * Math.PI), ey - 1 + 3.2 * Math.sin(0.15 * Math.PI));
+    ctx.arc(ex, ey - 1, 3.2, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'grumpy':
+      eyes(3.5, 3.2, 2);
+      brows(-5, -9, -5, -9);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'sleep':
+      closed();
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.2, 2.6 + Math.sin(t * 2) * 0.8, 0, 0, TAU));
+      break;
+    case 'pray':
+      closed();
+      brows(-8, -7, -8, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 3.5, 0.25 * Math.PI, 0.75 * Math.PI));
+      break;
+    case 'happy':
+      eyes(3.5, 4.5, 2);
+      brows(-8, -8, -8, -8);
+      mouthFill(() => { ctx.moveTo(-5, mouthY - 2); ctx.arc(0, mouthY - 2, 5, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.4)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawHeadwear(d, hy) {
+  if (d.crown) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath(); ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+    ctx.fillStyle = '#f2c230'; ctx.strokeStyle = '#b8861a'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-13, hy - 10); ctx.lineTo(-13, hy - 24); ctx.lineTo(-7, hy - 17); ctx.lineTo(0, hy - 27);
+    ctx.lineTo(7, hy - 17); ctx.lineTo(13, hy - 24); ctx.lineTo(13, hy - 10); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d64545'; ctx.beginPath(); ctx.arc(0, hy - 15, 2.5, 0, TAU); ctx.fill();
+    return;
+  }
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+  ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+  ctx.closePath(); ctx.fill();
+  if (d.band) {
+    ctx.strokeStyle = d.band; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 16, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  }
+}
+
+function drawBeard(d, hy) {
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-15, hy + 2);
+  ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+  ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+  ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+  ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+  ctx.fill();
+}
+
+// d: { robe, hair, skin, beard, scarf, kid, crown, band, sack, blink, phase, i }
+// pose: 'stand' | 'armsUp' | 'push' | 'pray' | 'kneel' | 'wave' | 'point'
+function drawPerson(d, x, y, s, mood, pose = 'stand', lookX = 0, lookY = 0.3) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + (d.phase || 0))) * 10;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.kid) s *= 0.78;
+  const kneel = pose === 'kneel' || pose === 'pray';
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  if (kneel) ctx.translate(0, 12);
+
+  const robe = d.sack ? '#b89a6a' : d.robe;
+  const sleeve = shade(robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+
+  if (pose === 'armsUp') {
+    const wave = Math.sin(t * 9 + (d.phase || 0)) * 4;
+    arm(-11, -32, -24 + wave, -66); arm(11, -32, 24 - wave, -66);
+  } else if (pose === 'wave') {
+    arm(11, -32, 24 + Math.sin(t * 10 + (d.phase || 0)) * 5, -64);
+  }
+
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (kneel) {
+    ctx.moveTo(-20, -12);
+    ctx.quadraticCurveTo(-17, -30, -11, -37);
+    ctx.quadraticCurveTo(0, -41, 11, -37);
+    ctx.quadraticCurveTo(17, -30, 20, -12);
+    ctx.quadraticCurveTo(0, -6, -20, -12);
+  } else {
+    ctx.moveTo(-18, 0);
+    ctx.quadraticCurveTo(-17, -30, -11, -37);
+    ctx.quadraticCurveTo(0, -41, 11, -37);
+    ctx.quadraticCurveTo(17, -30, 18, 0);
+    ctx.closePath();
+  }
+  ctx.fill(); ctx.stroke();
+  if (d.sack) {
+    // rough burlap stitches
+    ctx.strokeStyle = 'rgba(110,80,40,0.55)'; ctx.lineWidth = 1;
+    for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(k * 6, -34); ctx.lineTo(k * 6.6, kneel ? -12 : -2); ctx.stroke(); }
+    ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.lineTo(16, -17); ctx.stroke();
+  } else {
+    ctx.strokeStyle = d.belt || '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+
+  if (pose === 'stand' && mood !== 'shock') {
+    arm(-11, -32, -15, -12); arm(11, -32, 15, -12);
+  } else if (pose === 'wave') {
+    arm(-11, -32, -15, -12);
+  } else if (pose === 'push') {
+    arm(-11, -32, -22, -40); arm(11, -32, 22, -40);
+  } else if (pose === 'point') {
+    arm(-11, -32, -15, -12); arm(11, -32, 30, -46);
+  } else if (pose === 'pray' || pose === 'kneel') {
+    arm(-11, -32, -2, -40); arm(11, -32, 2, -40);
+  }
+
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  drawHeadwear(d, hy);
+  if (d.beard) drawBeard(d, hy);
+  drawFace(d, mood, hy, lookX, lookY);
+  if (d.sack && !d.crown) {
+    // a sprinkle of ashes on the head
+    ctx.fillStyle = 'rgba(120,120,120,0.55)';
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-8 + k * 4, hy - 15 + (k % 2) * 2, 1.4, 0, TAU); ctx.fill(); }
+  }
+  if (mood === 'shock' && pose === 'stand') {
+    arm(-11, -32, -15, hy + 4); arm(11, -32, 15, hy + 4);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles (world = playfield coordinates, scr = view coordinates)
+// ============================================================
+let particles = [];
+function spawn(x, y, vx, vy, life, color, size, grav = 0, scr = false, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, scr, kind, rot: rand(0, TAU) });
+}
+function sparkleBurst(x, y, n, scr = false, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#bfe8ff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), v = rand(60, 260);
+    spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, rand(0.5, 1.1), pick(cols), rand(2, 5), 120, scr, i % 3 ? 'dot' : 'star');
+  }
+}
+function splashBurst(x, y, n = 14, col = '#d8f0ff') {
+  for (let i = 0; i < n; i++) spawn(x + rand(-12, 12), y, rand(-120, 120), rand(-320, -120), rand(0.5, 0.9), i % 2 ? col : '#ffffff', rand(3, 6), 700);
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.rot += dt * 3;
+  }
+}
+function drawParticles(scr) {
+  for (const p of particles) {
+    if (p.scr !== scr) continue;
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const r = k % 2 ? p.size * 0.45 : p.size * 1.4; ctx.lineTo(Math.cos(k * Math.PI / 4) * r, Math.sin(k * Math.PI / 4) * r); }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    } else if (p.kind === 'heart') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(p.size / 8, p.size / 8);
+      ctx.beginPath(); ctx.moveTo(0, 3); ctx.bezierCurveTo(-8, -3, -4, -9, 0, -4); ctx.bezierCurveTo(4, -9, 8, -3, 0, 3); ctx.fill(); ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.kind === 'puff' ? 2 - a : 1), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+  try { overlay.querySelector('.card').scrollTop = 0; } catch (e) {}
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+let message = { text: '', t: 0 };
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+let pausedFrom = 'play';
+function togglePause() {
+  if (state === 'play' || state === 'intro') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input (shared parts; each game adds gameKey / gamePress / gameMove / gameRelease)
+// ============================================================
+const keys = new Set();
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  keys.add(e.code);
+  gameKey(e);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  p.x = p.vx - offX; p.y = p.vy - offY;   // playfield coordinates
+  gamePress(p, e);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (typeof gameMove !== 'function') return;
+  const p = toView(e); p.x = p.vx - offX; p.y = p.vy - offY;
+  gameMove(p, e);
+});
+canvas.addEventListener('pointerup', (e) => {
+  sfx.init();
+  if (typeof gameRelease !== 'function') return;
+  const p = toView(e); p.x = p.vx - offX; p.y = p.vy - offY;
+  gameRelease(p, e);
+});
+canvas.addEventListener('pointercancel', (e) => { if (typeof gameRelease === 'function') gameRelease(null, e); });
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+function drawHudButtons() {
+  ctx.save();
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// A labelled meter in the HUD strip
+function drawMeter(x, y, w, frac, label, cols, warn = false, ink = '#ffe9a8') {
+  ctx.save();
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ink;
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillText(label, x, y + 11);
+  ctx.shadowBlur = 0;
+  const lw = ctx.measureText(label).width + 8;
+  ctx.fillStyle = 'rgba(255,233,168,0.22)';
+  roundRect(x + lw, y, w, 13, 6.5); ctx.fill();
+  const g = ctx.createLinearGradient(x + lw, 0, x + lw + w, 0);
+  g.addColorStop(0, cols[0]); g.addColorStop(1, cols[1]);
+  ctx.fillStyle = warn && Math.sin(t * 10) > 0 ? '#ff6b6b' : g;
+  if (frac > 0.005) { roundRect(x + lw, y, Math.max(13, w * clamp(frac, 0, 1)), 13, 6.5); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawMessageAt(y0, dark = true) {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = dark ? 'rgba(20,12,24,0.9)' : 'rgba(255,255,255,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = dark ? '#ffe9a8' : '#7a5200';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+// A story caption with a Bible verse, drawn in view coordinates under the HUD
+function drawCaption(key, alpha = 1, y = 122, who = '') {
+  if (alpha <= 0) return;
+  const v = Bible.verse(VERSES[key]);
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  const w = Math.min(viewW - 28, 560);
+  const x = (viewW - w) / 2;
+  ctx.font = '600 19px Fredoka, sans-serif';
+  const text = (who ? who + ': “' : '“') + v.text.replace(/^\.\.\.\s*/, '…') + '”';
+  const lines = wrapText(text, w - 32);
+  const h = 22 + lines.length * 24 + 22;
+  if (y < 0) y = -y - h;   // a negative y means "bottom edge here"
+  ctx.fillStyle = 'rgba(255,252,240,0.94)';
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 12;
+  roundRect(x, y, w, h, 16); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(224,165,38,0.6)'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = '#4a3a20'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  lines.forEach((l, i) => ctx.fillText(l, viewW / 2, y + 34 + i * 24));
+  ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillStyle = '#9a7a40';
+  ctx.fillText('— ' + v.cite, viewW / 2, y + h - 12);
+  ctx.restore();
+  return h;
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+  splash(v = 1) { this.noiseBurst(900, 0.5, 0.35 * v, 0.6, 250, 'lowpass'); this.noiseBurst(2600, 0.3, 0.12 * v, 0.8, 900); },
+  whoosh() { this.noiseBurst(500, 0.35, 0.22, 0.9, 2200); },
+  thud() { this.tone(110, 0.25, 'sine', 0.4, 0, 60); this.noiseBurst(300, 0.25, 0.25, 0.7, 150, 'lowpass'); },
+  knock() { this.tone(240, 0.08, 'triangle', 0.3); this.tone(200, 0.1, 'triangle', 0.25, 0.09); },
+  scoop() { this.noiseBurst(1400, 0.25, 0.2, 1.2, 500); },
+  pop() { this.tone(600, 0.1, 'sine', 0.25, 0, 1100); },
+  bump() { this.tone(180, 0.18, 'triangle', 0.3, 0, 110); },
+  ding() { [1568, 2093].forEach((f, i) => this.tone(f, 0.45, 'sine', 0.13, i * 0.08)); },
+  chime() { [1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.12, i * 0.07)); },
+  gulp() { this.tone(220, 0.3, 'sine', 0.4, 0, 90); this.tone(160, 0.35, 'sine', 0.3, 0.2, 70); },
+  rumble() { this.noiseBurst(200, 1.2, 0.5, 0.6, 80, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!!sfx.ctx && !sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  The great fish (friendly!)  — facing right, mouth at +x
+// ============================================================
+function drawBigFish(x, y, s, mouth = 0, wink = 0, tailT = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const wag = Math.sin(tailT * 3) * 0.12;
+  // tail
+  ctx.save();
+  ctx.translate(-160, 0); ctx.rotate(wag);
+  ctx.fillStyle = '#2f7aa6';
+  ctx.beginPath();
+  ctx.moveTo(10, 0);
+  ctx.quadraticCurveTo(-40, -30, -80, -78);
+  ctx.quadraticCurveTo(-60, 0, -80, 78);
+  ctx.quadraticCurveTo(-40, 30, 10, 0);
+  ctx.fill();
+  ctx.restore();
+  // top fin
+  ctx.fillStyle = '#2f7aa6';
+  ctx.beginPath(); ctx.moveTo(-70, -78); ctx.quadraticCurveTo(-20, -150, 40, -86); ctx.closePath(); ctx.fill();
+  // body
+  const g = ctx.createLinearGradient(0, -100, 0, 100);
+  g.addColorStop(0, '#5fb2dc'); g.addColorStop(0.55, '#3f92c2'); g.addColorStop(1, '#2f78a2');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, 185, 100, 0, 0, TAU); ctx.fill();
+  // belly
+  ctx.fillStyle = '#cfeef5';
+  ctx.beginPath(); ctx.ellipse(10, 46, 150, 52, 0, 0, Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(10, 46, 150, 22, 0, Math.PI, TAU); ctx.fill();
+  // spots
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  for (const [sx, sy, r] of [[-90, -30, 12], [-60, -55, 8], [-110, 5, 9], [-30, -70, 7], [20, -60, 10]]) { ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill(); }
+  // side fin
+  ctx.fillStyle = '#2f7aa6';
+  ctx.beginPath(); ctx.moveTo(-10, 20); ctx.quadraticCurveTo(-60, 70, -10, 70 + Math.sin(tailT * 4) * 6); ctx.quadraticCurveTo(10, 50, -10, 20); ctx.fill();
+  // mouth
+  const mx = 170, my = 22;
+  if (mouth > 0.02) {
+    ctx.fillStyle = '#7a2e4a';
+    ctx.beginPath();
+    ctx.moveTo(95, my);
+    ctx.quadraticCurveTo(140, my - 70 * mouth, 196, my - 58 * mouth);
+    ctx.lineTo(196, my + 46 * mouth);
+    ctx.quadraticCurveTo(140, my + 58 * mouth, 95, my);
+    ctx.fill();
+    ctx.fillStyle = '#e07a96';
+    ctx.beginPath(); ctx.ellipse(150, my + 26 * mouth, 32, 12 * mouth, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#1d4f6e'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(118, my - 4); ctx.quadraticCurveTo(152, my + 22, mx + 10, my - 6); ctx.stroke();
+  }
+  // cheek
+  ctx.fillStyle = 'rgba(255,130,150,0.45)';
+  ctx.beginPath(); ctx.ellipse(118, 30, 16, 10, 0, 0, TAU); ctx.fill();
+  // eye
+  const ex = 108, ey = -28;
+  if (wink > 0.5) {
+    ctx.strokeStyle = '#123'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(ex, ey + 4, 16, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(ex, ey, 26, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#1d4f6e'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = '#1a2a3a';
+    ctx.beginPath(); ctx.arc(ex + 6, ey + 3, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(ex + 11, ey - 3, 5, 0, TAU); ctx.fill();
+  }
+  // gill
+  ctx.strokeStyle = 'rgba(29,79,110,0.5)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(55, 5, 50, -0.6, 0.7); ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;
+const STREET = 520;               // where the street starts (playfield y)
+const LANES = [{ y: 600, s: 0.88 }, { y: 712, s: 1.02 }, { y: 826, s: 1.16 }];
+const BEST_KEY = 'ninevehBest';
+const WRONG_COST = 3;             // seconds lost for telling someone twice
+const BUMP_COST = 2;              // seconds lost for tapping a camel or a cart
+
+const LEVEL_NAMES = [
+  'The City Gate',
+  'The Busy Market',
+  'Streets of Nineveh',
+  'Crowds and Camels',
+  'The Great City',
+  'A Three-Day Walk',
+];
+
+function makeConfig(n) {
+  const k = Math.min(n, 9) - 1;
+  return {
+    name: LEVEL_NAMES[n - 1] || `The Great City ${n - 5}`,
+    need: [8, 13, 17, 21, 25, 30, 32, 34, 36][k],
+    time: [50, 48, 46, 45, 44, 42, 42, 42, 42][k],
+    spawnEvery: Math.max(0.6, 1.5 - k * 0.15),
+    speed: 38 + k * 14,
+    doubters: [0, 0.12, 0.25, 0.34, 0.42, 0.48, 0.5, 0.52, 0.55][k],
+    carts: [0.06, 0.12, 0.16, 0.2, 0.22, 0.25, 0.27, 0.3, 0.3][k],
+    vineTime: n === 1 ? 14 : Math.max(9, 13 - k * 0.8),
+    wormEvery: n === 1 ? 6 : Math.max(2.4, 5 - k * 0.5),
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | pause | win | fail
+let phase = 'city';       // during play: 'city' or 'vine'
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem(BEST_KEY) || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let walkers = [];
+let heard = 0, wrong = 0, kingHeard = false, kingT = 0;
+let dayTime = 60, dayLeft = 60;
+let spawnT = 0, scrollX = 0;
+let bubblesUI = [];       // little words floating up
+let flashT = 0, shakeT = 0;
+let endTimer = 0, winT = 0, failT = 0, playT = 0;
+let lastScore = null;
+let told = {};
+let introT = 0, introStep = 0, introFade = 0, introSteps = [];
+let attempted = 0;
+let vine = null;          // the leafy plant scene
+let captionKey = null, captionT = 0;
+let nextId = 1;
+
+const JONAH = { robe: '#8a5a9e', hair: '#4a2f1a', beard: true, skin: '#d9a066', belt: '#e0c070', blink: 0, phase: 0 };
+const KING = { robe: '#6b3fa0', hair: '#3a2716', beard: true, skin: '#d7a070', crown: true, belt: '#f2c230' };
+const LOOKS = [
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true,  skin: '#d9a066' },
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#e8dcc0' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true,  skin: '#c98d56', band: '#e8dcc0' },
+  { robe: '#d9a13a', hair: '#6b3f1d', skin: '#e3b184', kid: true },
+  { robe: '#7a4fa0', hair: '#3a2716', skin: '#c58a55', scarf: '#f0c9a0' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true,  skin: '#d7a070', band: '#f2c230' },
+  { robe: '#3c8f86', hair: '#1f140c', skin: '#b87a48', scarf: '#d8c7a0' },
+  { robe: '#e07a5f', hair: '#5c3a1c', skin: '#dca678', kid: true },
+  { robe: '#4b7f4b', hair: '#2d1b0f', skin: '#bf8150', scarf: '#e8dcc0' },
+  { robe: '#a0673a', hair: '#3a2515', beard: true,  skin: '#d39a66' },
+  { robe: '#2f7f9a', hair: '#2a1a0e', beard: true,  skin: '#c88e5a', band: '#c0392b' },
+  { robe: '#d0565a', hair: '#1c120b', skin: '#c78f5c', kid: true },
+];
+
+// ============================================================
+//  The crowd
+// ============================================================
+function spawnWalker(kind = null, laneI = null) {
+  const lane = laneI != null ? laneI : Math.floor(rand(0, 3));
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  if (!kind) kind = Math.random() < cfg.carts ? (Math.random() < 0.5 ? 'camel' : 'cart') : 'person';
+  const s = LANES[lane].s;
+  const w = {
+    id: nextId++, kind, lane, dir, s,
+    x: dir > 0 ? -80 - offX : W + 80 + offX,
+    speed: (kind === 'person' ? cfg.speed * rand(0.8, 1.25) : cfg.speed * 0.8) * (0.75 + lane * 0.15),
+    look: { ...pick(LOOKS), phase: rand(0, TAU), blink: 0 },
+    heard: false, doubt: kind === 'person' && Math.random() < cfg.doubters, taps: 0,
+    listenT: 0, doubtT: 0, walkT: rand(0, 10), hop: 0,
+  };
+  if (kind === 'king') { w.look = { ...KING, phase: 0, blink: 0 }; w.speed = cfg.speed * 0.55; w.doubt = false; }
+  walkers.push(w);
+  return w;
+}
+
+function walkerBox(w) {
+  const y = LANES[w.lane].y, s = w.s;
+  if (w.kind === 'camel') return { x0: w.x - 62 * s, x1: w.x + 62 * s, y0: y - 120 * s, y1: y + 4 };
+  if (w.kind === 'cart') return { x0: w.x - 60 * s, x1: w.x + 60 * s, y0: y - 80 * s, y1: y + 4 };
+  const k = w.look.kid ? 0.78 : 1;
+  return { x0: w.x - 24 * s, x1: w.x + 24 * s, y0: y - 82 * s * k - 8, y1: y + 6 };
+}
+
+function hitWalker(px, py) {
+  for (let lane = 2; lane >= 0; lane--) {
+    let bestW = null, bestD = Infinity;
+    for (const w of walkers) {
+      if (w.lane !== lane) continue;
+      const b = walkerBox(w), pad = w.kind === 'person' || w.kind === 'king' ? 14 : 0;
+      if (px > b.x0 - pad && px < b.x1 + pad && py > b.y0 - pad && py < b.y1 + pad) {
+        const d = Math.abs(px - w.x);
+        if (d < bestD) { bestD = d; bestW = w; }
+      }
+    }
+    if (bestW) return bestW;
+  }
+  return null;
+}
+
+function tellWalker(w) {
+  const y = LANES[w.lane].y;
+  if (w.kind === 'camel' || w.kind === 'cart') {
+    dayLeft = Math.max(0.5, dayLeft - BUMP_COST);
+    w.hop = 0.4;
+    sfx.bump();
+    floatWord(w.x, y - 120 * w.s, w.kind === 'camel' ? 'Hmmph!' : 'Mind the cart!', '#ffe0a0');
+    if (!told.camel) { told.camel = true; showMessage('That’s a ' + w.kind + '! Tap the people', 2); }
+    return;
+  }
+  if (w.heard) {
+    wrong++;
+    dayLeft = Math.max(0.5, dayLeft - WRONG_COST);
+    w.hop = 0.3;
+    sfx.bump();
+    floatWord(w.x, y - 100 * w.s, 'I heard already!', '#ffd0c0');
+    if (!told.twice) { told.twice = true; showMessage('They already listened — find someone new!', 2.2); }
+    return;
+  }
+  sfx.tap(0.2 + (heard % 8) * 0.1);
+  if (w.doubt && w.taps === 0) {
+    w.taps = 1; w.doubtT = 0;
+    floatWord(w.x, y - 100 * w.s, 'Hmm… really?', '#fff');
+    if (!told.doubt) { told.doubt = true; showMessage('Some people need to hear it twice — tap again!', 2.6); }
+    return;
+  }
+  // they listen and turn to God
+  w.heard = true; w.listenT = w.kind === 'king' ? 3 : 1.3; w.taps++;
+  const gain = w.kind === 'king' ? 3 : 1;
+  heard += gain;
+  sparkleBurst(w.x, y - 60 * w.s, w.kind === 'king' ? 50 : 16);
+  floatWord(w.x, y - 104 * w.s, w.kind === 'king' ? 'The king listened!' : pick(['We will turn to God!', 'We believe God!', 'We are sorry!', 'Let’s pray!']), '#fff6b0');
+  if (w.kind === 'king') { kingHeard = true; sfx.chime(); captionKey = 'king'; captionT = 4.5; flashT = 0.25; }
+  else sfx.ding();
+  if (heard >= cfg.need) cityDone();
+}
+
+function floatWord(x, y, text, col) { bubblesUI.push({ x, y, text, col, t: 1.6 }); }
+
+function updateWalkers(dt) {
+  const active = state === 'play' && phase === 'city';
+  if (active || state === 'intro' || state === 'title') {
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      spawnT = cfg.spawnEvery * rand(0.7, 1.3) * (state === 'play' ? 1 : 1.4);
+      // keep enough people who still need to hear
+      spawnWalker();
+    }
+  }
+  for (let i = walkers.length - 1; i >= 0; i--) {
+    const w = walkers[i];
+    w.hop = Math.max(0, w.hop - dt);
+    w.walkT += dt;
+    let v = w.speed;
+    if (w.listenT > 0) { w.listenT -= dt; v = 0; }
+    else if (w.taps === 1 && !w.heard) { w.doubtT += dt; v *= 0.45; }
+    else if (w.heard) v *= 0.8;
+    w.x += w.dir * v * dt;
+    if ((w.dir > 0 && w.x > W + offX + 120) || (w.dir < 0 && w.x < -offX - 120)) walkers.splice(i, 1);
+  }
+  // the king comes by once half the city has listened
+  if (active && !kingHeard && heard >= Math.ceil(cfg.need * 0.4) && !walkers.some((w) => w.kind === 'king')) {
+    kingT -= dt;
+    if (kingT <= 0) {
+      spawnWalker('king', 1);
+      kingT = 14;
+      showMessage('Here comes the king of Nineveh!', 2.4);
+    }
+  }
+}
+
+// ============================================================
+//  The leafy plant (bonus scene)
+// ============================================================
+function cityDone() {
+  phase = 'vine';
+  sfx.win();
+  showMessage('The whole city is listening!', 2.4);
+  flashT = 0.3;
+  vine = { grow: 0.1, t: 0, worms: [], wormT: 2.5, fade: 0, taps: 0, shoos: 0, done: false };
+  captionKey = 'vine'; captionT = 5;
+  if (!told.vine) setTimeout(() => { if (state === 'play' && phase === 'vine') showMessage('Tap the vine to help it grow. Shoo the worm!', 3); }, 2500);
+  told.vine = true;
+}
+
+function vineRoot() { return { x: W * 0.5 + Math.min(150, W * 0.18), y: 780 }; }
+function updateVine(dt) {
+  vine.t += dt;
+  vine.fade = Math.min(1, vine.fade + dt * 1.5);
+  if (vine.t > cfg.vineTime || vine.grow >= 1) {
+    if (!vine.done) { vine.done = true; vine.endT = 0; if (vine.grow >= 1) { sfx.chime(); showMessage('Lovely shade for Jonah!', 2); } }
+    vine.endT += dt;
+    if (vine.endT > 1.6) winLevel();
+    return;
+  }
+  vine.wormT -= dt;
+  if (vine.wormT <= 0 && vine.worms.length < 2) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const r = vineRoot();
+    vine.worms.push({ x: r.x + side * (W * 0.5 + 40), y: r.y + 30, dir: -side, shoo: 0, ph: rand(0, TAU) });
+    vine.wormT = cfg.wormEvery * rand(0.8, 1.2);
+  }
+  const r = vineRoot();
+  for (let i = vine.worms.length - 1; i >= 0; i--) {
+    const w = vine.worms[i];
+    if (w.shoo > 0) { w.shoo += dt; w.x -= w.dir * 400 * dt; w.y -= 260 * dt * (1 - w.shoo); if (w.shoo > 1.2) vine.worms.splice(i, 1); continue; }
+    w.x += w.dir * (40 + level * 6) * dt;
+    if (Math.abs(w.x - r.x) < 26) {
+      // the worm nibbles the plant
+      vine.grow = Math.max(0.05, vine.grow - 0.25);
+      sfx.bump();
+      showMessage('The worm nibbled the vine!', 1.6);
+      w.shoo = 0.01; w.dir *= -1;
+    }
+  }
+}
+function tapVine(px, py) {
+  const r = vineRoot();
+  for (const w of vine.worms) {
+    if (w.shoo === 0 && Math.hypot(px - w.x, py - w.y) < 52) {
+      w.shoo = 0.01; vine.shoos++;
+      sfx.whoosh();
+      for (let k = 0; k < 8; k++) spawn(w.x, w.y - 10, rand(-90, 90), rand(-160, -60), 0.7, '#ffe27a', 4, 200, false, 'star');
+      floatWord(w.x, w.y - 40, 'Shoo!', '#fff');
+      return;
+    }
+  }
+  // anywhere on or near the plant helps it grow
+  const top = r.y - 60 - vine.grow * 380;
+  if (Math.abs(px - r.x) < 170 && py > top - 80 && py < r.y + 60) {
+    vine.grow = Math.min(1, vine.grow + 0.06);
+    vine.taps++;
+    sfx.tap(0.2 + vine.grow * 0.8);
+    for (let k = 0; k < 5; k++) spawn(px, py, rand(-60, 60), rand(-120, -40), 0.6, pick(['#7fc95a', '#a8e07a', '#fff6b0']), 4, 150);
+  }
+}
+
+// ============================================================
+//  Overlay screens and the flow of a level
+// ============================================================
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(1);
+  walkers = [];
+  for (let i = 0; i < 6; i++) { const w = spawnWalker(null, i % 3); w.x = rand(40, W - 40); }
+  showOverlay('Nineveh Listens', 'Jonah 3–4 · Tell the great city about God',
+    `${verseHTML('go')}
+     <ul>
+       <li>This time Jonah obeyed God! Help him tell everyone in the great city to <b>turn back to God</b>.</li>
+       <li><b>Tap the people</b> in the busy streets to share the message. They put on sackcloth and pray.</li>
+       <li>Don't tap the <b>same person twice</b>, and mind the <b>camels and carts</b>!</li>
+       <li>Some people need to hear it <b>twice</b> — tap them again. Look out for the <b>king</b> — he counts for three!</li>
+       <li>Hurry before the <b>day ends</b>. Then help God's leafy vine grow to shade Jonah, and <b>shoo the worm</b>!</li>
+     </ul>
+     ${verseHTML('believed')}
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Into the city', () => { level = 1; totalScore = 0; attempted = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; bubblesUI = [];
+  walkers = [];
+  heard = 0; wrong = 0; kingHeard = false; kingT = 0;
+  dayTime = cfg.time; dayLeft = dayTime;
+  spawnT = 0; playT = 0; winT = 0; failT = 0;
+  phase = 'city'; vine = null;
+  endTimer = 0; flashT = shakeT = 0;
+  captionKey = null; captionT = 0;
+  told = { camel: told.camel, twice: told.twice, doubt: told.doubt, vine: told.vine };
+  keys.clear();
+  // fill the street
+  for (let i = 0; i < 5 + Math.min(level, 4); i++) { const w = spawnWalker(i < 3 ? 'person' : null, i % 3); w.x = rand(30, W - 30); }
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  sfx.levelStart();
+  if (retry || attempted > 0) { beginPlay(); return; }
+  attempted++;
+  state = 'intro';
+  syncAmbience();
+  introT = 0; introStep = 0; introFade = 0;
+  introSteps = level === 1 ? ['go', 'cry'] : ['believed'];
+  showMessage(level === 1 ? 'Jonah goes to Nineveh…' : `Level ${level}: ${cfg.name}`, 2.2);
+}
+function advanceIntro() {
+  if (introFade > 0) return;
+  if (introStep < introSteps.length - 1) { introStep++; introT = 0; }
+  else introFade = 0.001;
+}
+function updateIntro(dt) {
+  introT += dt;
+  if (introFade > 0) { introFade += dt; if (introFade > 0.5) beginPlay(); return; }
+  if (introT > 5) advanceIntro();
+}
+function beginPlay() {
+  state = 'play';
+  syncAmbience();
+  introFade = 0;
+  attempted = Math.max(attempted, 1);
+  showMessage(`Level ${level}: ${cfg.name}`, 2);
+  if (level === 1 && !told.how) {
+    told.how = true;
+    setTimeout(() => { if (state === 'play') showMessage('Tap the people to tell them about God!', 2.8); }, 2100);
+  }
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(dayLeft * 15);
+  const crowdBonus = heard * 40;
+  const kingBonus = kingHeard ? 300 : 0;
+  const vineBonus = Math.round(vine.grow * 400) + vine.shoos * 30;
+  const carePenalty = wrong * 50;
+  const score = Math.max(0, timeBonus + crowdBonus + kingBonus + vineBonus - carePenalty + level * 200);
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem(BEST_KEY, best); } catch (e) {} }
+  lastScore = { timeBonus, crowdBonus, kingBonus, vineBonus, carePenalty, score };
+  endTimer = 1.2;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  showMessage('The sun has gone down…', 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay('Nineveh listened!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('turned')}
+       <p style="text-align:center">God loves every person in the great city — and He loves you too!</p>
+       ${verseHTML('spare')}
+       <p class="score">People who listened (${heard}): <b>${s.crowdBonus}</b><br>Daylight left: <b>${s.timeBonus}</b><br>The king: <b>${s.kingBonus}</b><br>The leafy vine: <b>${s.vineBonus}</b>${s.carePenalty ? `<br>Told twice (${wrong}): <b>−${s.carePenalty}</b>` : ''}</p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next part of the city', () => { level++; attempted = 0; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('The day is over', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${heard} of ${cfg.need} people heard. Tap <b>new people</b> quickly — the ones not in sackcloth yet — and tap the <b>doubters</b> twice.</p>
+       ${verseHTML('cry')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function gameKey(e) {
+  if (state === 'intro' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { advanceIntro(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (e.code === 'Space') {
+    if (phase === 'vine') {
+      const w = vine.worms.find((q) => q.shoo === 0);
+      if (w) tapVine(w.x, w.y); else { const r = vineRoot(); tapVine(r.x, r.y - 40); }
+      return;
+    }
+    // tell the nearest person who hasn't heard yet
+    const cands = walkers.filter((w) => (w.kind === 'person' || w.kind === 'king') && !w.heard && w.x > 0 && w.x < W);
+    if (cands.length) tellWalker(cands.reduce((a, b) => (Math.abs(b.x - W / 2) < Math.abs(a.x - W / 2) ? b : a)));
+  }
+}
+function gamePress(p) {
+  if (state === 'intro') { advanceIntro(); return; }
+  if (state !== 'play') return;
+  if (phase === 'vine') { tapVine(p.x, p.y); return; }
+  const w = hitWalker(p.x, p.y);
+  if (w) tellWalker(w);
+}
+
+// For tests: screen positions (CSS pixels)
+function screenPos(x, y) { return { x: (x + offX) * scale / dpr, y: (y + offY) * scale / dpr }; }
+function botInfo() {
+  const vis = (w) => w.x > -offX + 10 && w.x < W + offX - 10;
+  return {
+    phase,
+    people: walkers.filter(vis).map((w) => {
+      const b = walkerBox(w), px = w.x + w.dir * w.speed * (w.listenT > 0 ? 0 : 0.12), py = (b.y0 + b.y1) / 2;
+      return { ...screenPos(px, py), kind: w.kind, heard: w.heard, taps: w.taps, lane: w.lane, id: w.id, clear: hitWalker(px, py) === w };
+    }),
+    worms: vine ? vine.worms.filter((w) => w.shoo === 0).map((w) => screenPos(w.x, w.y)) : [],
+    vine: vine ? screenPos(vineRoot().x, vineRoot().y - 80) : null,
+    heard, need: cfg.need, dayLeft,
+  };
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawSky() {
+  const top = -offY;
+  const f = clamp(1 - dayLeft / dayTime, 0, 1);         // the day passes
+  const evening = state === 'play' && phase === 'city' || state === 'fail' ? f : 0;
+  const g = ctx.createLinearGradient(0, top, 0, STREET);
+  g.addColorStop(0, mix('#78bfe8', '#4a4f8a', evening * evening));
+  g.addColorStop(1, mix('#fbe7c0', '#f2a06a', evening));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX - 2, top, viewW + 4, STREET - top + 2);
+  // the sun crosses the sky with the day
+  const sx = lerp(-offX + 60, W + offX - 60, (state === 'play' && phase === 'city') || state === 'fail' ? f : 0.2);
+  const sy = top + 150 + Math.max(0, offY) * 0.3 + Math.sin(f * Math.PI) * -40 + f * f * 120;
+  const sg = ctx.createRadialGradient(sx, sy, 6, sx, sy, 90);
+  sg.addColorStop(0, 'rgba(255,246,200,1)'); sg.addColorStop(0.35, 'rgba(255,215,120,0.8)'); sg.addColorStop(1, 'rgba(255,215,120,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 90, 0, TAU); ctx.fill();
+  drawCloud(((W * 0.3 - scrollX * 0.05) % (W + 400) + W + 400) % (W + 400) - 200, top + 120 + Math.max(0, offY) * 0.2, 200, 50);
+  drawCloud(((W * 0.85 - scrollX * 0.08) % (W + 400) + W + 400) % (W + 400) - 200, top + 220 + Math.max(0, offY) * 0.25, 150, 40);
+}
+
+function drawCity() {
+  // far: the great city walls and a ziggurat
+  const far = -scrollX * 0.15;
+  ctx.fillStyle = '#e0c49a';
+  for (let i = -1; i < W / 300 + 2; i++) {
+    const x = ((far % 300) + 300) % 300 + i * 300 - 300;
+    ctx.fillRect(x, 330, 300, STREET - 330);
+    for (let k = 0; k < 6; k++) ctx.fillRect(x + k * 50 + 5, 314, 28, 18);
+  }
+  const zx = ((W * 0.7 + far * 0.5) % (W + 600) + W + 600) % (W + 600) - 300;
+  ctx.fillStyle = '#d7b07a';
+  for (let k = 0; k < 4; k++) ctx.fillRect(zx - 150 + k * 30, 330 - (k + 1) * 46, 300 - k * 60, 48);
+  ctx.fillStyle = '#8a5a2a'; ctx.fillRect(zx - 14, 330 - 4 * 46 - 10, 28, 30);
+  // near: houses and market stalls along the street
+  const near = -scrollX * 0.5;
+  const bw = 170;
+  const first = Math.floor((-offX - near) / bw) - 1;
+  for (let i = first; i < first + Math.ceil((W + 2 * offX) / bw) + 3; i++) {
+    const x = near + i * bw;
+    const h = 120 + hash(i, 3) * 90;
+    const col = ['#f0d6a8', '#e8c48e', '#f3dcb5', '#ddb985'][Math.floor(hash(i, 4) * 4)];
+    ctx.fillStyle = col;
+    ctx.fillRect(x + 6, STREET - h, bw - 12, h + 4);
+    ctx.fillStyle = shade(col, -25);
+    ctx.fillRect(x + 2, STREET - h - 10, bw - 4, 12);
+    // windows and a door
+    ctx.fillStyle = '#7a4a22';
+    ctx.fillRect(x + bw / 2 - 16, STREET - 56, 32, 56);
+    ctx.beginPath(); ctx.arc(x + bw / 2, STREET - 56, 16, Math.PI, TAU); ctx.fill();
+    ctx.fillStyle = '#5a3a1a';
+    if (h > 150) { ctx.fillRect(x + 26, STREET - h + 30, 22, 26); ctx.fillRect(x + bw - 48, STREET - h + 30, 22, 26); }
+    // striped market awning
+    if (hash(i, 5) > 0.45) {
+      const ac = ['#d64545', '#2f7f9a', '#e0a526', '#6b8e3a'][Math.floor(hash(i, 6) * 4)];
+      const ay = STREET - 80;
+      for (let k = 0; k < 6; k++) {
+        ctx.fillStyle = k % 2 ? '#fff6e0' : ac;
+        ctx.beginPath(); ctx.moveTo(x + 10 + k * (bw - 20) / 6, ay); ctx.lineTo(x + 10 + (k + 1) * (bw - 20) / 6, ay); ctx.lineTo(x + 10 + (k + 1) * (bw - 20) / 6, ay + 22); ctx.quadraticCurveTo(x + 10 + (k + 0.5) * (bw - 20) / 6, ay + 30, x + 10 + k * (bw - 20) / 6, ay + 22); ctx.fill();
+      }
+      // fruit baskets
+      ctx.fillStyle = '#b07a3a';
+      ctx.fillRect(x + 22, STREET - 18, 36, 18); ctx.fillRect(x + bw - 58, STREET - 18, 36, 18);
+      ctx.fillStyle = ['#e85a4a', '#f2c230', '#8fc65a'][Math.floor(hash(i, 7) * 3)];
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + 28 + k * 8, STREET - 20, 6, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(x + bw - 52 + k * 8, STREET - 20, 6, 0, TAU); ctx.fill(); }
+    } else if (hash(i, 8) > 0.6) {
+      // a palm tree
+      const px = x + bw - 20;
+      ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(px, STREET); ctx.quadraticCurveTo(px - 10, STREET - 80, px + 4, STREET - 150); ctx.stroke();
+      ctx.fillStyle = '#4f9a4a';
+      for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * 0.6 + Math.sin(t + i) * 0.05; ctx.beginPath(); ctx.ellipse(px + 4 + Math.cos(a) * 34, STREET - 150 + Math.sin(a) * 18 + 10, 38, 9, a, 0, TAU); ctx.fill(); }
+    }
+  }
+  // the street
+  const g = ctx.createLinearGradient(0, STREET, 0, H);
+  g.addColorStop(0, '#e6cf9e'); g.addColorStop(1, '#d4b47c');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX - 2, STREET, viewW + 4, H - STREET + 4);
+  ctx.fillStyle = 'rgba(160,120,70,0.18)';
+  for (let i = 0; i < 40; i++) {
+    const x = ((hash(i, 9) * (W + 2 * offX) - scrollX) % (W + 2 * offX) + W + 2 * offX) % (W + 2 * offX) - offX;
+    ctx.beginPath(); ctx.ellipse(x, STREET + 20 + hash(i, 10) * (H - STREET - 30), 14, 4, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function drawCamel(w) {
+  const y = LANES[w.lane].y, s = w.s;
+  ctx.save();
+  ctx.translate(w.x, y - w.hop * 40 * Math.sin(w.hop * 8));
+  ctx.scale(w.dir * s, s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0, 0, 58, 8, 0, 0, TAU); ctx.fill();
+  const leg = (x, ph) => { ctx.strokeStyle = '#b8864a'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, -50); ctx.lineTo(x + Math.sin(w.walkT * 6 + ph) * 8, -2); ctx.stroke(); };
+  leg(-32, 0); leg(-20, Math.PI); leg(24, Math.PI); leg(36, 0);
+  ctx.fillStyle = '#d4a061';
+  ctx.beginPath(); ctx.ellipse(0, -62, 50, 24, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-6, -84, 24, 20, 0, 0, TAU); ctx.fill();   // hump
+  // blanket
+  ctx.fillStyle = '#c0392b'; ctx.fillRect(-22, -80, 34, 22);
+  ctx.fillStyle = '#f2c230'; ctx.fillRect(-22, -62, 34, 4);
+  // neck and head
+  ctx.strokeStyle = '#d4a061'; ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.moveTo(40, -66); ctx.quadraticCurveTo(62, -80, 58, -108); ctx.stroke();
+  ctx.fillStyle = '#d4a061';
+  ctx.beginPath(); ctx.ellipse(66, -112, 18, 11, 0.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(64, -116, 3, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(78, -108, 4, 0.2, 1.4); ctx.stroke();
+  ctx.fillStyle = '#b8864a'; ctx.beginPath(); ctx.ellipse(54, -122, 4, 7, -0.4, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawCart(w) {
+  const y = LANES[w.lane].y, s = w.s;
+  ctx.save();
+  ctx.translate(w.x, y - w.hop * 30 * Math.sin(w.hop * 8));
+  ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0, 0, 60, 8, 0, 0, TAU); ctx.fill();
+  // the merchant pushing it
+  drawPerson({ robe: '#7a5a3a', hair: '#2e1d10', beard: true, skin: '#c98d56', band: '#e8dcc0', blink: 0, phase: 1 }, -w.dir * 52, 0, 0.9, 'watch', 'push', w.dir, 0.2);
+  ctx.fillStyle = '#a86a32'; ctx.strokeStyle = '#6a4220'; ctx.lineWidth = 2.5;
+  roundRect(-40, -56, 80, 34, 5); ctx.fill(); ctx.stroke();
+  // fruit and pots
+  const cols = ['#e85a4a', '#f2c230', '#8fc65a', '#f29a3a'];
+  for (let k = 0; k < 7; k++) { ctx.fillStyle = cols[(k + w.id) % 4]; ctx.beginPath(); ctx.arc(-30 + k * 10, -60 - (k % 2) * 6, 8, 0, TAU); ctx.fill(); }
+  for (const wx of [-24, 24]) {
+    ctx.save(); ctx.translate(wx, -14); ctx.rotate(w.x * 0.05 * w.dir);
+    ctx.fillStyle = '#6a4220'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#c99a5a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.moveTo(0, -12); ctx.lineTo(0, 12); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawWalker(w) {
+  if (w.kind === 'camel') return drawCamel(w);
+  if (w.kind === 'cart') return drawCart(w);
+  const y = LANES[w.lane].y;
+  const d = w.look;
+  d.sack = w.heard && (w.kind !== 'king' || w.listenT < 2.2);
+  let mood = 'watch', pose = 'stand';
+  if (w.listenT > 0) { mood = 'pray'; pose = 'kneel'; }
+  else if (w.heard) { mood = 'happy'; pose = w.kind === 'king' ? 'stand' : (w.id % 3 ? 'stand' : 'wave'); }
+  else if (w.taps === 1) mood = 'doubt';
+  else if (w.doubt) mood = 'grumpy';
+  if (w.hop > 0) mood = 'wow';
+  const bob = w.listenT > 0 ? 0 : Math.abs(Math.sin(w.walkT * 8)) * 3;
+  drawPerson(d, w.x, y - bob - w.hop * 30, w.s * (w.kind === 'king' ? 1.12 : 1), mood, pose, w.dir * 0.6, 0.1);
+  if (w.taps === 1 && !w.heard) {
+    // a "?" bubble over a doubter
+    const k = d.kid ? 0.78 : 1;
+    const bx = w.x + 20 * w.s, by = y - 100 * w.s * k - 10;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(bx, by, 13, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5a4210'; ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('?', bx, by + 6);
+  }
+  if (w.heard && w.listenT <= 0 && w.kind !== 'king' && (w.id % 2 === 0)) {
+    // a little heart
+    ctx.fillStyle = 'rgba(255,120,150,0.8)';
+    const hx = w.x, hy = y - 96 * w.s - Math.sin(t * 3 + w.id) * 3;
+    ctx.beginPath(); ctx.moveTo(hx, hy + 4); ctx.bezierCurveTo(hx - 8, hy - 2, hx - 4, hy - 9, hx, hy - 4); ctx.bezierCurveTo(hx + 4, hy - 9, hx + 8, hy - 2, hx, hy + 4); ctx.fill();
+  }
+}
+
+function drawJonahPreaching() {
+  const x = Math.max(56, -offX + 56), y = H - 14;
+  // a little step to stand on
+  ctx.fillStyle = '#b8966a'; roundRect(x - 40, y - 18, 80, 22, 6); ctx.fill();
+  drawPerson(JONAH, x, y - 18, 1.15, state === 'fail' ? 'worried' : 'happy', 'point', 1, -0.2);
+}
+
+function drawWords() {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  for (const b of bubblesUI) {
+    const a = clamp(b.t / 0.4, 0, 1);
+    const y = b.y - (1.6 - b.t) * 30;
+    ctx.globalAlpha = a;
+    const w = ctx.measureText(b.text).width + 18;
+    b.x = clamp(b.x, -offX + w / 2 + 6, W + offX - w / 2 - 6);
+    ctx.fillStyle = 'rgba(60,40,20,0.75)';
+    roundRect(b.x - w / 2, y - 18, w, 26, 13); ctx.fill();
+    ctx.fillStyle = b.col; ctx.fillText(b.text, b.x, y + 1);
+  }
+  ctx.restore();
+}
+
+// The leafy plant scene, outside the city
+function drawVineScene() {
+  const a = vine.fade;
+  ctx.save();
+  ctx.globalAlpha = a;
+  const top = -offY;
+  const g = ctx.createLinearGradient(0, top, 0, 640);
+  g.addColorStop(0, '#8fd0f2'); g.addColorStop(1, '#fff0c8');
+  ctx.fillStyle = g; ctx.fillRect(-offX - 2, top, viewW + 4, 660 - top);
+  // the hot sun
+  const sx = W * 0.82, sy = top + 160 + Math.max(0, offY) * 0.3;
+  ctx.fillStyle = 'rgba(255,220,120,0.35)'; ctx.beginPath(); ctx.arc(sx, sy, 90 + Math.sin(t * 3) * 6, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.arc(sx, sy, 48, 0, TAU); ctx.fill();
+  // the city in the distance
+  ctx.fillStyle = 'rgba(200,170,120,0.8)';
+  for (let k = 0; k < 7; k++) ctx.fillRect(W * 0.05 + k * 38, 560 - 30 - (k % 3) * 18, 34, 60 + (k % 3) * 18);
+  // the hillside
+  ctx.fillStyle = '#d9b77a';
+  ctx.beginPath(); ctx.moveTo(-offX - 2, 600); ctx.quadraticCurveTo(W * 0.5, 540, W + offX + 2, 610); ctx.lineTo(W + offX + 2, H + 4); ctx.lineTo(-offX - 2, H + 4); ctx.fill();
+  const r = vineRoot();
+  // Jonah's little shelter
+  const jx = r.x - 110;
+  ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(jx - 70, r.y + 10); ctx.lineTo(jx - 60, r.y - 150); ctx.moveTo(jx + 70, r.y + 10); ctx.lineTo(jx + 60, r.y - 150); ctx.stroke();
+  ctx.fillStyle = '#c9a46a'; ctx.fillRect(jx - 80, r.y - 160, 160, 14);
+  const shaded = vine.grow > 0.7;
+  drawPerson(JONAH, jx, r.y + 14, 1.25, shaded ? 'joy' : 'worried', shaded ? 'stand' : 'stand', 0.6, 0);
+  if (!shaded) {
+    // hot!
+    ctx.fillStyle = '#7cc4f2';
+    ctx.beginPath(); ctx.arc(jx + 26, r.y - 70 + (t * 30) % 20, 4, 0, TAU); ctx.fill();
+  }
+  // the vine: a stem that climbs over the shelter and spreads leaves
+  const gr = vine.grow;
+  const h = 60 + gr * 380;
+  ctx.strokeStyle = '#4f9a3a'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r.x, r.y + 20);
+  const cx = r.x + Math.sin(t * 1.5) * 4, topY = r.y - Math.min(h, 200);
+  ctx.quadraticCurveTo(r.x + 30, r.y - h * 0.3, cx, topY);
+  if (h > 200) ctx.quadraticCurveTo(cx - 20, r.y - 230, cx - Math.min(220, (h - 200) * 1.2), r.y - 190 - Math.min(40, (h - 200) * 0.2));
+  ctx.stroke();
+  const leaves = Math.floor(3 + gr * 16);
+  for (let k = 0; k < leaves; k++) {
+    const f = k / Math.max(1, leaves - 1);
+    let lx, ly;
+    if (f < 0.4 || h <= 200) { const q = f / (h > 200 ? 0.4 : 1); lx = lerp(r.x, cx, q) + Math.sin(q * 3) * 14; ly = lerp(r.y, topY, q); }
+    else { const q = (f - 0.4) / 0.6; lx = cx - q * Math.min(220, (h - 200) * 1.2); ly = r.y - 200 - Math.sin(q * Math.PI) * 30; }
+    const big = 16 + gr * 18;
+    ctx.fillStyle = k % 2 ? '#5cb85c' : '#7fd06a';
+    ctx.beginPath(); ctx.ellipse(lx + (k % 2 ? 14 : -14), ly + Math.sin(t * 2 + k) * 2, big, big * 0.6, k % 2 ? 0.5 : -0.5, 0, TAU); ctx.fill();
+  }
+  if (shaded) {
+    // cool shade under the leaves
+    ctx.fillStyle = 'rgba(40,80,40,0.15)';
+    ctx.beginPath(); ctx.ellipse(jx, r.y + 18, 110, 16, 0, 0, TAU); ctx.fill();
+  }
+  // worms
+  for (const w of vine.worms) {
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    ctx.scale(w.dir, 1);
+    if (w.shoo > 0) ctx.rotate(w.shoo * 8);
+    ctx.fillStyle = '#e88aa0';
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-k * 10, -Math.abs(Math.sin(t * 8 + k + w.ph)) * 6, 9 - k * 0.8, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(4, -4, 4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(5, -4, 2, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // grow meter on the plant
+  ctx.restore();
+}
+
+function drawHUD() {
+  const playing = ['play', 'fail', 'win'].includes(state) || (state === 'pause' && pausedFrom === 'play');
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(60,36,14,0.85)'); hg.addColorStop(1, 'rgba(60,36,14,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.fillStyle = '#ffe9a8';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.font = '700 17px Fredoka, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(state === 'title' ? 'Nineveh Listens' : state === 'intro' || (state === 'pause' && pausedFrom === 'intro') ? 'Jonah goes to Nineveh' : `Level ${level} · ${cfg.name}`, 12, 26);
+  ctx.restore();
+  if (playing) {
+    const bw = Math.min(150, viewW * 0.3);
+    if (phase === 'city') drawMeter(12, 38, bw, dayLeft / dayTime, 'DAY', ['#ffd36a', '#f29a3a'], dayLeft < 10);
+    else drawMeter(12, 38, bw, vine.grow, 'VINE', ['#a8e07a', '#4f9a3a']);
+    const rb = Math.min(150, viewW * 0.28);
+    drawMeter(viewW - rb - 84, 14, rb, Math.min(1, heard / cfg.need), 'LISTENING', ['#fff0a0', '#e0a526']);
+    ctx.save();
+    ctx.font = '600 14px Fredoka, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#ffe9a8';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+    ctx.fillText(`${Math.min(heard, cfg.need)} of ${cfg.need} people`, viewW - 12, 50);
+    if (kingHeard) ctx.fillText('The king listened!', viewW - 12, 70);
+    ctx.restore();
+  }
+  drawHudButtons();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0;
+  if (shakeT > 0) sx = rand(-3, 3) * shakeT * 3;
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, offY * scale);
+  if (phase === 'vine' && vine && vine.fade >= 1) {
+    drawVineScene();
+  } else {
+    drawSky();
+    drawCity();
+    const order = walkers.slice().sort((a, b) => a.lane - b.lane || (a.kind === 'person') - (b.kind === 'person'));
+    for (const w of order) drawWalker(w);
+    drawJonahPreaching();
+    if (phase === 'vine' && vine) drawVineScene();
+  }
+  drawParticles(false);
+  drawWords();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (introFade > 0) { ctx.fillStyle = `rgba(60,36,14,${clamp(introFade / 0.5, 0, 0.5)})`; ctx.fillRect(0, 0, viewW, viewH); }
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  if (state === 'intro' || (state === 'pause' && pausedFrom === 'intro')) {
+    drawCaption(introSteps[introStep], clamp(introT / 0.4, 0, 1) * (introFade > 0 ? 1 - introFade / 0.5 : 1), TOPH + 14);
+    ctx.save(); ctx.font = '600 14px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(60,36,14,0.85)';
+    ctx.fillText('Tap to go on', viewW / 2, viewH - 20); ctx.restore();
+  } else if (captionKey && captionT > 0 && state === 'play') {
+    drawCaption(captionKey, Math.min(1, captionT / 0.4, (5 - captionT) / 0.3 + 0.2), TOPH + 14);
+  }
+  drawMessageAt(state === 'intro' ? viewH - 60 : Math.round(viewH * 0.4), true);
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  for (let i = bubblesUI.length - 1; i >= 0; i--) { bubblesUI[i].t -= dt; if (bubblesUI[i].t <= 0) bubblesUI.splice(i, 1); }
+  captionT = Math.max(0, captionT - dt);
+  if (state === 'intro') { updateIntro(dt); updateWalkers(dt); scrollX += dt * 14; }
+  else if (state === 'title') { updateWalkers(dt); scrollX += dt * 14; }
+  else if (state === 'play') {
+    playT += dt;
+    if (phase === 'city') {
+      scrollX += dt * 22;
+      dayLeft -= dt;
+      updateWalkers(dt);
+      if (state === 'play' && phase === 'city' && dayLeft <= 0) { dayLeft = 0; fail(); }
+      else if (dayLeft < 10 && !told.late) { told.late = true; showMessage('Hurry! The sun is going down', 2); }
+    } else {
+      updateWalkers(dt);
+      updateVine(dt);
+    }
+  } else if (state === 'fail') { failT += dt; updateWalkers(dt * 0.5); }
+  else if (state === 'win') winT += dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

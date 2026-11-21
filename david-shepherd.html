@@ -1,0 +1,1713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2f4a2a">
+<title>The Shepherd Boy</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2f4a2a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Shepherd Boy</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js). Night levels swap the birds for crickets.
+Music.theme = { tune: 'jesusLovesMe', instrument: 'pipe', accent: 'harp', ambience: 'birds', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  flock: { ref: '1 Samuel 17:34–35', KJV: 'Thy servant kept his father\'s sheep, and there came a lion, and a bear, and took a lamb out of the flock: And I went out after him... and delivered it out of his mouth', NKJV: 'Your servant used to keep his father’s sheep, and when a lion or a bear came and took a lamb out of the flock, I went out after it... and delivered the lamb from its mouth', NIV: 'Your servant has been keeping his father’s sheep. When a lion or a bear came and carried off a sheep from the flock, I went after it... and rescued the sheep from its mouth.', NLT: 'I have been taking care of my father’s sheep and goats... When a lion or a bear comes to steal a lamb from the flock, I go after it with a club and rescue the lamb from its mouth.' },
+  // Level cards
+  youngest: { ref: '1 Samuel 16:11', KJV: 'There remaineth yet the youngest, and, behold, he keepeth the sheep.', NKJV: 'There remains yet the youngest, and there he is, keeping the sheep.', NIV: 'There is still the youngest... He is tending the sheep.', NLT: 'There is still the youngest... But he’s out in the fields watching the sheep and goats.' },
+  shepherd: { ref: 'Psalm 23:1', KJV: 'The Lord is my shepherd; I shall not want.', NKJV: 'The Lord is my shepherd; I shall not want.', NIV: 'The Lord is my shepherd, I lack nothing.', NLT: 'The Lord is my shepherd; I have all that I need.' },
+  pastures: { ref: 'Psalm 23:2', KJV: 'He maketh me to lie down in green pastures: he leadeth me beside the still waters.', NKJV: 'He makes me to lie down in green pastures; He leads me beside the still waters.', NIV: 'He makes me lie down in green pastures, he leads me beside quiet waters,', NLT: 'He lets me rest in green meadows; he leads me beside peaceful streams.' },
+  // Fail card
+  rescue: { ref: '1 Samuel 17:35', KJV: 'I went out after him... and delivered it out of his mouth', NKJV: 'I went out after it... and delivered the lamb from its mouth', NIV: 'I went after it... and rescued the sheep from its mouth.', NLT: 'I go after it with a club and rescue the lamb from its mouth.' },
+  // Win cards
+  paw: { ref: '1 Samuel 17:37', KJV: 'The Lord that delivered me out of the paw of the lion, and out of the paw of the bear, he will deliver me out of the hand of this Philistine.', NKJV: 'The Lord, who delivered me from the paw of the lion and from the paw of the bear, He will deliver me from the hand of this Philistine.', NIV: 'The Lord who rescued me from the paw of the lion and the paw of the bear will rescue me from the hand of this Philistine.', NLT: 'The Lord who rescued me from the claws of the lion and the bear will rescue me from this Philistine!' },
+  goWith: { ref: '1 Samuel 17:37', KJV: 'Go, and the Lord be with thee.', NKJV: 'Go, and the Lord be with you!', NIV: 'Go, and the Lord be with you.', NLT: 'And may the Lord be with you!' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  HZ = -clamp(offY, 0, 300) * 0.6;
+  PY0 = 380 + HZ;
+  SZ = clamp(W / 760, 1, 1.4);
+  keepInside();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 104;         // HUD strip at the top of the screen
+let PY0 = 380;            // top of the pasture (the hills are above it); moves up on tall screens
+let HZ = 0;               // how far the horizon is lifted on tall screens
+let SZ = 1;               // size of the animals and David (a little bigger on wide screens)
+const HIT_R = 62;         // how close a tap must be to a lion or bear
+const SHEEP_R = 46;       // how close a tap must be to a wandering sheep
+const MAX_LOST = 3;       // lambs you may lose before the level is lost
+
+const LEVELS = [
+  { name: 'Green Pastures',          sheep: 5, lions: 3, bears: 0, together: 1, dur: 38, sneak: 52, carry: 48, wander: 11, wspeed: 26, night: false, bush: false },
+  { name: 'A Bear in the Bushes',    sheep: 6, lions: 2, bears: 2, together: 1, dur: 44, sneak: 58, carry: 54, wander: 9,  wspeed: 30, night: false, bush: false },
+  { name: 'Lion and Bear Together',  sheep: 7, lions: 4, bears: 2, together: 2, dur: 50, sneak: 68, carry: 62, wander: 7,  wspeed: 33, night: false, bush: false },
+  { name: 'Sneaky in the Bushes',    sheep: 7, lions: 5, bears: 3, together: 2, dur: 56, sneak: 84, carry: 72, wander: 5.5, wspeed: 36, night: false, bush: true },
+  { name: 'Night Watch',             sheep: 8, lions: 6, bears: 3, together: 3, dur: 60, sneak: 96, carry: 80, wander: 4.5, wspeed: 40, night: true,  bush: false },
+  { name: 'The Longest Night',       sheep: 9, lions: 8, bears: 5, together: 3, dur: 70, sneak: 108, carry: 88, wander: 3.5, wspeed: 44, night: true,  bush: true },
+];
+const LAST_LEVEL = LEVELS.length;
+const LEVEL_VERSE = ['youngest', 'shepherd', 'pastures', 'shepherd', 'youngest', 'pastures'];
+const LEVEL_TIPS = [
+  'A <b>lion</b> will creep out from the edge. <b>Tap the lion</b> before it grabs a lamb!',
+  'Here comes a <b>bear</b>! Bears are big: <b>tap a bear two times</b> to send it home.',
+  'Now a lion <b>and</b> a bear can come at the same time. Keep your eyes open!',
+  'Sneaky! Lions and bears <b>hide inside bushes</b> as they creep closer. Tap the walking bushes!',
+  'Night has fallen. Look for <b>shining eyes</b> in the dark and tap them.',
+  'The longest night: up to <b>three</b> at once, and they are fast. Be brave, David!',
+];
+
+function makeConfig(n) {
+  return Object.assign({}, LEVELS[Math.min(n, LAST_LEVEL) - 1]);
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('davidShepherdBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0, playT = 0, endT = 0, endTimer = 0;
+let sheep = [], preds = [], queue = [];
+let particles = [], popups = [], rings = [];
+let lost = 0, chased = 0, rescued = 0, called = 0;
+let message = { text: '', t: 0 };
+let wanderT = 0;
+let told = {};
+let flashT = 0, shakeT = 0;
+const david = { x: 0, y: 0, tx: 0, ty: 0, swing: 0, mood: 'watch', moodT: 0, face: 1, blink: 0, blinkT: 2, walk: 0, moving: false, hair: '#7a3a1a', i: 0 };
+
+const flockC = () => ({ x: W / 2, y: 650 + HZ * 0.45 });
+const flockR = () => ({ x: Math.min(W * 0.28, 260), y: 95 - HZ * 0.2 });
+const leftEdge = () => -offX - 80;
+// Wide screens leave a longer walk from the edge to the flock, so lions and bears move a bit faster there
+const speedScale = () => clamp(Math.pow((W / 2 - flockR().x + offX + 80) / 186, 0.7), 1, 2);
+const rightEdge = () => W + offX + 80;
+
+// ============================================================
+//  Sheep
+// ============================================================
+function makeFlock() {
+  sheep = [];
+  const c = flockC(), R = flockR();
+  for (let i = 0; i < cfg.sheep; i++) {
+    const a = i / cfg.sheep * TAU + rand(-0.3, 0.3), f = i === 0 ? 0 : rand(0.45, 1);
+    const x = c.x + Math.cos(a) * R.x * f, y = c.y + Math.sin(a) * R.y * f;
+    sheep.push({ i, x, y, tx: x, ty: y, lamb: i % 2 === 1, state: 'graze', t: rand(0, 3), face: Math.random() < 0.5 ? -1 : 1,
+      walk: 0, moving: false, mood: 'watch', blink: 0, blinkT: rand(1, 4), hair: '#6b5548', jump: 0, phase: rand(0, TAU), by: null });
+  }
+}
+
+function grazeSpot() {
+  const c = flockC(), R = flockR();
+  const a = rand(0, TAU), f = Math.sqrt(Math.random());
+  return { x: c.x + Math.cos(a) * R.x * f, y: c.y + Math.sin(a) * R.y * f };
+}
+
+function startWander() {
+  const free = sheep.filter((s) => s.state === 'graze');
+  if (!free.length) return;
+  const s = pick(free);
+  s.state = 'wander';
+  // wander off towards the nearest side, or down the hill
+  const c = flockC();
+  let dx = s.x < c.x ? -1 : 1, dy = rand(-0.25, 0.6);
+  if (Math.random() < 0.3) { dx = rand(-0.4, 0.4); dy = 1; }
+  const l = Math.hypot(dx, dy);
+  s.tx = s.x + dx / l * 2000; s.ty = s.y + dy / l * 2000;
+  s.mood = 'watch';
+  if (!told.wander) {
+    told.wander = true;
+    showMessage('A sheep is wandering off! Tap it to call it back.', 3.2);
+  }
+}
+
+function sheepOut(s) {
+  return s.x < -offX - 10 || s.x > W + offX + 10 || s.y > H + 34 || s.y < PY0 - 30;
+}
+
+function updateSheep(dt) {
+  for (const s of sheep) {
+    s.blinkT -= dt;
+    if (s.blinkT <= 0) { s.blink = 0.13; s.blinkT = rand(1.5, 5); }
+    if (s.blink > 0) s.blink -= dt;
+    s.jump = Math.max(0, s.jump - dt * 60);
+    let speed = 0;
+    if (s.state === 'graze') {
+      s.t -= dt;
+      if (s.t <= 0) { const p = grazeSpot(); s.tx = p.x; s.ty = p.y; s.t = rand(2.5, 6); }
+      speed = 22;
+      s.mood = state === 'win' ? 'joy' : preds.some((p) => p.state === 'carry') ? 'worried' : 'watch';
+    } else if (s.state === 'wander') {
+      speed = cfg.wspeed;
+      if (state === 'play' && sheepOut(s)) {
+        s.state = 'gone';
+        loseLamb(s, 'wandered away');
+      }
+    } else if (s.state === 'return' || s.state === 'scared') {
+      speed = s.state === 'scared' ? 150 : 120;
+      if (Math.hypot(s.tx - s.x, s.ty - s.y) < 8) { s.state = 'graze'; s.t = rand(1, 3); }
+      s.mood = s.state === 'scared' ? 'shock' : 'joy';
+    } else if (s.state === 'carried' && s.by) {
+      const p = s.by;
+      s.x = p.x + p.face * 40 * p.k * SZ; s.y = p.y - 10 * SZ;
+      s.face = p.face;
+      s.mood = 'shock';
+      continue;
+    }
+    if (speed && s.state !== 'gone') {
+      const dx = s.tx - s.x, dy = s.ty - s.y, d = Math.hypot(dx, dy);
+      if (d > 2) {
+        const step = Math.min(d, speed * dt);
+        s.x += dx / d * step; s.y += dy / d * step;
+        if (Math.abs(dx) > 3) s.face = dx < 0 ? -1 : 1;
+        s.walk += dt * (speed > 60 ? 16 : 8);
+        s.moving = true;
+      } else s.moving = false;
+    }
+    if (state === 'win' && s.state !== 'gone') { if (s.jump <= 0 && Math.random() < dt * 2) s.jump = 18; }
+  }
+  // keep sheep in the meadow while they graze
+  for (const s of sheep) if (s.state === 'graze') s.y = Math.max(s.y, PY0 + 40);
+}
+
+function callBack(s) {
+  const p = grazeSpot();
+  s.state = 'return'; s.tx = p.x; s.ty = p.y;
+  called++;
+  addScore(40, s.x, s.y - 70);
+  for (let k = 0; k < 5; k++) spawn(s.x + rand(-14, 14), s.y - 60, rand(-20, 20), rand(-60, -30), 1, '#ff7a9a', 5, 0, 'heart');
+  sfx.baa(1.2);
+  sfx.call(1 - (s.y - PY0) / (H - PY0));
+}
+
+function loseLamb(s, why) {
+  lost++;
+  popText(clamp(s.x, -offX + 60, W + offX - 60), clamp(s.y - 80, PY0, H - 40), why === 'carried' ? 'Oh no! A lamb was taken!' : 'A sheep wandered away!', '#ffd0c8');
+  sfx.sad();
+  shakeT = 0.25;
+  if (lost >= MAX_LOST && state === 'play') fail();
+}
+
+// ============================================================
+//  Lions and bears
+// ============================================================
+function buildQueue() {
+  const kinds = [];
+  for (let i = 0; i < cfg.lions; i++) kinds.push('lion');
+  for (let i = 0; i < cfg.bears; i++) kinds.push('bear');
+  // the first one is always a lion; the first bear comes early on the bear level
+  kinds.sort(() => Math.random() - 0.5);
+  const li = kinds.indexOf('lion');
+  if (li > 0) [kinds[0], kinds[li]] = [kinds[li], kinds[0]];
+  if (level === 2) { const bi = kinds.indexOf('bear'); if (bi > 1) [kinds[1], kinds[bi]] = [kinds[bi], kinds[1]]; }
+  const span = cfg.dur * 0.78;
+  queue = kinds.map((k, i) => ({ kind: k, at: 2.5 + (i / Math.max(1, kinds.length - 1)) * (span - 2.5) + rand(-1.2, 1.2) }));
+  queue.sort((a, b) => a.at - b.at);
+  queue[0].at = 2.5;
+}
+
+function spawnPred(kind) {
+  const free = sheep.filter((s) => s.state === 'graze' || s.state === 'wander');
+  if (!free.length) return;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side < 0 ? leftEdge() : rightEdge();
+  const y = rand(PY0 + 90, H - 50);
+  const bear = kind === 'bear';
+  const p = { kind, x, y, face: -side, k: bear ? 1.12 : 1, hp: bear ? 2 : 1, state: 'sneak', target: null, walk: 0, stun: 0, hitT: 0,
+    speed: cfg.sneak * speedScale() * (bear ? 0.85 : 1) * rand(0.92, 1.08), bush: cfg.bush, blink: 0, flee: 0, id: Math.random() };
+  pickTarget(p);
+  preds.push(p);
+  sfx.rustle();
+  if (!told[kind]) {
+    told[kind] = true;
+    if (kind === 'lion') showMessage(cfg.bush ? 'A sneaky lion in a bush! Tap it!' : 'A lion! Tap it to chase it away!', 3);
+    else showMessage('A bear! Tap it TWO times!', 3);
+  } else if (cfg.bush && !told.bush) { told.bush = true; showMessage('That bush is walking… tap it!', 3); }
+  else if (cfg.night && !told.night) { told.night = true; showMessage('Shining eyes in the dark! Tap them!', 3); }
+}
+
+function pickTarget(p) {
+  const free = sheep.filter((s) => (s.state === 'graze' || s.state === 'wander') && !preds.some((q) => q !== p && q.target === s));
+  const pool = free.length ? free : sheep.filter((s) => s.state === 'graze' || s.state === 'wander');
+  if (!pool.length) { p.target = null; return; }
+  // lambs and wanderers are easiest to catch, and nearer ones first
+  pool.sort((a, b) => score(a) - score(b));
+  function score(s) { return Math.hypot(s.x - p.x, s.y - p.y) - (s.lamb ? 80 : 0) - (s.state === 'wander' ? 160 : 0); }
+  p.target = pool[0];
+}
+
+function updatePreds(dt) {
+  for (let i = preds.length - 1; i >= 0; i--) {
+    const p = preds[i];
+    p.hitT = Math.max(0, p.hitT - dt);
+    if (p.stun > 0) { p.stun -= dt; p.x += (p.kb || 0) * 70 * dt; continue; }
+    let tx = p.x, ty = p.y, sp = 0;
+    if (p.state === 'sneak') {
+      if (!p.target || !['graze', 'wander'].includes(p.target.state)) pickTarget(p);
+      if (!p.target) { p.state = 'flee'; continue; }
+      tx = p.target.x - p.face * 30 * p.k; ty = p.target.y + 2;
+      sp = p.speed;
+      // pounce: a little burst when close
+      if (Math.hypot(tx - p.x, ty - p.y) < 90) sp *= 1.35;
+      if (Math.hypot(tx - p.x, ty - p.y) < 12 + sp * dt) {
+        p.state = 'carry';
+        p.bush = false;
+        p.target.state = 'carried'; p.target.by = p;
+        p.face = p.x < W / 2 ? -1 : 1;
+        sfx.baa(1.6);
+        sfx.growl();
+        if (!told.carry) { told.carry = true; showMessage('Quick! Tap it to rescue the lamb!', 2.6); }
+        continue;
+      }
+    } else if (p.state === 'carry') {
+      tx = p.face < 0 ? leftEdge() - 40 : rightEdge() + 40; ty = p.y;
+      sp = cfg.carry * speedScale() * (p.kind === 'bear' ? 0.9 : 1);
+      if (p.x < leftEdge() + 10 || p.x > rightEdge() - 10) {
+        const s = p.target;
+        s.state = 'gone'; s.by = null;
+        preds.splice(i, 1);
+        if (state === 'play') loseLamb(s, 'carried');
+        continue;
+      }
+    } else if (p.state === 'flee') {
+      p.flee += dt;
+      tx = p.face < 0 ? leftEdge() - 60 : rightEdge() + 60; ty = p.y;
+      sp = 340;
+      if (p.x < leftEdge() - 20 || p.x > rightEdge() + 20) { preds.splice(i, 1); continue; }
+    }
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    if (d > 1) {
+      const step = Math.min(d, sp * dt);
+      p.x += dx / d * step; p.y += dy / d * step;
+      if (Math.abs(dx) > 4 && p.state !== 'carry') p.face = dx < 0 ? -1 : 1;
+      p.walk += dt * (sp > 150 ? 18 : 9);
+    }
+    p.y = clamp(p.y, PY0 + 50, H - 20);
+  }
+}
+
+function predCenter(p) { return { x: p.x + p.face * 10 * p.k * SZ, y: p.y - 34 * p.k * SZ }; }
+
+function hitPred(p) {
+  const c = predCenter(p);
+  p.hitT = 0.35;
+  p.kb = c.x >= david.x ? 1 : -1;
+  david.swing = 0.35;
+  sfx.bonk();
+  for (let k = 0; k < 6; k++) spawn(c.x + rand(-10, 10), c.y - 20, rand(-90, 90), rand(-140, -60), 0.8, pick(['#ffe27a', '#fff6d0']), 4, 200, 'star');
+  if (p.bush) {   // the disguise falls off
+    p.bush = false;
+    for (let k = 0; k < 12; k++) spawn(c.x + rand(-26, 26), c.y + rand(-10, 20), rand(-120, 120), rand(-160, -40), 0.9, pick(['#4f8a3a', '#6aa84f', '#3d6e2e']), 5, 360, 'leaf');
+  }
+  p.hp--;
+  if (p.hp > 0) {
+    p.stun = 0.7;
+    popText(c.x, c.y - 40, 'Once more!', '#fff2b0');
+    addScore(20, null, null);
+    return;
+  }
+  // run away!
+  const had = p.state === 'carry' ? p.target : null;
+  p.state = 'flee'; p.stun = 0.35; p.flee = 0;
+  p.face = p.x < W / 2 ? -1 : 1;
+  chased++;
+  if (had) {
+    had.state = 'scared'; had.by = null;
+    const g = grazeSpot(); had.tx = g.x; had.ty = g.y;
+    had.y = Math.min(had.y + 8, H - 20);
+    rescued++;
+    addScore(100, c.x, c.y - 50, 'Rescued! +100');
+    for (let k = 0; k < 6; k++) spawn(had.x + rand(-14, 14), had.y - 60, rand(-20, 20), rand(-60, -30), 1.1, '#ff7a9a', 5, 0, 'heart');
+    sfx.baa(1.3);
+  } else {
+    addScore(150, c.x, c.y - 50, 'Shoo! +150');
+  }
+  sfx.call(0.8);
+}
+
+// ============================================================
+//  Particles, popups and messages
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, rot: rand(0, TAU) });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+  for (let i = rings.length - 1; i >= 0; i--) { rings[i].t += dt; if (rings[i].t > 0.5) rings.splice(i, 1); }
+}
+function drawStar(x, y, s) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const an = k * Math.PI / 5 - Math.PI / 2, r = k % 2 ? s * 0.45 : s; ctx.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r); }
+  ctx.closePath(); ctx.fill();
+}
+function drawHeart(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.8);
+    else if (p.kind === 'heart') drawHeart(p.x, p.y, p.size);
+    else if (p.kind === 'leaf') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.size * 1.4, p.size * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  for (const r of rings) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.5)})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 14 + r.t * 90, 0, TAU); ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.lineJoin = 'round';
+  for (const p of popups) {
+    const a = clamp(p.t / 0.4, 0, 1), y = p.y - (1.4 - p.t) * 30;
+    ctx.globalAlpha = a;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(40,30,10,0.85)';
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+function popText(x, y, text, col = '#fff2b0') {
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const hw = ctx.measureText(text).width / 2 + 12;
+  x = clamp(x, -offX + hw, W + offX - hw);
+  popups.push({ x, y, text, col, t: 1.4 });
+}
+function addScore(n, x, y, text) {
+  levelScore += n;
+  if (x != null) popText(x, y, text || `+${n}`);
+}
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Faces (shared by David and the sheep)
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'shout':
+      eyes(4, 5, 2.1);
+      brows(-8, -11, -8, -11);
+      mouthFill(() => ctx.ellipse(0, mouthY, 4.5, 5, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4, 5, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 4, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+  }
+}
+
+// ============================================================
+//  Drawing the sheep
+// ============================================================
+function drawSheepHead(d, mood, lx, ly) {
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = '#6b5548';
+    ctx.beginPath(); ctx.ellipse(s * 18, -2, 9, 4.8, s * 0.35, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#e8a8a0';
+    ctx.beginPath(); ctx.ellipse(s * 18.5, -1.5, 5.5, 2.4, s * 0.35, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#ecd0b2'; ctx.strokeStyle = '#c9a07c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(0, 1, 15, 16, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fbfaf4';
+  ctx.beginPath();
+  for (const [x, y, r] of [[-8, -13, 6], [0, -15, 7], [8, -13, 6]]) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = '#c98f7a';
+  ctx.beginPath(); ctx.ellipse(0, 6, 3, 2, 0, 0, TAU); ctx.fill();
+  drawFace(d, mood, 0, lx, ly);
+}
+
+function woolPuffs(cx, cy, rx, ry, r, n) {
+  ctx.beginPath();
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * TAU;
+    const px = cx + Math.cos(a) * rx, py = cy + Math.sin(a) * ry;
+    ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU);
+  }
+  ctx.moveTo(cx + rx, cy); ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
+}
+
+function drawSheep(s) {
+  if (s.state === 'gone') return;
+  const sc = (s.lamb ? 0.68 : 0.88) * SZ;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  if (s.state !== 'carried') {
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath(); ctx.ellipse(0, 0, 30 * sc, 8 * sc, 0, 0, TAU); ctx.fill();
+  }
+  ctx.translate(0, -s.jump);
+  if (s.state === 'carried') { ctx.rotate(s.face * 0.35); ctx.translate(0, 26 * sc); }
+  ctx.scale(sc, sc);
+  const kick = s.state === 'carried' ? Math.sin(t * 22) * 5 : 0;
+  for (const [lx, ph] of [[-20, 0], [-8, Math.PI], [8, 0], [20, Math.PI]]) {
+    const lift = s.moving && s.state !== 'carried' ? Math.max(0, Math.sin(s.walk + ph)) * 5 : 0;
+    ctx.fillStyle = '#4a3f3a';
+    roundRect(lx - 3.5, -18 - lift + (ph ? kick : -kick) * 0.5, 7, 18, 3); ctx.fill();
+  }
+  ctx.fillStyle = '#d9d5c8';
+  woolPuffs(0, -30, 26, 13, 12, 10); ctx.fill();
+  ctx.fillStyle = s.state === 'wander' ? '#fffbe8' : '#fbfaf4';
+  woolPuffs(0, -33, 25, 12, 11.5, 10); ctx.fill();
+  ctx.beginPath(); ctx.arc(-30 * s.face, -38, 7, 0, TAU); ctx.fill();
+  ctx.save();
+  ctx.translate(s.face * 16, -36);
+  const lx = s.state === 'wander' ? s.face * 0.8 : s.face * 0.3;
+  drawSheepHead(s, s.mood, lx, s.state === 'graze' ? 0.5 : 0);
+  ctx.restore();
+  ctx.restore();
+  // a wandering sheep has a little "?" and a dotted ring so you know to tap it
+  if (s.state === 'wander' && state === 'play') {
+    const bob = Math.sin(t * 5 + s.phase) * 3;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([7, 6]);
+    ctx.lineDashOffset = -t * 20;
+    ctx.beginPath(); ctx.ellipse(s.x, s.y - 26 * sc, 40 * sc + 6, 34 * sc + 6, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#c47a1a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(s.x, s.y - 78 * sc - 14 + bob, 13, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c47a1a'; ctx.font = '700 19px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('?', s.x, s.y - 78 * sc - 7 + bob);
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Drawing the lion and the bear (cartoon, friendly)
+// ============================================================
+function drawPred(p, dark) {
+  const bear = p.kind === 'bear';
+  const k = p.k * SZ;
+  const moving = p.state !== 'sneak' || p.stun <= 0;
+  const run = p.walk;
+  const bob = moving ? Math.abs(Math.sin(run)) * 2.5 : 0;
+  const crouch = p.state === 'sneak' ? 0.86 : 1;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 40 * k, 9 * k, 0, 0, TAU); ctx.fill();
+  if (p.hitT > 0) ctx.translate(Math.sin(t * 60) * 4, 0);
+  ctx.scale(p.face * k, k * crouch);
+  const body = bear ? '#8a5a32' : '#e2a83a', belly = bear ? '#b07a4a' : '#f3cf7c', dk = bear ? '#5e3a1e' : '#b3761e';
+
+  // tail
+  if (!bear) {
+    ctx.strokeStyle = body; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    const tw = Math.sin(t * 6 + p.id * 9) * 6;
+    ctx.beginPath(); ctx.moveTo(-26, -34); ctx.quadraticCurveTo(-46, -40 - tw, -50, -56 - tw); ctx.stroke();
+    ctx.fillStyle = '#9a5418';
+    ctx.beginPath(); ctx.ellipse(-51, -59 - tw, 6, 8, -0.4, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = dk; ctx.beginPath(); ctx.arc(-32, -36, 6, 0, TAU); ctx.fill();
+  }
+  // legs
+  for (const [lx, ph] of [[-20, 0], [-10, Math.PI], [14, Math.PI], [24, 0]]) {
+    const sw = moving ? Math.sin(run + ph) * 0.35 : 0;
+    ctx.save(); ctx.translate(lx, -20 - bob); ctx.rotate(sw);
+    ctx.fillStyle = ph ? dk : body;
+    roundRect(-5, 0, 10, 20 + bob, 5); ctx.fill();
+    ctx.restore();
+  }
+  ctx.translate(0, -bob);
+  // body
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(0, -34, bear ? 36 : 32, bear ? 21 : 17, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = belly;
+  ctx.beginPath(); ctx.ellipse(4, -24, bear ? 22 : 20, 7, 0, 0, TAU); ctx.fill();
+  // head
+  ctx.save();
+  ctx.translate(bear ? 34 : 30, bear ? -50 : -48);
+  const scared = p.state === 'flee';
+  if (bear) {
+    ctx.fillStyle = body;
+    for (const ex of [-10, 8]) { ctx.beginPath(); ctx.arc(ex, -15, 7, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#d99a8a';
+    for (const ex of [-10, 8]) { ctx.beginPath(); ctx.arc(ex, -15, 3.5, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, 0, 17, 0, TAU); ctx.fill();
+  } else {
+    // mane
+    ctx.fillStyle = '#b8651e';
+    ctx.beginPath();
+    for (let a = 0; a < 12; a++) { const an = a / 12 * TAU; ctx.moveTo(Math.cos(an) * 19 + 7, Math.sin(an) * 19); ctx.arc(Math.cos(an) * 19, Math.sin(an) * 19, 7, 0, TAU); }
+    ctx.arc(0, 0, 20, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(-9, -13, 5, 0, TAU); ctx.arc(9, -13, 5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f0be5a';
+    ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+  }
+  // muzzle
+  ctx.fillStyle = bear ? '#d8b088' : '#fbe3a8';
+  ctx.beginPath(); ctx.ellipse(9, 5, 10, 7, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3a2418';
+  ctx.beginPath(); ctx.ellipse(15, 1.5, 4, 3, 0, 0, TAU); ctx.fill();
+  // eyes (big and cartoony; they shine at night)
+  for (const ex of [-3, 7]) {
+    ctx.fillStyle = dark ? '#fff7b0' : '#fff';
+    ctx.beginPath(); ctx.ellipse(ex, -5, scared ? 4.5 : 4, scared ? 5.5 : 4.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12';
+    ctx.beginPath(); ctx.arc(ex + (scared ? -1.5 : 1.5), -4.5, 2.2, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = '#3b2418'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  if (scared) { ctx.moveTo(-7, -13); ctx.lineTo(0, -12); ctx.moveTo(4, -12); ctx.lineTo(11, -13); }
+  else if (p.state === 'sneak') { ctx.moveTo(-7, -12); ctx.lineTo(0, -9); ctx.moveTo(4, -9); ctx.lineTo(11, -12); }  // sly
+  ctx.stroke();
+  // mouth
+  if (scared) {
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(10, 11, 3.5, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#7cc4f2';
+    ctx.beginPath(); ctx.moveTo(-14, -12); ctx.quadraticCurveTo(-10, -4, -14, -3); ctx.quadraticCurveTo(-18, -4, -14, -12); ctx.fill();
+  } else if (p.state === 'sneak') {
+    ctx.strokeStyle = '#5a2a1e'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(10, 8, 4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+  // dizzy stars after a bonk
+  if (p.stun > 0 || p.hitT > 0) {
+    ctx.fillStyle = '#ffe27a';
+    for (let s = 0; s < 3; s++) {
+      const an = t * 6 + s * TAU / 3;
+      drawStar((bear ? 34 : 30) + Math.cos(an) * 20, -78 + Math.sin(an) * 6, 6);
+    }
+  }
+  // the bush disguise
+  if (p.bush && p.state === 'sneak') {
+    const wob = Math.sin(t * 8 + p.id * 5) * 2;
+    for (const [bx, by, r, c] of [[-26, -30, 26, '#3d6e2e'], [6, -44, 32, '#4f8a3a'], [34, -36, 26, '#3d6e2e'], [-6, -20, 28, '#5c9a44'], [26, -18, 24, '#5c9a44']]) {
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(bx + wob, by, r, 0, TAU); ctx.fill();
+    }
+    // two sneaky eyes peeping through the leaves
+    ctx.fillStyle = '#fff';
+    for (const ex of [20, 32]) { ctx.beginPath(); ctx.ellipse(ex + wob, -48, 4, 4.6, 0, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#2b1d12';
+    for (const ex of [21.5, 33.5]) { ctx.beginPath(); ctx.arc(ex + wob, -47.5, 2.2, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+// Night: the eyes shine on top of the darkness so you can find them
+function drawPredEyes(p) {
+  const bear = p.kind === 'bear', k = p.k * SZ;
+  const hx = p.x + p.face * (bear ? 34 : 30) * k, hy = p.y - (bear ? 50 : 48) * k * (p.state === 'sneak' ? 0.86 : 1);
+  const glow = 0.75 + 0.25 * Math.sin(t * 5 + p.id * 9);
+  for (const ex of [-3, 7]) {
+    const x = hx + p.face * ex * k, y = hy - 5 * k;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 14);
+    g.addColorStop(0, `rgba(255,240,140,${0.7 * glow})`); g.addColorStop(1, 'rgba(255,240,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff7b0';
+    ctx.beginPath(); ctx.ellipse(x, y, 4 * k, 4.6 * k, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12';
+    ctx.beginPath(); ctx.arc(x + p.face * 1.5, y + 0.5, 2.1, 0, TAU); ctx.fill();
+  }
+}
+
+// ============================================================
+//  Drawing David
+// ============================================================
+function drawDavid(x, y, s) {
+  const d = david;
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7)) * 12;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 7 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump);
+  ctx.scale(s * d.face, s);
+  const skin = '#e3ad78', robe = '#d4782f', sleeve = shade(robe, -25);
+  // legs when running
+  const step = d.moving ? Math.sin(d.walk) * 6 : 0;
+  ctx.fillStyle = skin;
+  roundRect(-9 + step, -8, 7, 9, 3); ctx.fill();
+  roundRect(2 - step, -8, 7, 9, 3); ctx.fill();
+  ctx.fillStyle = '#7a4a22';
+  roundRect(-11 + step, -2, 10, 4, 2); ctx.fill();
+  roundRect(1 - step, -2, 10, 4, 2); ctx.fill();
+  // back arm
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  // shepherd's bag
+  ctx.fillStyle = '#8a6a3a';
+  roundRect(-20, -30, 13, 15, 4); ctx.fill();
+  // tunic
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-16, -6);
+  ctx.quadraticCurveTo(-15, -30, -10, -37);
+  ctx.quadraticCurveTo(0, -41, 10, -37);
+  ctx.quadraticCurveTo(15, -30, 16, -6);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#7a3f1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-15, -20); ctx.quadraticCurveTo(0, -17, 15, -20); ctx.stroke();
+  ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-14, -26); ctx.stroke();  // bag strap
+  // the staff (a shepherd's crook) swings forward on a bonk
+  const sw = d.swing > 0 ? Math.sin((1 - d.swing / 0.35) * Math.PI) : 0;
+  ctx.save();
+  ctx.translate(12, -26);
+  ctx.rotate(-0.12 + sw * 1.3);
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 24); ctx.lineTo(0, -48); ctx.arc(-9, -48, 9, 0, Math.PI, true); ctx.stroke();
+  ctx.restore();
+  if (mood === 'joy') { arm(-10, -32, -22, -62); arm(10, -32, 22, -62); }
+  else if (mood === 'shout') { arm(-10, -32, -18, -50); arm(10, -32, 13 + sw * 6, -26 - sw * 6); }
+  else { arm(-10, -32, -14, -14); arm(10, -32, 13 + sw * 6, -26 - sw * 6); }
+  // head
+  const hy = -53;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // curly ruddy hair
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  for (const [hx, hy2, r] of [[-12, -6, 6], [-6, -12, 7], [2, -14, 7], [10, -10, 6.5], [14, -3, 5], [-15, 1, 5]]) { ctx.moveTo(hx + r, hy + hy2); ctx.arc(hx, hy + hy2, r, 0, TAU); }
+  ctx.fill();
+  ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();   // headband
+  drawFace(d, mood === 'shout' ? 'shout' : mood, hy, 0.4, 0.2);
+  ctx.restore();
+}
+
+function updateDavid(dt) {
+  const d = david;
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4); }
+  if (d.blink > 0) d.blink -= dt;
+  d.swing = Math.max(0, d.swing - dt);
+  d.moodT = Math.max(0, d.moodT - dt);
+  // keyboard: arrows walk David about
+  let kx = 0, ky = 0;
+  if (state === 'play') {
+    if (keys.has('ArrowLeft') || keys.has('KeyA')) kx -= 1;
+    if (keys.has('ArrowRight') || keys.has('KeyD')) kx += 1;
+    if (keys.has('ArrowUp') || keys.has('KeyW')) ky -= 1;
+    if (keys.has('ArrowDown') || keys.has('KeyS')) ky += 1;
+  }
+  if (kx || ky) {
+    const n = Math.hypot(kx, ky);
+    d.tx = d.x + kx / n * 40; d.ty = d.y + ky / n * 40;
+  }
+  const dx = d.tx - d.x, dy = d.ty - d.y, dist = Math.hypot(dx, dy);
+  const sp = kx || ky ? 330 : 620;
+  if (dist > 3) {
+    const st = Math.min(dist, sp * dt);
+    d.x += dx / dist * st; d.y += dy / dist * st;
+    if (Math.abs(dx) > 2) d.face = dx < 0 ? -1 : 1;
+    d.walk += dt * 16; d.moving = true;
+  } else d.moving = false;
+  d.x = clamp(d.x, -offX + 30, W + offX - 30); d.y = clamp(d.y, PY0 + 60, H - 14);
+  d.tx = clamp(d.tx, -offX + 30, W + offX - 30); d.ty = clamp(d.ty, PY0 + 60, H - 14);
+  if (state === 'win') d.mood = 'joy';
+  else if (state === 'fail') d.mood = 'dismay';
+  else if (d.moodT > 0) d.mood = 'shout';
+  else d.mood = preds.some((p) => p.state === 'carry') ? 'worried' : 'watch';
+}
+
+// ============================================================
+//  Taps
+// ============================================================
+function tapAt(x, y) {
+  if (state !== 'play') return;
+  rings.push({ x, y, t: 0 });
+  // lions and bears first (the nearest one under the finger)
+  let bestP = null, bd = 1e9;
+  for (const p of preds) {
+    if (p.state === 'flee') continue;
+    const c = predCenter(p);
+    const r = HIT_R * p.k * SZ + (p.bush ? 14 : 0);
+    const d = Math.hypot(x - c.x, (y - c.y) * 0.85);
+    if (d < r && d < bd) { bd = d; bestP = p; }
+  }
+  if (bestP) {
+    runTo(bestP.x - bestP.face * 40, bestP.y + 4);
+    hitPred(bestP);
+    david.moodT = 0.6;
+    return;
+  }
+  let bestS = null; bd = 1e9;
+  for (const s of sheep) {
+    if (s.state !== 'wander') continue;
+    const d = Math.hypot(x - s.x, y - (s.y - 26 * SZ));
+    if (d < SHEEP_R * SZ + 10 && d < bd) { bd = d; bestS = s; }
+  }
+  if (bestS) {
+    runTo(bestS.x - bestS.face * 34, bestS.y + 4);
+    callBack(bestS);
+    david.moodT = 0.5;
+    return;
+  }
+  // a tap on empty grass just sends David there
+  runTo(x, y);
+}
+
+// Space: David swings his staff and calls; it reaches whatever is close to him
+function staffSwing() {
+  if (state !== 'play') return;
+  david.swing = 0.35;
+  david.moodT = 0.4;
+  let hit = false;
+  for (const p of preds) {
+    if (p.state === 'flee') continue;
+    const c = predCenter(p);
+    if (Math.hypot(c.x - david.x, c.y - (david.y - 30)) < 110) { hitPred(p); hit = true; break; }
+  }
+  if (!hit) {
+    for (const s of sheep) if (s.state === 'wander' && Math.hypot(s.x - david.x, s.y - david.y) < 110) { callBack(s); hit = true; }
+  }
+  if (!hit) sfx.swish();
+}
+
+function runTo(x, y) { david.tx = x; david.ty = y; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  cfg = makeConfig(1);
+  setAmbience();
+  resetLevel();
+  showOverlay('The Shepherd Boy', 'Young David keeps his father’s sheep',
+    `${verseHTML('flock')}
+     <ul>
+       <li>David watches his father Jesse’s sheep on the hills near Bethlehem.</li>
+       <li>When a <b>lion</b> or a <b>bear</b> creeps in, <b>tap it</b> to chase it away with David’s staff. If it grabs a lamb, tap it quickly so it <b>drops the lamb</b>!</li>
+       <li>Bears are big: <b>tap a bear two times</b>.</li>
+       <li>If a sheep <b>wanders off</b>, <b>tap the sheep</b> to call it back.</li>
+       <li>Keep the flock safe until the sun goes down. If <b>3</b> are lost, try again.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> walk, <kbd>Space</kbd> swings the staff.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'level';
+  cfg = makeConfig(level);
+  setAmbience();
+  resetLevel();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(LEVEL_VERSE[level - 1])}
+     <p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     <p class="score">${cfg.sheep} sheep &middot; ${cfg.lions} lion${cfg.lions === 1 ? '' : 's'}${cfg.bears ? ` &middot; ${cfg.bears} bear${cfg.bears === 1 ? '' : 's'}` : ''}</p>`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; popups = []; rings = [];
+  preds = [];
+  lost = 0; chased = 0; rescued = 0; called = 0;
+  levelScore = 0;
+  playT = 0; endT = 0; endTimer = 0;
+  wanderT = cfg.wander * 0.8;
+  flashT = shakeT = 0;
+  told = { lion: level > 1, bear: level > 2, wander: level > 1, carry: level > 1, bush: !cfg.bush || level > 4, night: !cfg.night || level > 5 };
+  keys.clear();
+  makeFlock();
+  buildQueue();
+  const c = flockC();
+  david.x = david.tx = c.x + 30; david.y = david.ty = c.y + 150; david.face = 1; david.swing = 0;
+}
+
+function startLevel(retry = false) {
+  if (retry) resetLevel();
+  else if (state !== 'level') resetLevel();
+  hideOverlay();
+  state = 'play';
+  setAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.4);
+}
+
+function setAmbience() {
+  Music.theme.ambience = cfg.night ? 'night' : 'birds';
+  syncAmbience();
+}
+
+function win() {
+  state = 'win';
+  syncAmbience();
+  const safe = sheep.filter((s) => s.state !== 'gone').length;
+  const flockBonus = safe * 50;
+  const allBonus = lost === 0 ? 300 : 0;
+  const levelBonus = level * 200;
+  levelScore += flockBonus + allBonus + levelBonus;
+  totalScore += levelScore;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('davidShepherdBest', best); } catch (e) {} }
+  lastScore = { safe, flockBonus, allBonus, levelBonus, levelScore };
+  sfx.win();
+  showMessage(cfg.night ? 'The sun is up! The flock is safe!' : 'Sunset! The flock is safe!', 2.6);
+  endTimer = 3.2;
+  for (const p of preds) if (p.state !== 'flee') { p.state = 'flee'; p.face = p.x < W / 2 ? -1 : 1; }
+}
+let lastScore = null;
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  sfx.fail();
+  showMessage('Too many sheep were lost…', 2.4);
+  endTimer = 2.6;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LAST_LEVEL;
+    showOverlay(last ? 'Brave Shepherd!' : 'The flock is safe!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'paw' : 'goWith')}
+       ${last ? '<p style="text-align:center">David trusted God to keep him safe. Later God helped him face a giant!</p>' : ''}
+       <p class="score">Lions and bears chased off: <b>${chased}</b><br>Lambs rescued: <b>${rescued}</b> &middot; Sheep called back: <b>${called}</b><br>Sheep safe (${s.safe}): <b>${s.flockBonus}</b>${s.allBonus ? `<br>Not one lost: <b>${s.allBonus}</b>` : ''}<br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', last ? () => { level = 1; totalScore = 0; levelCard(); } : () => { level++; levelCard(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh no!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Three sheep were lost. Tap the <b>lions and bears</b> before they reach the flock, and tap any sheep that <b>wanders off</b>.</p>
+       ${verseHTML('rescue', '…')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'play' && e.code === 'Space' && !e.repeat) { staffSwing(); return; }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && endTimer > 0 && endTimer < 2.2) { endTimer = 0.01; return; }
+  if (state !== 'play') return;
+  tapAt(p.vx - offX, p.vy - offY);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  call(h) { if (this.ctx) Music.tap(clamp(h, 0, 1)); },       // David's shepherd's call on the pipe
+  swish() { this.noiseBurst(2400, 0.2, 0.2, 0.9, 900); },
+  bonk() { this.swish(); this.tone(520, 0.12, 'triangle', 0.25, 0.04, 260); this.tone(180, 0.15, 'sine', 0.3, 0.04, 90); },
+  rustle() { this.noiseBurst(3000, 0.35, 0.12, 0.7, 1500); },
+  growl() { this.noiseBurst(180, 0.45, 0.25, 2, 120); this.tone(90, 0.4, 'sawtooth', 0.06, 0, 70); },
+  sad() { this.tone(392, 0.25, 'triangle', 0.16); this.tone(330, 0.4, 'triangle', 0.16, 0.2); },
+  baa(p = 1) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime, f = 300 * p;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), lp = this.ctx.createBiquadFilter();
+    o.type = 'sawtooth'; lp.type = 'lowpass'; lp.frequency.value = 1400;
+    for (let k = 0; k < 10; k++) o.frequency.setValueAtTime(f * (k % 2 ? 1.06 : 0.97) * (1 - k * 0.012), t0 + k * 0.035);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.09, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    o.connect(lp); lp.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + 0.45);
+  },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: the hills near Bethlehem
+// ============================================================
+function drawCloud(cx, cy, w, h) {
+  const n = Math.max(3, Math.round(w / 22));
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1), bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge);
+    const px = cx - w / 2 + h * 0.4 + f * (w - h * 0.8), py = cy - r * 0.3;
+    ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU);
+  }
+  ctx.fill();
+}
+
+function dayF() {
+  if (state === 'play' || state === 'pause' || state === 'fail') return clamp(playT / cfg.dur, 0, 1);
+  if (state === 'win') return 1;
+  return 0;
+}
+
+function drawWorld() {
+  const x0 = -offX - 2, x1 = W + offX + 2, top = -offY - 2;
+  const night = cfg.night;
+  const f = dayF();
+  // sky: the day grows golden towards sunset; the night grows towards dawn
+  const g = ctx.createLinearGradient(0, top, 0, PY0);
+  const arcBase = 250 + HZ;
+  if (night) {
+    const dawn = state === 'win' ? 1 : Math.max(0, f - 0.8) / 0.2;
+    g.addColorStop(0, `rgb(${lerp(14, 120, dawn) | 0},${lerp(22, 160, dawn) | 0},${lerp(60, 220, dawn) | 0})`);
+    g.addColorStop(1, `rgb(${lerp(40, 250, dawn) | 0},${lerp(52, 200, dawn) | 0},${lerp(110, 150, dawn) | 0})`);
+  } else {
+    const dusk = Math.max(0, f - 0.6) / 0.4;
+    g.addColorStop(0, `rgb(${lerp(110, 120, dusk) | 0},${lerp(180, 120, dusk) | 0},${lerp(235, 190, dusk) | 0})`);
+    g.addColorStop(1, `rgb(${lerp(205, 255, dusk) | 0},${lerp(232, 190, dusk) | 0},${lerp(245, 140, dusk) | 0})`);
+  }
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, top, x1 - x0, PY0 - top + 10);
+  // sun or moon crosses the sky as the time passes
+  const arcX = lerp(x0 + 60, x1 - 60, f), arcY = arcBase - Math.sin(f * Math.PI) * Math.min(170, arcBase - top - 120);
+  if (night) {
+    for (let i = 0; i < 60; i++) {
+      const sx = lerp(x0, x1, hash(i, 1)), sy = lerp(top, 250 + HZ, hash(i, 2));
+      ctx.fillStyle = `rgba(255,255,230,${0.4 + 0.5 * Math.abs(Math.sin(t * 1.5 + i))})`;
+      ctx.beginPath(); ctx.arc(sx, sy, 1.2 + hash(i, 3) * 1.4, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#fff6d8';
+    ctx.beginPath(); ctx.arc(arcX, arcY, 26, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(20,30,70,0.9)';
+    ctx.beginPath(); ctx.arc(arcX + 11, arcY - 6, 22, 0, TAU); ctx.fill();
+  } else {
+    const sg = ctx.createRadialGradient(arcX, arcY, 10, arcX, arcY, 70);
+    sg.addColorStop(0, 'rgba(255,240,170,0.8)'); sg.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(arcX, arcY, 70, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffe27a';
+    ctx.beginPath(); ctx.arc(arcX, arcY, 30, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 4; i++) {
+      const cx = ((hash(i, 7) * (x1 - x0) + t * (6 + i * 3)) % (x1 - x0 + 300)) + x0 - 150;
+      drawCloud(cx, lerp(top + 130, 200 + HZ, hash(i, 8)), 120 + hash(i, 9) * 80, 30);
+    }
+  }
+  // far hills with little Bethlehem on top (lifted on tall screens)
+  ctx.save(); ctx.translate(0, HZ);
+  const hillCol = night ? '#2c4a3a' : '#9cc47a';
+  ctx.fillStyle = hillCol;
+  ctx.beginPath(); ctx.moveTo(x0, 400);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 270 + Math.sin(x * 0.006) * 30 + Math.sin(x * 0.017 + 1) * 14);
+  ctx.lineTo(x1, 400); ctx.lineTo(x0, 400); ctx.fill();
+  // Bethlehem
+  const bx = W * 0.72;
+  for (let i = 0; i < 6; i++) {
+    const hx = bx + (i - 3) * 26 + (i % 2) * 6, hh = 18 + (i % 3) * 7, hy = 262 + Math.sin(hx * 0.006) * 30 + Math.sin(hx * 0.017 + 1) * 14 - hh + 6;
+    ctx.fillStyle = night ? '#4a4a5a' : '#e8d4a8';
+    ctx.fillRect(hx, hy, 22, hh);
+    ctx.fillStyle = night ? (i % 2 ? '#ffd76a' : '#33334a') : '#8a6a42';
+    ctx.fillRect(hx + 8, hy + 6, 6, 6);
+  }
+  // near hill
+  ctx.fillStyle = night ? '#24402e' : '#86b85e';
+  ctx.beginPath(); ctx.moveTo(x0, 410);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 330 + Math.sin(x * 0.011 + 2) * 22);
+  ctx.lineTo(x1, 410); ctx.fill();
+  ctx.restore();
+  // the meadow
+  const mg = ctx.createLinearGradient(0, PY0 - 40, 0, H);
+  mg.addColorStop(0, night ? '#2f5a36' : '#8fcf5e'); mg.addColorStop(1, night ? '#1f4026' : '#5fa83e');
+  ctx.fillStyle = mg;
+  ctx.beginPath(); ctx.moveTo(x0, H + 2);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, PY0 - 10 + Math.sin(x * 0.008) * 12);
+  ctx.lineTo(x1, H + 2); ctx.fill();
+  // tufts and flowers
+  for (let i = 0; i < 70; i++) {
+    const gx = lerp(x0, x1, hash(i, 11)), gy = lerp(PY0 + 20, H - 6, hash(i, 12));
+    ctx.strokeStyle = night ? '#2a5030' : '#4e9a33'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const a of [-0.5, 0, 0.5]) { ctx.moveTo(gx, gy); ctx.lineTo(gx + Math.sin(a + Math.sin(t + i) * 0.1) * 9, gy - 10 + Math.abs(a) * 3); }
+    ctx.stroke();
+    if (i % 5 === 0 && !night) {
+      ctx.fillStyle = ['#fff', '#ffd84a', '#ff9ab0', '#c9a0ff'][i % 4];
+      ctx.beginPath(); ctx.arc(gx + 6, gy - 4, 3.2, 0, TAU); ctx.fill();
+    }
+  }
+  // bushes at the edges where lions and bears hide
+  for (const [bx2, by] of [[x0 + 10, 470 + HZ * 0.8], [x0 + 4, 720 + HZ * 0.3], [x1 - 10, 520 + HZ * 0.7], [x1 - 4, 800]]) {
+    ctx.fillStyle = night ? '#1d3a22' : '#3d6e2e';
+    ctx.beginPath(); ctx.arc(bx2, by, 46, 0, TAU); ctx.arc(bx2 + (bx2 < W / 2 ? 30 : -30), by + 16, 34, 0, TAU); ctx.fill();
+    ctx.fillStyle = night ? '#24462a' : '#4f8a3a';
+    ctx.beginPath(); ctx.arc(bx2 + (bx2 < W / 2 ? 8 : -8), by - 10, 32, 0, TAU); ctx.fill();
+  }
+  // a small stone sheepfold behind the flock
+  const c = flockC();
+  ctx.fillStyle = night ? '#6a6a72' : '#b9ad96';
+  for (let i = 0; i < 9; i++) {
+    const sx = c.x - 150 + i * 36, sy = c.y - 150 - Math.sin(i / 8 * Math.PI) * 14;
+    ctx.beginPath(); ctx.ellipse(sx, sy, 20, 13, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function drawEntities() {
+  const night = cfg.night;
+  // painter's order: things further up the hill are drawn first
+  const list = [];
+  for (const s of sheep) if (s.state !== 'gone' && s.state !== 'carried') list.push({ y: s.y, f: () => drawSheep(s) });
+  for (const p of preds) list.push({ y: p.y, f: () => { drawPred(p, night); if (p.target && p.target.state === 'carried' && p.target.by === p) drawSheep(p.target); } });
+  list.push({ y: david.y, f: () => drawDavid(david.x, david.y, 1.25 * SZ) });
+  list.sort((a, b) => a.y - b.y);
+  for (const e of list) e.f();
+}
+
+// Darkness with David's lantern-light around him and the flock's campfire glow
+function drawNight() {
+  const x0 = -offX - 2, x1 = W + offX + 2, top = -offY - 2;
+  const dawn = state === 'win' ? 1 : Math.max(0, dayF() - 0.85) / 0.15;
+  const a = 0.55 * (1 - dawn);
+  if (a <= 0.01) return;
+  const g = ctx.createRadialGradient(david.x, david.y - 40, 40, david.x, david.y - 40, 260);
+  g.addColorStop(0, 'rgba(10,16,48,0)'); g.addColorStop(1, `rgba(10,16,48,${a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, PY0 - 60, x1 - x0, H - PY0 + 70);
+  // lantern
+  ctx.fillStyle = 'rgba(255,220,120,0.12)';
+  ctx.beginPath(); ctx.arc(david.x, david.y - 40, 70, 0, TAU); ctx.fill();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(30,40,20,0.75)'); hg.addColorStop(1, 'rgba(30,40,20,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  const ink = '#fff4cc';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ink;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Shepherd Boy' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    // time until sunset (or sunrise): a sun (or moon) travelling along a bar
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(cfg.night ? 'DAWN' : 'SUNSET', 12, 50);
+    const bx = cfg.night ? 54 : 66, bw = 130;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,244,204,0.25)';
+    roundRect(bx, 39, bw, 13, 6.5); ctx.fill();
+    const f = dayF();
+    ctx.fillStyle = cfg.night ? '#9fb4ff' : '#ffcf4a';
+    if (f > 0) { roundRect(bx, 39, Math.max(13, bw * f), 13, 6.5); ctx.fill(); }
+    ctx.fillStyle = cfg.night ? '#fff6d8' : '#ffe27a';
+    ctx.beginPath(); ctx.arc(bx + bw * f, 45.5, 8, 0, TAU); ctx.fill();
+    // lost sheep: three little sheep slots on the right
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + levelScore}`, viewW - 12, 26);
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('LOST', viewW - 12 - MAX_LOST * 30 - 4, 50);
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < MAX_LOST; i++) {
+      const x = viewW - 26 - (MAX_LOST - 1 - i) * 30, y = 46;
+      ctx.fillStyle = i < lost ? '#e86a5a' : 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, TAU); ctx.fill();
+      ctx.fillStyle = i < lost ? '#fff' : 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.arc(x - 4, y - 1, 5, 0, TAU); ctx.arc(x + 1, y - 3, 5, 0, TAU); ctx.arc(x + 4, y + 1, 5, 0, TAU); ctx.fill();
+      if (i < lost) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.stroke(); }
+    }
+    // flock count
+    const here = sheep.filter((s) => s.state !== 'gone').length;
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = ink;
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(`Flock ${here}/${cfg.sheep}`, viewW - 12, 80);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = TOPH + 40 + Math.max(0, offY) * 0.5;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(30,24,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff4cc';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+// A pulsing ring around the first lion so the youngest players know what to tap
+function drawHints() {
+  if (state !== 'play' || level > 2) return;
+  for (const p of preds) {
+    if (p.state === 'flee' || p.hintDone) continue;
+    const c = predCenter(p);
+    const r = 56 * p.k * SZ + Math.sin(t * 6) * 6;
+    ctx.strokeStyle = 'rgba(255,240,150,0.9)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, TAU); ctx.stroke();
+    // a little pointing hand
+    ctx.fillStyle = '#fff4cc'; ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(30,24,10,0.85)';
+    ctx.strokeText('TAP!', c.x, c.y - r - 8); ctx.fillText('TAP!', c.x, c.y - r - 8);
+  }
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawWorld();
+  drawEntities();
+  if (cfg.night) {
+    drawNight();
+    for (const p of preds) if (p.state !== 'flee' && !p.bush) drawPredEyes(p);
+  }
+  drawHints();
+  drawParticles();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// Keep everyone on screen when the window changes size
+function keepInside() {
+  for (const s of sheep) if (s.state === 'graze') { s.x = clamp(s.x, 30, W - 30); s.tx = clamp(s.tx, 30, W - 30); }
+  david.x = clamp(david.x, 30, W - 30); david.tx = clamp(david.tx, 30, W - 30);
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updateDavid(dt);
+  if (state === 'play') {
+    playT += dt;
+    // sheep wander off now and then
+    wanderT -= dt;
+    if (wanderT <= 0) {
+      if (sheep.filter((s) => s.state === 'wander').length < (level >= 6 ? 3 : level >= 4 ? 2 : 1)) startWander();
+      wanderT = cfg.wander * rand(0.75, 1.25);
+    }
+    // lions and bears arrive on their schedule
+    const alive = preds.filter((p) => p.state !== 'flee').length;
+    if (queue.length && playT >= queue[0].at && alive < cfg.together) spawnPred(queue.shift().kind);
+    updateSheep(dt);
+    updatePreds(dt);
+    if (state === 'play' && playT >= cfg.dur && !queue.length && !preds.some((p) => p.state !== 'flee')) {
+      // bring any wanderer home before the day ends
+      for (const s of sheep) if (s.state === 'wander') { const g = grazeSpot(); s.state = 'return'; s.tx = g.x; s.ty = g.y; }
+      win();
+    }
+  } else if (state === 'win' || state === 'fail' || state === 'level' || state === 'title') {
+    updateSheep(dt);
+    if (state !== 'title' && state !== 'level') updatePreds(dt);
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

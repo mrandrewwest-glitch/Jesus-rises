@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3a2414">
+<title>Out of the Pit</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3a2414;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(60, 30, 10, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Out of the Pit</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'strings', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  pit: { ref: 'Genesis 37:24', KJV: 'And they took him, and cast him into a pit: and the pit was empty, there was no water in it.', NKJV: 'Then they took him and cast him into a pit. And the pit was empty; there was no water in it.', NIV: 'and they took him and threw him into the cistern. The cistern was empty; there was no water in it.', NLT: 'Then they grabbed him and threw him into the cistern. Now the cistern was empty; there was no water in it.' },
+  // Level cards
+  empty: { ref: 'Genesis 37:24', KJV: 'the pit was empty, there was no water in it.', NKJV: 'the pit was empty; there was no water in it.', NIV: 'The cistern was empty; there was no water in it.', NLT: 'Now the cistern was empty; there was no water in it.' },
+  // Win cards
+  drew: { ref: 'Genesis 37:28', KJV: 'they drew and lifted up Joseph out of the pit... and they brought Joseph into Egypt.', NKJV: 'the brothers pulled Joseph up and lifted him out of the pit... And they took Joseph to Egypt.', NIV: 'his brothers pulled Joseph up out of the cistern... who took him to Egypt.', NLT: 'Joseph’s brothers pulled him out of the cistern... And the traders took him to Egypt.' },
+  // Fail card
+  withJoseph: { ref: 'Genesis 39:2', KJV: 'And the Lord was with Joseph', NKJV: 'The Lord was with Joseph', NIV: 'The Lord was with Joseph', NLT: 'The Lord was with Joseph' },
+  // The last win card
+  good: { ref: 'Genesis 50:20', KJV: 'But as for you, ye thought evil against me; but God meant it unto good, to bring to pass, as it is this day, to save much people alive.', NKJV: 'But as for you, you meant evil against me; but God meant it for good, in order to bring it about as it is this day, to save many people alive.', NIV: 'You intended to harm me, but God intended it for good to accomplish what is now being done, the saving of many lives.', NLT: 'You intended to harm me, but God intended it all for good. He brought me to this position so I could save the lives of many people.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes tent roof above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function rgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Levels
+// ============================================================
+const LEVELS = [
+  { name: 'A Dry Pit',             depth: 1000, crumble: 3.4, time: 60,  crumblyP: 0,    rootEvery: 4, extras: 1.2 },
+  { name: 'Deeper Down',           depth: 1400, crumble: 2.8, time: 70,  crumblyP: 0.15, rootEvery: 5, extras: 1.0 },
+  { name: 'Sandy Stones',          depth: 1800, crumble: 2.3, time: 80,  crumblyP: 0.3,  rootEvery: 6, extras: 0.9 },
+  { name: 'The Old Well',          depth: 2200, crumble: 1.9, time: 85,  crumblyP: 0.4,  rootEvery: 7, extras: 0.8 },
+  { name: 'Crumbly Walls',         depth: 2600, crumble: 1.6, time: 90,  crumblyP: 0.5,  rootEvery: 9, extras: 0.7 },
+  { name: 'The Deepest Cistern',   depth: 3100, crumble: 1.35, time: 100, crumblyP: 0.55, rootEvery: 12, extras: 0.6 },
+];
+const NUM_LEVELS = LEVELS.length;
+const HEARTS = 3;
+const REACH = 165;          // how far Joseph can reach from one hold to the next
+const TAP_R = 46;
+const ROPE_Y = 70;          // where the rope's end hangs
+function makeConfig(n) { return LEVELS[clamp(n, 1, NUM_LEVELS) - 1]; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('pitBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let holds = [];
+let joe = null;           // { hold, x, y, fromX, fromY, moveT, fall }
+let hearts = HEARTS, slips = 0, sparkles = 0, timeLeft = 60;
+let camY = 0;
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastScore = null;
+let highest = 0;
+
+// ============================================================
+//  The pit
+// ============================================================
+function shaft() {
+  const half = Math.min(W / 2 - 34, 320);
+  return { x0: W / 2 - half, x1: W / 2 + half, cx: W / 2, half };
+}
+
+function buildPit() {
+  const S = shaft();
+  holds = [];
+  const D = cfg.depth;
+  const add = (x, y, type) => { const h = { x, y, type, life: 1, used: false, broken: false, crumbleT: 0, shake: 0, sparkle: false, i: holds.length }; holds.push(h); return h; };
+  // the floor of the pit
+  add(S.cx, D, 'floor');
+  // a path that can always be climbed
+  let px = S.cx, py = D - 110;
+  let k = 0;
+  const path = [];
+  while (py > ROPE_Y + REACH * 0.85) {
+    const dy = rand(0.5, 0.78) * REACH;
+    const maxDx = Math.sqrt(Math.max(0, (REACH * 0.92) ** 2 - dy * dy));
+    let nx = px + rand(-maxDx, maxDx);
+    if (nx < S.x0 + 40 || nx > S.x1 - 40) nx = px - (nx - px);
+    nx = clamp(nx, S.x0 + 40, S.x1 - 40);
+    py -= dy; px = nx; k++;
+    const type = k % cfg.rootEvery === 0 ? 'root' : Math.random() < cfg.crumblyP ? 'sand' : 'stone';
+    path.push(add(px, py, type));
+  }
+  // the rope hangs down near the top of the path
+  const lastP = path[path.length - 1] || { x: S.cx, y: D - 110 };
+  const ropeX = clamp(lastP.x + rand(-60, 60), S.x0 + 50, S.x1 - 50);
+  add(ropeX, Math.max(ROPE_Y, lastP.y - REACH * 0.8), 'rope');
+  // extra holds all over the walls
+  const area = (S.x1 - S.x0) * (D - 150);
+  const n = Math.round(area / 15000 * cfg.extras);
+  for (let i = 0; i < n * 4 && holds.length < path.length + n + 2; i++) {
+    const x = rand(S.x0 + 34, S.x1 - 34), y = rand(ROPE_Y + 120, D - 90);
+    if (holds.some((h) => Math.hypot(h.x - x, (h.y - y) * 1.3) < 88)) continue;
+    add(x, y, Math.random() < cfg.crumblyP * 1.3 ? 'sand' : Math.random() < 0.08 ? 'root' : 'stone');
+  }
+  // a few sparkles of light to collect
+  const cands = holds.filter((h) => h.type === 'stone' || h.type === 'sand');
+  cands.sort(() => Math.random() - 0.5);
+  cands.slice(0, 3 + level).forEach((h) => { h.sparkle = true; });
+}
+
+function holdLife(h) {
+  if (h.type === 'sand') return cfg.crumble * 0.5;
+  return cfg.crumble;
+}
+
+function handPos(h) {
+  if (h.type === 'floor') return { x: joe ? joe.x : h.x, y: h.y - 110 };
+  return { x: h.x, y: h.y };
+}
+
+function reachable(h) {
+  if (!joe || joe.moveT > 0 || joe.fall || h.broken || h === joe.hold || h.type === 'floor') return false;
+  const p = handPos(joe.hold);
+  return Math.hypot(h.x - p.x, h.y - p.y) <= REACH;
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildPit();
+  const floor = holds[0];
+  joe = { hold: floor, x: shaft().cx, y: floor.y, fromX: 0, fromY: 0, moveT: 0, fall: null, mood: 'worried' };
+  hearts = HEARTS; slips = 0; sparkles = 0; timeLeft = cfg.time;
+  highest = 0;
+  particles = []; popups = [];
+  flashT = shakeT = 0;
+  endTimer = 0; winT = 0; failT = 0;
+  told = {};
+  camY = cfg.depth + 60 - viewH;
+  keys.clear();
+}
+
+// ============================================================
+//  Climbing
+// ============================================================
+function grab(h) {
+  if (state !== 'play' || !joe) return;
+  if (joe.moveT > 0 || joe.fall) return;
+  if (h.broken) return;
+  if (!reachable(h)) {
+    if (h !== joe.hold) { showMessage('Too far! Tap a glowing hold', 1.4); sfx.tick(); }
+    return;
+  }
+  const from = joe.hold;
+  const p = handPos(from);
+  joe.fromX = p.x; joe.fromY = p.y;
+  joe.hold = h;
+  joe.moveT = 0.22;
+  // the hold he leaves keeps crumbling
+  if (from.type !== 'floor' && from.type !== 'root') from.leftT = true;
+  if (h.type === 'rope') { sfx.grab(); return; }
+  if (!h.used) {
+    h.used = true;
+    if (h.type !== 'root') h.crumbleT = holdLife(h);
+    const climbed = Math.max(0, Math.round((cfg.depth - h.y) / 10));
+    if (climbed > highest) { totalBump(climbed - highest); highest = climbed; }
+  }
+  if (h.sparkle) {
+    h.sparkle = false; sparkles++;
+    popups.push({ x: h.x, y: h.y - 40, text: '+50', t: 1, col: '#ffe27a' });
+    for (let k = 0; k < 14; k++) spawn(h.x, h.y - 10, rand(-90, 90), rand(-140, -30), rand(0.5, 1), pick(['#fff3b0', '#ffe27a', '#ffffff']), rand(2, 4), 120, false, 'star');
+    sfx.sparkle();
+  }
+  sfx.grab(h.type);
+  if (h.type === 'sand' && !told.sand) { told.sand = true; showMessage('Sandy stones crumble fast — keep moving!', 2); }
+  if (h.type === 'root' && !told.root) { told.root = true; showMessage('A strong root! It won’t crumble.', 1.8); }
+}
+
+let heightPts = 0;
+function totalBump(n) { heightPts += n; }
+
+function slip() {
+  // the hold has crumbled away: Joseph slides down to a hold below
+  hearts--; slips++;
+  shakeT = 0.35;
+  sfx.slip();
+  joe.mood = 'worried';
+  const p = { x: joe.hold.x, y: joe.hold.y };
+  let target = null, bd = 1e9;
+  for (const h of holds) {
+    if (h.broken || h === joe.hold || h.type === 'rope') continue;
+    if (h.y <= p.y + 20) continue;
+    const dx = Math.abs(h.x - p.x);
+    if (dx > 110 && h.type !== 'floor') continue;
+    const d = h.y - p.y + dx * 0.6;
+    if (d < bd) { bd = d; target = h; }
+  }
+  if (!target) target = holds[0];
+  joe.fall = { fromX: p.x, fromY: p.y, to: target, t: 0, dur: clamp((target.y - p.y) / 700, 0.3, 0.9) };
+  if (hearts <= 0) { showMessage('Oh no, Joseph slipped again…', 1.6); }
+  else showMessage(hearts === 1 ? 'Whoops! Careful — one heart left' : 'Whoops! The stone crumbled', 1.5);
+}
+
+function landFall() {
+  const f = joe.fall;
+  joe.fall = null;
+  joe.hold = f.to;
+  if (f.to.type !== 'floor' && !f.to.used) { f.to.used = true; if (f.to.type !== 'root') f.to.crumbleT = holdLife(f.to); }
+  if (f.to.type === 'floor') joe.x = clamp(f.fromX, shaft().x0 + 30, shaft().x1 - 30);
+  dustPuff(f.to.x, f.to.y);
+  sfx.thud();
+  if (hearts <= 0) fail();
+}
+
+function updateClimb(dt) {
+  timeLeft -= dt;
+  if (timeLeft <= 0) { timeLeft = 0; failTime(); return; }
+  if (timeLeft < 12 && !told.lowTime) { told.lowTime = true; showMessage('Hurry! The traders won’t wait long', 2); }
+  if (joe.moveT > 0) joe.moveT = Math.max(0, joe.moveT - dt);
+  if (joe.hold.type === 'rope' && joe.moveT <= 0) { reachRope(); return; }
+  if (joe.fall) {
+    joe.fall.t += dt;
+    if (joe.fall.t >= joe.fall.dur) landFall();
+  }
+  // crumbling holds
+  for (const h of holds) {
+    if (!h.used || h.broken || h.type === 'root' || h.type === 'floor' || h.type === 'rope') continue;
+    h.crumbleT -= dt;
+    h.shake = h.crumbleT < 0.8 ? (0.8 - h.crumbleT) : 0;
+    if (h.crumbleT < 0.8 && Math.random() < dt * 12) spawn(h.x + rand(-18, 18), h.y + 8, rand(-10, 10), rand(20, 60), 0.6, '#a08a6a', rand(1.5, 3), 400);
+    if (h.crumbleT <= 0) {
+      h.broken = true;
+      for (let k = 0; k < 14; k++) spawn(h.x + rand(-18, 18), h.y + rand(-6, 6), rand(-60, 60), rand(-40, 40), rand(0.7, 1.2), pick(['#8a7458', '#a08a6a', '#6e5a42']), rand(3, 6), 700);
+      sfx.crumble();
+      if (joe.hold === h && !joe.fall && state === 'play') slip();
+    }
+  }
+  if (joe.hold.type !== 'floor' && joe.hold.type !== 'root' && joe.hold.crumbleT < 1 && !joe.fall) joe.mood = 'worried';
+  else if (!joe.fall) joe.mood = joe.hold.type === 'floor' ? 'worried' : 'watch';
+  if (!told.first && t > 0) {
+    told.first = true;
+    setTimeout(() => { if (state === 'play' && joe.hold.type === 'floor') showMessage('Tap a glowing stone to climb!', 2.4); }, 1600);
+  }
+}
+
+function reachRope() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(timeLeft * 10);
+  const sparkleBonus = sparkles * 50;
+  const heartBonus = hearts * 150;
+  const levelBonus = level * 200;
+  const climb = heightPts;
+  const score = climb + timeBonus + sparkleBonus + heartBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('pitBest', best); } catch (e) {} }
+  lastScore = { climb, timeBonus, sparkleBonus, heartBonus, levelBonus, score };
+  flashT = 0.3;
+  showMessage('Out of the pit!', 2.4);
+  sfx.win();
+  endTimer = 3.6;
+}
+
+function failTime() {
+  showMessage('The traders went on without him…', 2);
+  fail();
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  sfx.fail();
+  endTimer = 2.4;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('Out of the Pit', 'Help Joseph climb up',
+    `${verseHTML('pit')}
+     <ul>
+       <li>Joseph’s brothers put him in a deep, dry pit. Help him <b>climb up</b> to the <b>rope</b> at the top!</li>
+       <li><b>Tap a glowing stone</b> to reach for it. Only stones close enough will glow.</li>
+       <li>Stones <b>crumble</b> a little while after Joseph holds them, so <b>keep moving</b>! <b>Sandy</b> stones crumble fast. Green <b>roots</b> never crumble.</li>
+       <li>If a stone crumbles under him, Joseph slips down and loses a heart. Lose 3 hearts, or run out of time, and you must try again.</li>
+       <li>Collect the <b>sparkles</b> for extra points.</li>
+       <li><b>Keys:</b> <kbd>&uarr;</kbd> highest stone, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> stones to the side, <kbd>&darr;</kbd> a lower one.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start climbing', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+const LEVEL_TIPS = [
+  'Tap the glowing stones to climb up to the rope. Take your time — but not too long!',
+  'A deeper pit, and some stones are sandy. Sandy stones crumble fast!',
+  'More sandy stones. Look for the green roots — you can rest on those.',
+  'An old, deep well. The stones crumble quicker now.',
+  'The walls are crumbly everywhere. Plan your way up!',
+  'The deepest pit of all. Quick hands, sharp eyes!',
+];
+
+function levelCard() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(level);
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     ${verseHTML('empty')}
+     <p class="score">Depth: <b>${Math.round(cfg.depth / 10)}</b> &nbsp;·&nbsp; Time: <b>${cfg.time}s</b><br>Score so far: <b>${totalScore}</b></p>`,
+    'Climb!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  heightPts = 0;
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 1.8);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'Onward to Egypt!' : 'Out of the pit!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'good' : 'drew')}
+       <p style="text-align:center">${last ? 'Joseph was taken far away to Egypt. It was hard, but God was with him, and one day God used Joseph to save many people — even his brothers!' : 'The traders pulled Joseph up out of the pit, and he went with them toward Egypt. God was with him all the way.'}</p>
+       <p class="score">Climbing: <b>${s.climb}</b><br>Time left: <b>${s.timeBonus}</b><br>Sparkles (${sparkles}): <b>${s.sparkleBonus}</b><br>Hearts left (${hearts}): <b>${s.heartBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next pit', () => {
+        if (last) titleScreen();
+        else { level++; levelCard(); }
+      });
+  } else if (state === 'fail') {
+    showOverlay('Try again!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${timeLeft <= 0 ? 'Time ran out.' : 'Joseph slipped too many times.'} Keep moving before the stones <b>crumble</b>, rest on <b>roots</b>, and head for the <b>rope</b>!</p>
+       ${verseHTML('withJoseph')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+function keyHold(dir) {
+  const opts = holds.filter(reachable);
+  if (!opts.length) return;
+  const p = handPos(joe.hold);
+  let bestH = null, bs = -1e9;
+  for (const h of opts) {
+    const dx = h.x - p.x, dy = p.y - h.y;
+    let s;
+    if (dir === 'up') s = dy * 2 + (h.type === 'rope' ? 1000 : 0) - Math.abs(dx) * 0.3;
+    else if (dir === 'left') s = -dx * 1.5 + dy * 0.6;
+    else if (dir === 'right') s = dx * 1.5 + dy * 0.6;
+    else s = -dy;
+    if (s > bs) { bs = s; bestH = h; }
+  }
+  if (bestH) grab(bestH);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && !e.repeat) {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') keyHold('up');
+    else if (e.code === 'ArrowLeft' || e.code === 'KeyA') keyHold('left');
+    else if (e.code === 'ArrowRight' || e.code === 'KeyD') keyHold('right');
+    else if (e.code === 'ArrowDown' || e.code === 'KeyS') keyHold('down');
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+
+function holdAt(wx, wy) {
+  let bestH = null, bd = TAP_R;
+  // prefer holds Joseph can reach
+  for (const pass of [true, false]) {
+    for (const h of holds) {
+      if (h.broken || h.type === 'floor') continue;
+      if (pass && !reachable(h)) continue;
+      const d = Math.hypot(wx - h.x, wy - (h.type === 'rope' ? h.y - 30 : h.y));
+      const r = h.type === 'rope' ? TAP_R + 20 : TAP_R;
+      if (d < r && d < bd + (h.type === 'rope' ? 20 : 0)) { bd = d; bestH = h; }
+    }
+    if (bestH) return bestH;
+  }
+  return null;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const h = holdAt(p.vx - offX, p.vy + camY);
+  if (h) grab(h);
+  else if (!told.tapHold) { told.tapHold = true; showMessage('Tap a glowing stone', 1.4); }
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  grab(type) {
+    if (!this.ctx) return;
+    Music.tap(clamp(1 - joe.hold.y / cfg.depth, 0, 1));
+    this.noiseBurst(type === 'sand' ? 2600 : 900, 0.08, 0.12, 1.5);
+  },
+  tick() { this.tone(500, 0.08, 'triangle', 0.08); },
+  sparkle() { [1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.3, 'sine', 0.09, i * 0.06)); },
+  crumble() { this.noiseBurst(500, 0.4, 0.22, 0.6, 180); },
+  slip() { this.tone(520, 0.4, 'triangle', 0.16, 0, 200); },
+  thud() { this.tone(120, 0.2, 'sine', 0.35, 0, 70); this.noiseBurst(300, 0.2, 0.15, 0.7); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Particles and popups
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, scr = false, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, scr, kind, rot: rand(0, TAU) });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; popups[i].y -= 30 * dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.4, p.rot);
+    else if (p.kind === 'thread') {
+      ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+      ctx.quadraticCurveTo(p.x + Math.cos(p.rot) * 8, p.y + Math.sin(p.rot) * 8, p.x + 10, p.y + 3); ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStar(x, y, r, rot = 0) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = rot + i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+
+function dustPuff(x, y) {
+  for (let k = 0; k < 10; k++) spawn(x + rand(-20, 20), y + rand(-4, 4), rand(-60, 60), rand(-50, -10), rand(0.4, 0.8), 'rgba(190,170,140,0.7)', rand(4, 8), 30);
+}
+
+// ============================================================
+//  People
+// ============================================================
+const JOSEPH = { robe: '#d9cba8', hair: '#4a2f1a', beard: false, skin: '#e3b184', kid: true, i: 3, blink: 0, blinkT: 3, phase: 1.3 };
+const TRADER = { robe: '#2f7f9a', hair: '#2e1d10', beard: true, skin: '#c98d56', scarf: '#f0e2c0', i: 2, blink: 0, blinkT: 2, phase: 0.4 };
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 3, 2);
+      brows(-9, -5, -9, -5);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// d.stripes (optional): colours for a striped robe (Joseph's new coat)
+function drawPerson(d, mood, x, y, s, lookX, lookY, holding = null) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  if (d.kid) s *= 0.8;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.stripes ? d.stripes[0] : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  // robe
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fillStyle = d.robe; ctx.fill();
+  if (d.stripes) {
+    ctx.save(); ctx.clip();
+    const n = d.stripes.length, h = 41 / n;
+    d.stripes.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-20, -41 + i * h, 40, h + 0.5); });
+    ctx.restore();
+  }
+  ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5; ctx.stroke();
+  if (!d.stripes) {
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (mood === 'watch' || mood === 'wow') {
+    if (holding === 'needle') {
+      arm(-11, -32, -15, -12);
+      arm(11, -32, 20, -28);
+      ctx.strokeStyle = '#cfd6de'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(18, -24); ctx.lineTo(28, -38); ctx.stroke();
+    } else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried' || mood === 'dismay') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);
+  }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 24, 0, hy + 26);
+    ctx.quadraticCurveTo(14, hy + 24, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+  ctx.restore();
+}
+
+
+// Joseph hanging from a hold by both hands (hx, hy is where his hands are)
+function drawHanging(hx, hy0, s, mood, swing) {
+  const d = JOSEPH;
+  ctx.save();
+  ctx.translate(hx, hy0);
+  ctx.rotate(swing);
+  ctx.scale(s, s);
+  const sleeve = shade(d.robe, -25);
+  // arms up to the hold
+  ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-10, 40); ctx.lineTo(-7, 2); ctx.moveTo(10, 40); ctx.lineTo(7, 2); ctx.stroke();
+  // body
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-16, 82);
+  ctx.quadraticCurveTo(-16, 52, -11, 40);
+  ctx.quadraticCurveTo(0, 36, 11, 40);
+  ctx.quadraticCurveTo(16, 52, 16, 82);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#a08a5a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-14, 60); ctx.quadraticCurveTo(0, 63, 14, 60); ctx.stroke();
+  // legs and feet
+  ctx.strokeStyle = d.skin; ctx.lineWidth = 5;
+  const kick = Math.sin(t * 6) * 3;
+  ctx.beginPath(); ctx.moveTo(-6, 82); ctx.lineTo(-8 + kick, 96); ctx.moveTo(6, 82); ctx.lineTo(8 - kick, 96); ctx.stroke();
+  // hands
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(-7, 0, 4.5, 0, TAU); ctx.arc(7, 0, 4.5, 0, TAU); ctx.fill();
+  // head (looking up)
+  const hy = 24;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 15.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 10, 0, hy - 9);
+  ctx.quadraticCurveTo(-8, hy - 11, -15, hy + 1);
+  ctx.closePath(); ctx.fill();
+  drawFace(d, mood, hy, 0, -1);
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawPitWalls() {
+  const S = shaft();
+  const top = -camY;                       // rim, in view coordinates
+  // sky above the rim
+  if (top > 0) {
+    const g = ctx.createLinearGradient(0, Math.min(0, top - 400), 0, top);
+    g.addColorStop(0, '#6fb4e8'); g.addColorStop(1, '#cfe9f7');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, top + 2);
+    // sun
+    ctx.fillStyle = '#ffe27a';
+    ctx.beginPath(); ctx.arc(offX + W * 0.34, top - 90, 30, 0, TAU); ctx.fill();
+  }
+  // the earth on either side
+  const y0 = Math.max(0, top);
+  ctx.fillStyle = '#8a6a44';
+  ctx.fillRect(0, y0, viewW, viewH - y0);
+  // stone blocks in the walls (world-anchored)
+  const ox = offX;
+  const rowH = 46;
+  const firstRow = Math.floor(Math.max(0, camY) / rowH);
+  for (let r = firstRow; r * rowH - camY < viewH; r++) {
+    const vy = r * rowH - camY;
+    if (r * rowH > cfg.depth + 40) break;
+    for (let c = -2; c < 40; c++) {
+      const bw = 64, sx = c * bw + (r % 2) * 32 - 40;
+      const vx = ox + sx;
+      if (vx > viewW + 80) break;
+      const inShaft = sx + bw > S.x0 && sx < S.x1;
+      const n = hash(r, c);
+      ctx.fillStyle = inShaft ? (n < 0.5 ? '#6e5640' : '#76604a') : (n < 0.5 ? '#9a7a52' : '#a5865c');
+      roundRect(vx + 2, vy + 2, bw - 4, rowH - 4, 7); ctx.fill();
+    }
+  }
+  // the shaft is in shadow, lit from above
+  const sx0 = ox + S.x0, sx1 = ox + S.x1;
+  const sg = ctx.createLinearGradient(0, top, 0, top + cfg.depth + 60);
+  sg.addColorStop(0, 'rgba(255,240,200,0.05)'); sg.addColorStop(0.25, 'rgba(30,18,10,0.25)'); sg.addColorStop(1, 'rgba(20,12,6,0.55)');
+  ctx.fillStyle = sg; ctx.fillRect(sx0, Math.max(0, top), sx1 - sx0, viewH);
+  // shaft edges
+  ctx.fillStyle = 'rgba(40,24,12,0.45)';
+  ctx.fillRect(sx0 - 8, Math.max(0, top), 8, viewH); ctx.fillRect(sx1, Math.max(0, top), 8, viewH);
+  // light from above
+  const lg = ctx.createLinearGradient(0, top, 0, top + 700);
+  lg.addColorStop(0, 'rgba(255,245,200,0.35)'); lg.addColorStop(1, 'rgba(255,245,200,0)');
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.moveTo(sx0 + 30, top); ctx.lineTo(sx1 - 10, top); ctx.lineTo(sx1 - 80, top + 700); ctx.lineTo(sx0 + 90, top + 700); ctx.fill();
+  // the dry floor
+  const fy = cfg.depth - camY;
+  if (fy < viewH + 20) {
+    ctx.fillStyle = '#b89a6a';
+    ctx.fillRect(sx0, fy, sx1 - sx0, viewH - fy + 10);
+    ctx.fillStyle = '#9a7e54';
+    for (let k = 0; k < 9; k++) { ctx.beginPath(); ctx.ellipse(sx0 + (k + 0.5) * (sx1 - sx0) / 9, fy + 14 + (k % 2) * 8, 10, 5, 0, 0, TAU); ctx.fill(); }
+  }
+  // the rim, with grass and the traders' rope beam
+  if (top > -60) {
+    ctx.fillStyle = '#7da84a';
+    ctx.fillRect(0, top - 10, sx0 - 8, 14); ctx.fillRect(sx1 + 8, top - 10, viewW - sx1, 14);
+    ctx.fillStyle = '#8a5a30';
+    roundRect(sx0 - 30, top - 22, sx1 - sx0 + 60, 14, 6); ctx.fill();
+  }
+}
+
+function drawRopeAndTraders() {
+  const rope = holds.find((h) => h.type === 'rope');
+  if (!rope) return;
+  const top = -camY;
+  const ox = offX;
+  const rx = ox + rope.x, ry = rope.y - camY;
+  let pull = 0;
+  if (state === 'win') pull = ease(clamp((winT - 0.3) / 1.6, 0, 1)) * (rope.y + 60);
+  // rope
+  ctx.strokeStyle = '#c9a46a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(rx, top - 16); ctx.quadraticCurveTo(rx + Math.sin(t * 1.5) * 6, (top + ry - pull) / 2, rx, ry - pull); ctx.stroke();
+  ctx.strokeStyle = '#9a7a44'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]);
+  ctx.beginPath(); ctx.moveTo(rx, top - 16); ctx.lineTo(rx, ry - pull); ctx.stroke(); ctx.setLineDash([]);
+  // the loop at the end
+  ctx.strokeStyle = '#c9a46a'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.ellipse(rx, ry - pull + 8, 10, 14, 0, 0, TAU); ctx.stroke();
+  // traders peeking over the rim
+  if (top > -120) {
+    drawPerson(TRADER, state === 'win' ? 'joy' : 'watch', rx + 60, top - 6, 1.1, rx, ry);
+    const camelX = ox + (rope.x > W / 2 ? shaft().x0 - 90 : shaft().x1 + 90);
+    drawCamel(camelX, top - 8, 1.1);
+  }
+}
+
+function drawCamel(x, y, s) {
+  if (x < -100 || x > viewW + 100) return;
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#c9965a';
+  ctx.strokeStyle = '#8a6036'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); for (const lx of [-26, -14, 16, 28]) { ctx.moveTo(lx, -30); ctx.lineTo(lx, 0); } ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, -42, 40, 18, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-6, -58, 18, 14, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(30, -46); ctx.quadraticCurveTo(48, -60, 46, -82); ctx.lineTo(56, -84); ctx.quadraticCurveTo(64, -78, 56, -72); ctx.lineTo(54, -70); ctx.quadraticCurveTo(56, -56, 38, -36); ctx.fill();
+  ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(54, -79, 2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c0392b'; roundRect(-20, -66, 30, 12, 4); ctx.fill();
+  ctx.restore();
+}
+
+function drawHold(h) {
+  const vx = offX + h.x, vy = h.y - camY;
+  if (vy < -60 || vy > viewH + 60) return;
+  if (h.type === 'floor' || h.type === 'rope') return;
+  if (h.broken) return;
+  const can = state === 'play' && reachable(h);
+  const shake = h.shake > 0 ? Math.sin(t * 60) * h.shake * 3 : 0;
+  ctx.save();
+  ctx.translate(vx + shake, vy);
+  if (can) {
+    const a = 0.45 + 0.3 * Math.sin(t * 6 + h.i);
+    ctx.fillStyle = `rgba(255,236,140,${a * 0.5})`;
+    ctx.beginPath(); ctx.ellipse(0, 0, 40, 26, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(255,236,140,${a + 0.2})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, 0, 36, 22, 0, 0, TAU); ctx.stroke();
+  }
+  if (h.type === 'root') {
+    ctx.strokeStyle = '#5a7a2a'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-30, -6); ctx.quadraticCurveTo(-10, 14, 10, 2); ctx.quadraticCurveTo(22, -6, 30, 4); ctx.stroke();
+    ctx.strokeStyle = '#7da84a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-26, -6); ctx.quadraticCurveTo(-8, 10, 10, -1); ctx.stroke();
+    ctx.fillStyle = '#7da84a';
+    ctx.beginPath(); ctx.ellipse(26, -6, 7, 4, -0.6, 0, TAU); ctx.fill();
+  } else {
+    const sand = h.type === 'sand';
+    const base = sand ? '#d8b878' : '#a8a092';
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(2, 8, 26, 9, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = base;
+    ctx.beginPath(); ctx.ellipse(0, 0, 26, 13, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(base, 30);
+    ctx.beginPath(); ctx.ellipse(-4, -4, 18, 6, 0, 0, TAU); ctx.fill();
+    if (sand) {
+      ctx.fillStyle = '#b8945a';
+      for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.arc(-16 + k * 5.5, (k % 3 - 1) * 4, 1.6, 0, TAU); ctx.fill(); }
+    }
+    // cracks as it crumbles
+    if (h.used) {
+      const f = 1 - clamp(h.crumbleT / holdLife(h), 0, 1);
+      ctx.strokeStyle = 'rgba(50,30,15,0.8)'; ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      if (f > 0.15) { ctx.moveTo(-4, -10); ctx.lineTo(0, -2); ctx.lineTo(-6, 6); }
+      if (f > 0.45) { ctx.moveTo(8, -9); ctx.lineTo(6, 0); ctx.lineTo(12, 8); }
+      if (f > 0.7) { ctx.moveTo(-16, -4); ctx.lineTo(-10, 2); ctx.moveTo(16, -2); ctx.lineTo(20, 4); }
+      ctx.stroke();
+    }
+  }
+  if (h.sparkle) {
+    ctx.fillStyle = '#fff3b0';
+    ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 5 + h.i);
+    drawStar(0, -26, 9, t);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function joePos() {
+  // where Joseph's hands are, in world coordinates
+  if (joe.fall) {
+    const f = joe.fall, k = clamp(f.t / f.dur, 0, 1);
+    const to = handPos(f.to);
+    return { x: lerp(f.fromX, to.x, k), y: lerp(f.fromY, to.y, k * k) };
+  }
+  const p = handPos(joe.hold);
+  if (joe.moveT > 0) {
+    const k = ease(1 - joe.moveT / 0.22);
+    return { x: lerp(joe.fromX, p.x, k), y: lerp(joe.fromY, p.y, k) - Math.sin(k * Math.PI) * 14 };
+  }
+  return p;
+}
+
+function drawJoseph() {
+  if (!joe) return;
+  const S = 1.15;
+  if (state === 'win') {
+    const rope = holds.find((h) => h.type === 'rope');
+    const pull = ease(clamp((winT - 0.3) / 1.6, 0, 1)) * (rope.y + 60);
+    const x = offX + rope.x, y = rope.y - pull - camY + 16;
+    if (winT < 2.0) drawHanging(x, y, S, 'joy', Math.sin(t * 3) * 0.05);
+    else drawPerson(JOSEPH, 'joy', x + 30, -camY - 6, S * 1.1, x, -camY - 200);
+    return;
+  }
+  if (joe.hold.type === 'floor' && !joe.fall && joe.moveT <= 0) {
+    drawPerson(JOSEPH, state === 'fail' ? 'dismay' : 'worried', offX + joe.x, joe.hold.y - camY, S * 1.1, offX + joe.x, joe.hold.y - camY - 300);
+    return;
+  }
+  const p = joePos();
+  const swing = joe.fall ? Math.sin(t * 20) * 0.2 : Math.sin(t * 2.2) * 0.06;
+  drawHanging(offX + p.x, p.y - camY, S, joe.fall ? 'worried' : joe.mood, swing);
+}
+
+function drawReachLines() {
+  if (state !== 'play' || !joe || joe.moveT > 0 || joe.fall) return;
+  const p = handPos(joe.hold);
+  ctx.strokeStyle = 'rgba(255,236,140,0.25)'; ctx.lineWidth = 2; ctx.setLineDash([3, 7]);
+  ctx.beginPath();
+  for (const h of holds) if (reachable(h)) { ctx.moveTo(offX + p.x, p.y - camY); ctx.lineTo(offX + h.x, h.y - camY); }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawParticlesView() {
+  ctx.save();
+  ctx.translate(offX, -camY);
+  drawParticles();
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(40,24,12,0.9)';
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawHUD() {
+  const inGame = state !== 'title';
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const hg = ctx.createLinearGradient(0, 0, 0, 112);
+  hg.addColorStop(0, 'rgba(40,24,12,0.85)'); hg.addColorStop(1, 'rgba(40,24,12,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, 112);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Out of the Pit' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (inGame && joe) {
+    const toGo = Math.max(0, Math.round((joePos().y - ROPE_Y) / 10));
+    ctx.font = '600 14px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'win' ? 0 : heightPts + sparkles * 50)}   ·   ${state === 'win' ? 'Out!' : toGo + ' to the rope'}`, 12, 50);
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < HEARTS; k++) {
+      const x = viewW - 26 - k * 32, y = 84;
+      ctx.globalAlpha = k < hearts ? 1 : 0.25;
+      drawHeart(x, y, 13, k < hearts ? '#e84a5f' : '#ffffff');
+    }
+    ctx.globalAlpha = 1;
+    // time bar: the traders' caravan
+    const bx = 130, bw = Math.max(80, viewW - bx - 120), by = 78;
+    const f = clamp(timeLeft / cfg.time, 0, 1);
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(bx, by, bw, 12, 6); ctx.fill();
+    ctx.fillStyle = f < 0.2 && Math.sin(t * 10) > 0 ? '#ff8a7a' : '#f2c14e';
+    roundRect(bx, by, bw * f, 12, 6); ctx.fill();
+    ctx.fillStyle = '#ffe9a8'; ctx.font = '600 11px Fredoka, sans-serif';
+    ctx.fillText(`TIME ${Math.ceil(timeLeft)}s`, bx, by + 26);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawHeart(x, y, r, col) {
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.8);
+  ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.6, y - r * 1.1, x, y - r * 0.35);
+  ctx.bezierCurveTo(x + r * 0.6, y - r * 1.1, x + r * 1.3, y - r * 0.1, x, y + r * 0.8);
+  ctx.fill();
+}
+
+function drawMessage() {
+  if (message.t <= 0 || state === 'title') return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 600));
+  const y0 = 140;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(40,24,12,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, sy * scale);
+  if (joe) {
+    drawPitWalls();
+    for (const h of holds) drawHold(h);
+    drawReachLines();
+    drawRopeAndTraders();
+    drawJoseph();
+    drawParticlesView();
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.2})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function updateCamera(dt) {
+  if (!joe) return;
+  let target;
+  if (state === 'title') target = cfg.depth + 60 - viewH;
+  else if (state === 'win') target = -viewH * 0.45;
+  else target = joePos().y - viewH * 0.55;
+  target = clamp(target, -viewH * 0.45, cfg.depth + 60 - viewH);
+  camY = lerp(camY, target, 1 - Math.pow(0.02, dt));
+}
+
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  JOSEPH.blinkT -= dt;
+  if (JOSEPH.blinkT <= 0) { JOSEPH.blink = 0.13; JOSEPH.blinkT = rand(1.5, 4.5); }
+  if (JOSEPH.blink > 0) JOSEPH.blink -= dt;
+  if (state === 'play') updateClimb(dt);
+  else if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, W), -rand(40, 300), 0, -20, 1.2, '#fff3b0', 3, 0, false, 'star');
+  } else if (state === 'fail') failT += dt;
+  updateCamera(dt);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

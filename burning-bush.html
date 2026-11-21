@@ -1,0 +1,1760 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3a2a1e">
+<title>The Burning Bush</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3a2a1e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Burning Bush</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  bush: { ref: 'Exodus 3:2', KJV: 'And the angel of the LORD appeared unto him in a flame of fire out of the midst of a bush: and he looked, and, behold, the bush burned with fire, and the bush was not consumed.', NKJV: 'And the Angel of the LORD appeared to him in a flame of fire from the midst of a bush. So he looked, and behold, the bush was burning with fire, but the bush was not consumed.', NIV: 'There the angel of the LORD appeared to him in flames of fire from within a bush. Moses saw that though the bush was on fire it did not burn up.', NLT: 'There the angel of the LORD appeared to him in a blazing fire from the middle of a bush. Moses stared in amazement. Though the bush was engulfed in flames, it didn’t burn up.' },
+  // Level cards: looking closely
+  notBurnt: { ref: 'Exodus 3:2', KJV: 'the bush burned with fire, and the bush was not consumed.', NKJV: 'the bush was burning with fire, but the bush was not consumed.', NIV: 'though the bush was on fire it did not burn up.', NLT: 'Though the bush was engulfed in flames, it didn’t burn up.' },
+  turnAside: { ref: 'Exodus 3:3', KJV: 'I will now turn aside, and see this great sight, why the bush is not burnt.', NKJV: 'I will now turn aside and see this great sight, why the bush does not burn.', NIV: 'I will go over and see this strange sight—why the bush does not burn up.', NLT: 'This is amazing,” Moses said to himself. “Why isn’t that bush burning up? I must go see it.' },
+  // God calls; Moses answers
+  hereAmI: { ref: 'Exodus 3:4', KJV: 'God called unto him out of the midst of the bush, and said, Moses, Moses. And he said, Here am I.', NKJV: 'God called to him from the midst of the bush and said, “Moses, Moses!” And he said, “Here I am.”', NIV: 'God called to him from within the bush, “Moses! Moses!” And Moses said, “Here I am.”', NLT: 'God called to him from the middle of the bush, “Moses! Moses!” “Here I am!” Moses replied.' },
+  // Speech bubbles
+  callMoses: { ref: 'Exodus 3:4', KJV: 'Moses, Moses.', NKJV: 'Moses, Moses!', NIV: 'Moses! Moses!', NLT: 'Moses! Moses!' },
+  hereIAm: { ref: 'Exodus 3:4', KJV: 'Here am I.', NKJV: 'Here I am.', NIV: 'Here I am.', NLT: 'Here I am!' },
+  sandals: { ref: 'Exodus 3:5', KJV: 'put off thy shoes from off thy feet, for the place whereon thou standest is holy ground.', NKJV: 'Take your sandals off your feet, for the place where you stand is holy ground.', NIV: 'Take off your sandals, for the place where you are standing is holy ground.', NLT: 'Take off your sandals, for you are standing on holy ground.' },
+  // Win card for the last level
+  withYou: { ref: 'Exodus 3:12', KJV: 'Certainly I will be with thee', NKJV: 'I will certainly be with you.', NIV: 'I will be with you.', NLT: 'I will be with you.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  if (world && state !== 'title') layoutBushes();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function mixHex(a, b, f) {
+  const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(lerp((p >> s) & 255, (q >> s) & 255, f));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// Top of the playfield that is clear of the HUD buttons (in playfield units)
+function topSafe() { return Math.max(12, 118 - offY); }
+
+// ============================================================
+//  Levels
+// ============================================================
+const NUM_LEVELS = 6;
+const LEVEL_NAMES = [
+  'Sheep on the Mountain',
+  'Flowers on the Hillside',
+  'Smoke on the Wind',
+  'Shepherds’ Campfires',
+  'The Far Side of the Wilderness',
+  'Holy Ground',
+];
+const LEVEL_TIPS = [
+  'Find the bush that is on fire, and tap it. Then spot <b>3 differences</b> between the two pictures.',
+  'Some bushes have <b>red flowers</b>. They are not on fire! Then spot <b>4 differences</b>.',
+  'Now a bush is <b>burning up</b> with <b>smoke</b> and black leaves. God’s bush stays <b>green</b> and <b>glows gold</b>! Then <b>5 differences</b>.',
+  'More fires, and shepherds’ <b>campfires</b> too. Look for the <b>golden glow</b>. Then <b>6 smaller differences</b>.',
+  'A wide hillside with lots of bushes, and less time. Then <b>7 tiny differences</b>.',
+  'The hardest of all! Be quick and careful: <b>8 tiny differences</b>.',
+];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1],
+    bushes: [6, 9, 12, 15, 18, 21][n - 1],
+    flowers: [0, 3, 3, 3, 4, 4][n - 1],
+    autumn: [0, 0, 2, 2, 3, 3][n - 1],
+    fires: [0, 0, 1, 2, 3, 4][n - 1],          // ordinary fires that burn bushes up
+    camps: [0, 0, 0, 1, 2, 2][n - 1],
+    bushR: [52, 46, 42, 38, 34, 32][n - 1],
+    glow: [1, 1, 0.85, 0.6, 0.45, 0.35][n - 1], // how bright God's bush shines
+    bushTime: [30, 25, 22, 20, 18, 16][n - 1],
+    diffs: [3, 4, 5, 6, 7, 8][n - 1],
+    diffTime: [75, 70, 70, 70, 70, 65][n - 1],
+    subtle: [0, 0, 1, 2, 3, 3][n - 1],          // which kinds of differences may be used
+    penalty: [0, 2, 3, 3, 4, 4][n - 1],         // seconds lost for a wrong tap
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('burningBushBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let world = null;          // { bushes, camps }
+let phase = 'bush';        // bush | call | diff | sandals | done
+let phaseT = 0;
+let timer = 0, timerMax = 1;
+let wrong = 0;
+let levelPts = 0, timeBonus = 0;
+let scene = null;          // spot-the-difference scene
+let particles = [];
+let marks = [];            // red crosses for wrong taps
+let message = { text: '', t: 0 };
+let bubbles = [];          // speech bubbles { key, x, y, t }
+let flashT = 0, shakeT = 0, endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastScore = null;
+let cursor = { i: 0, x: 0.5, y: 0.5, show: false };   // keyboard cursor
+let sandals = [{ off: 0 }, { off: 0 }];
+let godBush = null;
+const MOSES = { robe: '#8a5a3a', hair: '#7a6a58', beard: true, skin: '#d39a66', scarf: '#e8dcc0', i: 0, mood: 'watch', blink: 0, blinkT: 2, phase: 0, staff: true };
+
+// ============================================================
+//  The hillside of bushes
+// ============================================================
+function hillRegion() {
+  const top = Math.max(topSafe() + 70, 250);
+  return { x0: 44, x1: W - 44, y0: top, y1: 735 };
+}
+
+function buildWorld() {
+  const kinds = [];
+  kinds.push('god');
+  for (let i = 0; i < cfg.flowers; i++) kinds.push('flower');
+  for (let i = 0; i < cfg.autumn; i++) kinds.push('autumn');
+  while (kinds.length < cfg.bushes) kinds.push('plain');
+  world = { bushes: kinds.map((k, i) => ({ kind: k, i, u: 0, v: 0, x: 0, y: 0, r: cfg.bushR * rand(0.9, 1.1), burn: -1, phase: rand(0, TAU), shake: 0, seed: rand(0, 100) })), camps: [], fireT: 1.5 };
+  // spread the bushes over the hillside in unit coordinates so a resize keeps them apart
+  const placed = [];
+  for (const b of world.bushes) {
+    let best = null, bd = -1;
+    for (let k = 0; k < 60; k++) {
+      const u = rand(0, 1), v = rand(0, 1);
+      let d = 9;
+      for (const p of placed) d = Math.min(d, Math.hypot((p.u - u) * 1.3, p.v - v));
+      if (b.kind === 'god' && v < 0.15) continue;
+      if (d > bd) { bd = d; best = { u, v }; }
+    }
+    b.u = best.u; b.v = best.v;
+    placed.push(b);
+  }
+  for (let i = 0; i < cfg.camps; i++) {
+    let best = null, bd = -1;
+    for (let k = 0; k < 40; k++) {
+      const u = rand(0, 1), v = rand(0.1, 1);
+      let d = 9;
+      for (const p of placed) d = Math.min(d, Math.hypot((p.u - u) * 1.3, p.v - v));
+      if (d > bd) { bd = d; best = { u, v }; }
+    }
+    const c = { kind: 'camp', u: best.u, v: best.v, x: 0, y: 0, r: 34, phase: rand(0, TAU), shake: 0 };
+    world.camps.push(c); placed.push(c);
+  }
+  godBush = world.bushes[0];
+  // the ordinary fires start staggered so the hillside is never the same twice
+  const plain = shuffle(world.bushes.filter((b) => b.kind === 'plain'));
+  for (let i = 0; i < cfg.fires && i < plain.length; i++) plain[i].burn = 0.15 + i * 0.22;
+  layoutBushes();
+}
+
+function layoutBushes() {
+  const R = hillRegion();
+  for (const b of [...world.bushes, ...world.camps]) {
+    b.x = lerp(R.x0 + b.r * 0.6, R.x1 - b.r * 0.6, b.u);
+    b.y = lerp(R.y0, R.y1, b.v);
+  }
+}
+
+function updateFires(dt) {
+  if (!cfg.fires) return;
+  let burning = 0;
+  for (const b of world.bushes) {
+    if (b.burn >= 0 && b.burn < 1) {
+      b.burn = Math.min(1, b.burn + dt / 9);
+      burning++;
+      if (Math.random() < dt * 9) spawn(b.x + rand(-b.r * 0.4, b.r * 0.4), b.y - b.r * 1.2, rand(-8, 14), rand(-50, -30), rand(1.4, 2.4), 'rgba(110,105,100,0.45)', rand(7, 13), -6, false, 'puff');
+    }
+  }
+  // when a fire burns out, a new bush catches a spark somewhere else
+  world.fireT -= dt;
+  if (burning < cfg.fires && world.fireT <= 0) {
+    const fresh = world.bushes.filter((b) => b.kind === 'plain' && b.burn < 0);
+    if (fresh.length) { pick(fresh).burn = 0; world.fireT = rand(1, 2.5); }
+  }
+}
+
+// ============================================================
+//  Drawing: people
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2); brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1); brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2); brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2); brows(-10, -6, -10, -6);
+      mouthLine(() => { ctx.moveTo(-5, mouthY); ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY); ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY); });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  ctx.strokeStyle = '#8a3a2a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY, opt = {}) {
+  const mood = opt.mood || d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s * (opt.flip ? -1 : 1), s);
+  const robe = opt.robe || d.robe;
+  const sleeve = shade(robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // shepherd's staff
+  const staff = opt.staff !== undefined ? opt.staff : d.staff;
+  if (staff) {
+    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(22, 2); ctx.lineTo(22, -78); ctx.arc(15, -78, 7, 0, Math.PI, true); ctx.stroke();
+  }
+  if (mood === 'joy') { const w = Math.sin(t * 9 + d.phase) * 4; arm(-11, -32, -24 + w, -66); }
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  // stripes of a shepherd's cloak
+  ctx.strokeStyle = 'rgba(255,240,210,0.35)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-11, 0); ctx.moveTo(9, -36); ctx.lineTo(11, 0); ctx.stroke();
+  if (mood !== 'joy') arm(-11, -32, -15, -12);
+  arm(11, -32, staff ? 21 : 15, staff ? -40 : -12);
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 23, 0, hy + 25);
+    ctx.quadraticCurveTo(14, hy + 23, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx * (opt.flip ? -1 : 1), ly);
+  ctx.restore();
+}
+
+function drawSheep(x, y, s, flip = false, wool = '#f4f0e6', horns = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s * (flip ? -1 : 1), s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 24, 6, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#3a2e26'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const lx of [-13, -6, 7, 13]) { ctx.beginPath(); ctx.moveTo(lx, -8); ctx.lineTo(lx, 1); ctx.stroke(); }
+  ctx.fillStyle = wool;
+  for (const [dx, dy, r] of [[-12, -16, 10], [0, -20, 12], [12, -16, 10], [-6, -10, 10], [7, -10, 10]]) { ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#3a2e26';
+  ctx.beginPath(); ctx.ellipse(23, -18, 8, 9, 0.3, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(18, -24, 5, 3, -0.6, 0, TAU); ctx.fill();
+  if (horns) {
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(20, -27, 5, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(25, -20, 2.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(25.6, -20, 1.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Drawing: bushes and fire
+// ============================================================
+function drawFlames(x, y, r, power, holy) {
+  if (power <= 0) return;
+  const n = 5;
+  for (let layer = 0; layer < 3; layer++) {
+    ctx.fillStyle = holy ? ['#ff8a1f', '#ffc93b', '#fff6c8'][layer] : ['#e0561c', '#f29a2e', '#ffd77a'][layer];
+    const lw = 1 - layer * 0.3;
+    for (let k = 0; k < n; k++) {
+      const fx = x + (k - (n - 1) / 2) * r * 0.36 * lw;
+      const fh = r * (0.95 + 0.35 * Math.sin(t * 9 + k * 1.7 + x)) * power * lw * (k === 2 ? 1.35 : 1);
+      const fw = r * 0.26 * lw;
+      const sway = Math.sin(t * 6 + k + y) * fw * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(fx - fw, y);
+      ctx.quadraticCurveTo(fx - fw, y - fh * 0.5, fx + sway, y - fh);
+      ctx.quadraticCurveTo(fx + fw, y - fh * 0.5, fx + fw, y);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+// kind: plain | flower | autumn | god; burn: -1 (never) .. 1 (burnt up)
+function drawBush(x, y, r, kind, burn = -1, glow = 1, seed = 0) {
+  const burnt = burn >= 0 ? burn : 0;
+  // God's bush glows with a warm golden light
+  if (kind === 'god') {
+    const gr = r * (2.1 + 0.15 * Math.sin(t * 3));
+    const g = ctx.createRadialGradient(x, y - r * 0.7, r * 0.2, x, y - r * 0.7, gr);
+    g.addColorStop(0, `rgba(255,236,150,${0.75 * glow})`); g.addColorStop(1, 'rgba(255,220,120,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - r * 0.7, gr, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(x, y + 2, r * 1.05, r * 0.28, 0, 0, TAU); ctx.fill();
+  // branches
+  ctx.strokeStyle = '#5a3e25'; ctx.lineWidth = Math.max(2, r * 0.09); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const a of [-0.6, 0, 0.6]) { ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a) * r * 0.7, y - r * 0.9); }
+  ctx.stroke();
+  const shrink = 1 - burnt * 0.35;
+  if (burnt >= 1) {
+    // a burnt-up black stump
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = Math.max(2, r * 0.1);
+    ctx.beginPath();
+    for (const a of [-0.7, 0, 0.5]) { ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a) * r * 0.6, y - r * 0.7); }
+    ctx.stroke();
+    ctx.fillStyle = '#4a4440';
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.6, r * 0.16, 0, 0, TAU); ctx.fill();
+    return;
+  }
+  let base = kind === 'autumn' ? '#c4622a' : '#4f8a34';
+  let light = kind === 'autumn' ? '#e0893a' : '#6fae45';
+  if (burnt > 0) { base = mixHex(base, '#2a2622', clamp(burnt * 1.3, 0, 1)); light = mixHex(light, '#4a423c', clamp(burnt * 1.3, 0, 1)); }
+  const blobs = [[-0.55, -0.45, 0.5], [0.55, -0.45, 0.5], [0, -0.75, 0.6], [-0.3, -1.05, 0.42], [0.3, -1.05, 0.42], [0, -0.35, 0.5]];
+  ctx.fillStyle = base;
+  for (const [dx, dy, rr] of blobs) { ctx.beginPath(); ctx.arc(x + dx * r * shrink, y + dy * r * shrink, rr * r * shrink, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = light;
+  for (const [dx, dy, rr] of blobs) { ctx.beginPath(); ctx.arc(x + dx * r * shrink - rr * r * 0.18, y + dy * r * shrink - rr * r * 0.2, rr * r * 0.55 * shrink, 0, TAU); ctx.fill(); }
+  if (kind === 'flower') {
+    ctx.fillStyle = '#e0402a';
+    for (let k = 0; k < 9; k++) {
+      const a = hash(seed, k) * TAU, d = hash(k, seed) * 0.8;
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * d * 0.8, y - r * 0.7 + Math.sin(a) * r * d * 0.55, r * 0.1, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#ffd34a';
+    for (let k = 0; k < 9; k++) {
+      const a = hash(seed, k) * TAU, d = hash(k, seed) * 0.8;
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * d * 0.8, y - r * 0.7 + Math.sin(a) * r * d * 0.55, r * 0.035, 0, TAU); ctx.fill();
+    }
+  }
+  if (kind === 'god') {
+    drawFlames(x, y - r * 0.55, r * 0.95, 1, true);
+    // golden sparkles rising
+    ctx.fillStyle = '#fff6c8';
+    for (let k = 0; k < 4; k++) {
+      const f = (t * 0.6 + k / 4) % 1;
+      ctx.globalAlpha = Math.sin(f * Math.PI) * glow;
+      ctx.beginPath(); ctx.arc(x + Math.sin(k * 2.3 + t) * r * 0.8, y - r * (1.2 + f * 1.4), 2.4, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (burn >= 0) {
+    drawFlames(x, y - r * 0.5 * shrink, r * 0.85 * shrink, 1 - burnt * 0.6, false);
+  }
+}
+
+function drawCamp(c) {
+  const x = c.x, y = c.y;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(x, y + 2, 34, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#9a8a78';
+  for (let k = 0; k < 7; k++) { const a = k / 7 * TAU; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 26, y + Math.sin(a) * 7, 8, 5, 0, 0, TAU); ctx.fill(); }
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 16, y); ctx.lineTo(x + 12, y - 12); ctx.moveTo(x + 16, y); ctx.lineTo(x - 12, y - 12); ctx.stroke();
+  drawFlames(x, y - 4, 26, 1, false);
+  if (Math.random() < 0.08) spawn(x + rand(-6, 6), y - 40, rand(-6, 10), rand(-40, -25), rand(1.2, 2), 'rgba(120,115,110,0.4)', rand(6, 10), -6, false, 'puff');
+}
+
+// ============================================================
+//  Drawing: the mountainside
+// ============================================================
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, 420);
+  g.addColorStop(0, '#f8d8a0'); g.addColorStop(0.5, '#f6e2b8'); g.addColorStop(1, '#cfe3ea');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, viewH);
+  // sun
+  const sx = W * 0.82, sy = Math.max(60, topSafe() + 10);
+  const sg = ctx.createRadialGradient(sx, sy, 8, sx, sy, 110);
+  sg.addColorStop(0, 'rgba(255,250,215,1)'); sg.addColorStop(0.3, 'rgba(255,236,170,0.8)'); sg.addColorStop(1, 'rgba(255,230,160,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 110, 0, TAU); ctx.fill();
+  // drifting clouds
+  for (let k = 0; k < 4; k++) {
+    const cw = 90 + hash(k, 5) * 70;
+    const cx = ((hash(k, 4) * (viewW + 300) + t * (5 + k * 2)) % (viewW + 300)) - offX - 150;
+    const cy = lerp(-offY + 40, 170, hash(k, 6));
+    drawCloud(cx, cy, cw, cw * 0.3);
+  }
+}
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#eee6da') {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.42 + 0.38 * Math.sin(f * Math.PI)) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function drawMountainside() {
+  drawSky();
+  const R = hillRegion();
+  // Mount Horeb behind, with a rocky peak
+  ctx.fillStyle = '#b48a66';
+  ctx.beginPath(); ctx.moveTo(-offX, R.y0 + 40);
+  ctx.lineTo(W * 0.18, R.y0 - 70); ctx.lineTo(W * 0.35, R.y0 - 40); ctx.lineTo(W * 0.55, R.y0 - 150);
+  ctx.lineTo(W * 0.72, R.y0 - 60); ctx.lineTo(W * 0.88, R.y0 - 90); ctx.lineTo(W + offX, R.y0 + 10);
+  ctx.lineTo(W + offX, R.y0 + 100); ctx.lineTo(-offX, R.y0 + 100); ctx.fill();
+  ctx.fillStyle = '#c99c74';
+  ctx.beginPath(); ctx.moveTo(W * 0.55, R.y0 - 150); ctx.lineTo(W * 0.62, R.y0 - 90); ctx.lineTo(W * 0.58, R.y0 - 70); ctx.lineTo(W * 0.66, R.y0 - 30); ctx.lineTo(W * 0.5, R.y0 - 60); ctx.closePath(); ctx.fill();
+  // the hillside where the bushes grow
+  const g = ctx.createLinearGradient(0, R.y0 - 40, 0, H);
+  g.addColorStop(0, '#c7b07a'); g.addColorStop(0.5, '#b9a46a'); g.addColorStop(1, '#a8955c');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(-offX, R.y0 - 10);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, R.y0 - 30 + Math.sin(x / 130) * 14 + Math.sin(x / 47) * 5);
+  ctx.lineTo(W + offX, H + 10); ctx.lineTo(-offX, H + 10); ctx.fill();
+  // tufts of grass and pebbles
+  for (let k = 0; k < 50; k++) {
+    const px = hash(k, 1) * W, py = lerp(R.y0, H - 10, hash(k, 2));
+    if (k % 3) { ctx.fillStyle = 'rgba(110,90,50,0.25)'; ctx.beginPath(); ctx.ellipse(px, py, 5 + hash(k, 3) * 8, 3, 0, 0, TAU); ctx.fill(); }
+    else { ctx.strokeStyle = '#8a9a4a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - 4, py); ctx.lineTo(px - 6, py - 8); ctx.moveTo(px, py); ctx.lineTo(px, py - 10); ctx.moveTo(px + 4, py); ctx.lineTo(px + 6, py - 8); ctx.stroke(); }
+  }
+}
+
+function drawFlock() {
+  // Moses and his sheep at the foot of the hill
+  const mx = Math.min(W * 0.2, 150), my = 862;
+  const sheep = [[mx + 70, 870, false, '#f4f0e6'], [mx + 120, 852, true, '#efe7d6'], [mx + 175, 874, false, '#f4f0e6'], [mx - 70, 872, true, '#3a3a3a']];
+  for (const [sx, sy, f, c] of sheep) if (sx < W - 20) drawSheep(sx + Math.sin(t * 1.3 + sx) * 3, sy, 1.1, f, c, c === '#3a3a3a');
+  const look = phase === 'bush' ? (cursor.show ? world.bushes[cursor.i] : godBush) : godBush;
+  drawPerson(MOSES, mx, my, 1.45, look.x, look.y, { mood: MOSES.mood });
+}
+
+function drawBushScene() {
+  drawMountainside();
+  const items = [...world.bushes, ...world.camps].sort((a, b) => a.y - b.y);
+  for (const b of items) {
+    const sh = b.shake > 0 ? Math.sin(b.shake * 50) * b.shake * 10 : 0;
+    if (b.kind === 'camp') drawCamp(b);
+    else drawBush(b.x + sh, b.y, b.r, b.kind, b.burn, cfg.glow, b.seed);
+  }
+  drawParticles(false);
+  if (phase === 'call' || phase === 'bush' && state === 'win') {
+    const f = clamp(phaseT / 1.2, 0, 1);
+    const g = ctx.createRadialGradient(godBush.x, godBush.y - 40, 10, godBush.x, godBush.y - 40, 260 * f + 40);
+    g.addColorStop(0, `rgba(255,245,200,${0.55 * f})`); g.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = g; ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  drawFlock();
+  if (cursor.show && phase === 'bush') {
+    const b = world.bushes[cursor.i];
+    ctx.strokeStyle = `rgba(255,255,255,${0.6 + 0.4 * Math.sin(t * 6)})`; ctx.lineWidth = 4;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.arc(b.x, b.y - b.r * 0.6, b.r * 1.25, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// ============================================================
+//  Spot the difference
+// ============================================================
+// Every thing in the picture lives in unit coordinates (u, v) of a panel.
+const OBJ = {
+  cloud:     { r: 50, size: 'big', sky: true, cols: ['#ffffff'], types: ['missing', 'size', 'move'] },
+  bird:      { r: 14, size: 'small', sky: true, cols: ['#4a3a30', '#2a5a9a'], types: ['missing', 'flip', 'color'] },
+  tree:      { r: 46, size: 'big', cols: ['#5f8a3a', '#3f7a4a'], types: ['missing', 'flip', 'size'] },
+  rock:      { r: 26, size: 'med', cols: ['#9a8a78', '#7a6a5a'], types: ['missing', 'size', 'color'] },
+  sheep:     { r: 28, size: 'med', cols: ['#f4f0e6', '#3a3a3a', '#d8c4a0'], types: ['missing', 'color', 'flip'] },
+  flower:    { r: 10, size: 'small', cols: ['#e0402a', '#f2c14e', '#b06ad0', '#ffffff'], types: ['color', 'missing'] },
+  butterfly: { r: 12, size: 'small', cols: ['#f28fb1', '#5ab0e0', '#f2c14e'], types: ['color', 'missing', 'flip'] },
+  lizard:    { r: 14, size: 'small', cols: ['#7aa04a', '#c48a3a'], types: ['missing', 'color', 'flip'] },
+  jar:       { r: 14, size: 'small', cols: ['#b8683a', '#4a7ab0'], types: ['missing', 'color'] },
+  tent:      { r: 44, size: 'big', cols: ['#3a2a22', '#7a4a2a'], types: ['missing', 'color', 'flip'] },
+};
+
+function makeScene() {
+  const objs = [];
+  const add = (kind, u, v, extra = {}) => {
+    const o = { id: objs.length, kind, u, v, s: 1, col: OBJ[kind] ? OBJ[kind].cols[0] : '#888888', flip: Math.random() < 0.5, ...extra };
+    objs.push(o); return o;
+  };
+  const free = (u, v, r) => objs.every((o) => Math.hypot((o.u - u) * 1.4, o.v - v) > r + 0.02 + (OBJ[o.kind] ? OBJ[o.kind].r / 520 : 0.08));
+  const place = (kind, v0, v1, r) => {
+    for (let k = 0; k < 80; k++) {
+      const u = rand(0.06, 0.94), v = rand(v0, v1);
+      if (free(u, v, r)) return add(kind, u, v, { col: pick(OBJ[kind].cols) });
+    }
+    return null;
+  };
+  // fixed: the burning bush and Moses with his staff
+  add('bush', 0.62, 0.62, { flip: false, col: '#4f8a34' });
+  add('moses', 0.3, 0.86, { flip: false, col: '#8a5a3a', staff: true });
+  place('cloud', 0.08, 0.2, 0.14); place('cloud', 0.08, 0.22, 0.14);
+  place('tree', 0.5, 0.62, 0.14);
+  place('tent', 0.44, 0.5, 0.14);
+  for (let i = 0; i < 2; i++) place('bird', 0.08, 0.3, 0.05);
+  for (let i = 0; i < 3; i++) place('sheep', 0.66, 0.95, 0.07);
+  for (let i = 0; i < 3; i++) place('rock', 0.56, 0.95, 0.06);
+  for (let i = 0; i < 5; i++) place('flower', 0.6, 0.97, 0.035);
+  place('butterfly', 0.4, 0.7, 0.04);
+  place('lizard', 0.6, 0.95, 0.04);
+  place('jar', 0.7, 0.97, 0.04);
+  for (const o of objs) o.b = null;   // panel B variant, filled in by the differences
+
+  // choose the differences, from big and bold (level 1) to tiny and sneaky (level 5+)
+  const allowSize = cfg.subtle === 0 ? ['big', 'med'] : cfg.subtle === 1 ? ['big', 'med', 'small'] : ['med', 'small', 'small', 'big'];
+  const allowTypes = cfg.subtle === 0 ? ['missing', 'color'] : cfg.subtle === 1 ? ['missing', 'color', 'flip'] : ['missing', 'color', 'flip', 'size', 'move'];
+  const diffs = [];
+  const cands = shuffle(objs.filter((o) => OBJ[o.kind]));
+  // a little preference for the size classes this level wants
+  cands.sort((a, b) => (allowSize.includes(OBJ[b.kind].size) ? 1 : 0) - (allowSize.includes(OBJ[a.kind].size) ? 1 : 0));
+  // Moses's staff can go missing too
+  if (cfg.subtle >= 1 && Math.random() < 0.6) diffs.push({ o: objs[1], type: 'staff' });
+  for (const o of cands) {
+    if (diffs.length >= cfg.diffs) break;
+    if (!allowSize.includes(OBJ[o.kind].size)) continue;
+    const types = OBJ[o.kind].types.filter((ty) => allowTypes.includes(ty) && (ty !== 'color' || OBJ[o.kind].cols.length > 1));
+    if (!types.length) continue;
+    // don't put two differences right on top of each other
+    if (diffs.some((d) => Math.hypot((d.o.u - o.u) * 1.4, d.o.v - o.v) < 0.1)) continue;
+    diffs.push({ o, type: pick(types) });
+  }
+  // if the scene ran short, fill with anything
+  for (const o of cands) {
+    if (diffs.length >= cfg.diffs) break;
+    if (diffs.some((d) => d.o === o)) continue;
+    if (diffs.some((d) => Math.hypot((d.o.u - o.u) * 1.4, d.o.v - o.v) < 0.08)) continue;
+    diffs.push({ o, type: 'missing' });
+  }
+  for (const d of diffs) {
+    const o = d.o, b = { ...o };
+    if (d.type === 'missing') b.hidden = true;
+    if (d.type === 'color') b.col = pick(OBJ[o.kind].cols.filter((c) => c !== o.col));
+    if (d.type === 'flip') b.flip = !o.flip;
+    if (d.type === 'size') b.s = o.s * (cfg.subtle >= 3 ? pick([0.72, 1.3]) : pick([0.6, 1.45]));
+    if (d.type === 'move') { b.u = clamp(o.u + pick([-1, 1]) * 0.07, 0.05, 0.95); }
+    if (d.type === 'staff') b.staff = false;
+    b.b = null;
+    // half the time the odd one out is in the top picture instead
+    if (Math.random() < 0.5 && d.type !== 'staff') {
+      const orig = { ...o, b: null };
+      Object.assign(o, b);
+      o.b = orig;
+    } else o.b = b;
+    d.found = false; d.foundT = 0;
+  }
+  scene = { objs, diffs, found: 0, hintT: 0 };
+}
+
+function panels() {
+  const top = topSafe() + 6, bot = H - 54;
+  if (W >= 820) {
+    const gap = 22;
+    const pw = (W - gap * 3) / 2;
+    const ph = Math.min(bot - top, pw * 0.86);
+    const y = top + (bot - top - ph) / 2;
+    return [{ x: gap, y, w: pw, h: ph }, { x: gap * 2 + pw, y, w: pw, h: ph }];
+  }
+  const gap = 14;
+  const pw = W - 24;
+  const ph = Math.min((bot - top - gap) / 2, pw * 0.95);
+  const y = top + (bot - top - ph * 2 - gap) / 2;
+  return [{ x: 12, y, w: pw, h: ph }, { x: 12, y: y + ph + gap, w: pw, h: ph }];
+}
+
+function panelK(P) { return Math.min(P.w / 560, P.h / 400) * 1.1; }
+
+function drawSceneObj(o, P, k) {
+  if (o.hidden) return;
+  const x = P.x + o.u * P.w, y = P.y + o.v * P.h, s = k * o.s;
+  switch (o.kind) {
+    case 'bush': drawBush(x, y, 40 * k, 'god', -1, 1, 3); break;
+    case 'moses': drawPerson(MOSES, x, y, 1.15 * k, P.x + 0.62 * P.w, P.y + 0.5 * P.h, { robe: o.col, staff: o.staff, mood: 'wow' }); break;
+    case 'cloud': drawCloud(x, y, 100 * s, 30 * s); break;
+    case 'bird': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s * (o.flip ? -1 : 1), s);
+      ctx.strokeStyle = o.col; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      const w = Math.sin(t * 6 + o.id) * 4;
+      ctx.beginPath(); ctx.moveTo(-14, -4 + w); ctx.quadraticCurveTo(-7, -9, 0, 0); ctx.quadraticCurveTo(7, -9, 14, -4 + w); ctx.stroke();
+      ctx.fillStyle = '#f2a93b'; ctx.beginPath(); ctx.moveTo(1, -1); ctx.lineTo(6, 1); ctx.lineTo(1, 2); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'tree': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s * (o.flip ? -1 : 1), s);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0, 2, 40, 9, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-4, -40); ctx.lineTo(-22, -62); ctx.moveTo(-4, -40); ctx.lineTo(14, -66); ctx.stroke();
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.ellipse(-4, -74, 50, 15, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = shade(o.col, 25);
+      ctx.beginPath(); ctx.ellipse(-12, -79, 32, 8, 0, 0, TAU); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'rock': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.moveTo(-26, 0); ctx.quadraticCurveTo(-24, -24, -4, -28); ctx.quadraticCurveTo(22, -26, 26, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.ellipse(-6, -20, 10, 4, -0.3, 0, TAU); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'sheep': drawSheep(x, y, 0.95 * s, o.flip, o.col, o.col === '#3a3a3a'); break;
+    case 'flower': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+      ctx.strokeStyle = '#4f8a34'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -14); ctx.stroke();
+      ctx.fillStyle = o.col;
+      for (let p = 0; p < 5; p++) { const a = p / 5 * TAU; ctx.beginPath(); ctx.arc(Math.cos(a) * 5, -16 + Math.sin(a) * 5, 4.2, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#f2a93b'; ctx.beginPath(); ctx.arc(0, -16, 3, 0, TAU); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'butterfly': {
+      ctx.save(); ctx.translate(x, y + Math.sin(t * 2 + o.id) * 4); ctx.scale(s * (o.flip ? -1 : 1), s);
+      const f = 0.6 + 0.4 * Math.abs(Math.sin(t * 8 + o.id));
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.ellipse(-6 * f, -4, 7 * f, 6, -0.4, 0, TAU); ctx.ellipse(6 * f, -4, 7 * f, 6, 0.4, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-5 * f, 4, 5 * f, 4, 0.3, 0, TAU); ctx.ellipse(5 * f, 4, 5 * f, 4, -0.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3a2a1a'; roundRect(-1.5, -7, 3, 14, 1.5); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'lizard': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s * (o.flip ? -1 : 1), s);
+      ctx.strokeStyle = o.col; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.quadraticCurveTo(-18, -2, -22, 4); ctx.stroke();
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.ellipse(0, -2, 9, 4, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(10, -3, 5, 3.4, 0, 0, TAU); ctx.fill();
+      ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-7, 4); ctx.moveTo(4, 0); ctx.lineTo(7, 4); ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(12, -4, 1.2, 0, TAU); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'jar': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.moveTo(-5, 0); ctx.quadraticCurveTo(-15, -10, -9, -20); ctx.lineTo(9, -20); ctx.quadraticCurveTo(15, -10, 5, 0); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-5, -26, 10, 7);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-9, -14, 18, 3);
+      ctx.restore(); break;
+    }
+    case 'tent': {
+      ctx.save(); ctx.translate(x, y); ctx.scale(s * (o.flip ? -1 : 1), s);
+      ctx.fillStyle = o.col;
+      ctx.beginPath(); ctx.moveTo(-44, 0); ctx.lineTo(-30, -34); ctx.lineTo(30, -38); ctx.lineTo(46, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8dcc0'; ctx.fillRect(-36, -14, 76, 5);
+      ctx.fillStyle = '#1e140e'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -22); ctx.lineTo(8, 0); ctx.fill();
+      ctx.restore(); break;
+    }
+  }
+}
+
+function drawPanel(P, which) {
+  const k = panelK(P);
+  ctx.save();
+  roundRect(P.x, P.y, P.w, P.h, 16);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.clip();
+  const g = ctx.createLinearGradient(0, P.y, 0, P.y + P.h);
+  g.addColorStop(0, '#f8dca8'); g.addColorStop(0.42, '#d8e8e8'); g.addColorStop(0.43, '#c7b07a'); g.addColorStop(1, '#a8955c');
+  ctx.fillStyle = g; ctx.fillRect(P.x, P.y, P.w, P.h);
+  // the mountain
+  ctx.fillStyle = '#b48a66';
+  ctx.beginPath(); ctx.moveTo(P.x, P.y + P.h * 0.46);
+  ctx.lineTo(P.x + P.w * 0.25, P.y + P.h * 0.3); ctx.lineTo(P.x + P.w * 0.5, P.y + P.h * 0.12);
+  ctx.lineTo(P.x + P.w * 0.75, P.y + P.h * 0.28); ctx.lineTo(P.x + P.w, P.y + P.h * 0.4); ctx.lineTo(P.x + P.w, P.y + P.h * 0.46); ctx.fill();
+  ctx.fillStyle = '#c7b07a';
+  ctx.beginPath(); ctx.moveTo(P.x, P.y + P.h * 0.48);
+  ctx.quadraticCurveTo(P.x + P.w * 0.5, P.y + P.h * 0.38, P.x + P.w, P.y + P.h * 0.47);
+  ctx.lineTo(P.x + P.w, P.y + P.h); ctx.lineTo(P.x, P.y + P.h); ctx.fill();
+  const objs = scene.objs.map((o) => (which === 1 && o.b ? o.b : o));
+  const order = objs.slice().sort((a, b) => (OBJ[a.kind] && OBJ[a.kind].sky ? 0 : a.v) - (OBJ[b.kind] && OBJ[b.kind].sky ? 0 : b.v));
+  for (const o of order) drawSceneObj(o, P, k);
+  ctx.restore();
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 4;
+  roundRect(P.x, P.y, P.w, P.h, 16); ctx.stroke();
+  // circles around the differences already found
+  for (const d of scene.diffs) {
+    if (!d.found) continue;
+    const o = which === 1 && d.o.b ? d.o.b : d.o;
+    const r = diffR(d, P);
+    const x = P.x + (d.type === 'move' ? (d.o.u + d.o.b.u) / 2 : o.u) * P.w, y = P.y + diffY(d) * P.h;
+    ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 4.5;
+    ctx.shadowColor = 'rgba(120,70,0,0.6)'; ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.arc(x, y, r * Math.min(1, d.foundT * 4), 0, TAU); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  // a gentle hint sparkle
+  if (scene.hint && which === 1) {
+    const d = scene.hint;
+    const x = P.x + d.o.u * P.w, y = P.y + diffY(d) * P.h;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(t * 8)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, diffR(d, P) * 1.5, 0, TAU); ctx.stroke();
+  }
+  // keyboard crosshair
+  if (cursor.show && phase === 'diff') {
+    const x = P.x + cursor.x * P.w, y = P.y + cursor.y * P.h;
+    ctx.strokeStyle = 'rgba(90,40,20,0.85)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 14, 0, TAU); ctx.moveTo(x - 22, y); ctx.lineTo(x - 8, y); ctx.moveTo(x + 8, y); ctx.lineTo(x + 22, y);
+    ctx.moveTo(x, y - 22); ctx.lineTo(x, y - 8); ctx.moveTo(x, y + 8); ctx.lineTo(x, y + 22); ctx.stroke();
+  }
+}
+
+// the centre and size of a difference (objects are drawn standing on their (u, v) point)
+function diffY(d) {
+  const o = d.o;
+  const lift = { tree: 0.12, tent: 0.04, sheep: 0.04, rock: 0.03, flower: 0.035, jar: 0.03, moses: 0.12 }[o.kind] || 0;
+  return o.v - (d.type === 'staff' ? 0.1 : lift);
+}
+function diffR(d, P) {
+  const k = panelK(P);
+  if (d.type === 'staff') return 46 * k;
+  if (d.type === 'move') return (OBJ[d.o.kind].r + 34) * k;
+  const s = Math.max(d.o.s, d.o.b ? d.o.b.s : 1);
+  return Math.max(24, (OBJ[d.o.kind].r * s + 10) * k);
+}
+
+function drawDiffScene() {
+  drawSky();
+  ctx.fillStyle = '#a8955c'; ctx.fillRect(-offX, 500, viewW, H - 500 + 20);
+  const Ps = panels();
+  drawPanel(Ps[0], 0);
+  drawPanel(Ps[1], 1);
+  drawParticles(false);
+  for (const m of marks) {
+    ctx.globalAlpha = clamp(m.t / 0.3, 0, 1);
+    ctx.strokeStyle = '#d23a2a'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(m.x - 12, m.y - 12); ctx.lineTo(m.x + 12, m.y + 12); ctx.moveTo(m.x + 12, m.y - 12); ctx.lineTo(m.x - 12, m.y + 12); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function tapDiff(x, y) {
+  const Ps = panels();
+  const pi = Ps.findIndex((P) => x >= P.x && x <= P.x + P.w && y >= P.y && y <= P.y + P.h);
+  if (pi < 0) return;
+  const P = Ps[pi];
+  let bestD = null, bd = 1e9;
+  for (const d of scene.diffs) {
+    if (d.found) continue;
+    const pts = [[d.o.u, diffY(d)]];
+    if (d.type === 'move') pts.push([d.o.b.u, diffY(d)]);
+    for (const [u, v] of pts) {
+      const dist = Math.hypot(P.x + u * P.w - x, P.y + v * P.h - y);
+      if (dist < diffR(d, P) + 12 && dist < bd) { bd = dist; bestD = d; }
+    }
+  }
+  if (bestD) {
+    bestD.found = true; bestD.foundT = 0;
+    scene.found++; scene.hint = null; scene.hintT = 0;
+    levelPts += 100;
+    for (const Q of Ps) sparkleBurst(Q.x + bestD.o.u * Q.w, Q.y + diffY(bestD) * Q.h, 14, false);
+    sfx.tap(0.2 + 0.8 * scene.found / scene.diffs.length);
+    sfx.ding();
+    const left = scene.diffs.length - scene.found;
+    showMessage(left ? `Found one! ${left} more` : 'You found them all!', 1.4);
+    if (!left) { phase = 'sandals'; phaseT = 0; timeBonus += Math.round(timer) * 10; levelPts += Math.round(timer) * 10; sandalsStart(); }
+  } else {
+    wrongTap(x, y);
+  }
+}
+
+function wrongTap(x, y) {
+  wrong++;
+  marks.push({ x, y, t: 0.7 });
+  sfx.bonk();
+  if (cfg.penalty) { timer = Math.max(0, timer - cfg.penalty); showMessage(`Not there… −${cfg.penalty}s`, 1.1); }
+  else showMessage('Not there… look again', 1.1);
+}
+
+// ============================================================
+//  Take off your sandals
+// ============================================================
+function sandalsStart() {
+  sandals = [{ off: 0 }, { off: 0 }];
+  bubbles = [{ key: 'sandals', who: 'god', t: 99 }];
+  sfx.holy();
+  if (!told.sandals) { told.sandals = true; }
+}
+
+function sandalLayout() {
+  const cx = W / 2, y = Math.min(H - 150, 720);
+  const s = clamp(W / 520, 1, 1.5);
+  return { cx, y, s, feet: [{ x: cx - 70 * s, y }, { x: cx + 70 * s, y }] };
+}
+
+function drawSandalScene() {
+  drawSky();
+  // holy ground glowing
+  const L = sandalLayout();
+  const g = ctx.createLinearGradient(0, 420, 0, H);
+  g.addColorStop(0, '#d4bc84'); g.addColorStop(1, '#b8a06a');
+  ctx.fillStyle = g; ctx.fillRect(-offX, 420, viewW, H - 420 + 20);
+  const gl = ctx.createRadialGradient(L.cx, L.y, 20, L.cx, L.y, 360);
+  gl.addColorStop(0, 'rgba(255,240,180,0.7)'); gl.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = gl; ctx.fillRect(-offX, 300, viewW, H);
+  // the bush, big, behind
+  drawBush(L.cx, Math.max(topSafe() + 230, 400), 90, 'god', -1, 1, 3);
+  // Moses's robe hem and feet, close up
+  ctx.save();
+  ctx.translate(L.cx, L.y); ctx.scale(L.s, L.s);
+  ctx.fillStyle = MOSES.robe;
+  ctx.beginPath(); ctx.moveTo(-150, -150); ctx.lineTo(150, -150); ctx.quadraticCurveTo(140, -60, 130, -40); ctx.quadraticCurveTo(0, -22, -130, -40); ctx.quadraticCurveTo(-140, -60, -150, -150); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,240,210,0.35)'; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(-60, -150); ctx.lineTo(-66, -36); ctx.moveTo(60, -150); ctx.lineTo(66, -36); ctx.stroke();
+  ctx.restore();
+  L.feet.forEach((f, i) => {
+    ctx.save();
+    ctx.translate(f.x, f.y); ctx.scale(L.s * (i ? -1 : 1), L.s);
+    // foot
+    ctx.fillStyle = MOSES.skin;
+    ctx.beginPath(); ctx.ellipse(0, 0, 30, 52, 0, 0, TAU); ctx.fill();
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-16 + k * 8, 46 - Math.abs(k - 1) * 3, 6 - k * 0.5, 0, TAU); ctx.fill(); }
+    ctx.restore();
+    const sd = sandals[i];
+    if (sd.off < 1) {
+      // sandal flies off to the side when tapped
+      const f2 = ease(sd.off);
+      ctx.save();
+      ctx.translate(f.x + (i ? 1 : -1) * f2 * 190 * L.s, f.y - Math.sin(f2 * Math.PI) * 140 + f2 * 50);
+      ctx.rotate((i ? 1 : -1) * f2 * 2.5);
+      ctx.scale(L.s, L.s);
+      ctx.fillStyle = '#8a5a2a';
+      ctx.beginPath(); ctx.ellipse(0, 4, 36, 60, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(-30, -10); ctx.lineTo(30, -10); ctx.moveTo(-30, 22); ctx.lineTo(30, 22); ctx.moveTo(0, 40); ctx.lineTo(0, -10); ctx.stroke();
+      ctx.restore();
+      if (sd.off === 0) {
+        const p = 0.5 + 0.5 * Math.sin(t * 5 + i);
+        ctx.strokeStyle = `rgba(255,255,255,${0.5 + p * 0.5})`; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(f.x, f.y, 74 * L.s + p * 6, 0, TAU); ctx.stroke();
+      }
+    } else {
+      ctx.save(); ctx.translate(f.x + (i ? 1 : -1) * 190 * L.s, f.y + 50); ctx.rotate((i ? 1 : -1) * 2.5); ctx.scale(L.s * 0.9, L.s * 0.9);
+      ctx.fillStyle = '#8a5a2a'; ctx.beginPath(); ctx.ellipse(0, 4, 36, 60, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+  });
+  drawParticles(false);
+  if (phaseT > 0.5 && sandals.some((s) => s.off === 0)) {
+    ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    const msg = isTouch() ? 'Tap each sandal' : 'Click each sandal (or press ← →)';
+    ctx.strokeText(msg, L.cx, H - 50); ctx.fillStyle = '#7a3a10'; ctx.fillText(msg, L.cx, H - 50);
+  }
+}
+
+function tapSandals(x, y) {
+  const L = sandalLayout();
+  L.feet.forEach((f, i) => {
+    if (sandals[i].off === 0 && Math.hypot(x - f.x, (y - f.y) * 0.7) < 85 * L.s) takeOff(i);
+  });
+}
+function takeOff(i) {
+  if (sandals[i].off > 0) return;
+  sandals[i].off = 0.001;
+  const L = sandalLayout();
+  sparkleBurst(L.feet[i].x, L.feet[i].y, 16, false);
+  sfx.tap(0.5 + i * 0.4);
+  levelPts += 50;
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, scr = false, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, scr, kind });
+}
+function sparkleBurst(x, y, n, scr = false, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffb33b']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.4), cols[i % cols.length], rand(2, 4.5), 40, scr, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'puff') { p.vx *= Math.pow(0.4, dt); p.vy *= Math.pow(0.6, dt); p.size += dt * 9; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles(scr) {
+  for (const p of particles) {
+    if (p.scr !== scr) continue;
+    const a = p.life / p.max;
+    ctx.globalAlpha = p.kind === 'puff' ? a * 0.8 : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Playing
+// ============================================================
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+function tapBush(x, y) {
+  let hit = null, hd = 1e9;
+  for (const b of [...world.bushes, ...world.camps]) {
+    const d = Math.hypot(x - b.x, (y - (b.y - b.r * 0.6)) * 0.9);
+    if (d < b.r * 1.15 + 10 && d < hd) { hd = d; hit = b; }
+  }
+  if (!hit) return;
+  pickBush(hit);
+}
+
+function pickBush(b) {
+  if (b === godBush) {
+    phase = 'call'; phaseT = 0;
+    const pts = 100 + Math.round(timer) * 20;
+    levelPts += pts; timeBonus += Math.round(timer) * 20;
+    sparkleBurst(b.x, b.y - b.r, 40, false);
+    flashT = 0.3;
+    sfx.holy();
+    MOSES.mood = 'wow';
+    bubbles = [{ key: 'callMoses', who: 'god', t: 2.2 }];
+    showMessage('The bush is not burnt up!', 2);
+    return;
+  }
+  b.shake = 0.4;
+  wrong++;
+  marks.push({ x: b.x, y: b.y - b.r * 0.6, t: 0.7 });
+  sfx.bonk();
+  const why = b.kind === 'camp' ? 'Just a shepherds’ campfire!'
+    : b.burn >= 1 ? 'That bush has burnt up!'
+    : b.burn >= 0 ? 'That bush is burning up! See the smoke?'
+    : b.kind === 'flower' ? 'Only red flowers!'
+    : b.kind === 'autumn' ? 'Just orange leaves!' : 'Just a bush.';
+  if (cfg.penalty) timer = Math.max(0, timer - cfg.penalty);
+  showMessage(cfg.penalty ? `${why} −${cfg.penalty}s` : why, 1.6);
+  MOSES.mood = 'doubt';
+  setTimeout(() => { if (MOSES.mood === 'doubt') MOSES.mood = 'watch'; }, 900);
+}
+
+function updatePlay(dt) {
+  phaseT += dt;
+  for (const b of [...world.bushes, ...world.camps]) if (b.shake > 0) b.shake = Math.max(0, b.shake - dt);
+  for (const m of marks) m.t -= dt;
+  marks = marks.filter((m) => m.t > 0);
+  for (const bb of bubbles) bb.t -= dt;
+  bubbles = bubbles.filter((bb) => bb.t > 0);
+  if (phase === 'bush') {
+    updateFires(dt);
+    timer -= dt;
+    if (timer <= 5 && !told.hurry) { told.hurry = true; showMessage('Hurry! Find the bush!', 1.5); }
+    if (timer <= 0) { timer = 0; fail('The sheep wandered off before Moses found the bush.'); }
+  } else if (phase === 'call') {
+    updateFires(dt);
+    if (phaseT > 2.2 && !bubbles.some((b) => b.key === 'hereIAm')) { bubbles = [{ key: 'hereIAm', who: 'moses', t: 1.8 }]; MOSES.mood = 'joy'; }
+    if (phaseT > 4) {
+      phase = 'diff'; phaseT = 0;
+      makeScene();
+      timer = timerMax = cfg.diffTime;
+      told.hurry = false;
+      showMessage(`Spot ${cfg.diffs} differences!`, 2.2);
+      if (level === 1) setTimeout(() => { if (state === 'play' && phase === 'diff' && scene.found === 0) showMessage('Tap a difference in either picture', 2.6); }, 2400);
+    }
+  } else if (phase === 'diff') {
+    timer -= dt;
+    for (const d of scene.diffs) if (d.found) d.foundT += dt;
+    scene.hintT += dt;
+    // level 1 and 2: after a while a sparkle helps
+    if (level <= 2 && scene.hintT > 14 && !scene.hint) { scene.hint = scene.diffs.find((d) => !d.found); }
+    if (timer <= 8 && !told.hurry) { told.hurry = true; showMessage('Quick! Time is nearly up!', 1.5); }
+    if (timer <= 0) { timer = 0; fail('Time ran out before you spotted every difference.'); }
+  } else if (phase === 'sandals') {
+    for (const s of sandals) if (s.off > 0 && s.off < 1) s.off = Math.min(1, s.off + dt * 1.6);
+    if (sandals.every((s) => s.off >= 1)) { phase = 'done'; phaseT = 0; }
+  } else if (phase === 'done') {
+    if (phaseT > 0.6) winLevel();
+  }
+  updateMoses(dt);
+}
+
+function updateMoses(dt) {
+  MOSES.blinkT -= dt;
+  if (MOSES.blinkT <= 0) { MOSES.blink = 0.13; MOSES.blinkT = rand(1.5, 4); }
+  if (MOSES.blink > 0) MOSES.blink -= dt;
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const levelBonus = level * 200;
+  const care = Math.max(0, 300 - wrong * 50);
+  const score = levelPts + levelBonus + care;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('burningBushBest', best); } catch (e) {} }
+  lastScore = { pts: levelPts - timeBonus, timeBonus, care, levelBonus, score };
+  sfx.win();
+  sparkleBurst(W / 2, 500, 60, false);
+  endTimer = 2.2;
+}
+
+function fail(why) {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  failWhy = why;
+  showMessage('Out of time!', 2);
+  sfx.fail();
+  endTimer = 1.8;
+}
+let failWhy = '';
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = makeConfig(1);
+  buildWorld();
+  phase = 'bush';
+  showOverlay('The Burning Bush', 'Moses sees a great sight on the mountain',
+    `${verseHTML('bush')}
+     <ul>
+       <li>Moses is looking after his sheep. One bush is <b>on fire</b> but it does <b>not burn up</b>! <b>Tap that bush</b> before time runs out.</li>
+       <li>Careful! Some bushes have <b>red flowers</b>, and some fires <b>burn the bush up</b> with smoke. God’s bush stays <b>green</b> and <b>glows gold</b>.</li>
+       <li>Then look closely: <b>tap the differences</b> between the two pictures.</li>
+       <li>Last of all, <b>tap Moses’ sandals</b> to take them off. It is holy ground!</li>
+       <li>Wrong taps cost time on later levels.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd> move, <kbd>Space</kbd> picks.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'card';
+  syncAmbience();
+  cfg = makeConfig(level);
+  buildWorld();
+  phase = 'bush';
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     ${verseHTML(level % 2 ? 'notBurnt' : 'turnAside')}
+     <p class="score">Score so far: <b>${totalScore}</b></p>`,
+    'Go!', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; marks = []; bubbles = [];
+  wrong = 0; levelPts = 0; timeBonus = 0;
+  flashT = shakeT = 0; endTimer = 0; winT = 0; failT = 0;
+  told = {};
+  scene = null;
+  cursor = { i: 0, x: 0.5, y: 0.5, show: false };
+  MOSES.mood = 'watch';
+  buildWorld();
+  phase = 'bush'; phaseT = 0;
+  timer = timerMax = cfg.bushTime;
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.0);
+  setTimeout(() => { if (state === 'play' && phase === 'bush') showMessage(isTouch() ? 'Tap the bush that burns but is not burnt up!' : 'Click the bush that burns but is not burnt up!', 2.6); }, 2000);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'Holy Ground!' : 'Here I am!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'withYou' : level % 2 ? 'hereAmI' : 'sandals')}
+       <p style="text-align:center">${last ? 'God called Moses from the bush and promised to be with him. You found the bush every time!' : 'God called to Moses from the burning bush, and Moses listened.'}</p>
+       <p class="score">Found it all: <b>${s.pts}</b><br>Time left: <b>${s.timeBonus}</b><br>Careful taps (${wrong} wrong): <b>${s.care}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', () => { if (last) titleScreen(); else { level++; levelCard(); } });
+  } else if (state === 'fail') {
+    showOverlay('Out of time!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${failWhy} Look for the bush that stays <b>green</b> and <b>glows gold</b>, and look closely at both pictures.</p>
+       ${verseHTML('turnAside')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state !== 'play') return;
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+  if (phase === 'bush') {
+    if (dir) {
+      if (!cursor.show) { cursor.show = true; return; }
+      // jump to the nearest bush in that direction
+      const c = world.bushes[cursor.i];
+      let bi = cursor.i, bd = 1e9;
+      world.bushes.forEach((b, i) => {
+        const dx = b.x - c.x, dy = b.y - c.y;
+        const along = dx * dir[0] + dy * dir[1];
+        if (along <= 4) return;
+        const d = along + Math.abs(dx * dir[1] + dy * dir[0]) * 2;
+        if (d < bd) { bd = d; bi = i; }
+      });
+      cursor.i = bi;
+    } else if ((e.code === 'Space' || e.code === 'Enter') && cursor.show && !e.repeat) pickBush(world.bushes[cursor.i]);
+  } else if (phase === 'diff') {
+    if (dir) { cursor.show = true; cursor.x = clamp(cursor.x + dir[0] * 0.04, 0, 1); cursor.y = clamp(cursor.y + dir[1] * 0.04, 0, 1); }
+    else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) { const P = panels()[1]; tapDiff(P.x + cursor.x * P.w, P.y + cursor.y * P.h); }
+  } else if (phase === 'sandals') {
+    if (e.code === 'ArrowLeft') takeOff(0);
+    else if (e.code === 'ArrowRight') takeOff(1);
+    else if (e.code === 'Space' && !e.repeat) takeOff(sandals[0].off ? 1 : 0);
+  }
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  cursor.show = false;
+  const x = p.vx - offX, y = p.vy - offY;
+  if (phase === 'bush') tapBush(x, y);
+  else if (phase === 'diff') tapDiff(x, y);
+  else if (phase === 'sandals') tapSandals(x, y);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+    syncAmbience();
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+  bonk() { this.tone(200, 0.16, 'triangle', 0.25, 0, 120); },
+  ding() { this.tone(1568, 0.3, 'sine', 0.1, 0.05); },
+  holy() {
+    if (!this.ctx) return;
+    [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 1.2, 'sine', 0.07, i * 0.09));
+  },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD and speech bubbles
+// ============================================================
+function drawBubble(text, ax, ay, golden) {
+  ctx.save();
+  ctx.font = '700 19px Fredoka, sans-serif';
+  const maxW = Math.min(W - 60, 420);
+  const lines = wrapText('“' + text + '”', maxW);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 30, h = lines.length * 24 + 20;
+  const bx = clamp(ax - w / 2, 12, W - w - 12), by = ay - 30 - h;
+  ctx.fillStyle = golden ? '#fff6d0' : '#fffbe8'; ctx.strokeStyle = golden ? '#f2a93b' : '#e0a526'; ctx.lineWidth = 3;
+  if (golden) { ctx.shadowColor = 'rgba(255,210,100,0.9)'; ctx.shadowBlur = 16; }
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  const tx = clamp(ax - 11, bx + 14, bx + w - 36);
+  ctx.beginPath(); ctx.moveTo(tx, by + h - 1.5); ctx.lineTo(ax, ay - 6); ctx.lineTo(tx + 22, by + h - 1.5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(tx, by + h); ctx.lineTo(ax, ay - 6); ctx.lineTo(tx + 22, by + h); ctx.stroke();
+  ctx.fillStyle = golden ? '#9a5a00' : '#5a4210';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 15, by + 22 + i * 24));
+  ctx.restore();
+}
+
+function drawBubbles() {
+  for (const b of bubbles) {
+    const text = Bible.verse(VERSES[b.key]).text;
+    if (phase === 'sandals') { drawBubble(text, W / 2, Math.max(topSafe() + 150, 300), true); continue; }
+    if (b.who === 'god') drawBubble(text, godBush.x, godBush.y - godBush.r * 1.9, true);
+    else drawBubble(text, Math.min(W * 0.2, 150), 862 - 120, false);
+  }
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a3210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const inGame = state === 'play' || state === 'win' || state === 'fail' || state === 'pause';
+  ctx.fillText(inGame ? `Level ${level} · ${cfg.name}` : 'The Burning Bush', 12, 26);
+  if (inGame && (phase === 'bush' || phase === 'diff')) {
+    // timer bar
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('TIME', 12, 49);
+    ctx.shadowBlur = 0;
+    const bw = Math.min(170, viewW - 230);
+    ctx.fillStyle = 'rgba(90,50,16,0.22)';
+    roundRect(48, 38, bw, 13, 6.5); ctx.fill();
+    const f = clamp(timer / timerMax, 0, 1);
+    ctx.fillStyle = f < 0.25 && Math.sin(t * 10) > 0 ? '#e0402a' : '#e07a1f';
+    if (f > 0) { roundRect(48, 38, bw * f, 13, 6.5); ctx.fill(); }
+    if (phase === 'diff' && scene) {
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = '#5a3210'; ctx.font = '700 16px Fredoka, sans-serif';
+      ctx.fillText(`Found ${scene.found} / ${scene.diffs.length}`, 140, 90);
+    }
+  }
+  if (inGame) {
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#5a3210'; ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'win' ? 0 : levelPts)}`, viewW - 12, 26);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = viewH - 22 - (lines.length - 1) * 28;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#7a3a00';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  if (!world) buildWorld();
+  const ph = state === 'title' || state === 'card' ? 'bush' : phase;
+  if (ph === 'bush' || ph === 'call') { drawBushScene(); drawBubbles(); }
+  else if (ph === 'diff') drawDiffScene();
+  else drawSandalScene(), drawBubbles();
+  if (state === 'win') {
+    ctx.fillStyle = `rgba(255,245,210,${0.35 * clamp(winT / 1, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(60,40,30,${0.3 * clamp(failT / 1, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawParticles(true);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') { winT += dt; if (Math.random() < dt * 8) spawn(rand(0, W), rand(200, 700), 0, -20, 1.2, '#fff6d0', 3, 0, false, 'star'); }
+  else if (state === 'fail') failT += dt;
+  else if (state === 'title' || state === 'card') { updateFires(dt); updateMoses(dt); }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+resize();
+titleScreen();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,1520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a3a22">
+<title>Coat of Many Colours</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #5a3a22;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(60, 30, 10, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+  .swatches { display: flex; justify-content: center; gap: 6px; margin: 6px 0 2px; }
+  .swatches span { width: 22px; height: 22px; border-radius: 50%; display: inline-block; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Coat of Many Colours</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'pipe', ambience: 'none', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  loved: { ref: 'Genesis 37:3', KJV: 'Now Israel loved Joseph more than all his children, because he was the son of his old age: and he made him a coat of many colours.', NKJV: 'Now Israel loved Joseph more than all his children, because he was the son of his old age. Also he made him a tunic of many colors.', NIV: 'Now Israel loved Joseph more than any of his other sons, because he had been born to him in his old age; and he made an ornate robe for him.', NLT: 'Jacob loved Joseph more than any of his other children because Joseph had been born to him in his old age. So one day Jacob had a special gift made for Joseph—a beautiful robe.' },
+  // Level cards
+  oldAge: { ref: 'Genesis 37:3', KJV: 'Now Israel loved Joseph more than all his children, because he was the son of his old age', NKJV: 'Now Israel loved Joseph more than all his children, because he was the son of his old age.', NIV: 'Now Israel loved Joseph more than any of his other sons, because he had been born to him in his old age', NLT: 'Jacob loved Joseph more than any of his other children because Joseph had been born to him in his old age.' },
+  // Win card and fail card
+  madeCoat: { ref: 'Genesis 37:3', KJV: 'and he made him a coat of many colours.', NKJV: 'Also he made him a tunic of many colors.', NIV: 'and he made an ornate robe for him.', NLT: 'So one day Jacob had a special gift made for Joseph—a beautiful robe.' },
+  // The very last coat
+  wearing: { ref: 'Genesis 37:23', KJV: 'his coat of many colours that was on him', NKJV: 'the tunic of many colors that was on him', NIV: 'the ornate robe he was wearing', NLT: 'the beautiful robe he was wearing' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes tent roof above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function rgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+// ============================================================
+//  Threads and levels
+// ============================================================
+const THREADS = [
+  { name: 'red',    col: '#d8443a', sym: 'heart' },
+  { name: 'blue',   col: '#3b6fd1', sym: 'circle' },
+  { name: 'yellow', col: '#f4c430', sym: 'star' },
+  { name: 'green',  col: '#46a84a', sym: 'triangle' },
+  { name: 'purple', col: '#8a50c6', sym: 'diamond' },
+  { name: 'orange', col: '#f2872a', sym: 'square' },
+  { name: 'pink',   col: '#ee7fb6', sym: 'plus' },
+];
+
+const LEVELS = [
+  { name: 'A Simple Stripe',        rows: 5, segs: [1],    cols: 4, rowTime: 4.4, preview: 1.0, ghost: 'all', peek: 0,   snake: false, shuffle: false },
+  { name: 'Brighter Colours',       rows: 6, segs: [1, 2], cols: 5, rowTime: 3.8, preview: 0.9, ghost: 'all', peek: 0,   snake: false, shuffle: false },
+  { name: 'Two Colours a Row',      rows: 7, segs: [2],    cols: 5, rowTime: 3.4, preview: 0.8, ghost: 'all', peek: 0,   snake: false, shuffle: false },
+  { name: 'Remember the Pattern',   rows: 7, segs: [2, 3], cols: 6, rowTime: 3.7, preview: 1.7, ghost: 'row', peek: 1.2, snake: false, shuffle: false },
+  { name: 'Back and Forth',         rows: 8, segs: [3],    cols: 6, rowTime: 3.4, preview: 1.6, ghost: 'row', peek: 0.5, snake: true,  shuffle: false },
+  { name: 'A Coat of Many Colours', rows: 8, segs: [3, 4], cols: 7, rowTime: 3.5, preview: 1.8, ghost: 'row', peek: 0,   snake: true,  shuffle: true },
+];
+const NUM_LEVELS = LEVELS.length;
+const HEARTS = 3;
+
+function makeConfig(n) { return LEVELS[clamp(n, 1, NUM_LEVELS) - 1]; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('coatBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let pattern = [];         // pattern[row][seg] = thread index
+let sewn = [];            // sewn[row][seg] = 0 (not yet), 1 sewn, 2 neat
+let rowI = 0;
+let phase = 'preview';    // preview | sew | next | unpick
+let phaseT = 0, prog = 0;
+let hearts = HEARTS;
+let mistakes = 0, neatCount = 0, perfectRows = 0, rowPerfect = true;
+let spoolOrder = [];      // slot -> thread index
+let spoolX = [];          // animated x of each thread's spool
+let spoolPress = [];      // press animation per thread
+let segFlash = null;      // { seg, t, ok }
+let unpickMemory = null;  // which pieces were sewn when the row unpicked
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastScore = null;
+let jacobMood = 'watch', jacobMoodT = 0;
+let josephMood = 'watch', josephMoodT = 0;
+
+// ============================================================
+//  Layout (playfield coordinates: 0..W by 0..H)
+// ============================================================
+function layout() {
+  const wide = W >= 900;
+  const cx = W / 2;
+  const L = { wide, cx };
+  if (wide) {
+    L.yT = 140; L.yB = 660;
+    L.sh = 270; L.bh = 150; L.fl = 40;
+    L.jacob = { x: cx - 410, y: 700, s: 1.9 };
+    L.joseph = { x: cx + 410, y: 700, s: 2.0 };
+    L.spoolY = 806;
+  } else {
+    L.yT = 140; L.yB = 628;
+    L.sh = Math.min(W / 2 - 22, 250); L.bh = L.sh * 0.56; L.fl = 28;
+    L.jacob = { x: Math.max(44, cx - L.bh - L.fl - 70), y: 744, s: 1.15 };
+    L.joseph = { x: Math.min(W - 44, cx + L.bh + L.fl + 70), y: 744, s: 1.25 };
+    L.spoolY = 818;
+  }
+  L.sd = (L.yB - L.yT) * 0.3;      // sleeve depth
+  L.ys = L.yT + L.sd;
+  return L;
+}
+
+function halfWidthAt(L, y) {
+  if (y < L.ys) return L.sh;
+  return lerp(L.bh, L.bh + L.fl, clamp((y - L.ys) / (L.yB - L.ys), 0, 1));
+}
+
+function rowGeom(L, i) {
+  const rh = (L.yB - L.yT) / cfg.rows;
+  const yt = L.yT + i * rh, yb = yt + rh, ym = yt + rh / 2;
+  const hw = halfWidthAt(L, ym) - 14;
+  const K = pattern[i] ? pattern[i].length : 1;
+  const dir = cfg.snake && i % 2 === 1 ? -1 : 1;
+  return { yt, yb, ym, xl: L.cx - hw, xr: L.cx + hw, K, dir };
+}
+function segRange(g, j) {
+  const w = (g.xr - g.xl) / g.K;
+  return [g.xl + j * w, g.xl + (j + 1) * w];
+}
+
+function coatPath(L) {
+  const { cx, yT, yB, sh, bh, fl, ys } = L;
+  const p = new Path2D();
+  p.moveTo(cx - 34, yT);
+  p.lineTo(cx - bh, yT);
+  p.quadraticCurveTo(cx - sh + 4, yT - 2, cx - sh, yT + 22);
+  p.lineTo(cx - sh, ys - 12);
+  p.quadraticCurveTo(cx - sh, ys, cx - sh + 12, ys);
+  p.lineTo(cx - bh, ys);
+  p.lineTo(cx - bh - fl, yB);
+  p.quadraticCurveTo(cx, yB + 16, cx + bh + fl, yB);
+  p.lineTo(cx + bh, ys);
+  p.lineTo(cx + sh - 12, ys);
+  p.quadraticCurveTo(cx + sh, ys, cx + sh, ys - 12);
+  p.lineTo(cx + sh, yT + 22);
+  p.quadraticCurveTo(cx + sh - 4, yT - 2, cx + bh, yT);
+  p.lineTo(cx + 34, yT);
+  p.quadraticCurveTo(cx, yT + 46, cx - 34, yT);
+  p.closePath();
+  return p;
+}
+
+function spoolGeom() {
+  const L = layout();
+  const n = cfg.cols;
+  const gap = Math.min(L.wide ? 104 : 96, (W - 24) / n);
+  const r = Math.min(36, gap * 0.45);
+  const x0 = W / 2 - gap * (n - 1) / 2;
+  return { y: L.spoolY, r, gap, x0, n };
+}
+function slotX(slot) { const g = spoolGeom(); return g.x0 + slot * g.gap; }
+
+// ============================================================
+//  Building a level
+// ============================================================
+function makePattern() {
+  pattern = [];
+  for (let i = 0; i < cfg.rows; i++) {
+    const K = pick(cfg.segs);
+    const row = [];
+    for (let j = 0; j < K; j++) {
+      let c, tries = 0;
+      do {
+        c = Math.floor(Math.random() * cfg.cols);
+        tries++;
+      } while (tries < 30 && ((j > 0 && c === row[j - 1]) || (K === 1 && i > 0 && pattern[i - 1].length === 1 && pattern[i - 1][0] === c)));
+      row.push(c);
+    }
+    pattern.push(row);
+  }
+  // From level 2 on, make sure every colour is used at least once
+  if (level >= 2) {
+    const used = new Set(pattern.flat());
+    for (let c = 0; c < cfg.cols; c++) {
+      if (used.has(c)) continue;
+      for (let k = 0; k < 40; k++) {
+        const i = Math.floor(Math.random() * cfg.rows), j = Math.floor(Math.random() * pattern[i].length);
+        const old = pattern[i][j];
+        if (pattern.flat().filter((x) => x === old).length < 2) continue;
+        if (pattern[i][j - 1] === c || pattern[i][j + 1] === c) continue;
+        pattern[i][j] = c; used.add(c); break;
+      }
+    }
+  }
+  sewn = pattern.map((r) => r.map(() => 0));
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  makePattern();
+  rowI = 0; phase = 'preview'; phaseT = 0; prog = 0;
+  hearts = HEARTS;
+  mistakes = 0; neatCount = 0; perfectRows = 0; rowPerfect = true;
+  levelScore = 0;
+  spoolOrder = Array.from({ length: cfg.cols }, (_, i) => i);
+  spoolX = spoolOrder.map((c, s) => slotX(s));
+  spoolPress = spoolOrder.map(() => 0);
+  segFlash = null; unpickMemory = null;
+  particles = []; popups = [];
+  flashT = shakeT = 0;
+  endTimer = 0; winT = 0; failT = 0;
+  told = {};
+  jacobMoodT = josephMoodT = 0;
+  keys.clear();
+}
+
+// ============================================================
+//  Sewing
+// ============================================================
+function currentSeg() {
+  const K = pattern[rowI].length;
+  const jt = Math.min(K - 1, Math.floor(prog * K));
+  const dir = cfg.snake && rowI % 2 === 1 ? -1 : 1;
+  return { seg: dir > 0 ? jt : K - 1 - jt, jt, K, local: prog * K - jt, dir };
+}
+
+function needlePos(L) {
+  const g = rowGeom(L, Math.min(rowI, cfg.rows - 1));
+  let f = phase === 'sew' ? prog : phase === 'next' ? 1 : 0;
+  if (g.dir < 0) f = 1 - f;
+  return { x: lerp(g.xl, g.xr, f), y: g.ym };
+}
+
+function pressThread(c) {
+  if (state !== 'play') return;
+  if (c < 0 || c >= cfg.cols) return;
+  spoolPress[c] = 1;
+  if (phase === 'preview') {
+    if (!told.wait) { told.wait = true; showMessage('Wait for the needle to start…', 1.4); }
+    sfx.tick();
+    return;
+  }
+  if (phase !== 'sew') return;
+  const s = currentSeg();
+  if (sewn[rowI][s.seg]) { sfx.tick(); return; }
+  if (c === pattern[rowI][s.seg]) {
+    const neat = s.local > 0.15 && s.local < 0.85;
+    sewn[rowI][s.seg] = neat ? 2 : 1;
+    const pts = Math.round((20 + (neat ? 10 : 0)) * (1 + (level - 1) * 0.25));
+    levelScore += pts;
+    if (neat) neatCount++;
+    const L = layout(), g = rowGeom(L, rowI), [x0, x1] = segRange(g, s.seg);
+    popups.push({ x: (x0 + x1) / 2, y: g.ym - 10, text: neat ? `Neat! +${pts}` : `+${pts}`, t: 1.1, col: THREADS[c].col });
+    for (let k = 0; k < 12; k++) spawn((x0 + x1) / 2 + rand(-30, 30), g.ym + rand(-10, 10), rand(-60, 60), rand(-120, -30), rand(0.5, 0.9), THREADS[c].col, rand(3, 5), 160);
+    segFlash = { seg: s.seg, t: 0.4, ok: true };
+    sfx.stitch(c);
+    // the row is finished as soon as every piece is sewn
+    if (sewn[rowI].every((v) => v)) finishRow();
+  } else {
+    segFlash = { seg: s.seg, t: 0.5, ok: false };
+    mistake('wrong');
+  }
+}
+
+function finishRow() {
+  phase = 'next'; phaseT = 0;
+  if (rowPerfect) { perfectRows++; levelScore += 50; const L = layout(); popups.push({ x: L.cx, y: rowGeom(L, rowI).ym + 30, text: 'Row done! +50', t: 1.2, col: '#a8741a' }); }
+  setJoseph('wow', 0.9);
+  sfx.rowDone();
+}
+
+function mistake(kind) {
+  hearts--; mistakes++;
+  rowPerfect = false;
+  shakeT = 0.3;
+  setJacob('worried', 1.4);
+  sfx.oops();
+  showMessage(kind === 'wrong' ? 'Oops, wrong colour! Unpick the row…' : 'Too slow! The needle went past…', 1.8);
+  // the row's thread comes out
+  const L = layout(), g = rowGeom(L, rowI);
+  unpickMemory = { row: rowI, segs: sewn[rowI].slice() };
+  for (let j = 0; j < g.K; j++) {
+    if (!sewn[rowI][j]) continue;
+    const [x0, x1] = segRange(g, j);
+    for (let k = 0; k < 10; k++) spawn(rand(x0, x1), g.ym + rand(-12, 12), rand(-40, 40), rand(-60, 20), rand(0.6, 1.1), THREADS[pattern[rowI][j]].col, rand(2, 4), 220, false, 'thread');
+  }
+  sewn[rowI] = sewn[rowI].map(() => 0);
+  if (hearts <= 0) { fail(); return; }
+  phase = 'unpick'; phaseT = 0;
+}
+
+function startRow() {
+  phase = 'preview'; phaseT = 0; prog = 0;
+  sewn[rowI] = sewn[rowI].map(() => 0);
+}
+
+function nextRow() {
+  rowI++;
+  rowPerfect = true;
+  if (rowI >= cfg.rows) { rowI = cfg.rows - 1; levelWon(); return; }
+  if (cfg.shuffle && rowI > 0 && Math.random() < 0.6) shuffleSpools();
+  startRow();
+}
+
+function shuffleSpools() {
+  const old = spoolOrder.slice();
+  for (let k = 0; k < 10 && spoolOrder.every((c, i) => c === old[i]); k++) {
+    for (let i = spoolOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [spoolOrder[i], spoolOrder[j]] = [spoolOrder[j], spoolOrder[i]];
+    }
+  }
+  if (!told.shuffle) { told.shuffle = true; showMessage('The threads moved! Look carefully.', 1.8); }
+  sfx.shuffle();
+}
+
+function updateSewing(dt) {
+  phaseT += dt;
+  if (phase === 'preview') {
+    if (phaseT >= cfg.preview) { phase = 'sew'; phaseT = 0; prog = 0; }
+    return;
+  }
+  if (phase === 'unpick') {
+    if (phaseT >= 0.9) startRow();
+    return;
+  }
+  if (phase === 'next') {
+    if (phaseT >= 0.45) nextRow();
+    return;
+  }
+  // sew: the needle runs along the row
+  const before = currentSeg();
+  prog += dt / cfg.rowTime;
+  const after = prog >= 1 ? { jt: before.K } : currentSeg();
+  for (let jt = before.jt; jt < after.jt; jt++) {
+    const seg = before.dir > 0 ? jt : before.K - 1 - jt;
+    if (!sewn[rowI][seg]) { mistake('slow'); return; }
+  }
+  if (prog >= 1) { prog = 1; if (sewn[rowI].every((v) => v)) finishRow(); }
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function levelWon() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * 150;
+  const levelBonus = level * 200;
+  const score = levelScore + heartBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('coatBest', best); } catch (e) {} }
+  lastScore = { stitches: levelScore, heartBonus, levelBonus, score };
+  flashT = 0.3;
+  setJacob('joy', 99); setJoseph('joy', 99);
+  showMessage(level === NUM_LEVELS ? 'A coat of many colours!' : 'The coat is finished!', 2.4);
+  const L = layout();
+  for (let k = 0; k < 60; k++) spawn(L.cx + rand(-200, 200), rand(L.yT, L.yB), rand(-80, 80), rand(-160, -40), rand(0.8, 1.6), pick(THREADS).col, rand(3, 6), 120, false, 'star');
+  sfx.win();
+  endTimer = 3.6;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  setJacob('dismay', 99); setJoseph('worried', 99);
+  showMessage('The thread got all tangled…', 2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+function setJacob(m, d) { jacobMood = m; jacobMoodT = d; }
+function setJoseph(m, d) { josephMood = m; josephMoodT = d; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function swatchHTML(n) {
+  return `<div class="swatches">${THREADS.slice(0, n).map((th) => `<span style="background:${th.col}"></span>`).join('')}</div>`;
+}
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = makeConfig(1);
+  makePattern();
+  sewn = pattern.map((r) => r.map(() => 2));
+  showOverlay('Coat of Many Colours', 'Help Jacob sew a gift for Joseph',
+    `${verseHTML('loved')}
+     <ul>
+       <li>Jacob is sewing a special coat for his son Joseph. The <b>needle</b> runs along each stripe of the coat.</li>
+       <li><b>Tap the thread</b> with the <b>same colour</b> as the stripe while the needle is on it.</li>
+       <li>Tap when the needle is in the <b>middle</b> of a stripe for a <b>neat</b> stitch and extra points.</li>
+       <li>Wrong colour, or too slow? The row <b>unpicks</b> and you lose a heart. Lose 3 hearts and the thread tangles!</li>
+       <li>Later coats have more colours, faster needles, and patterns you must <b>remember</b>.</li>
+       <li><b>Keys:</b> <kbd>1</kbd>–<kbd>7</kbd> pick the threads from left to right.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start sewing', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+const LEVEL_TIPS = [
+  'Tap the thread that matches each stripe. Take your time!',
+  'More colours now, and a quicker needle. Some stripes have two colours.',
+  'Every stripe has two colours. Tap each one as the needle passes over it.',
+  'Look at the pattern before the needle starts. It fades away, so remember it!',
+  'Three colours a stripe, and the needle goes back and forth, like real sewing.',
+  'The finest coat of all! Seven colours, four to a stripe, and the threads swap places.',
+];
+
+function levelCard() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(level);
+  makePattern();             // the new level has more rows, so the coat behind the card needs them too
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     ${swatchHTML(cfg.cols)}
+     ${verseHTML('oldAge')}
+     <p class="score">Score so far: <b>${totalScore}</b></p>`,
+    'Sew!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.0);
+  if (level === 1 && !retry) setTimeout(() => { if (state === 'play' && rowI === 0) showMessage('Tap the matching thread!', 2.4); }, 1200);
+  if (level === 4) setTimeout(() => { if (state === 'play') showMessage('Remember the colours — they fade!', 2.4); }, 1300);
+  if (level === 5) setTimeout(() => { if (state === 'play') showMessage('The needle goes back and forth now', 2.4); }, 1300);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'A Coat of Many Colours!' : 'Well sewn!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'wearing' : 'madeCoat')}
+       <p style="text-align:center">${last ? 'Joseph wears the beautiful coat his father made for him. You sewed every coat!' : 'Joseph loves his new coat! Jacob made it with love.'}</p>
+       <p class="score">Stitches (${neatCount} neat, ${perfectRows} perfect rows): <b>${s.stitches}</b><br>Hearts left (${hearts}): <b>${s.heartBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next coat', () => {
+        if (last) titleScreen();
+        else { level++; levelCard(); }
+      });
+  } else if (state === 'fail') {
+    showOverlay('Tangled thread!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The thread got in a tangle. Watch the <b>needle</b>, match the <b>colours</b>, and tap while the needle is on each stripe.</p>
+       ${verseHTML('madeCoat', '…')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && !e.repeat) {
+    const m = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+    if (m) {
+      const slot = +m[2] - 1;
+      if (slot < spoolOrder.length) pressThread(spoolOrder[slot]);
+    }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function spoolAt(px, py) {
+  const g = spoolGeom();
+  let bestC = -1, bd = 1e9;
+  for (let c = 0; c < cfg.cols; c++) {
+    const x = spoolX[c];
+    const dx = Math.abs(px - x), dy = Math.abs(py - g.y);
+    if (dx < g.gap / 2 && dy < g.r + 34) {
+      const d = dx + dy * 0.5;
+      if (d < bd) { bd = d; bestC = c; }
+    }
+  }
+  return bestC;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const px = p.vx - offX, py = p.vy - offY;
+  const c = spoolAt(px, py);
+  if (c >= 0) { pressThread(c); return; }
+  if (!told.tapSpool) { told.tapSpool = true; showMessage('Tap a thread spool at the bottom', 1.6); }
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  stitch(c) { if (!this.ctx) return; Music.tap(0.15 + 0.7 * c / 6); this.noiseBurst(3200, 0.08, 0.12, 2); },
+  tick() { this.tone(900, 0.06, 'triangle', 0.08); },
+  rowDone() { [1047, 1319, 1568].forEach((f, i) => this.tone(f, 0.3, 'sine', 0.1, i * 0.06)); },
+  oops() { this.tone(330, 0.25, 'triangle', 0.22, 0, 200); this.noiseBurst(1500, 0.3, 0.15, 0.7, 500); },
+  shuffle() { for (let i = 0; i < 4; i++) this.noiseBurst(2400 + i * 300, 0.07, 0.08, 2); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Particles and popups
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, scr = false, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, scr, kind, rot: rand(0, TAU) });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; popups[i].y -= 30 * dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.4, p.rot);
+    else if (p.kind === 'thread') {
+      ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+      ctx.quadraticCurveTo(p.x + Math.cos(p.rot) * 8, p.y + Math.sin(p.rot) * 8, p.x + 10, p.y + 3); ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStar(x, y, r, rot = 0) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = rot + i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// ============================================================
+//  People
+// ============================================================
+const JACOB = { robe: '#6b5a8e', hair: '#d4cec4', beard: true, skin: '#d9a066', scarf: '#e8dcc0', i: 0, blink: 0, blinkT: 2, phase: 0 };
+const JOSEPH = { robe: '#e8dcc0', hair: '#4a2f1a', beard: false, skin: '#e3b184', kid: true, i: 3, blink: 0, blinkT: 3, phase: 1.3 };
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 3, 2);
+      brows(-9, -5, -9, -5);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// d.stripes (optional): colours for a striped robe (Joseph's new coat)
+function drawPerson(d, mood, x, y, s, lookX, lookY, holding = null) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  if (d.kid) s *= 0.8;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.stripes ? d.stripes[0] : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  // robe
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fillStyle = d.robe; ctx.fill();
+  if (d.stripes) {
+    ctx.save(); ctx.clip();
+    const n = d.stripes.length, h = 41 / n;
+    d.stripes.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-20, -41 + i * h, 40, h + 0.5); });
+    ctx.restore();
+  }
+  ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5; ctx.stroke();
+  if (!d.stripes) {
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (mood === 'watch' || mood === 'wow') {
+    if (holding === 'needle') {
+      arm(-11, -32, -15, -12);
+      arm(11, -32, 20, -28);
+      ctx.strokeStyle = '#cfd6de'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(18, -24); ctx.lineTo(28, -38); ctx.stroke();
+    } else { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  } else if (mood === 'worried' || mood === 'dismay') {
+    arm(-11, -32, -2, -28); arm(11, -32, 2, -28);
+  }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 24, 0, hy + 26);
+    ctx.quadraticCurveTo(14, hy + 24, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+  ctx.restore();
+}
+
+function updatePeople(dt) {
+  for (const d of [JACOB, JOSEPH]) {
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+  jacobMoodT -= dt; josephMoodT -= dt;
+  if (jacobMoodT <= 0) jacobMood = 'watch';
+  if (josephMoodT <= 0) josephMood = 'watch';
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawBackdrop() {
+  // Tent cloth fills the whole screen (extra height becomes tent roof)
+  ctx.fillStyle = '#7a4a2a';
+  ctx.fillRect(0, 0, viewW, viewH);
+  const top = offY + 0;
+  const pw = 70;
+  for (let x = -((offX) % pw) - pw, i = 0; x < viewW + pw; x += pw, i++) {
+    ctx.fillStyle = i % 2 ? '#a8693c' : '#b97a46';
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x + pw, 0); ctx.lineTo(x + pw, viewH); ctx.lineTo(x, viewH); ctx.fill();
+  }
+  // tent roof shading and ridge
+  const g = ctx.createLinearGradient(0, 0, 0, top + 300);
+  g.addColorStop(0, 'rgba(60,30,10,0.55)'); g.addColorStop(1, 'rgba(60,30,10,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, top + 300);
+  // warm lamp glow in the middle
+  const cx = offX + W / 2, cy = offY + 420;
+  const lg = ctx.createRadialGradient(cx, cy, 40, cx, cy, Math.max(viewW, 700) * 0.7);
+  lg.addColorStop(0, 'rgba(255,220,140,0.35)'); lg.addColorStop(1, 'rgba(255,220,140,0)');
+  ctx.fillStyle = lg; ctx.fillRect(0, 0, viewW, viewH);
+  // floor
+  const fy = offY + 705;
+  ctx.fillStyle = '#8a6a44';
+  ctx.fillRect(0, fy, viewW, viewH - fy);
+  // a woven rug
+  const rx0 = offX + W * 0.04, rx1 = offX + W * 0.96, ry0 = fy + 26, ry1 = Math.max(viewH - 8, fy + 180);
+  ctx.fillStyle = '#9e3a2e';
+  roundRect(rx0, ry0, rx1 - rx0, ry1 - ry0, 10); ctx.fill();
+  ctx.strokeStyle = '#e8c56a'; ctx.lineWidth = 4;
+  roundRect(rx0 + 10, ry0 + 10, rx1 - rx0 - 20, ry1 - ry0 - 20, 6); ctx.stroke();
+  ctx.fillStyle = '#e8c56a';
+  for (let x = rx0 + 30; x < rx1 - 20; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, ry0 + 16); ctx.lineTo(x + 8, ry0 + 24); ctx.lineTo(x, ry0 + 32); ctx.lineTo(x - 8, ry0 + 24); ctx.fill();
+  }
+}
+
+function drawLamp(L) {
+  // hanging oil lamp, top of the tent
+  const x = L.wide ? L.cx - 360 : W - 40, y = L.wide ? 150 : 128;
+  if (!L.wide) return;
+  ctx.strokeStyle = '#4a3020'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, -400); ctx.lineTo(x, y - 14); ctx.stroke();
+  ctx.fillStyle = '#b8683a';
+  ctx.beginPath(); ctx.ellipse(x, y, 22, 10, 0, 0, TAU); ctx.fill();
+  const f = 1 + Math.sin(t * 12) * 0.08;
+  ctx.fillStyle = '#ffd25a';
+  ctx.beginPath(); ctx.moveTo(x + 20, y - 4); ctx.quadraticCurveTo(x + 28, y - 18 * f, x + 22, y - 26 * f); ctx.quadraticCurveTo(x + 16, y - 14, x + 20, y - 4); ctx.fill();
+}
+
+function drawSymbol(sym, x, y, r, col) {
+  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, r * 0.35);
+  ctx.beginPath();
+  switch (sym) {
+    case 'heart':
+      ctx.moveTo(x, y + r * 0.8);
+      ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.6, y - r * 1.1, x, y - r * 0.35);
+      ctx.bezierCurveTo(x + r * 0.6, y - r * 1.1, x + r * 1.3, y - r * 0.1, x, y + r * 0.8);
+      ctx.fill(); break;
+    case 'circle': ctx.arc(x, y, r * 0.75, 0, TAU); ctx.fill(); break;
+    case 'star': drawStar(x, y, r, 0); break;
+    case 'triangle': ctx.moveTo(x, y - r * 0.85); ctx.lineTo(x + r * 0.9, y + r * 0.7); ctx.lineTo(x - r * 0.9, y + r * 0.7); ctx.closePath(); ctx.fill(); break;
+    case 'diamond': ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.75, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.75, y); ctx.closePath(); ctx.fill(); break;
+    case 'square': ctx.rect(x - r * 0.68, y - r * 0.68, r * 1.36, r * 1.36); ctx.fill(); break;
+    case 'plus': ctx.lineCap = 'round'; ctx.moveTo(x - r * 0.8, y); ctx.lineTo(x + r * 0.8, y); ctx.moveTo(x, y - r * 0.8); ctx.lineTo(x, y + r * 0.8); ctx.stroke(); break;
+  }
+}
+
+// How strongly the pattern of an unsewn piece shows on the cloth (0..1)
+function ghostAlpha(i) {
+  if (state === 'title') return 1;
+  if (cfg.ghost === 'all') return i >= rowI || state !== 'play' ? 1 : 0;
+  if (i !== rowI) return 0;
+  if (phase === 'preview') return Math.min(1, phaseT / 0.2);
+  if (phase === 'sew') return cfg.peek > 0 ? clamp(1 - prog * cfg.rowTime / cfg.peek, 0, 1) : 0;
+  return 0;
+}
+
+function drawCoat(L) {
+  const path = coatPath(L);
+  // shadow
+  ctx.save();
+  ctx.translate(6, 10);
+  ctx.fillStyle = 'rgba(40,20,5,0.25)';
+  ctx.fill(path);
+  ctx.restore();
+  // linen
+  ctx.fillStyle = '#f3e8cf';
+  ctx.fill(path);
+  ctx.save();
+  ctx.clip(path);
+  // linen weave
+  ctx.strokeStyle = 'rgba(160,130,80,0.12)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let y = L.yT; y < L.yB + 20; y += 6) { ctx.moveTo(L.cx - L.sh - 10, y); ctx.lineTo(L.cx + L.sh + 10, y); }
+  ctx.stroke();
+  const left = L.cx - L.sh - 30, right = L.cx + L.sh + 30;
+  for (let i = 0; i < cfg.rows; i++) {
+    if (!pattern[i] || !sewn[i]) continue;
+    const g = rowGeom(L, i);
+    const ga = ghostAlpha(i);
+    const unpicking = state === 'play' && phase === 'unpick' && i === rowI;
+    for (let j = 0; j < g.K; j++) {
+      let [x0, x1] = segRange(g, j);
+      if (j === 0) x0 = left;
+      if (j === g.K - 1) x1 = right;
+      const th = THREADS[pattern[i][j]];
+      const s = sewn[i][j];
+      if (s) {
+        ctx.fillStyle = th.col;
+        ctx.fillRect(x0, g.yt, x1 - x0, g.yb - g.yt + 0.5);
+        // stitches
+        ctx.strokeStyle = shade(th.col, 60); ctx.lineWidth = 2; ctx.setLineDash([7, 6]);
+        ctx.beginPath();
+        ctx.moveTo(x0, g.yt + 6); ctx.lineTo(x1, g.yt + 6);
+        ctx.moveTo(x0, g.yb - 6); ctx.lineTo(x1, g.yb - 6);
+        ctx.stroke(); ctx.setLineDash([]);
+        // a little zigzag for the neat ones
+        if (s === 2) {
+          ctx.strokeStyle = rgba('#ffffff', 0.35); ctx.lineWidth = 2;
+          ctx.beginPath();
+          const zh = (g.yb - g.yt) * 0.18;
+          for (let x = Math.max(x0, g.xl - 20), k = 0; x < Math.min(x1, g.xr + 20); x += 12, k++) ctx.lineTo(x, g.ym + (k % 2 ? zh : -zh));
+          ctx.stroke();
+        }
+      } else if (ga > 0 || unpicking) {
+        const a = unpicking ? clamp(1 - phaseT / 0.9, 0, 1) : 0;
+        if (a > 0 && segWasSewn(i, j)) {
+          ctx.fillStyle = rgba(th.col, a);
+          ctx.fillRect(x0, g.yt, x1 - x0, g.yb - g.yt);
+        }
+        if (ga > 0) {
+          ctx.fillStyle = rgba(th.col, 0.32 * ga);
+          ctx.fillRect(x0, g.yt, x1 - x0, g.yb - g.yt);
+          const [sx0, sx1] = segRange(g, j);
+          const sr = Math.min(14, (g.yb - g.yt) * 0.24);
+          ctx.globalAlpha = 0.75 * ga;
+          drawSymbol(th.sym, (sx0 + sx1) / 2, g.ym, sr, shade(th.col, -20));
+          ctx.globalAlpha = 1;
+        }
+      }
+      // piece divider
+      if (j > 0) {
+        ctx.strokeStyle = 'rgba(90,60,30,0.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(x0, g.yt + 3); ctx.lineTo(x0, g.yb - 3); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    // row line
+    ctx.strokeStyle = 'rgba(90,60,30,0.3)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(left, g.yb); ctx.lineTo(right, g.yb); ctx.stroke();
+  }
+  // the row being sewn glows
+  if (state === 'play' && (phase === 'sew' || phase === 'preview')) {
+    const g = rowGeom(L, rowI);
+    ctx.strokeStyle = `rgba(255,240,170,${0.6 + 0.3 * Math.sin(t * 6)})`; ctx.lineWidth = 4;
+    ctx.strokeRect(left, g.yt + 2, right - left, g.yb - g.yt - 4);
+    // the piece under the needle
+    if (phase === 'sew') {
+      const s = currentSeg(), [x0, x1] = segRange(g, s.seg);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x0, g.yt, x1 - x0, g.yb - g.yt);
+    }
+  }
+  if (segFlash && segFlash.t > 0 && state !== 'title') {
+    const g = rowGeom(L, rowI), [x0, x1] = segRange(g, segFlash.seg);
+    ctx.fillStyle = segFlash.ok ? `rgba(255,255,255,${segFlash.t})` : `rgba(255,60,60,${segFlash.t})`;
+    ctx.fillRect(x0, g.yt, x1 - x0, g.yb - g.yt);
+  }
+  ctx.restore();
+  // outline and neck trim
+  ctx.strokeStyle = '#6a4a28'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+  ctx.stroke(path);
+  ctx.strokeStyle = '#d9a83a'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(L.cx - 34, L.yT + 2); ctx.quadraticCurveTo(L.cx, L.yT + 48, L.cx + 34, L.yT + 2); ctx.stroke();
+}
+
+function segWasSewn(i, j) { return unpickMemory && unpickMemory.row === i && unpickMemory.segs[j]; }
+
+function drawNeedle(L) {
+  if (state !== 'play' && state !== 'pause') return;
+  if (phase === 'next' || phase === 'unpick') return;
+  const n = needlePos(L);
+  const g = rowGeom(L, rowI);
+  const bob = Math.sin(t * 16) * (phase === 'sew' ? 5 : 1.5);
+  const x = n.x, y = n.y + bob;
+  // the thread trailing behind
+  const back = g.dir > 0 ? -1 : 1;
+  ctx.strokeStyle = '#efe6d2'; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(x + back * 10, y - 22);
+  ctx.quadraticCurveTo(x + back * 40, y - 50 + Math.sin(t * 5) * 6, x + back * 70, y - 30);
+  ctx.stroke();
+  // needle
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(back * -0.5);
+  ctx.fillStyle = '#e4e9ef'; ctx.strokeStyle = '#7b8794'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 20); ctx.lineTo(-4, -22); ctx.quadraticCurveTo(0, -30, 4, -22); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#7b8794';
+  ctx.beginPath(); ctx.ellipse(0, -20, 1.4, 4, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  // shine marker under the needle
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(x, g.yb - 4, 3, 0, TAU); ctx.fill();
+}
+
+function drawSpool(x, y, r, th, press, hint, dim) {
+  const s = 1 - press * 0.12;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  if (hint) {
+    ctx.fillStyle = `rgba(255,240,150,${0.45 + 0.35 * Math.sin(t * 8)})`;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.35, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = dim ? 0.55 : 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(0, r * 1.05, r * 0.95, r * 0.25, 0, 0, TAU); ctx.fill();
+  // wooden ends
+  ctx.fillStyle = '#c08a52'; ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 2;
+  roundRect(-r * 0.95, -r, r * 1.9, r * 0.3, r * 0.12); ctx.fill(); ctx.stroke();
+  roundRect(-r * 0.95, r * 0.7, r * 1.9, r * 0.3, r * 0.12); ctx.fill(); ctx.stroke();
+  // wound thread
+  ctx.fillStyle = th.col;
+  roundRect(-r * 0.75, -r * 0.72, r * 1.5, r * 1.44, r * 0.2); ctx.fill();
+  ctx.strokeStyle = shade(th.col, -35); ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let k = -0.6; k <= 0.6; k += 0.2) { ctx.moveTo(-r * 0.75, r * k); ctx.lineTo(r * 0.75, r * (k + 0.08)); }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  roundRect(-r * 0.6, -r * 0.7, r * 0.22, r * 1.4, r * 0.1); ctx.fill();
+  // badge with the colour's shape
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.38, 0, TAU); ctx.fill();
+  drawSymbol(th.sym, 0, 0, r * 0.24, shade(th.col, -15));
+  ctx.restore();
+}
+
+function drawSpools(L) {
+  const g = spoolGeom();
+  // shelf
+  ctx.fillStyle = 'rgba(70,40,20,0.35)';
+  roundRect(W / 2 - g.gap * g.n / 2 - 6, g.y - g.r - 14, g.gap * g.n + 12, g.r * 2 + 32, 18); ctx.fill();
+  let hintC = -1;
+  if (state === 'play' && level === 1 && rowI < 2 && phase === 'sew') hintC = pattern[rowI][currentSeg().seg];
+  const showKeys = !matchMedia('(pointer: coarse)').matches;
+  for (let c = 0; c < cfg.cols; c++) {
+    drawSpool(spoolX[c], g.y, g.r, THREADS[c], spoolPress[c], c === hintC, false);
+    if (showKeys) {
+      const slot = spoolOrder.indexOf(c);
+      ctx.fillStyle = 'rgba(255,240,210,0.8)'; ctx.font = '600 12px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(String(slot + 1), spoolX[c], g.y + g.r + 16);
+    }
+  }
+}
+
+function drawPeople(L) {
+  const n = state === 'play' ? needlePos(L) : { x: L.cx, y: L.yT + 200 };
+  drawPerson(JACOB, state === 'title' ? 'watch' : jacobMood, L.jacob.x, L.jacob.y, L.jacob.s, n.x, n.y, 'needle');
+  const jo = { ...JOSEPH };
+  if (state === 'win' || state === 'title') jo.stripes = pattern.map((r) => THREADS[r[0]].col);
+  drawPerson(jo, state === 'title' ? 'joy' : josephMood, L.joseph.x, L.joseph.y, L.joseph.s, n.x, n.y);
+}
+
+function drawPopups() {
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = shade(p.col, -40);
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  const inGame = state !== 'title';
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const hg = ctx.createLinearGradient(0, 0, 0, 110);
+  hg.addColorStop(0, 'rgba(50,25,10,0.85)'); hg.addColorStop(1, 'rgba(50,25,10,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, 110);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Coat of Many Colours' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (inGame) {
+    ctx.font = '600 14px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'win' ? 0 : levelScore)}   ·   Row ${Math.min(rowI + 1, cfg.rows)} of ${cfg.rows}`, 12, 50);
+    // hearts
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < HEARTS; k++) {
+      const x = viewW - 26 - k * 32, y = 84;
+      ctx.globalAlpha = k < hearts ? 1 : 0.25;
+      drawSymbol('heart', x, y, 13, k < hearts ? '#e84a5f' : '#ffffff');
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0 || state === 'title') return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 600));
+  const y0 = offY + 120;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(60,30,10,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawBackdrop();
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  const L = layout();
+  drawLamp(L);
+  drawCoat(L);
+  drawNeedle(L);
+  drawPeople(L);
+  if (state !== 'title') drawSpools(L);
+  drawParticles();
+  drawPopups();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  // spools glide to their slots
+  if (cfg && spoolOrder.length) {
+    for (let s = 0; s < spoolOrder.length; s++) {
+      const c = spoolOrder[s], tx = slotX(s);
+      spoolX[c] = spoolX[c] === undefined ? tx : lerp(spoolX[c], tx, 1 - Math.pow(0.001, dt));
+    }
+    for (let c = 0; c < spoolPress.length; c++) spoolPress[c] = Math.max(0, spoolPress[c] - dt * 6);
+  }
+  if (segFlash) { segFlash.t -= dt; if (segFlash.t <= 0) segFlash = null; }
+  if (state === 'play') {
+    updateSewing(dt);
+  } else if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 8) { const L = layout(); spawn(L.joseph.x + rand(-60, 60), L.joseph.y - rand(40, 160), 0, -30, 1.2, pick(THREADS).col, 4, 0, false, 'star'); }
+  } else if (state === 'fail') {
+    failT += dt;
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

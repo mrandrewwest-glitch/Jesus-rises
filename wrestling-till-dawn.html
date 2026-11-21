@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1d2856">
+<title>Wrestling till Dawn</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1d2856;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 24, 60, 0.3);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Wrestling till Dawn</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'strings', ambience: 'night', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  alone: { ref: 'Genesis 32:24', KJV: 'And Jacob was left alone; and there wrestled a man with him until the breaking of the day.', NKJV: 'Then Jacob was left alone; and a Man wrestled with him until the breaking of day.', NIV: 'So Jacob was left alone, and a man wrestled with him till daybreak.', NLT: 'This left Jacob all alone in the camp, and a man came and wrestled with him until the dawn began to break.' },
+  // Level cards
+  hold: { ref: 'Genesis 32:26', KJV: 'Let me go, for the day breaketh. And he said, I will not let thee go, except thou bless me.', NKJV: 'Let Me go, for the day breaks. But he said, I will not let You go unless You bless me!', NIV: 'Let me go, for it is daybreak. But Jacob replied, I will not let you go unless you bless me.', NLT: 'Let me go, for the dawn is breaking! But Jacob said, I will not let you go unless you bless me.' },
+  // Speech bubbles near dawn (and the fail card)
+  dayBreaks: { ref: 'Genesis 32:26', KJV: 'Let me go, for the day breaketh.', NKJV: 'Let Me go, for the day breaks.', NIV: 'Let me go, for it is daybreak.', NLT: 'Let me go, for the dawn is breaking!' },
+  notLetGo: { ref: 'Genesis 32:26', KJV: 'I will not let thee go, except thou bless me.', NKJV: 'I will not let You go unless You bless me!', NIV: 'I will not let you go unless you bless me.', NLT: 'I will not let you go unless you bless me.' },
+  // Win: the new name
+  newName: { ref: 'Genesis 32:28', KJV: 'Thy name shall be called no more Jacob, but Israel', NKJV: 'Your name shall no longer be called Jacob, but Israel', NIV: 'Your name will no longer be Jacob, but Israel', NLT: 'From now on you will be called Israel' },
+  israel: { ref: 'Genesis 32:28', KJV: 'Thy name shall be called no more Jacob, but Israel: for as a prince hast thou power with God and with men, and hast prevailed.', NKJV: 'Your name shall no longer be called Jacob, but Israel; for you have struggled with God and with men, and have prevailed.', NIV: 'Your name will no longer be Jacob, but Israel, because you have struggled with God and with humans and have overcome.', NLT: 'Your name will no longer be Jacob... From now on you will be called Israel, because you have fought with God and with men and have won.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function bubbleText(key) {
+  return Bible.verse(VERSES[key]).text.replace(/\.\.\.\s*/g, '… ');
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function mix(h1, h2, f) {
+  const a = parseInt(h1.slice(1), 16), b = parseInt(h2.slice(1), 16);
+  const c = (s) => Math.round(lerp((a >> s) & 255, (b >> s) & 255, clamp(f, 0, 1)));
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+// speed: marker crossings of the bar per second; zone: width of the gold zone (0..1);
+// holds: good holds until sunrise; slip / pass: grip lost for a mistimed tap / a missed beat
+const LEVELS = [
+  { name: 'By the River Jabbok', speed: 0.5,  zone: 0.32, holds: 8,  slip: 14, pass: 9,  move: false, wobble: 0 },
+  { name: 'A Long Night',        speed: 0.62, zone: 0.26, holds: 10, slip: 16, pass: 11, move: false, wobble: 0 },
+  { name: 'Hold On!',            speed: 0.7,  zone: 0.22, holds: 12, slip: 18, pass: 12, move: true,  wobble: 0 },
+  { name: 'The Stars Fade',      speed: 0.78, zone: 0.2,  holds: 14, slip: 18, pass: 13, move: true,  wobble: 0.25 },
+  { name: 'Before the Dawn',     speed: 0.86, zone: 0.18, holds: 16, slip: 20, pass: 14, move: true,  wobble: 0.35 },
+  { name: 'Until Daybreak',      speed: 0.95, zone: 0.16, holds: 18, slip: 22, pass: 15, move: true,  wobble: 0.45 },
+];
+const NLEV = LEVELS.length;
+const PERFECT = 0.3;      // inner part of the zone (fraction of its width) that counts as perfect
+function makeConfig(n) { return LEVELS[clamp(n, 1, NLEV) - 1]; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('wrestleBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let introduced = 0;       // the level whose card was last shown
+let t = 0;
+let phase = 0;            // marker phase; position = triangle wave of it
+let marker = 0.5;
+let zone = { c: 0.5, w: 0.3 };
+let inZone = false, tappedThisPass = false;
+let grip = 100, holds = 0, dawn = 0, dawnShown = 0;
+let streak = 0, bestStreak = 0, perfects = 0, slips = 0;
+let lean = 0, leanV = 0;  // how the two are leaning (+ = Jacob pushing)
+let particles = [], popups = [], ripples = [];
+let message = { text: '', t: 0 };
+let bubble = null;        // { key, who, t }
+let saidDay = false, saidHold = false;
+let flashT = 0, shakeT = 0, endTimer = 0;
+let lastScore = null;
+let playT = 0, winT = 0, failT = 0;
+let zoneFlash = 0, zoneFlashGood = true;
+
+// ============================================================
+//  The meter
+// ============================================================
+function tri(p) { const f = p - Math.floor(p); return f < 0.5 ? f * 2 : 2 - f * 2; }
+function meterBox() {
+  const w = Math.min(W - 60, 640);
+  return { x: (W - w) / 2, y: 712, w, h: 50 };
+}
+
+function placeZone(first) {
+  zone.w = cfg.zone;
+  if (!cfg.move || first) { zone.c = 0.5; return; }
+  const m = zone.w / 2 + 0.04;
+  let c = 0.5;
+  for (let k = 0; k < 20; k++) {
+    c = rand(m, 1 - m);
+    if (Math.abs(c - marker) > zone.w * 1.2 && Math.abs(c - zone.c) > 0.12) break;
+  }
+  zone.c = c;
+}
+
+function grab() {
+  if (state !== 'play') return;
+  const d = Math.abs(marker - zone.c);
+  if (d <= zone.w / 2 && !tappedThisPass) {
+    tappedThisPass = true;
+    const perfect = d <= zone.w * PERFECT / 2;
+    holds++;
+    streak++; bestStreak = Math.max(bestStreak, streak);
+    if (perfect) perfects++;
+    const pts = (perfect ? 200 : 100) + Math.min(streak, 10) * 10;
+    levelScore += pts;
+    grip = Math.min(100, grip + (perfect ? 6 : 3));
+    leanV += 2.6;
+    zoneFlash = 0.35; zoneFlashGood = true;
+    const M = meterBox();
+    popups.push({ x: M.x + M.w * marker, y: M.y - 18, text: perfect ? 'Perfect!' : 'Hold!', t: 0.9, col: perfect ? '#fff2a0' : '#ffffff' });
+    sfx.hold(holds / cfg.holds, perfect);
+    sparkleBurst(M.x + M.w * marker, M.y + M.h / 2, perfect ? 14 : 7);
+    if (holds >= cfg.holds) { win(); return; }
+    if (cfg.move) { placeZone(false); inZone = false; tappedThisPass = false; }
+  } else if (d <= zone.w / 2) {
+    // a second tap in the same pass: harmless, but does nothing
+    sfx.tick();
+  } else slip('Too soon or too late!', cfg.slip);
+}
+
+function slip(text, amt) {
+  streak = 0; slips++;
+  grip -= amt;
+  leanV -= 2.2;
+  shakeT = 0.25;
+  zoneFlash = 0.35; zoneFlashGood = false;
+  sfx.slip();
+  showMessage(text, 1.2);
+  if (grip <= 0) { grip = 0; fail(); }
+}
+
+function updateMeter(dt) {
+  const sp = cfg.speed * (1 + cfg.wobble * Math.sin(t * 1.7) * Math.sin(t * 0.63 + 1));
+  phase += sp * dt / 2;            // one crossing of the bar = half a triangle period
+  marker = tri(phase);
+  const now = Math.abs(marker - zone.c) <= zone.w / 2;
+  if (now && !inZone) { inZone = true; tappedThisPass = false; }
+  if (!now && inZone) {
+    inZone = false;
+    if (!tappedThisPass) slip('Hold on! Tap in the gold.', cfg.pass);
+    tappedThisPass = false;
+  }
+}
+
+// ============================================================
+//  People
+// ============================================================
+const JACOB = { robe: '#2f8a7a', hair: '#4a2f1a', skin: '#d9a066', stripe: '#e8d9a0', blinkT: 2, blink: 0 };
+const MAN = { robe: '#eef2fb', hair: '#6b5a48', skin: '#e0b088', stripe: '#c9d6f0', blinkT: 3, blink: 0 };
+
+function drawFace(d, mood, hy, lx) {
+  const ex = 6, ey = hy - 1, dark = '#2b1d12', mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke(); continue; }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey, pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (li, lo, ri, ro) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(-ex - 4, ey + lo); ctx.lineTo(-ex + 3, ey + li); ctx.moveTo(ex - 3, ey + ri); ctx.lineTo(ex + 4, ey + ro); ctx.stroke();
+  };
+  ctx.strokeStyle = '#6a2a1e'; ctx.fillStyle = '#7a2e22'; ctx.lineWidth = 2;
+  if (mood === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+    ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,120,120,0.45)'; ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  } else if (mood === 'effort') {
+    eyes(3.4, 3.6, 2);
+    brows(-6, -8, -6, -8);
+    ctx.beginPath(); ctx.moveTo(-5, mouthY); ctx.lineTo(5, mouthY); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,120,0.35)'; ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+  } else if (mood === 'tired') {
+    eyes(3.5, 2.6, 1.8);
+    brows(-8, -6, -8, -6);
+    ctx.beginPath(); ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke();
+  } else if (mood === 'kind') {
+    eyes(3.5, 4.5, 2);
+    brows(-8, -8, -8, -8);
+    ctx.beginPath(); ctx.arc(0, mouthY - 4, 5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  } else {
+    eyes(3.5, 4.5, 2);
+    brows(-7, -7, -7, -7);
+    ctx.beginPath(); ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+
+function updatePerson(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+// One wrestler, standing at (x,y), facing dir (+1 right / -1 left), leaning by ang
+function drawWrestler(d, x, y, dir, ang, mood, armsUp) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 26, 7, 0, 0, TAU); ctx.fill();
+  ctx.rotate(ang * dir);
+  const sleeve = shade(d.robe, -25);
+  // legs braced apart
+  ctx.strokeStyle = shade(d.robe, -50); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-6, -10); ctx.lineTo(-16 * dir, 0); ctx.moveTo(6, -10); ctx.lineTo(14 * dir, 0); ctx.stroke();
+  // robe
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -45); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, -4); ctx.quadraticCurveTo(-17, -32, -11, -40); ctx.quadraticCurveTo(0, -44, 11, -40); ctx.quadraticCurveTo(17, -32, 18, -4);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.stripe; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-6, -41); ctx.lineTo(-8, -5); ctx.moveTo(6, -41); ctx.lineTo(8, -5); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -20); ctx.quadraticCurveTo(0, -17, 16, -20); ctx.stroke();
+  // head
+  const hy = -56;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = d === MAN ? '#f6f2e6' : d.hair;
+  ctx.beginPath();
+  ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10); ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-15, hy + 2); ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22); ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+  ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8); ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+  ctx.fill();
+  drawFace(d, mood, hy, dir * 0.6);
+  // arms: reaching across to hold the other's shoulders (a hug-like hold)
+  ctx.strokeStyle = sleeve; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  const hand = (x2, y2) => { ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4.5, 0, TAU); ctx.fill(); };
+  if (armsUp) {
+    // blessing: one hand raised, one resting on Jacob's head
+    ctx.beginPath(); ctx.moveTo(-10 * dir, -36); ctx.lineTo(-20 * dir, -74); ctx.moveTo(10 * dir, -36); ctx.quadraticCurveTo(30 * dir, -56, 50 * dir, -58); ctx.stroke();
+    hand(-20 * dir, -74); hand(50 * dir, -58);
+  } else {
+    ctx.beginPath(); ctx.moveTo(10 * dir, -36); ctx.quadraticCurveTo(26 * dir, -40, 34 * dir, -46); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8 * dir, -34); ctx.quadraticCurveTo(14 * dir, -24, 30 * dir, -30); ctx.stroke();
+    hand(34 * dir, -46); hand(30 * dir, -30);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles and popups
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffd0a0']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 60, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; popups[i].y -= 40 * dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t * 2, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,20,50,0.85)'; ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1; cfg = makeConfig(1);
+  dawn = dawnShown = 0;
+  showOverlay('Wrestling till Dawn', 'Hold on until the sun comes up',
+    `${verseHTML('alone')}
+     <ul>
+       <li>All night long by the river, Jacob held on to a mysterious man. He would not let go until the man <b>blessed</b> him!</li>
+       <li>A marker slides along the bar. <b>Tap</b> (anywhere) when it is in the <b>gold zone</b> to hold on tight.</li>
+       <li>Every good hold brings the <b>dawn</b> a little closer. Tap right in the <b>bright middle</b> for a <b>Perfect!</b></li>
+       <li>Tapping at the wrong moment, or <b>missing a beat</b>, loosens Jacob's <b>grip</b>. If it runs out, try again!</li>
+       <li>Each night is faster, and later the gold zone <b>moves</b>.</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> to hold.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start', () => { level = 1; totalScore = 0; introduced = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  phase = 0.25; marker = tri(phase);   // the marker starts at the right-hand end
+  placeZone(true);
+  inZone = false; tappedThisPass = false;
+  grip = 100; holds = 0; dawn = 0; dawnShown = 0;
+  streak = 0; bestStreak = 0; perfects = 0; slips = 0;
+  lean = 0; leanV = 0;
+  particles = []; popups = [];
+  bubble = null; saidDay = saidHold = false;
+  levelScore = 0;
+  playT = 0; winT = 0; failT = 0;
+  flashT = shakeT = 0; endTimer = 0; zoneFlash = 0;
+}
+
+const LEVEL_TIPS = [
+  'Tap when the marker is inside the <b>gold zone</b>. Take your time: it is slow tonight.',
+  'A little faster now. Find the <b>rhythm</b>: tap, tap, tap…',
+  'The gold zone <b>moves</b> after every good hold. Watch where it goes!',
+  'The marker <b>speeds up and slows down</b>. Stay calm and watch it.',
+  'Smaller zone, longer night. Don\'t let go!',
+  'The last and longest night. Hold on until daybreak!',
+];
+
+function startLevel(retry = false) {
+  resetLevel();
+  sfx.levelStart();
+  if (retry || introduced === level) { beginPlay(); return; }
+  introduced = level;   // the level card shows once; retries go straight in
+  state = 'intro';
+  syncAmbience();
+  showOverlay(`Night ${level}`, cfg.name,
+    `${verseHTML('hold')}
+     <p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     <p class="score">${cfg.holds} good holds until sunrise</p>`,
+    'Hold on!', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(level === 1 ? 'Tap when the marker is in the gold!' : `Night ${level}: ${cfg.name}`, 2.4);
+}
+
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const gripBonus = Math.round(grip) * 5;
+  const levelBonus = level * 200;
+  const clean = slips === 0 ? 300 : 0;
+  const score = levelScore + gripBonus + levelBonus + clean;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('wrestleBest', best); } catch (e) {} }
+  lastScore = { holdPts: levelScore, gripBonus, levelBonus, clean, score };
+  bubble = { key: 'newName', who: 'man', t: 4.5 };
+  showMessage('The sun is up!', 2);
+  sfx.win();
+  endTimer = 4.4;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  bubble = null;
+  showMessage('Jacob lost his grip…', 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NLEV;
+    if (last) state = 'done';
+    showOverlay(last ? 'Israel!' : 'Day is breaking!', `Night ${level} complete — ${cfg.name}`,
+      `${verseHTML('israel')}
+       <p style="text-align:center">Jacob held on, and God blessed him and gave him a new name: <b>Israel</b>.</p>
+       <p class="score">Holds: <b>${s.holdPts}</b> (${perfects} perfect, best run ${bestStreak})<br>Grip left: <b>${s.gripBonus}</b><br>${s.clean ? `No slips: <b>${s.clean}</b><br>` : ''}Night bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${last ? '<p style="text-align:center"><b>You held on through every night. Well done!</b></p>' : ''}
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next night', last ? () => { level = 1; totalScore = 0; introduced = 0; startLevel(); } : () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Hold on, Jacob!', `Night ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Jacob's grip slipped before the sun came up. Watch the marker and tap <b>only when it is in the gold</b> &mdash; once every time it passes.</p>
+       ${verseHTML('notLetGo')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Night ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'play' && (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') && !e.repeat) grab();
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'play') grab();
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  huff() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 0.8;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.18, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.18);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + 0.2);
+  },
+  // the tune climbs as the dawn comes closer
+  hold(f, perfect) { if (!this.ctx) return; Music.tap(clamp(0.15 + f * 0.8, 0, 1)); this.huff(); if (perfect) this.tone(1568, 0.25, 'sine', 0.08, 0.05); },
+  slip() { this.tone(240, 0.22, 'triangle', 0.22, 0, 150); this.huff(); },
+  tick() { this.tone(900, 0.05, 'triangle', 0.05); },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: the riverbank from night to dawn
+// ============================================================
+function drawScene() {
+  const d = dawnShown;
+  const top = -offY, left = -offX, right = W + offX;
+  const sky = ctx.createLinearGradient(0, top, 0, 520);
+  sky.addColorStop(0, mix('#0b1433', '#6fb3ea', d));
+  sky.addColorStop(0.6, mix('#1d2856', '#f2a98a', d));
+  sky.addColorStop(1, mix('#33366a', '#ffd48a', d));
+  ctx.fillStyle = sky; ctx.fillRect(left, top, right - left, 540 - top);
+  // stars fade out
+  const sa = clamp(1 - d * 1.5, 0, 1);
+  if (sa > 0) {
+    for (let i = 0; i < 70; i++) {
+      const x = left + hash(i, 1) * (right - left), y = top + hash(i, 2) * (420 - top);
+      const tw = 0.6 + 0.4 * Math.sin(t * (1 + hash(i, 3) * 2) + i);
+      ctx.globalAlpha = sa * tw;
+      ctx.fillStyle = '#fff8dc';
+      ctx.beginPath(); ctx.arc(x, y, 1 + hash(i, 4) * 1.6, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // moon sets, sun rises
+  if (d < 0.45) {
+    ctx.globalAlpha = 1 - d / 0.45;
+    ctx.fillStyle = '#fff3c4';
+    ctx.beginPath(); ctx.arc(W * 0.8, lerp(top + 120, 470, d), 30, 0, TAU); ctx.fill();
+    ctx.fillStyle = mix('#0b1433', '#6fb3ea', d);
+    ctx.beginPath(); ctx.arc(W * 0.8 + 12, lerp(top + 120, 470, d) - 8, 26, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  const sunY = lerp(560, 300, ease(clamp((d - 0.45) / 0.55, 0, 1)));
+  const glow = ctx.createRadialGradient(W * 0.25, sunY, 10, W * 0.25, sunY, 260);
+  glow.addColorStop(0, `rgba(255,220,140,${0.7 * d})`); glow.addColorStop(1, 'rgba(255,200,120,0)');
+  ctx.fillStyle = glow; ctx.fillRect(left, top, right - left, 600 - top);
+  ctx.fillStyle = '#ffd25a';
+  ctx.beginPath(); ctx.arc(W * 0.25, sunY, 46, 0, TAU); ctx.fill();
+  // hills
+  ctx.fillStyle = mix('#1a2340', '#7a9a6a', d);
+  ctx.beginPath(); ctx.moveTo(left, 500);
+  for (let x = left; x <= right + 40; x += 40) ctx.lineTo(x, 420 + Math.sin(x * 0.007) * 30 + Math.sin(x * 0.019) * 12);
+  ctx.lineTo(right, 560); ctx.lineTo(left, 560); ctx.fill();
+  // near bank
+  ctx.fillStyle = mix('#232c3c', '#8a9a5a', d);
+  ctx.beginPath(); ctx.moveTo(left, 480);
+  for (let x = left; x <= right + 40; x += 40) ctx.lineTo(x, 470 + Math.sin(x * 0.013 + 2) * 10);
+  ctx.lineTo(right, 560); ctx.lineTo(left, 560); ctx.fill();
+  // the river Jabbok
+  const rg = ctx.createLinearGradient(0, 520, 0, 600);
+  rg.addColorStop(0, mix('#1c2b55', '#7cc0e8', d)); rg.addColorStop(1, mix('#14204a', '#4f9ac8', d));
+  ctx.fillStyle = rg; ctx.fillRect(left, 520, right - left, 80);
+  ctx.strokeStyle = `rgba(255,255,255,${0.25 + d * 0.2})`; ctx.lineWidth = 2;
+  for (let i = 0; i < 14; i++) {
+    const x = left + ((i * 97 + t * 25) % (right - left + 80)) - 40, y = 534 + (i % 4) * 16;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 12, y - 4, x + 24, y); ctx.stroke();
+  }
+  // ground where they wrestle
+  ctx.fillStyle = mix('#2c3328', '#b59a62', d);
+  ctx.beginPath(); ctx.moveTo(left, 600);
+  for (let x = left; x <= right + 40; x += 40) ctx.lineTo(x, 592 + Math.sin(x * 0.02) * 5);
+  ctx.lineTo(right, H + 10); ctx.lineTo(left, H + 10); ctx.fill();
+  // stones and reeds
+  for (let i = 0; i < 9; i++) {
+    const x = left + hash(i, 7) * (right - left), y = 640 + hash(i, 8) * 30;
+    if (Math.abs(x - W / 2) < 120) continue;
+    ctx.fillStyle = mix('#3a4038', '#9a8a6a', d);
+    ctx.beginPath(); ctx.ellipse(x, y, 14 + hash(i, 9) * 14, 7 + hash(i, 9) * 5, 0, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = mix('#2a3a2a', '#5a8a3a', d); ctx.lineWidth = 3;
+  for (let i = 0; i < 12; i++) {
+    const x = left + hash(i, 11) * (right - left);
+    if (Math.abs(x - W / 2) < 100) continue;
+    const sw = Math.sin(t * 1.5 + i) * 3;
+    ctx.beginPath(); ctx.moveTo(x, 600); ctx.quadraticCurveTo(x + 2, 580, x + 4 + sw, 556 - hash(i, 12) * 20); ctx.stroke();
+  }
+  // Jacob's camp fire across the river, far away
+  if (d < 0.6) {
+    ctx.globalAlpha = 1 - d / 0.6;
+    ctx.fillStyle = '#ffb347';
+    ctx.beginPath(); ctx.arc(W * 0.9, 476, 4 + Math.sin(t * 9) * 1, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPair() {
+  const cx = W / 2, cy = 640;
+  const sway = Math.sin(t * 1.6) * 0.05 + lean * 0.12;
+  const s = 1.7;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  // a soft light around the man (God's presence, gentle)
+  const g = ctx.createRadialGradient(22, -50, 4, 22, -50, 90);
+  g.addColorStop(0, `rgba(255,250,220,${0.28 + dawnShown * 0.2})`); g.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(22, -50, 90, 0, TAU); ctx.fill();
+  const won = state === 'win' || state === 'done';
+  const jMood = won ? 'joy' : state === 'fail' ? 'tired' : grip < 35 ? 'tired' : 'effort';
+  if (won) {
+    // the blessing: Jacob kneels, the man lays his hands on him
+    const k = ease(clamp(winT / 0.8, 0, 1));
+    // a gentle light of blessing behind Jacob
+    const bg = ctx.createRadialGradient(-28, -50, 4, -28, -50, 70);
+    bg.addColorStop(0, `rgba(255,246,190,${k * (0.6 + 0.2 * Math.sin(t * 4))})`); bg.addColorStop(1, 'rgba(255,246,190,0)');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(-28, -50, 70, 0, TAU); ctx.fill();
+    drawWrestler(MAN, lerp(29, 34, k), 0, -1, lerp(0.2, 0, k), 'kind', k > 0.5);
+    ctx.save(); ctx.translate(lerp(-29, -30, k), lerp(0, 8, k)); ctx.scale(1, lerp(1, 0.86, k));
+    drawWrestler(JACOB, 0, 0, 1, lerp(0.22, -0.08, k), jMood, false);
+    ctx.restore();
+  } else {
+    drawWrestler(JACOB, -29 + lean * 3, 0, 1, 0.2 + sway, jMood, false);
+    drawWrestler(MAN, 29 + lean * 3, 0, -1, 0.22 - sway, state === 'fail' ? 'kind' : 'calm', false);
+  }
+  ctx.restore();
+}
+
+function drawBubble() {
+  if (!bubble) return;
+  const a = clamp(bubble.t / 0.4, 0, 1) * clamp((5 - bubble.t) * 4, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, a + 0.2);
+  ctx.font = '600 19px Fredoka, sans-serif';
+  const text = bubbleText(bubble.key);
+  const maxW = Math.min(300, W * 0.62);
+  const lines = wrapText(text, maxW - 28);
+  const bw = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 30);
+  const bh = lines.length * 24 + 18;
+  const hx = W / 2 + (bubble.who === 'man' ? 40 : -40);
+  const bx = clamp(hx - bw / 2 + (bubble.who === 'man' ? 50 : -50), 10, W - bw - 10);
+  const by = 640 - 1.7 * 85 - bh - 26;
+  ctx.fillStyle = bubble.who === 'man' ? '#fffbe8' : '#ffffff';
+  ctx.strokeStyle = bubble.who === 'man' ? '#e0b84a' : '#6a8a9a'; ctx.lineWidth = 2.5;
+  roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx - 8, by + bh - 1); ctx.lineTo(hx, by + bh + 16); ctx.lineTo(hx + 8, by + bh - 1); ctx.fill();
+  ctx.fillStyle = '#3b2f1e'; ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 30 + i * 24));
+  ctx.restore();
+}
+
+function drawMeter() {
+  const M = meterBox();
+  ctx.save();
+  // panel
+  ctx.fillStyle = 'rgba(20,24,50,0.55)';
+  roundRect(M.x - 14, M.y - 40, M.w + 28, M.h + 118, 20); ctx.fill();
+  // bar
+  ctx.fillStyle = '#f3ead2';
+  roundRect(M.x, M.y, M.w, M.h, 25); ctx.fill();
+  // gold zone + bright perfect middle
+  const zx = M.x + M.w * (zone.c - zone.w / 2), zw = M.w * zone.w;
+  ctx.fillStyle = '#f2b632';
+  roundRect(zx, M.y + 4, zw, M.h - 8, 18); ctx.fill();
+  const px = M.x + M.w * (zone.c - zone.w * PERFECT / 2), pw = M.w * zone.w * PERFECT;
+  ctx.fillStyle = '#fff09a';
+  roundRect(px, M.y + 8, pw, M.h - 16, 12); ctx.fill();
+  if (zoneFlash > 0) {
+    ctx.fillStyle = zoneFlashGood ? `rgba(255,255,255,${zoneFlash * 2})` : `rgba(240,80,80,${zoneFlash * 1.5})`;
+    roundRect(M.x, M.y, M.w, M.h, 25); ctx.fill();
+  }
+  // the marker: Jacob's hand
+  const mx = M.x + M.w * marker;
+  const inside = Math.abs(marker - zone.c) <= zone.w / 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  roundRect(mx - 9, M.y - 10 + 4, 18, M.h + 20, 9); ctx.fill();
+  ctx.fillStyle = inside ? '#2fbf8a' : '#5a4a8a';
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  roundRect(mx - 9, M.y - 10, 18, M.h + 20, 9); ctx.fill(); ctx.stroke();
+  // grip and dawn meters underneath
+  ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff4d0';
+  const gy = M.y + M.h + 22;
+  const half = (M.w - 20) / 2;
+  ctx.fillText('Grip', M.x, gy + 4);
+  ctx.fillText('Dawn', M.x + half + 20, gy + 4);
+  const bar = (x, w, f, c1, c2, warn) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'; roundRect(x, gy + 12, w, 16, 8); ctx.fill();
+    const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = warn && Math.sin(t * 10) > 0 ? '#ff6b6b' : g;
+    if (f > 0) { roundRect(x, gy + 12, Math.max(16, w * f), 16, 8); ctx.fill(); }
+  };
+  bar(M.x, half, grip / 100, '#e8505b', '#f2a03c', grip < 30);
+  bar(M.x + half + 20, half, holds / cfg.holds, '#f28a5a', '#ffe27a', false);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff4d0';
+  ctx.fillText(`${holds} / ${cfg.holds}`, M.x + M.w, gy + 4);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-3, 3) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawScene();
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawPair();
+  if (state !== 'title') drawMeter();
+  drawParticles();
+  drawBubble();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  ctx.fillStyle = '#fff4d0';
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Wrestling till Dawn' : `Night ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.textAlign = 'right';
+    ctx.font = '700 18px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + levelScore}`, viewW - 12, 26);
+    if (streak >= 3) { ctx.font = '600 15px Fredoka, sans-serif'; ctx.fillStyle = '#ffe27a'; ctx.fillText(`Run ×${streak}`, viewW - 12, 48); }
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 560));
+  const y0 = offY + 170;   // up in the sky, clear of the pair and the meter
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28 - (lines.length - 1) * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,20,50,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePerson(JACOB, dt); updatePerson(MAN, dt);
+  zoneFlash = Math.max(0, zoneFlash - dt);
+  // lean springs back to the middle
+  leanV += -lean * 6 * dt; leanV *= Math.pow(0.08, dt); lean = clamp(lean + leanV * dt, -1.5, 1.5);
+  if (state === 'play') {
+    playT += dt;
+    dawn = holds / cfg.holds;
+    updateMeter(dt);
+    if (state === 'play') {
+      if (dawn >= 0.7 && !saidDay) { saidDay = true; bubble = { key: 'dayBreaks', who: 'man', t: 2.6 }; }
+      else if (saidDay && !saidHold && (!bubble || bubble.t < 0.2) && dawn >= 0.78) { saidHold = true; bubble = { key: 'notLetGo', who: 'jacob', t: 2.8 }; }
+    }
+  } else if (state === 'win' || state === 'done') {
+    winT += dt;
+    dawn = 1;
+    if (Math.random() < dt * 8) sparkleBurst(W / 2 + rand(-80, 80), 560 + rand(-60, 20), 2);
+  } else if (state === 'fail') failT += dt;
+  dawnShown += (dawn - dawnShown) * (1 - Math.pow(0.1, dt));
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

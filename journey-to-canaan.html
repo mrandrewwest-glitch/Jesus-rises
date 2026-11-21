@@ -1,0 +1,1410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#c8a060">
+<title>Journey to Canaan</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #c8a060;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.1rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Journey to Canaan</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  getOut: { ref: 'Genesis 12:1', KJV: 'Now the Lord had said unto Abram, Get thee out of thy country, and from thy kindred, and from thy father\'s house, unto a land that I will shew thee:', NKJV: 'Now the Lord had said to Abram: “Get out of your country, From your family And from your father’s house, To a land that I will show you.', NIV: 'The Lord had said to Abram, “Go from your country, your people and your father’s household to the land I will show you.', NLT: 'The Lord had said to Abram, “Leave your native country, your relatives, and your father’s family, and go to the land that I will show you.' },
+  // Level cards
+  departed: { ref: 'Genesis 12:4', KJV: 'So Abram departed, as the Lord had spoken unto him; and Lot went with him', NKJV: 'So Abram departed as the Lord had spoken to him, and Lot went with him.', NIV: 'So Abram went, as the Lord had told him; and Lot went with him.', NLT: 'So Abram departed as the Lord had instructed, and Lot went with him.' },
+  took: { ref: 'Genesis 12:5', KJV: 'And Abram took Sarai his wife, and Lot his brother\'s son, and all their substance that they had gathered', NKJV: 'Then Abram took Sarai his wife and Lot his brother’s son, and all their possessions that they had gathered', NIV: 'He took his wife Sarai, his nephew Lot, all the possessions they had accumulated', NLT: 'He took his wife, Sarai, his nephew Lot, and all his wealth—his livestock' },
+  byFaith: { ref: 'Hebrews 11:8', KJV: 'By faith Abraham, when he was called to go out into a place which he should after receive for an inheritance, obeyed; and he went out, not knowing whither he went.', NKJV: 'By faith Abraham obeyed when he was called to go out to the place which he would receive as an inheritance. And he went out, not knowing where he was going.', NIV: 'By faith Abraham, when called to go to a place he would later receive as his inheritance, obeyed and went, even though he did not know where he was going.', NLT: 'It was by faith that Abraham obeyed when God called him to leave home and go to another land that God would give him as his inheritance. He went without knowing where he was going.' },
+  bless: { ref: 'Genesis 12:2', KJV: 'And I will make of thee a great nation, and I will bless thee, and make thy name great; and thou shalt be a blessing', NKJV: 'I will make you a great nation; I will bless you And make your name great; And you shall be a blessing.', NIV: 'I will make you into a great nation, and I will bless you; I will make your name great, and you will be a blessing.', NLT: 'I will make you into a great nation. I will bless you and make you famous, and you will be a blessing to others.' },
+  wentForth: { ref: 'Genesis 12:5', KJV: 'and they went forth to go into the land of Canaan; and into the land of Canaan they came.', NKJV: 'and they departed to go to the land of Canaan. So they came to the land of Canaan.', NIV: 'and they set out for the land of Canaan, and they arrived there.', NLT: 'and headed for the land of Canaan. When they arrived in Canaan' },
+  // Final win card
+  thisLand: { ref: 'Genesis 12:7', KJV: 'And the Lord appeared unto Abram, and said, Unto thy seed will I give this land: and there builded he an altar unto the Lord, who appeared unto him.', NKJV: 'Then the Lord appeared to Abram and said, “To your descendants I will give this land.” And there he built an altar to the Lord, who had appeared to him.', NIV: 'The Lord appeared to Abram and said, “To your offspring I will give this land.” So he built an altar there to the Lord, who had appeared to him.', NLT: 'Then the Lord appeared to Abram and said, “I will give this land to your descendants.” And Abram built an altar there and dedicated it to the Lord, who had appeared to him.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes more road ahead
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning and levels
+// ============================================================
+const LANE_W = 150;
+const LEAD_Y = 690;       // where Abram walks (playfield y)
+const LANES = 3;
+const laneX = (k) => W / 2 + (k - 1) * LANE_W;
+
+const LEVELS = [
+  { name: 'Leaving Haran',          speed: 190, rowGap: 340, pTwo: 0,    wadi: 0,    storm: 0,    days: 2, dayLen: 3600, drain: 0.045, wellGap: 1500, verse: 'departed' },
+  { name: 'Across the Desert',      speed: 215, rowGap: 310, pTwo: 0.15, wadi: 0,    storm: 0,    days: 3, dayLen: 3800, drain: 0.05,  wellGap: 1800, verse: 'took' },
+  { name: 'The Dry Wadis',          speed: 240, rowGap: 290, pTwo: 0.25, wadi: 0.35, storm: 0,    days: 3, dayLen: 4000, drain: 0.055, wellGap: 2100, verse: 'byFaith' },
+  { name: 'Dust Storms',            speed: 260, rowGap: 275, pTwo: 0.3,  wadi: 0.3,  storm: 0.22, days: 4, dayLen: 4000, drain: 0.05,  wellGap: 2400, verse: 'bless' },
+  { name: 'The Long Dry Road',      speed: 285, rowGap: 260, pTwo: 0.4,  wadi: 0.35, storm: 0.28, days: 4, dayLen: 4200, drain: 0.055, wellGap: 2700, verse: 'byFaith' },
+  { name: 'Into the Land of Canaan', speed: 310, rowGap: 245, pTwo: 0.45, wadi: 0.4,  storm: 0.32, days: 5, dayLen: 4400, drain: 0.06,  wellGap: 3000, verse: 'wentForth' },
+];
+const LAST = LEVELS.length;
+const LEVEL_NEWS = [
+  '<b>Tap left or right</b> of the caravan to move it to the next path. Walk through the <b>wells</b> to fill up with water, and keep away from <b>rocks</b> and <b>thorn bushes</b>!',
+  'Sometimes two paths are blocked: find the open one! Little <b>lost lambs</b> want to join the flock.',
+  'Watch out for <b>wadis</b>: deep dry gullies across the path. Wells are further apart now.',
+  '<b>Dust storms</b> swirl across the paths. Dodge them!',
+  'A long, dry road with few wells. Do not miss one!',
+  'The last and longest journey. At the end is the land God promised!',
+];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('canaanBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0;
+let dist = 0;             // how far the caravan has walked (px)
+let lane = 1;             // the path Abram is on (0..2)
+let leadX = 0;            // Abram's x, easing to his lane
+let trail = [];           // Abram's past x positions, for the followers
+let objs = [];            // things on the road
+let rowT = 0, sinceWell = 0;
+let water = 1;
+let day = 1, dayDist = 0, night = 0, nightOn = false, campRowCount = 0;
+let camping = 0;          // seconds left of resting at camp
+let arriving = false, arriveObj = null;
+let bumps = 0, wells = 0, lambs = 0, dates = 0;
+let bumpT = 0;
+let particles = [];
+let floaters = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0, winT = 0, failT = 0;
+let told = {};
+let lastResult = null;
+const abram = { mood: 'watch', moodT: 0, blinkT: 2, blink: 0 };
+
+// ============================================================
+//  Particles and floating words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#bfe8ff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.1), cols[i % cols.length], rand(2, 4.5), 60, i % 3 ? 'dot' : 'star');
+  }
+}
+function dustPuff(x, y, n = 10) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-20, 20), y + rand(-10, 10), rand(-60, 60), rand(-50, 10), rand(0.5, 1), pick(['rgba(214,186,130,0.8)', 'rgba(230,206,160,0.75)']), rand(5, 11), 0, 'puff');
+}
+function splash(x, y) {
+  for (let i = 0; i < 16; i++) { const a = rand(-Math.PI, 0); spawn(x, y, Math.cos(a) * rand(40, 140), Math.sin(a) * rand(60, 180), rand(0.4, 0.8), pick(['#7cc4f2', '#bfe8ff', '#ffffff']), rand(2.5, 4.5), 400); }
+}
+function floatText(x, y, text, color = '#fff6d0') { floaters.push({ x, y, text, color, t: 1.2 }); }
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'puff') { p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.3, dt); p.size += dt * 10; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 34 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = p.kind === 'puff' ? a * 0.7 : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.font = '700 20px Fredoka, sans-serif';
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(70,40,10,0.85)';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  The road ahead
+// ============================================================
+const SIZES = { rock: 34, bush: 34, wadi: 30, well: 40, lamb: 26, palm: 36, camp: 46, storm: 56, tree: 80 };
+function addObj(kind, ln, extra = {}) {
+  const o = { kind, lane: ln, x: laneX(ln), y: -offY - 90, r: SIZES[kind], hit: false, ph: rand(0, TAU), ...extra };
+  objs.push(o);
+  return o;
+}
+function stormOnScreen() { return objs.some((o) => o.kind === 'storm' && o.y < LEAD_Y + 60); }
+
+function spawnRow() {
+  if (arriving) return;
+  const lanes = [0, 1, 2];
+  // nightfall: a place to pitch the tents
+  if (nightOn) {
+    campRowCount++;
+    if (campRowCount % 2 === 1) { addObj('camp', pick(lanes)); return; }
+  }
+  // a well when it is time for one
+  if (sinceWell >= cfg.wellGap) {
+    sinceWell = 0;
+    const wl = pick(lanes);
+    addObj('well', wl);
+    if (level >= 3 && Math.random() < 0.5) addObj(pick(['rock', 'bush']), pick(lanes.filter((k) => k !== wl)));
+    return;
+  }
+  // obstacles, always leaving at least one path open
+  const two = Math.random() < cfg.pTwo && !stormOnScreen();
+  const free = pick(lanes);
+  const blocked = shuffle3(lanes.filter((k) => k !== free)).slice(0, two ? 2 : 1);
+  if (two && cfg.wadi && Math.random() < cfg.wadi && Math.abs(blocked[0] - blocked[1]) === 1) {
+    addObj('wadi', Math.min(...blocked), { span: 2 });
+  } else {
+    for (const k of blocked) addObj(cfg.wadi && Math.random() < cfg.wadi * 0.5 ? 'wadi' : pick(['rock', 'bush']), k, { span: 1 });
+  }
+  // something nice in the open path now and then
+  const r = Math.random();
+  if (r < 0.16) addObj('lamb', free);
+  else if (r < 0.3) addObj('palm', free);
+  // dust storms drift across the paths
+  if (cfg.storm && dist > 1500 && Math.random() < cfg.storm * 0.5 && !stormOnScreen()) {
+    const from = Math.random() < 0.5 ? 0 : 2;
+    const o = addObj('storm', from, { vx: (from === 0 ? 1 : -1) * rand(40, 60) });
+    o.y -= cfg.rowGap / 2;
+    if (!told.storm) { told.storm = true; showMessage('A dust storm! Keep out of its way.', 2.4); }
+  }
+}
+function shuffle3(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function moveLane(d) {
+  if (state !== 'play' || camping > 0) return;
+  const n = clamp(lane + d, 0, LANES - 1);
+  if (n === lane) { sfx.tick(0.2); return; }
+  lane = n;
+  sfx.step();
+}
+
+function curLane() { return clamp(Math.round((leadX - W / 2) / LANE_W) + 1, 0, LANES - 1); }
+
+function touches(o) {
+  const dy = Math.abs(o.y - LEAD_Y);
+  if (o.kind === 'storm') return dy < 46 && Math.abs(o.x - leadX) < 70;
+  if (dy > o.r * 0.7 + 18) return false;
+  const span = o.span || 1;
+  const cl = curLane();
+  return cl >= o.lane && cl < o.lane + span && Math.abs(leadX - laneX(cl)) < 60;
+}
+
+function meet(o) {
+  o.hit = true;
+  const x = leadX, y = LEAD_Y;
+  switch (o.kind) {
+    case 'well':
+      water = 1; wells++; levelScore += 100;
+      splash(o.x, o.y);
+      floatText(x, y - 70, 'Fresh water! +100', '#bfe8ff');
+      abram.mood = 'joy'; abram.moodT = 1.2;
+      sfx.well();
+      break;
+    case 'lamb':
+      lambs++; levelScore += 150;
+      sparkleBurst(o.x, o.y, 12);
+      floatText(x, y - 70, 'A lost lamb! +150', '#fff6d0');
+      sfx.lamb();
+      if (!told.lamb) { told.lamb = true; showMessage('The lamb joins the flock!', 1.8); }
+      break;
+    case 'palm':
+      dates++; levelScore += 50;
+      water = Math.min(1, water + 0.05);
+      sparkleBurst(o.x, o.y, 8, ['#c0662a', '#ffe27a', '#8ac04a']);
+      floatText(x, y - 70, 'Sweet dates! +50', '#ffe27a');
+      sfx.pick();
+      break;
+    case 'camp':
+      startCamp(o);
+      break;
+    case 'tree':
+      arrive();
+      break;
+    default:
+      bump(o);
+  }
+}
+
+function bump(o) {
+  bumps++;
+  water = Math.max(0, water - (o.kind === 'storm' ? 0.2 : 0.16));
+  bumpT = 0.8;
+  shakeT = 0.25;
+  dustPuff(leadX, LEAD_Y - 10, 14);
+  for (let i = 0; i < 5; i++) spawn(leadX + rand(-12, 12), LEAD_Y - 60, rand(-40, 40), rand(-40, -10), 0.9, '#ffe27a', 4, 40, 'star');
+  floatText(leadX, LEAD_Y - 80, o.kind === 'wadi' ? 'Bump! Into the wadi!' : o.kind === 'storm' ? 'Whoosh! Dust everywhere!' : 'Ouch!', '#ffd0b0');
+  abram.mood = 'ouch'; abram.moodT = 1.2;
+  sfx.bump();
+  if (!told.bump) { told.bump = true; showMessage('Bumps spill the water! Tap left or right to dodge.', 2.6); }
+}
+
+function startCamp(o) {
+  camping = 2.8;
+  nightOn = false;
+  campRowCount = 0;
+  levelScore += 200;
+  water = Math.min(1, water + 0.3);
+  objs = objs.filter((q) => q === o);
+  abram.mood = 'sleepy'; abram.moodT = 3;
+  sfx.camp();
+  showMessage(day >= cfg.days ? 'One last night… Canaan is near!' : `Day ${day} done. Rest under the stars.`, 2.6);
+}
+
+function endCamp() {
+  objs = [];
+  day++;
+  dayDist = 0;
+  rowT = cfg.rowGap * 0.6;
+  if (day > cfg.days) {
+    // the last stretch: the land of Canaan and the great tree at Shechem
+    arriving = true;
+    arriveObj = addObj('tree', 1, { y: -offY - 200 });
+    showMessage('Look! The land of Canaan!', 2.6);
+  } else showMessage(`Day ${day} of ${cfg.days}`, 1.8);
+  abram.mood = 'watch'; abram.moodT = 0;
+}
+
+function arrive() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const waterBonus = Math.round(water * 500);
+  const careBonus = Math.max(0, 400 - bumps * 80);
+  const levelBonus = level * 200;
+  const score = levelScore + waterBonus + careBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('canaanBest', best); } catch (e) {} }
+  lastResult = { roadPts: levelScore, waterBonus, careBonus, levelBonus, score };
+  abram.mood = 'joy'; abram.moodT = 99;
+  flashT = 0.3;
+  sparkleBurst(leadX, LEAD_Y - 120, 40);
+  sfx.win();
+  showMessage(level === LAST ? 'The land God promised!' : 'Safe at the camp!', 2.6);
+  endTimer = level === LAST ? 4.4 : 3.2;
+}
+
+function failLevel() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  abram.mood = 'thirsty'; abram.moodT = 99;
+  showMessage('Out of water…', 2.4);
+  sfx.fail();
+  endTimer = 2.4;
+}
+
+function updatePlay(dt) {
+  if (camping > 0) {
+    camping -= dt;
+    night = Math.min(1, night + dt * 2);
+    if (camping <= 0) endCamp();
+    return;
+  }
+  const sp = cfg.speed * (bumpT > 0 ? 0.55 : 1) * (arriving ? 0.8 : 1);
+  const d = sp * dt;
+  dist += d;
+  levelScore += d / 20;
+  if (!arriving) { dayDist += d; sinceWell += d; }
+  bumpT = Math.max(0, bumpT - dt);
+  // nightfall
+  if (!arriving && !nightOn && dayDist > cfg.dayLen) {
+    nightOn = true; campRowCount = 0;
+    showMessage(told.night ? 'Night is falling. Find a camp!' : 'Night is falling! Walk into a camp to pitch the tents.', 2.6);
+    told.night = true;
+    sfx.night();
+  }
+  night = lerp(night, nightOn ? 1 : 0, 1 - Math.pow(0.3, dt));
+  // water
+  water -= cfg.drain * dt * (nightOn ? 1.25 : 1) * (arriving ? 0.3 : 1);
+  if (water < 0.3 && !told.thirsty) { told.thirsty = true; showMessage('Thirsty! Look for a well!', 2.2); }
+  if (water <= 0) { water = 0; failLevel(); return; }
+  if (water < 0.3) { abram.mood = abram.moodT > 0 ? abram.mood : 'thirsty'; }
+  // the road
+  rowT += d;
+  if (rowT >= cfg.rowGap) { rowT -= cfg.rowGap; spawnRow(); }
+  for (const o of objs) {
+    o.y += d;
+    if (o.kind === 'storm') {
+      o.x += o.vx * dt;
+      if (o.x < laneX(0) - 20 || o.x > laneX(2) + 20) o.vx *= -1;
+    }
+    if (!o.hit && touches(o)) { meet(o); if (state !== 'play' || camping > 0) return; }
+  }
+  objs = objs.filter((o) => o.y < H + 120);
+  if (arriveObj && !arriveObj.hit && arriveObj.y > LEAD_Y + 10) arrive();
+}
+
+function updateCommon(dt) {
+  t += dt;
+  updateParticles(dt);
+  const tx = laneX(lane);
+  leadX = lerp(leadX, tx, 1 - Math.pow(0.0002, dt));
+  trail.unshift(leadX);
+  if (trail.length > 400) trail.length = 400;
+  if (abram.moodT > 0) { abram.moodT -= dt; if (abram.moodT <= 0) abram.mood = 'watch'; }
+  abram.blinkT -= dt;
+  if (abram.blinkT <= 0) { abram.blink = 0.14; abram.blinkT = rand(2, 5); }
+  if (abram.blink > 0) abram.blink -= dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function resetRoad() {
+  objs = []; particles = []; floaters = []; trail = [];
+  lane = 1; leadX = laneX(1);
+  dist = 0; rowT = 0; sinceWell = 0;
+  water = 1; day = 1; dayDist = 0; night = 0; nightOn = false; campRowCount = 0;
+  camping = 0; arriving = false; arriveObj = null;
+  bumps = 0; wells = 0; lambs = 0; dates = 0; bumpT = 0;
+  levelScore = 0;
+  winT = 0; failT = 0; endTimer = 0; flashT = 0; shakeT = 0;
+  abram.mood = 'watch'; abram.moodT = 0;
+}
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = LEVELS[0];
+  resetRoad();
+  showOverlay('Journey to Canaan', 'Abram sets off for the land God will show him',
+    `${verseHTML('getOut')}
+     <ul>
+       <li>Lead Abram's caravan (Sarai, Lot, the camel and the sheep) across the desert.</li>
+       <li><b>Tap left</b> or <b>tap right</b> of the caravan to step onto the next path. (You can swipe, too.)</li>
+       <li>Walk through the <b>wells</b> to fill the water skins. If the water runs out, the journey stops!</li>
+       <li>Dodge <b>rocks</b>, <b>thorn bushes</b>, <b>wadis</b> and <b>dust storms</b>: bumps spill water.</li>
+       <li>When night falls, walk into a <b>camp</b> to pitch the tents. Lost <b>lambs</b> and <b>dates</b> give bonus points.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd> change path, <kbd>P</kbd> pause.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'card';
+  syncAmbience();
+  cfg = LEVELS[level - 1];
+  resetRoad();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${LEVEL_NEWS[level - 1]}</p>
+     <p class="score">A journey of <b>${cfg.days}</b> days</p>`,
+    'Set off!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  cfg = LEVELS[level - 1];
+  hideOverlay();
+  resetRoad();
+  if (!retry) told = {};
+  rowT = cfg.rowGap * 0.4;
+  sinceWell = cfg.wellGap * 0.45;
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 && !retry ? 'Tap left or right to change path!' : `Level ${level}: ${cfg.name}`, 2.6);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastResult;
+    const final = level === LAST;
+    showOverlay(final ? 'Into the land of Canaan!' : 'Journey done!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(final ? 'thisLand' : 'bless')}
+       ${final ? '<p style="text-align:center">Abram trusted God all the way, and God kept His promise. Abram built an altar to thank Him.</p>' : ''}
+       <p class="score">The road (wells ${wells}, lambs ${lambs}, dates ${dates}): <b>${Math.round(s.roadPts)}</b><br>Water left: <b>${s.waterBonus}</b><br>Careful walking (${bumps} bumps): <b>${s.careBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      final ? 'Play again' : 'Next journey', () => {
+        if (final) { level = 1; totalScore = 0; } else level++;
+        levelCard();
+      });
+  } else if (state === 'fail') {
+    showOverlay('Out of water!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The water skins ran dry. Steer into every <b>well</b> you see, and dodge the rocks so you don't spill any!</p>
+       ${verseHTML('byFaith')}
+       <p class="score">Day ${Math.min(day, cfg.days)} of ${cfg.days} &nbsp;&middot;&nbsp; Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The caravan stops for a rest. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+// Playfield point -> CSS pixels (used by the tests)
+function playToCss(x, y) { return { x: (x + offX) * scale / dpr, y: (y + offY) * scale / dpr }; }
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const v = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(v.vx - b.x, v.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const x = v.vx - offX;
+  if (x < leadX - 20) moveLane(-1);
+  else if (x > leadX + 20) moveLane(1);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') moveLane(-1);
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') moveLane(1);
+});
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tick(h = 0.5) { this.tone(500 + h * 400, 0.06, 'sine', 0.06); },
+  step() { if (this.ctx) { Music.tap(0.35 + lane * 0.2); this.noiseBurst(1400, 0.1, 0.12, 1.2); } },
+  well() { this.noiseBurst(2200, 0.4, 0.3, 0.6, 700); [784, 988, 1175].forEach((f, i) => this.tone(f, 0.3, 'sine', 0.1, 0.1 + i * 0.07)); },
+  lamb() { this.tone(700, 0.35, 'triangle', 0.12, 0, 640); this.tone(720, 0.25, 'triangle', 0.1, 0.12, 600); },
+  pick() { if (this.ctx) Music.tap(0.8); },
+  bump() { this.tone(140, 0.25, 'sine', 0.4, 0, 70); this.noiseBurst(400, 0.35, 0.3, 0.7, 150, 'lowpass'); },
+  night() { [523, 392, 330].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.08, i * 0.2)); },
+  camp() { [392, 494, 587, 784].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.08, i * 0.12)); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing: the desert
+// ============================================================
+function greenF() { return arriving && arriveObj ? clamp((arriveObj.y + offY + 300) / 900, 0, 1) : state === 'win' ? 1 : 0; }
+
+function drawGround() {
+  const top = -offY;
+  const g = greenF();
+  const sand = g ? `rgb(${Math.round(lerp(236, 170, g))},${Math.round(lerp(206, 200, g))},${Math.round(lerp(146, 110, g))})` : '#ecce92';
+  ctx.fillStyle = sand;
+  ctx.fillRect(-offX, top, viewW, H - top);
+  // dunes and grass on the sides, drifting past
+  const step = 90;
+  const k0 = Math.floor((dist - (H + 100)) / step), k1 = Math.ceil((dist + offY + 100) / step);
+  for (let k = k0; k <= k1; k++) {
+    const y = dist - k * step;
+    if (y < top - 60 || y > H + 60) continue;
+    for (const side of [-1, 1]) {
+      const r = hash(k, side);
+      const x = W / 2 + side * (LANE_W * 1.6 + r * Math.max(40, (viewW - LANE_W * 3) / 2 - 40));
+      if (r < 0.45) {
+        ctx.fillStyle = g > 0.5 ? 'rgba(90,150,70,0.5)' : 'rgba(200,160,100,0.45)';
+        ctx.beginPath(); ctx.ellipse(x, y, 50 + r * 40, 16 + r * 8, 0, 0, TAU); ctx.fill();
+      } else if (r < 0.7) {
+        drawTuft(x, y, g);
+      } else if (r < 0.8) {
+        ctx.fillStyle = '#b8a07a'; ctx.beginPath(); ctx.ellipse(x, y, 9, 6, 0, 0, TAU); ctx.fill();
+      }
+    }
+  }
+  // the three paths
+  for (let k = 0; k < LANES; k++) {
+    const x = laneX(k);
+    ctx.fillStyle = g ? `rgba(225,200,150,${0.6})` : 'rgba(248,228,184,0.75)';
+    ctx.fillRect(x - 46, top, 92, H - top);
+    ctx.fillStyle = 'rgba(190,150,95,0.35)';
+    for (let y = ((dist * 1) % 46) + top - 46; y < H; y += 46) {
+      ctx.beginPath(); ctx.ellipse(x - 12, y, 4, 7, 0, 0, TAU); ctx.ellipse(x + 12, y + 23, 4, 7, 0, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.strokeStyle = 'rgba(170,130,80,0.25)'; ctx.lineWidth = 2; ctx.setLineDash([14, 14]);
+  ctx.lineDashOffset = -dist;
+  for (const x of [laneX(0) + LANE_W / 2, laneX(1) + LANE_W / 2]) { ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, H); ctx.stroke(); }
+  ctx.setLineDash([]);
+}
+function drawTuft(x, y, g) {
+  ctx.strokeStyle = g > 0.5 ? '#4f8a3a' : '#9a9a50'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = -2; i <= 2; i++) { ctx.moveTo(x + i * 3, y + 6); ctx.quadraticCurveTo(x + i * 5, y - 4, x + i * 8, y - 10); }
+  ctx.stroke();
+}
+
+// ============================================================
+//  Drawing: things on the road
+// ============================================================
+function drawObj(o) {
+  const x = o.x, y = o.y;
+  ctx.save();
+  ctx.translate(x, y);
+  switch (o.kind) {
+    case 'rock': {
+      ctx.fillStyle = 'rgba(80,50,20,0.25)'; ctx.beginPath(); ctx.ellipse(4, 16, 40, 12, 0, 0, TAU); ctx.fill();
+      for (const [dx, dy, r, c] of [[-16, 4, 18, '#9a8f86'], [14, 6, 16, '#8a8079'], [0, -8, 22, '#aaa096']]) {
+        ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(dx, dy, r, r * 0.8, 0.3, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.ellipse(dx - r * 0.3, dy - r * 0.35, r * 0.4, r * 0.22, 0.3, 0, TAU); ctx.fill();
+      }
+      break;
+    }
+    case 'bush': {
+      ctx.fillStyle = 'rgba(80,50,20,0.22)'; ctx.beginPath(); ctx.ellipse(3, 18, 38, 11, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 34, Math.sin(a) * 26); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 22, Math.sin(a) * 17); ctx.lineTo(Math.cos(a + 0.3) * 30, Math.sin(a + 0.3) * 23); ctx.stroke();
+      }
+      ctx.fillStyle = '#7a8a3a';
+      for (let i = 0; i < 9; i++) { const a = i * 0.7; ctx.beginPath(); ctx.arc(Math.cos(a) * 16, Math.sin(a) * 11, 8, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#c0504a';
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 1.7) * 14, Math.sin(i * 1.7) * 9, 2.6, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'wadi': {
+      const w = (o.span || 1) * LANE_W - 30, cx = ((o.span || 1) - 1) * LANE_W / 2;
+      ctx.translate(cx, 0);
+      ctx.fillStyle = '#b98a52';
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -6);
+      for (let i = 0; i <= 10; i++) ctx.lineTo(-w / 2 + (w * i) / 10, -22 + (i % 2) * 8);
+      for (let i = 10; i >= 0; i--) ctx.lineTo(-w / 2 + (w * i) / 10, 22 - (i % 2) * 8);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#7a5530';
+      ctx.beginPath();
+      for (let i = 0; i <= 10; i++) ctx.lineTo(-w / 2 + 8 + ((w - 16) * i) / 10, -10 + (i % 2) * 5);
+      for (let i = 10; i >= 0; i--) ctx.lineTo(-w / 2 + 8 + ((w - 16) * i) / 10, 12 - (i % 2) * 5);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#9a8f86';
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(-w / 2 + 20 + i * (w - 40) / 3, (i % 2 ? 4 : -2), 4, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'well': {
+      const glow = o.hit ? 0 : 0.35 + 0.25 * Math.sin(t * 5 + o.ph);
+      ctx.fillStyle = `rgba(140,210,255,${glow})`; ctx.beginPath(); ctx.arc(0, 0, 52, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#a89c90'; ctx.beginPath(); ctx.arc(0, 0, 36, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#7a7068'; ctx.lineWidth = 2;
+      for (let i = 0; i < 10; i++) { const a = i * TAU / 10; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 25, Math.sin(a) * 25); ctx.lineTo(Math.cos(a) * 36, Math.sin(a) * 36); ctx.stroke(); }
+      ctx.fillStyle = '#3d8ac4'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.ellipse(-7, -7, 9, 4, -0.5, 0, TAU); ctx.fill();
+      // bucket on a rope
+      ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(30, -26); ctx.lineTo(38, -40); ctx.stroke();
+      ctx.fillStyle = '#8a5a32'; roundRect(32, -48, 14, 12, 3); ctx.fill();
+      break;
+    }
+    case 'lamb': {
+      const hop = Math.abs(Math.sin(t * 6 + o.ph)) * 5;
+      ctx.translate(0, -hop);
+      ctx.fillStyle = 'rgba(80,50,20,0.2)'; ctx.beginPath(); ctx.ellipse(0, 22 + hop, 22, 6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fbf8f0';
+      ctx.beginPath();
+      for (const [dx, dy, r] of [[-10, 4, 11], [10, 4, 11], [0, -2, 13], [-6, 12, 10], [6, 12, 10]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+      ctx.fill();
+      ctx.fillStyle = '#4a3a30'; ctx.fillRect(-8, 18, 4, 8); ctx.fillRect(4, 18, 4, 8);
+      // head (facing us: it is lost and looking for its mother)
+      ctx.fillStyle = '#4a3a30'; ctx.beginPath(); ctx.ellipse(-14, -10, 7, 4, -0.5, 0, TAU); ctx.ellipse(14, -10, 7, 4, 0.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f2e6d0'; ctx.beginPath(); ctx.arc(0, -8, 11, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-4, -10, 3, 3.6, 0, 0, TAU); ctx.ellipse(4, -10, 3, 3.6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(-4, -9.5, 1.8, 0, TAU); ctx.arc(4, -9.5, 1.8, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#e8909a'; ctx.beginPath(); ctx.ellipse(0, -3, 3, 2, 0, 0, TAU); ctx.fill();
+      break;
+    }
+    case 'palm': {
+      ctx.fillStyle = 'rgba(80,50,20,0.22)'; ctx.beginPath(); ctx.ellipse(8, 14, 40, 12, 0, 0, TAU); ctx.fill();
+      for (let i = 0; i < 7; i++) {
+        const a = i * TAU / 7 + 0.3 + Math.sin(t * 2 + o.ph) * 0.04;
+        ctx.fillStyle = i % 2 ? '#4f9a3a' : '#5aae44';
+        ctx.save(); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(22, -12, 44, 0); ctx.quadraticCurveTo(22, 10, 0, 0); ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#8a5a32'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#b5652a';
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(Math.cos(i) * 12, Math.sin(i) * 12, 4.5, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'camp': {
+      const glow = 0.4 + 0.3 * Math.sin(t * 5);
+      ctx.strokeStyle = `rgba(255,220,120,${glow})`; ctx.lineWidth = 5; ctx.setLineDash([10, 8]);
+      ctx.beginPath(); ctx.arc(0, 0, 54, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(210,180,120,0.6)'; ctx.beginPath(); ctx.arc(0, 0, 48, 0, TAU); ctx.fill();
+      // little tent and fire
+      ctx.fillStyle = '#5a4438';
+      ctx.beginPath(); ctx.moveTo(-34, 10); ctx.lineTo(-22, -24); ctx.lineTo(4, -24); ctx.lineTo(14, 10); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(230,200,150,0.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-30, -4); ctx.lineTo(10, -4); ctx.stroke();
+      ctx.fillStyle = '#ffcf70'; ctx.beginPath(); ctx.moveTo(-14, 10); ctx.lineTo(-11, -10); ctx.lineTo(-5, -10); ctx.lineTo(-2, 10); ctx.fill();
+      const fl = 10 + Math.sin(t * 10) * 3;
+      ctx.fillStyle = '#ff9a2a'; ctx.beginPath(); ctx.moveTo(22, 20); ctx.quadraticCurveTo(26, 20 - fl * 1.6, 30, 20); ctx.fill();
+      ctx.fillStyle = '#ffe080'; ctx.beginPath(); ctx.moveTo(24, 20); ctx.quadraticCurveTo(26, 20 - fl, 28, 20); ctx.fill();
+      break;
+    }
+    case 'storm': {
+      ctx.rotate(t * 3 + o.ph);
+      for (let i = 0; i < 4; i++) {
+        ctx.strokeStyle = `rgba(${190 - i * 15},${160 - i * 15},${110 - i * 10},${0.7 - i * 0.12})`;
+        ctx.lineWidth = 10 - i * 1.5;
+        ctx.beginPath(); ctx.arc(0, 0, 18 + i * 12, i * 1.3, i * 1.3 + 4.2); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(200,170,120,0.5)'; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+      break;
+    }
+    case 'tree': {
+      // the great tree at Shechem: the end of the journey
+      ctx.fillStyle = 'rgba(40,60,20,0.25)'; ctx.beginPath(); ctx.ellipse(10, 30, 110, 30, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#6a4a2a'; ctx.fillRect(-12, -10, 24, 40);
+      for (const [dx, dy, r, c] of [[-50, -20, 46, '#4f8a3a'], [48, -16, 44, '#4f8a3a'], [0, -50, 54, '#5aa044'], [-20, 0, 40, '#62aa4a'], [26, 4, 38, '#62aa4a']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+      const gl = ctx.createRadialGradient(0, -20, 10, 0, -20, 160);
+      gl.addColorStop(0, 'rgba(255,240,170,0.45)'); gl.addColorStop(1, 'rgba(255,240,170,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, -20, 160, 0, TAU); ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Drawing: the caravan (seen from behind as it walks away)
+// ============================================================
+function trailX(delay) {
+  const i = Math.min(trail.length - 1, Math.round(delay * 120));
+  return i >= 0 && trail.length ? trail[i] : leadX;
+}
+function walkBob(ph) { return state === 'play' && camping <= 0 ? Math.abs(Math.sin(t * 9 + ph)) * 3 : 0; }
+
+function drawWalker(x, y, robe, head, band, ph, staff = false, child = false) {
+  const s = child ? 0.85 : 1;
+  const b = walkBob(ph);
+  ctx.save(); ctx.translate(x, y - b); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(80,50,20,0.25)'; ctx.beginPath(); ctx.ellipse(0, 18 + b, 20, 7, 0, 0, TAU); ctx.fill();
+  // feet stepping
+  const st = state === 'play' && camping <= 0 ? Math.sin(t * 9 + ph) * 5 : 0;
+  ctx.fillStyle = '#7a5230';
+  ctx.beginPath(); ctx.ellipse(-7, 14 + st, 4, 6, 0, 0, TAU); ctx.ellipse(7, 14 - st, 4, 6, 0, 0, TAU); ctx.fill();
+  // robe from behind
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-17, 14); ctx.quadraticCurveTo(-20, -14, -10, -20); ctx.quadraticCurveTo(0, -24, 10, -20); ctx.quadraticCurveTo(20, -14, 17, 14); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(robe.startsWith('#') ? robe : '#888888', -30); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-6, -18); ctx.lineTo(-7, 12); ctx.moveTo(6, -18); ctx.lineTo(7, 12); ctx.stroke();
+  if (staff) {
+    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(22, 16); ctx.lineTo(24, -40); ctx.quadraticCurveTo(25, -50, 17, -48); ctx.stroke();
+    ctx.fillStyle = '#d39a66'; ctx.beginPath(); ctx.arc(22, -6, 4, 0, TAU); ctx.fill();
+  }
+  // head from behind, with head cloth
+  ctx.fillStyle = head;
+  ctx.beginPath(); ctx.arc(0, -30, 13, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-13, -30); ctx.lineTo(-14, -14); ctx.lineTo(14, -14); ctx.lineTo(13, -30); ctx.closePath(); ctx.fill();
+  if (band) { ctx.strokeStyle = band; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -30, 12.5, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawCamel(x, y, ph) {
+  const b = walkBob(ph) * 0.7;
+  ctx.save(); ctx.translate(x, y - b);
+  ctx.fillStyle = 'rgba(80,50,20,0.25)'; ctx.beginPath(); ctx.ellipse(0, 30 + b, 30, 9, 0, 0, TAU); ctx.fill();
+  const st = state === 'play' && camping <= 0 ? Math.sin(t * 6 + ph) * 6 : 0;
+  ctx.fillStyle = '#b07a42';
+  for (const [lx, d] of [[-16, st], [16, -st]]) { roundRect(lx - 5, 16 + d, 10, 18, 4); ctx.fill(); }
+  // body
+  ctx.fillStyle = '#d29a58';
+  ctx.beginPath(); ctx.ellipse(0, 0, 26, 38, 0, 0, TAU); ctx.fill();
+  // neck and head out in front
+  ctx.strokeStyle = '#d29a58'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -30); ctx.quadraticCurveTo(0, -52, 0, -60); ctx.stroke();
+  ctx.fillStyle = '#c48a4a'; ctx.beginPath(); ctx.ellipse(0, -66, 10, 13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#9a6a38'; ctx.beginPath(); ctx.ellipse(-8, -70, 3, 5, -0.4, 0, TAU); ctx.ellipse(8, -70, 3, 5, 0.4, 0, TAU); ctx.fill();
+  // saddle blanket and Sarai riding
+  ctx.fillStyle = '#b5503f'; roundRect(-24, -8, 48, 30, 8); ctx.fill();
+  ctx.strokeStyle = '#e8c860'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-24, 6); ctx.lineTo(24, 6); ctx.stroke();
+  ctx.restore();
+  drawWalker(x, y - 6 - b, '#c46b8c', '#f0c9a0', '#7a4fa0', ph, false, true);
+  // the tail
+  ctx.strokeStyle = '#9a6a38'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y + 36 - b); ctx.quadraticCurveTo(x + Math.sin(t * 4) * 6, y + 46, x + 2, y + 52); ctx.stroke();
+}
+
+function drawSheepBack(x, y, ph) {
+  const b = walkBob(ph + 1) * 0.8;
+  ctx.save(); ctx.translate(x, y - b);
+  ctx.fillStyle = 'rgba(80,50,20,0.2)'; ctx.beginPath(); ctx.ellipse(0, 14 + b, 18, 5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#4a3a30'; ctx.beginPath(); ctx.ellipse(0, -18, 6, 8, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-7, -19, 5, 3, -0.5, 0, TAU); ctx.ellipse(7, -19, 5, 3, 0.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#f6f2e8';
+  ctx.beginPath();
+  for (const [dx, dy, r] of [[-8, -4, 9], [8, -4, 9], [0, -8, 10], [-7, 6, 9], [7, 6, 9], [0, 4, 10]]) { ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU); }
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCaravan() {
+  const ys = [LEAD_Y, LEAD_Y + 84, LEAD_Y + 156];
+  // the flock trots along at the back
+  const nSheep = 3 + Math.min(lambs, 5);
+  for (let i = nSheep - 1; i >= 0; i--) {
+    const row = Math.floor(i / 2), col = i % 2;
+    const y = LEAD_Y + 196 + row * 26;
+    if (y > H + 20) continue;
+    drawSheepBack(trailX(0.5 + row * 0.08) + (col ? 16 : -16), y, i * 1.7);
+  }
+  drawWalker(trailX(0.38), ys[2], '#4b7f4b', '#c9a170', '#e8dcc0', 2.1);    // Lot
+  drawCamel(trailX(0.2), ys[1], 1.3);                                            // camel with Sarai
+  const lb = bumpT > 0 ? Math.sin(bumpT * 40) * 4 : 0;
+  drawWalker(leadX + lb, ys[0], '#4b6fa5', '#e8dcc0', '#a0522d', 0, true);    // Abram leads
+  if (bumpT > 0) {
+    for (let i = 0; i < 3; i++) {
+      const a = t * 6 + i * TAU / 3;
+      ctx.fillStyle = '#ffe27a';
+      const sx = leadX + Math.cos(a) * 18, sy = LEAD_Y - 52 + Math.sin(a) * 6;
+      ctx.beginPath(); for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? 2 : 5; ctx.lineTo(sx + Math.cos(an) * r, sy + Math.sin(an) * r); } ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+// Night: everything darkens except a warm lamp glow round the caravan
+function drawNight() {
+  const n = night * (state === 'win' ? Math.max(0, 1 - winT) : 1);
+  if (n <= 0.01) return;
+  const top = -offY;
+  const g = ctx.createRadialGradient(leadX, LEAD_Y - 40, 60, leadX, LEAD_Y - 40, camping > 0 ? 260 : 380);
+  g.addColorStop(0, `rgba(20,24,60,${0.15 * n})`);
+  g.addColorStop(1, `rgba(16,20,52,${0.8 * n})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, top, viewW, H - top);
+  // a few stars
+  ctx.fillStyle = `rgba(255,255,240,${0.8 * n})`;
+  for (let i = 0; i < 40; i++) {
+    const sx = hash(i, 7) * viewW - offX, sy = top + hash(i, 8) * (H - top) * 0.6;
+    ctx.beginPath(); ctx.arc(sx, sy, 1 + hash(i, 9) * 1.2, 0, TAU); ctx.fill();
+  }
+  if (camping > 0) {
+    // pitching the tents round the caravan
+    const f = clamp((2.8 - camping) / 0.8, 0, 1);
+    for (const [dx, dy] of [[-90, -10], [90, 20]]) {
+      ctx.save(); ctx.translate(leadX + dx, LEAD_Y + dy); ctx.scale(f, f);
+      ctx.fillStyle = '#5a4438';
+      ctx.beginPath(); ctx.moveTo(-40, 24); ctx.lineTo(-26, -24); ctx.lineTo(26, -24); ctx.lineTo(40, 24); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffcf70'; ctx.beginPath(); ctx.moveTo(-8, 24); ctx.lineTo(-5, 0); ctx.lineTo(5, 0); ctx.lineTo(8, 24); ctx.fill();
+      ctx.restore();
+    }
+    const fx = leadX + 40, fy = LEAD_Y + 60;
+    const fg = ctx.createRadialGradient(fx, fy, 4, fx, fy, 90);
+    fg.addColorStop(0, 'rgba(255,190,90,0.5)'); fg.addColorStop(1, 'rgba(255,190,90,0)');
+    ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(fx, fy, 90, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff9a2a'; ctx.beginPath(); ctx.moveTo(fx - 10, fy); ctx.quadraticCurveTo(fx, fy - 26 - Math.sin(t * 9) * 4, fx + 10, fy); ctx.fill();
+  }
+}
+
+function drawGlory() {
+  // On arriving, light shines down on Abram: the Lord appeared to him
+  if (state !== 'win') return;
+  const f = clamp(winT / 1.2, 0, 1);
+  const top = -offY;
+  ctx.save();
+  ctx.globalAlpha = f * 0.6;
+  const g = ctx.createLinearGradient(0, top, 0, LEAD_Y);
+  g.addColorStop(0, 'rgba(255,245,200,0.9)'); g.addColorStop(1, 'rgba(255,245,200,0.1)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(leadX - 40, top); ctx.lineTo(leadX + 40, top); ctx.lineTo(leadX + 120, LEAD_Y + 40); ctx.lineTo(leadX - 120, LEAD_Y + 40); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  {
+    // Abram builds an altar of stones
+    const n = Math.floor(clamp((winT - 0.8) / 1.6, 0, 1) * 7);
+    const ax = leadX + 70, ay = LEAD_Y + 10;
+    const pos = [[-18, 10], [0, 10], [18, 10], [-9, -4], [9, -4], [0, -18], [0, -30]];
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i % 2 ? '#a89c90' : '#9a8f86';
+      ctx.beginPath(); ctx.ellipse(ax + pos[i][0], ay + pos[i][1], 11, 8, 0, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawScene() {
+  drawGround();
+  for (const o of objs) if (o.kind !== 'storm') drawObj(o);
+  drawCaravan();
+  for (const o of objs) if (o.kind === 'storm') drawObj(o);
+  drawGlory();
+  drawNight();
+  drawParticles();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function portraitPos() { return { x: viewW - 50, y: 52 }; }
+function drawPortrait() {
+  const P = portraitPos();
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,248,230,0.92)';
+  ctx.beginPath(); ctx.arc(P.x, P.y, 40, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(P.x, P.y, 38.5, 0, TAU); ctx.clip();
+  ctx.translate(P.x, P.y + 6);
+  ctx.scale(1.5, 1.5);
+  const skin = '#d39a66', hair = '#cfcfcf';
+  ctx.fillStyle = '#4b6fa5';
+  ctx.beginPath(); ctx.moveTo(-24, 30); ctx.quadraticCurveTo(-22, 12, 0, 10); ctx.quadraticCurveTo(22, 12, 24, 30); ctx.fill();
+  const hy = -4;
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8dcc0';
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 0.95, Math.PI * 2.05); ctx.lineTo(17, hy + 12); ctx.lineTo(12, hy + 4); ctx.lineTo(12, hy - 6); ctx.quadraticCurveTo(0, hy - 12, -12, hy - 6); ctx.lineTo(-12, hy + 4); ctx.lineTo(-17, hy + 12); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, hy - 1, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.moveTo(-13, hy + 1); ctx.quadraticCurveTo(-13, hy + 22, 0, hy + 25); ctx.quadraticCurveTo(13, hy + 22, 13, hy + 1); ctx.quadraticCurveTo(8, hy + 7, 0, hy + 7); ctx.quadraticCurveTo(-8, hy + 7, -13, hy + 1); ctx.fill();
+  const m = abram.mood, dark = '#2b1d12', ey = hy - 3;
+  for (const sx of [-5.5, 5.5]) {
+    if (m === 'joy') { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, ey + 1.5, 3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+    else if (m === 'sleepy' || abram.blink > 0) { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, ey, 3, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke(); }
+    else if (m === 'ouch') { ctx.strokeStyle = dark; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(sx, ey, 3, 0, TAU * 0.8); ctx.stroke(); }
+    else {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, ey, 3.4, 4.4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx, ey + 0.5, 2, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#7a2e22';
+  if (m === 'joy') { ctx.beginPath(); ctx.moveTo(-5, hy + 8); ctx.arc(0, hy + 8, 5, 0, Math.PI); ctx.closePath(); ctx.fill(); }
+  else if (m === 'thirsty') {
+    ctx.beginPath(); ctx.ellipse(0, hy + 10, 3, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff8a9a'; ctx.beginPath(); ctx.ellipse(1, hy + 13, 2.2, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#7cc4f2'; ctx.beginPath(); ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8); ctx.fill();
+  } else if (m === 'ouch') { ctx.beginPath(); ctx.ellipse(0, hy + 10, 3, 4, 0, 0, TAU); ctx.fill(); }
+  else if (m === 'sleepy') { ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, hy + 9, 2.5, 0, TAU); ctx.stroke(); }
+  else { ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, hy + 6, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,120,120,0.35)'; ctx.beginPath(); ctx.arc(-9, hy + 3, 2.6, 0, TAU); ctx.arc(9, hy + 3, 2.6, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawHUD() {
+  const inGame = state !== 'title' && state !== 'card';
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, 116);
+  hg.addColorStop(0, 'rgba(70,40,10,0.7)'); hg.addColorStop(1, 'rgba(70,40,10,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, 116);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(inGame ? `Level ${level} · ${cfg.name}` : 'Journey to Canaan', 12, 26);
+  if (inGame) {
+    // water skin and water left
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#a0683a';
+    ctx.beginPath(); ctx.ellipse(20, 48, 8, 10, 0.2, 0, TAU); ctx.fill();
+    ctx.fillRect(16, 35, 6, 5);
+    const px = 34, pw = Math.min(170, viewW - 230);
+    ctx.fillStyle = 'rgba(255,233,168,0.25)';
+    roundRect(px, 41, pw, 13, 6.5); ctx.fill();
+    const g = ctx.createLinearGradient(px, 0, px + pw, 0);
+    g.addColorStop(0, '#3d8ac4'); g.addColorStop(1, '#8ed0ff');
+    ctx.fillStyle = water < 0.3 && Math.sin(t * 10) > 0 ? '#ff7a6a' : g;
+    if (water > 0) { roundRect(px, 41, Math.max(13, pw * water), 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8'; ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText('water', px + pw + 6, 52);
+    // the journey: Haran to Canaan, with a dot for each day
+    const jx0 = 132, jx1 = Math.max(jx0 + 80, viewW - 104), jy = 86;
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,233,168,0.55)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.moveTo(jx0, jy); ctx.lineTo(jx1, jy); ctx.stroke(); ctx.setLineDash([]);
+    for (let k = 0; k <= cfg.days; k++) {
+      const x = lerp(jx0, jx1, k / cfg.days);
+      ctx.fillStyle = k === cfg.days ? '#7ad07a' : k < day ? '#ffe27a' : 'rgba(255,233,168,0.6)';
+      ctx.beginPath(); ctx.arc(x, jy, k === cfg.days || k === 0 ? 6 : 4, 0, TAU); ctx.fill();
+    }
+    const prog = state === 'win' ? 1 : clamp((Math.min(day, cfg.days + 1) - 1 + (arriving ? 0 : Math.min(1, dayDist / (cfg.dayLen * 1.12)))) / cfg.days, 0, 1);
+    const cx = lerp(jx0, jx1, prog);
+    ctx.fillStyle = '#d29a58'; ctx.beginPath(); ctx.ellipse(cx, jy - 1, 8, 6, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 2, jy - 7, 4, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8'; ctx.font = '600 11px Fredoka, sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('Haran', jx0 - 6, jy + 19);
+    ctx.textAlign = 'right'; ctx.fillText('Canaan', jx1 + 8, jy + 19);
+    ctx.textAlign = 'right'; ctx.font = '700 15px Fredoka, sans-serif';
+    ctx.fillText(`${Math.round(totalScore + levelScore)}`, viewW - 8, 112);
+    ctx.textAlign = 'left';
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  if (inGame) drawPortrait();
+}
+
+function drawTapHints() {
+  // Level 1: soft arrows either side of Abram show where to tap
+  if (state !== 'play' || level !== 1 || dist > 2600) return;
+  const a = 0.35 + 0.25 * Math.sin(t * 4);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ffffff';
+  for (const d of [-1, 1]) {
+    if ((d < 0 && lane === 0) || (d > 0 && lane === LANES - 1)) continue;
+    const x = leadX + d * 95, y = LEAD_Y - 10;
+    ctx.beginPath(); ctx.moveTo(x + d * 22, y); ctx.lineTo(x - d * 6, y - 20); ctx.lineTo(x - d * 6, y + 20); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 560));
+  const y0 = offY + LEAD_Y - 150 - (lines.length - 1) * 27;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 27;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(70,40,10,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4); sy = rand(-3, 3); }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawScene();
+  drawTapHints();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  updateCommon(dt);
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') winT += dt;
+  else if (state === 'fail') failT += dt;
+  else if (state === 'title' || state === 'card') {
+    // the caravan wanders gently behind the cards
+    dist += 60 * dt;
+    if (Math.random() < dt * 0.3) lane = clamp(lane + pick([-1, 1]), 0, 2);
+  }
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
