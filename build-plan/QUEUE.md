@@ -11,8 +11,8 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | C | N1, N2, N3, N4 | Noah | DONE |
 | D | J1, J2, J3 | Jonah | DONE |
 | E | 1, 2, 3, 4 | Creation | DONE |
-| F | 9, 10, 11 | Noah + Abraham | PARTIAL (all three files exist) |
-| G | 12, 13, 14 | Abraham + Jacob | PARTIAL (all three files exist) |
+| F | 9, 10, 11 | Noah + Abraham | BUILDING (all three files exist) |
+| G | 12, 13, 14 | Abraham + Jacob | BUILDING (all three files exist) |
 | H | 15, 16, 17 | Jacob | PARTIAL (all three files exist) |
 | I | 25, 28, 30, 31 | Moses | PARTIAL (burning-bush exists) |
 | J | 32, 33, 34, 35 | Joshua | TODO |
