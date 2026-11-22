@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a4a3a">
+<title>The Ten Commandments</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #5a4a3a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Ten Commandments</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'oComeAllYeFaithful', instrument: 'harp', accent: 'strings', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  finger: { ref: 'Exodus 31:18', KJV: 'two tables of testimony, tables of stone, written with the finger of God.', NKJV: 'two tablets of the Testimony, tablets of stone, written with the finger of God.', NIV: 'the two tablets of the covenant law, the tablets of stone inscribed by the finger of God.', NLT: 'the two stone tablets inscribed with the terms of the covenant, written by the finger of God.' },
+  // Level cards
+  spake: { ref: 'Exodus 20:1', KJV: 'And God spake all these words, saying,', NKJV: 'And God spoke all these words, saying:', NIV: 'And God spoke all these words:', NLT: 'Then God gave the people all these instructions:' },
+  likeFirst: { ref: 'Exodus 34:1', KJV: 'Hew thee two tables of stone like unto the first: and I will write upon these tables the words that were in the first tables', NKJV: 'Cut two tablets of stone like the first ones, and I will write on these tablets the words that were on the first tablets', NIV: 'Chisel out two stone tablets like the first ones, and I will write on them the words that were on the first tablets', NLT: 'Chisel out two stone tablets like the first ones. I will write on them the same words that were on the tablets you smashed.' },
+  // Speech bubble when the tablets are whole
+  fingerShort: { ref: 'Exodus 31:18', KJV: 'written with the finger of God', NKJV: 'written with the finger of God', NIV: 'inscribed by the finger of God', NLT: 'written by the finger of God' },
+  // Fail card
+  hidden: { ref: 'Psalm 119:11', KJV: 'Thy word have I hid in mine heart, that I might not sin against thee.', NKJV: 'Your word I have hidden in my heart, That I might not sin against You.', NIV: 'I have hidden your word in my heart that I might not sin against you.', NLT: 'I have hidden your word in my heart, that I might not sin against you.' },
+  // The commandments on the word cards (short phrases)
+  c1: { ref: 'Exodus 20:3', KJV: 'Thou shalt have no other gods before me.', NKJV: 'You shall have no other gods before Me.', NIV: 'You shall have no other gods before me.', NLT: 'You must not have any other god but me.' },
+  c2: { ref: 'Exodus 20:4', KJV: 'Thou shalt not make unto thee any graven image', NKJV: 'You shall not make for yourself a carved image', NIV: 'You shall not make for yourself an image', NLT: 'You must not make for yourself an idol of any kind' },
+  c3: { ref: 'Exodus 20:7', KJV: 'Thou shalt not take the name of the Lord thy God in vain', NKJV: 'You shall not take the name of the Lord your God in vain', NIV: 'You shall not misuse the name of the Lord your God', NLT: 'You must not misuse the name of the Lord your God.' },
+  c4: { ref: 'Exodus 20:8', KJV: 'Remember the sabbath day, to keep it holy.', NKJV: 'Remember the Sabbath day, to keep it holy.', NIV: 'Remember the Sabbath day by keeping it holy.', NLT: 'Remember to observe the Sabbath day by keeping it holy.' },
+  c5: { ref: 'Exodus 20:12', KJV: 'Honour thy father and thy mother', NKJV: 'Honor your father and your mother', NIV: 'Honor your father and your mother', NLT: 'Honor your father and mother.' },
+  c8: { ref: 'Exodus 20:15', KJV: 'Thou shalt not steal.', NKJV: 'You shall not steal.', NIV: 'You shall not steal.', NLT: 'You must not steal.' },
+  c9: { ref: 'Exodus 20:16', KJV: 'Thou shalt not bear false witness against thy neighbour.', NKJV: 'You shall not bear false witness against your neighbor.', NIV: 'You shall not give false testimony against your neighbor.', NLT: 'You must not testify falsely against your neighbor.' },
+  c10: { ref: 'Exodus 20:17', KJV: 'Thou shalt not covet thy neighbour’s house', NKJV: 'You shall not covet your neighbor’s house', NIV: 'You shall not covet your neighbor’s house.', NLT: 'You must not covet your neighbor’s house.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function topSafe() { return Math.max(12, 118 - offY); }
+function inPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// ============================================================
+//  Levels
+// ============================================================
+const LEVELS = [
+  { name: 'Two Stone Tablets',        rows: 2, cols: 1, rot: 0,   pairs: 2, time: 120, penalty: 0,
+    tip: '<b>Drag</b> each broken piece back onto the tablets (or tap a piece, then tap where it goes). Then <b>match</b> each picture to its words.' },
+  { name: 'The Words of God',         rows: 3, cols: 1, rot: 0,   pairs: 3, time: 120, penalty: 0,
+    tip: 'More pieces! Look at the <b>jagged edges</b> and the writing to see where each one fits.' },
+  { name: 'Written by God’s Finger',  rows: 2, cols: 2, rot: 0,   pairs: 4, time: 130, penalty: 3,
+    tip: 'Four pieces for each tablet, and four commandments to match. Wrong guesses cost time now.' },
+  { name: 'Turn and Fit',             rows: 3, cols: 2, rot: 0.5, pairs: 5, time: 150, penalty: 3,
+    tip: 'Some pieces landed <b>upside down</b> or sideways. <b>Tap a piece to turn it</b> before it can fit.' },
+  { name: 'Tablets Like the First',   rows: 4, cols: 2, rot: 1,   pairs: 6, time: 165, penalty: 4,
+    tip: 'Every piece is turned around. Tap to turn, drag to fit. Six commandments to match!' },
+  { name: 'All the Words',            rows: 3, cols: 3, rot: 1,   pairs: 8, time: 180, penalty: 4,
+    tip: 'The hardest puzzle: nine pieces in each tablet, and eight commandments to match.' },
+];
+const NUM_LEVELS = LEVELS.length;
+function makeConfig(n) { return { ...LEVELS[n - 1] }; }
+
+// The commandments with pictures (the gentlest eight for young children), easiest first
+const COMMANDS = [
+  { key: 'c5', n: 5, pic: 'family' },
+  { key: 'c8', n: 8, pic: 'steal' },
+  { key: 'c4', n: 4, pic: 'rest' },
+  { key: 'c1', n: 1, pic: 'one' },
+  { key: 'c2', n: 2, pic: 'idol' },
+  { key: 'c10', n: 10, pic: 'house' },
+  { key: 'c9', n: 9, pic: 'truth' },
+  { key: 'c3', n: 3, pic: 'name' },
+];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('commandmentsBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let phase = 'puzzle';     // puzzle | glow | match | done
+let phaseT = 0;
+let pieces = [];          // { tab, poly, cx, cy, rot, anim, placed, tray, ft }
+let pairs = [];           // { cmd, matched, word: index }
+let wordOrder = [];
+let sel = null;           // selected piece
+let selPic = -1, selWord = -1;
+let drag = null;          // { p, x, y, sx, sy, moved, id }
+let timer = 0, timerMax = 1;
+let mistakes = 0, levelPts = 0;
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;
+let told = {};
+let endTimer = 0, winT = 0, failT = 0, flashT = 0;
+let lastScore = null;
+let shakeWord = { i: -1, t: 0 };
+let kbd = false;
+
+const MOSES = { robe: '#8a5a3a', hair: '#b8b0a0', beard: true, skin: '#d39a66', scarf: '#e8dcc0', i: 0, mood: 'watch', blink: 0, blinkT: 2, phase: 0, staff: true };
+
+// ============================================================
+//  The stone tablets (drawn once onto their own canvases)
+// ============================================================
+const TWI = 200, THI = 300;   // a tablet in its own units
+function tabletPath(c, k = 1) {
+  c.beginPath();
+  c.moveTo(0, THI * k);
+  c.lineTo(0, TWI / 2 * k);
+  c.arc(TWI / 2 * k, TWI / 2 * k, TWI / 2 * k, Math.PI, 0);
+  c.lineTo(TWI * k, THI * k);
+  c.closePath();
+}
+const NUMERALS = [['I', 'II', 'III', 'IV', 'V'], ['VI', 'VII', 'VIII', 'IX', 'X']];
+function makeTablet(side, c = document.createElement('canvas')) {
+  const K = 2;
+  c.width = TWI * K; c.height = THI * K;
+  const g = c.getContext('2d');
+  g.scale(K, K);
+  tabletPath(g);
+  const sg = g.createLinearGradient(0, 0, TWI, THI);
+  sg.addColorStop(0, '#c9c0b0'); sg.addColorStop(1, '#a89e8e');
+  g.fillStyle = sg; g.fill();
+  g.save(); g.clip();
+  // speckles in the stone
+  for (let k = 0; k < 120; k++) {
+    g.fillStyle = k % 2 ? 'rgba(255,255,255,0.12)' : 'rgba(60,50,40,0.1)';
+    g.beginPath(); g.arc(hash(k, side) * TWI, hash(side, k) * THI, 1 + hash(k, 7) * 3, 0, TAU); g.fill();
+  }
+  // engraved lines of writing beside each numeral
+  for (let r = 0; r < 5; r++) {
+    const y = 108 + r * 38;
+    g.fillStyle = '#6a5e50';
+    g.font = '700 22px Fredoka, Georgia, serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(NUMERALS[side][r], 16, y);
+    g.strokeStyle = '#7a6e60'; g.lineWidth = 3; g.lineCap = 'round';
+    let x = 70;
+    while (x < TWI - 20) {
+      const w = 8 + hash(r * 9 + x, side) * 14;
+      g.beginPath();
+      g.moveTo(x, y - 6); g.lineTo(x + w * 0.5, y - 6); g.lineTo(x + w * 0.5, y + 6);
+      if (hash(x, r) > 0.5) { g.moveTo(x + w, y - 6); g.lineTo(x + w, y + 6); }
+      g.stroke();
+      x += w + 8;
+    }
+  }
+  // a little flame-like glow at the top (God's own writing)
+  g.restore();
+  g.strokeStyle = '#8a7e6e'; g.lineWidth = 5;
+  tabletPath(g); g.stroke();
+  return c;
+}
+const tabC = [0, 1].map((side) => makeTablet(side));
+// redraw the writing once the bundled Fredoka font has loaded
+try { document.fonts.ready.then(() => { tabC.forEach((c, side) => makeTablet(side, c)); }); } catch (e) {}
+
+// Split each tablet into jagged pieces that share their crack lines
+function buildPieces() {
+  pieces = [];
+  const R = cfg.rows, C = cfg.cols;
+  for (let tab = 0; tab < 2; tab++) {
+    // lattice points; the outer ones sit past the edge so the tablet outline clips them
+    const P = [];
+    for (let i = 0; i <= R; i++) {
+      P.push([]);
+      for (let j = 0; j <= C; j++) {
+        let x = TWI * j / C, y = i === 0 ? -20 : THI * i / R;
+        if (j === 0) x = -20; if (j === C) x = TWI + 20; if (i === R) y = THI + 20;
+        if (i > 0 && i < R) y += rand(-0.12, 0.12) * THI / R;
+        if (j > 0 && j < C) x += rand(-0.12, 0.12) * TWI / C;
+        P[i].push([x, y]);
+      }
+    }
+    // jagged crack along an edge between two lattice points (inner edges only)
+    const cracks = new Map();
+    const crack = (a, b, inner) => {
+      const key = a.join() + '|' + b.join(), rkey = b.join() + '|' + a.join();
+      if (cracks.has(rkey)) return cracks.get(rkey).slice().reverse();
+      let pts = [a];
+      if (inner) {
+        const n = 4;
+        const nx = -(b[1] - a[1]), ny = b[0] - a[0], l = Math.hypot(nx, ny) || 1;
+        for (let k = 1; k < n; k++) {
+          const f = k / n, j = (k % 2 ? 1 : -1) * rand(5, 11);
+          pts.push([lerp(a[0], b[0], f) + nx / l * j, lerp(a[1], b[1], f) + ny / l * j]);
+        }
+      }
+      pts.push(b);
+      cracks.set(key, pts);
+      return pts;
+    };
+    for (let i = 0; i < R; i++) {
+      for (let j = 0; j < C; j++) {
+        const tl = P[i][j], tr = P[i][j + 1], br = P[i + 1][j + 1], bl = P[i + 1][j];
+        const poly = [
+          ...crack(tl, tr, i > 0).slice(0, -1),
+          ...crack(tr, br, j < C - 1).slice(0, -1),
+          ...crack(br, bl, i < R - 1).slice(0, -1),
+          ...crack(bl, tl, j > 0).slice(0, -1),
+        ];
+        // the piece's centre, kept inside the tablet
+        const cx = clamp((tl[0] + tr[0] + br[0] + bl[0]) / 4, 18, TWI - 18);
+        const cy = clamp((tl[1] + tr[1] + br[1] + bl[1]) / 4, 18, THI - 18);
+        const rad = Math.max(...poly.map(([x, y]) => Math.hypot(clamp(x, 0, TWI) - cx, clamp(y, 0, THI) - cy)));
+        pieces.push({ tab, poly, cx, cy, rad, rot: 0, anim: 0, placed: false, tray: 0, ft: 0 });
+      }
+    }
+  }
+  // turn some pieces around on the rotating levels
+  for (const p of pieces) if (Math.random() < cfg.rot) p.rot = 1 + Math.floor(Math.random() * 3);
+  if (cfg.rot >= 0.5 && !pieces.some((p) => p.rot)) pieces[0].rot = 2;
+  shuffle(pieces).forEach((p, i) => { p.tray = i; });
+}
+
+function buildPairs() {
+  const cmds = COMMANDS.slice(0, cfg.pairs);
+  pairs = cmds.map((c) => ({ cmd: c, matched: false, mt: 0 }));
+  shuffle(pairs);
+  wordOrder = shuffle(pairs.map((_, i) => i));
+}
+
+// ============================================================
+//  Layout
+// ============================================================
+function layout() {
+  const top = topSafe() + 104;
+  let th = clamp((H - top) * 0.42, 210, 350), tw = th * TWI / THI;
+  const gap = 24;
+  if (tw * 2 + gap > W - 32) { tw = (W - 32 - gap) / 2; th = tw * THI / TWI; }
+  const k = tw / TWI;
+  const tabs = [{ x: W / 2 - gap / 2 - tw, y: top }, { x: W / 2 + gap / 2, y: top }];
+  const tray = { x0: 14, y0: top + th + 22, x1: W - 14, y1: H - 14 };
+  return { k, tw, th, tabs, tray };
+}
+
+// where piece p sits on its tablet (playfield coords)
+function homePos(p, L = layout()) {
+  const T = L.tabs[p.tab];
+  return { x: T.x + p.cx * L.k, y: T.y + p.cy * L.k };
+}
+// tray slot for piece p, with the size it is shown at there
+function trayPos(p, L = layout()) {
+  const n = pieces.length, R = L.tray;
+  const w = R.x1 - R.x0, h = R.y1 - R.y0;
+  let bestC = 1, bestS = 0;
+  for (let c = 1; c <= n; c++) {
+    const rows = Math.ceil(n / c), s = Math.min(w / c, h / rows);
+    if (s > bestS) { bestS = s; bestC = c; }
+  }
+  const rows = Math.ceil(n / bestC);
+  const cw = w / bestC, ch = h / rows;
+  const i = p.tray, r = Math.floor(i / bestC), c = i % bestC;
+  const maxR = Math.max(...pieces.map((q) => q.rad));
+  const s = Math.min(1, (Math.min(cw, ch) * 0.47) / (maxR * L.k));
+  return { x: R.x0 + (c + 0.5) * cw + (r % 2 ? 4 : -4), y: R.y0 + (r + 0.5) * ch, s };
+}
+function piecePos(p, L = layout()) {
+  if (p.placed) { const h = homePos(p, L); return { ...h, s: 1 }; }
+  if (drag && drag.p === p) return { x: drag.x, y: drag.y, s: 1 };
+  const tp = trayPos(p, L);
+  if (p.ft > 0) {   // flying home after a tap-to-place
+    const h = homePos(p, L), f = ease(1 - p.ft);
+    return { x: lerp(tp.x, h.x, f), y: lerp(tp.y, h.y, f), s: lerp(tp.s, 1, f) };
+  }
+  return tp;
+}
+
+// matching layout inside the tray area
+function matchLayout(L = layout()) {
+  const R = L.tray, n = pairs.length;
+  const w = R.x1 - R.x0;
+  const ps = Math.min(92, (w - (n - 1) * 8) / Math.max(n, 4));
+  const pics = pairs.map((_, i) => {
+    const rowN = n;
+    const total = rowN * ps + (rowN - 1) * 8;
+    return { x: R.x0 + (w - total) / 2 + i * (ps + 8), y: R.y0, s: ps };
+  });
+  const cols = W > 900 ? (n > 4 ? 4 : n) : 2;
+  const rows = Math.ceil(n / cols);
+  const wy0 = R.y0 + ps + 16;
+  const cw = Math.min(340, (w - (cols - 1) * 10) / cols), chh = Math.min(96, (R.y1 - wy0 - (rows - 1) * 10) / rows);
+  const gx = R.x0 + (w - (cols * cw + (cols - 1) * 10)) / 2;
+  const words = wordOrder.map((_, k) => ({ x: gx + (k % cols) * (cw + 10), y: wy0 + Math.floor(k / cols) * (chh + 10), w: cw, h: chh }));
+  return { pics, words };
+}
+
+// ============================================================
+//  Drawing
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2); brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1); brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2); brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2); brows(-10, -6, -10, -6);
+      mouthLine(() => { ctx.moveTo(-5, mouthY); ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY); ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY); });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  ctx.strokeStyle = '#8a3a2a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY, opt = {}) {
+  const mood = opt.mood || d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s * (opt.flip ? -1 : 1), s);
+  const robe = opt.robe || d.robe;
+  const sleeve = shade(robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // shepherd's staff
+  const staff = opt.staff !== undefined ? opt.staff : d.staff;
+  if (staff) {
+    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(22, 2); ctx.lineTo(22, -78); ctx.arc(15, -78, 7, 0, Math.PI, true); ctx.stroke();
+  }
+  if (mood === 'joy') { const w = Math.sin(t * 9 + d.phase) * 4; arm(-11, -32, -24 + w, -66); }
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  // stripes of a shepherd's cloak
+  ctx.strokeStyle = 'rgba(255,240,210,0.35)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-11, 0); ctx.moveTo(9, -36); ctx.lineTo(11, 0); ctx.stroke();
+  if (mood !== 'joy') arm(-11, -32, -15, -12);
+  arm(11, -32, staff ? 21 : 15, staff ? -40 : -12);
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 23, 0, hy + 25);
+    ctx.quadraticCurveTo(14, hy + 23, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx * (opt.flip ? -1 : 1), ly);
+  ctx.restore();
+}
+
+function drawSheep(x, y, s, flip = false, wool = '#f4f0e6', horns = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s * (flip ? -1 : 1), s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 24, 6, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#3a2e26'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const lx of [-13, -6, 7, 13]) { ctx.beginPath(); ctx.moveTo(lx, -8); ctx.lineTo(lx, 1); ctx.stroke(); }
+  ctx.fillStyle = wool;
+  for (const [dx, dy, r] of [[-12, -16, 10], [0, -20, 12], [12, -16, 10], [-6, -10, 10], [7, -10, 10]]) { ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#3a2e26';
+  ctx.beginPath(); ctx.ellipse(23, -18, 8, 9, 0.3, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(18, -24, 5, 3, -0.6, 0, TAU); ctx.fill();
+  if (horns) {
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(20, -27, 5, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(25, -20, 2.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(25.6, -20, 1.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+
+function drawCloud(cx, cy, w, h, top = '#ffffff', under = '#e6e2ee') {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.42 + 0.38 * Math.sin(f * Math.PI)) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [[under, h * 0.18], [top, 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function drawSinai() {
+  const top = -offY;
+  const L = layout();
+  const g = ctx.createLinearGradient(0, top, 0, H);
+  g.addColorStop(0, '#9cc8e8'); g.addColorStop(0.45, '#f4e4c8'); g.addColorStop(1, '#e8d4a8');
+  ctx.fillStyle = g; ctx.fillRect(-offX, top, viewW, viewH);
+  // Mount Sinai, with God's glory on the top
+  const px = W / 2, py = L.tabs[0].y - 40;
+  const glow = ctx.createRadialGradient(px, py, 10, px, py, 260);
+  glow.addColorStop(0, 'rgba(255,245,200,0.9)'); glow.addColorStop(1, 'rgba(255,240,190,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(px, py, 260, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#b08a6a';
+  ctx.beginPath(); ctx.moveTo(-offX, L.tabs[0].y + L.th * 0.6);
+  ctx.lineTo(W * 0.2, L.tabs[0].y + 40); ctx.lineTo(px - 40, py + 10); ctx.lineTo(px + 30, py); ctx.lineTo(W * 0.78, L.tabs[0].y + 50);
+  ctx.lineTo(W + offX, L.tabs[0].y + L.th * 0.5); ctx.lineTo(W + offX, H + 20); ctx.lineTo(-offX, H + 20); ctx.fill();
+  ctx.fillStyle = '#c29c7a';
+  ctx.beginPath(); ctx.moveTo(px - 40, py + 10); ctx.lineTo(px + 30, py); ctx.lineTo(px + 10, py + 80); ctx.lineTo(px - 70, py + 120); ctx.closePath(); ctx.fill();
+  // clouds wrapping the mountain top
+  for (let k = 0; k < 4; k++) {
+    const cx = px + (k - 1.5) * 90 + Math.sin(t * 0.3 + k) * 20;
+    drawCloud(cx, py + 6 + (k % 2) * 14, 130, 36, '#ffffff', '#e8e4f0');
+  }
+  // the ground where the tray of pieces lies
+  const R = L.tray;
+  ctx.fillStyle = 'rgba(120,90,60,0.22)';
+  roundRect(R.x0 - 4, R.y0 - 8, R.x1 - R.x0 + 8, R.y1 - R.y0 + 12, 20); ctx.fill();
+  // Moses at the side on wide screens
+  if (W > L.tw * 2 + 260) {
+    MOSES.mood = phase === 'glow' || state === 'win' ? 'joy' : 'watch';
+    drawPerson(MOSES, L.tabs[0].x - 90, L.tabs[0].y + L.th, 1.6, W / 2, L.tabs[0].y + L.th / 2, { staff: true });
+  }
+}
+
+function drawTabletOutline(tab, L) {
+  const T = L.tabs[tab];
+  ctx.save();
+  ctx.translate(T.x, T.y);
+  ctx.fillStyle = 'rgba(80,60,40,0.25)';
+  tabletPath(ctx, L.k); ctx.fill();
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3;
+  tabletPath(ctx, L.k); ctx.stroke();
+  ctx.setLineDash([]);
+  // faint crack lines of the empty spots
+  ctx.save(); tabletPath(ctx, L.k); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
+  for (const p of pieces) {
+    if (p.tab !== tab || p.placed) continue;
+    ctx.beginPath();
+    p.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x * L.k, y * L.k) : ctx.moveTo(x * L.k, y * L.k)));
+    ctx.closePath(); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawPiece(p, L, lift = false) {
+  const pos = piecePos(p, L);
+  const k = L.k * pos.s;
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+  if (lift) { ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; }
+  ctx.rotate(p.rot * Math.PI / 2 + p.anim);
+  ctx.scale(k, k);
+  ctx.translate(-p.cx, -p.cy);
+  ctx.beginPath();
+  p.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  tabletPath(ctx);
+  ctx.fillStyle = '#b0a696';
+  if (lift) ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.clip();
+  ctx.drawImage(tabC[p.tab], 0, 0, TWI, THI);
+  ctx.restore();
+  // crack edges
+  const polyPath = () => { ctx.beginPath(); p.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
+  ctx.save();
+  tabletPath(ctx); ctx.clip();
+  polyPath();
+  ctx.strokeStyle = p.placed ? 'rgba(90,80,70,0.25)' : '#6a5e50'; ctx.lineWidth = p.placed ? 1.5 / k : 3 / k; ctx.stroke();
+  if (sel === p && !p.placed) {
+    ctx.strokeStyle = `rgba(255,215,80,${0.7 + 0.3 * Math.sin(t * 8)})`; ctx.lineWidth = 6 / k; ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawPuzzle() {
+  const L = layout();
+  for (let tab = 0; tab < 2; tab++) drawTabletOutline(tab, L);
+  for (const p of pieces) if (p.placed) drawPiece(p, L);
+  if (phase === 'glow' || phase === 'match' || phase === 'done' || state === 'win') {
+    for (let tab = 0; tab < 2; tab++) {
+      const T = L.tabs[tab];
+      const f = phase === 'glow' ? clamp(phaseT / 0.8, 0, 1) : 0.5;
+      ctx.save(); ctx.translate(T.x, T.y);
+      ctx.shadowColor = `rgba(255,220,120,${f})`; ctx.shadowBlur = 30;
+      ctx.strokeStyle = `rgba(255,225,130,${0.4 + 0.5 * f})`; ctx.lineWidth = 5;
+      tabletPath(ctx, L.k); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  if (phase !== 'puzzle') return;
+  for (const p of pieces) if (!p.placed && !(drag && drag.p === p) && sel !== p) drawPiece(p, L);
+  if (sel && !sel.placed && !(drag && drag.p === sel)) drawPiece(sel, L, true);
+  if (drag) drawPiece(drag.p, L, true);
+}
+
+// ---- the commandment pictures ----
+function drawPic(kind, x, y, s, n) {
+  ctx.save(); ctx.translate(x + s / 2, y + s / 2); ctx.scale(s / 100, s / 100);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const X = () => { ctx.strokeStyle = '#d23a2a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-30, -30); ctx.lineTo(30, 30); ctx.moveTo(30, -30); ctx.lineTo(-30, 30); ctx.stroke(); };
+  switch (kind) {
+    case 'one': {   // one God: light from heaven
+      for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; ctx.strokeStyle = '#f2b33d'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 24, Math.sin(a) * 24); ctx.lineTo(Math.cos(a) * 40, Math.sin(a) * 40); ctx.stroke(); }
+      ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#a8741a'; ctx.font = '700 34px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('1', 0, 2);
+      break;
+    }
+    case 'idol': {  // a golden calf statue, crossed out
+      ctx.fillStyle = '#e0a526';
+      ctx.beginPath(); ctx.ellipse(0, 0, 26, 15, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(26, -12, 11, 10, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 7;
+      for (const lx of [-16, -6, 8, 18]) { ctx.beginPath(); ctx.moveTo(lx, 8); ctx.lineTo(lx, 26); ctx.stroke(); }
+      ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(26, -24, 8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      ctx.fillStyle = '#8a6a4a'; ctx.fillRect(-34, 26, 68, 10);
+      X(); break;
+    }
+    case 'name': {  // speaking God's name with love
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#7a4fa0'; ctx.lineWidth = 4;
+      roundRect(-38, -32, 76, 50, 16); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-14, 18); ctx.lineTo(-24, 36); ctx.lineTo(2, 18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e0402a';
+      ctx.beginPath(); ctx.moveTo(0, 6); ctx.bezierCurveTo(-22, -8, -12, -28, 0, -16); ctx.bezierCurveTo(12, -28, 22, -8, 0, 6); ctx.fill();
+      break;
+    }
+    case 'rest': {  // the Sabbath rest: moon, stars and a sleepy face
+      ctx.fillStyle = '#3c4a7a'; roundRect(-40, -40, 80, 80, 18); ctx.fill();
+      ctx.fillStyle = '#ffe27a';
+      ctx.beginPath(); ctx.arc(-6, -6, 22, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3c4a7a'; ctx.beginPath(); ctx.arc(6, -14, 20, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff6d0';
+      for (const [sx, sy] of [[22, 14], [-24, 24], [26, -26]]) { ctx.beginPath(); ctx.arc(sx, sy, 3, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#fff'; ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('z z', 18, 30);
+      break;
+    }
+    case 'family': { // honour father and mother
+      const fig = (fx, fy, s2, robe, skin) => {
+        ctx.fillStyle = robe; ctx.beginPath(); ctx.moveTo(fx - 12 * s2, fy + 30 * s2); ctx.quadraticCurveTo(fx, fy - 8 * s2, fx + 12 * s2, fy + 30 * s2); ctx.fill();
+        ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(fx, fy - 10 * s2, 9 * s2, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(fx - 3 * s2, fy - 11 * s2, 1.4 * s2, 0, TAU); ctx.arc(fx + 3 * s2, fy - 11 * s2, 1.4 * s2, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(fx, fy - 8 * s2, 3 * s2, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+      };
+      fig(-24, -4, 1.1, '#3f6fb5', '#d9a066');
+      fig(24, -4, 1.1, '#c46b8c', '#d7a070');
+      fig(0, 10, 0.8, '#e0a526', '#e3b184');
+      ctx.fillStyle = '#e0402a';
+      ctx.beginPath(); ctx.moveTo(0, -18); ctx.bezierCurveTo(-10, -26, -6, -36, 0, -30); ctx.bezierCurveTo(6, -36, 10, -26, 0, -18); ctx.fill();
+      break;
+    }
+    case 'steal': {  // a bag of coins: hands off!
+      ctx.fillStyle = '#b8864a';
+      ctx.beginPath(); ctx.moveTo(-26, 30); ctx.quadraticCurveTo(-36, -4, -10, -18); ctx.lineTo(10, -18); ctx.quadraticCurveTo(36, -4, 26, 30); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#7a5028'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-12, -20); ctx.lineTo(12, -20); ctx.stroke();
+      ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.arc(0, -26, 8, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(12, -30, 6, 0, TAU); ctx.fill();
+      X(); break;
+    }
+    case 'truth': {  // fair scales: tell the truth
+      ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(0, -34); ctx.lineTo(0, 30); ctx.moveTo(-20, 30); ctx.lineTo(20, 30); ctx.moveTo(-32, -22); ctx.lineTo(32, -22); ctx.stroke();
+      ctx.lineWidth = 2;
+      for (const sx of [-32, 32]) {
+        ctx.beginPath(); ctx.moveTo(sx, -22); ctx.lineTo(sx - 12, 6); ctx.moveTo(sx, -22); ctx.lineTo(sx + 12, 6); ctx.stroke();
+        ctx.fillStyle = '#e0a526'; ctx.beginPath(); ctx.moveTo(sx - 16, 6); ctx.quadraticCurveTo(sx, 20, sx + 16, 6); ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = '#3a9a4a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-8, -42); ctx.lineTo(-2, -36); ctx.lineTo(10, -48); ctx.stroke();
+      break;
+    }
+    case 'house': {  // a neighbour's house, with a wishing thought
+      ctx.fillStyle = '#e8d4a8'; ctx.fillRect(-26, -6, 52, 38);
+      ctx.fillStyle = '#b5503f'; ctx.beginPath(); ctx.moveTo(-32, -4); ctx.lineTo(0, -30); ctx.lineTo(32, -4); ctx.fill();
+      ctx.fillStyle = '#6b4a2b'; ctx.fillRect(-6, 12, 12, 20);
+      ctx.fillStyle = '#7cc4f2'; ctx.fillRect(12, 2, 10, 10);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#9a8a7a'; ctx.lineWidth = 2;
+      for (const [bx, by, br] of [[-34, 26, 4], [-40, 16, 6]]) { ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill(); ctx.stroke(); }
+      X(); break;
+    }
+  }
+  ctx.restore();
+  if (n) {
+    ctx.save();
+    ctx.fillStyle = '#7a4fa0'; ctx.beginPath(); ctx.arc(x + 12, y + 12, 11, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '700 13px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(n), x + 12, y + 12.5);
+    ctx.restore();
+  }
+}
+
+function drawMatch() {
+  const L = layout();
+  const M = matchLayout(L);
+  // pictures still to match
+  pairs.forEach((pr, i) => {
+    const P = M.pics[i];
+    if (pr.matched) {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; roundRect(P.x, P.y, P.s, P.s, 14); ctx.fill();
+      return;
+    }
+    const on = selPic === i;
+    const bob = on ? -6 : Math.sin(t * 2 + i) * 1.5;
+    ctx.fillStyle = on ? '#fff6d0' : '#fffbef';
+    ctx.strokeStyle = on ? '#e0a526' : '#c9b48a'; ctx.lineWidth = on ? 5 : 3;
+    roundRect(P.x, P.y + bob, P.s, P.s, 14); ctx.fill(); ctx.stroke();
+    drawPic(pr.cmd.pic, P.x, P.y + bob, P.s, pr.cmd.n);
+  });
+  // word cards
+  wordOrder.forEach((pi, k) => {
+    const pr = pairs[pi], Wd = M.words[k];
+    const sh = shakeWord.i === k && shakeWord.t > 0 ? Math.sin(shakeWord.t * 50) * 6 : 0;
+    const hi = kbd && selWord === k;
+    ctx.save(); ctx.translate(sh, 0);
+    ctx.fillStyle = pr.matched ? '#fff1c0' : '#fffdf6';
+    ctx.strokeStyle = pr.matched ? '#e0a526' : hi ? '#7a4fa0' : '#b8a888'; ctx.lineWidth = pr.matched || hi ? 4 : 2.5;
+    roundRect(Wd.x, Wd.y, Wd.w, Wd.h, 14); ctx.fill(); ctx.stroke();
+    let tx = Wd.x + 12;
+    if (pr.matched) {
+      const ps = Math.min(Wd.h - 12, 60);
+      drawPic(pr.cmd.pic, Wd.x + 6, Wd.y + (Wd.h - ps) / 2, ps, 0);
+      tx += ps;
+    }
+    const text = Bible.verse(VERSES[pr.cmd.key]).text.replace(/^[“"]/, '');
+    let fs = 16, lines;
+    for (; fs >= 11; fs--) {
+      ctx.font = `600 ${fs}px Fredoka, sans-serif`;
+      lines = wrapText(text, Wd.x + Wd.w - 10 - tx);
+      if (lines.length * fs * 1.2 <= Wd.h - 10) break;
+    }
+    ctx.fillStyle = '#4a3a20'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const y0 = Wd.y + Wd.h / 2 - (lines.length - 1) * fs * 0.6;
+    lines.forEach((l, i) => ctx.fillText(l, tx, y0 + i * fs * 1.2));
+    ctx.restore();
+  });
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffb33b']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.1), cols[i % cols.length], rand(2, 4.5), 60, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Playing
+// ============================================================
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+function pieceAt(x, y) {
+  const L = layout();
+  // top-most first: the selected one, then in reverse tray order
+  const list = pieces.filter((p) => !p.placed && p.ft <= 0).sort((a, b) => (a === sel ? -1 : b === sel ? 1 : b.tray - a.tray));
+  for (const p of list) {
+    const pos = piecePos(p, L);
+    const k = L.k * pos.s;
+    // into the piece's own units
+    const a = -(p.rot * Math.PI / 2);
+    const dx = (x - pos.x) / k, dy = (y - pos.y) / k;
+    const lx = dx * Math.cos(a) - dy * Math.sin(a) + p.cx, ly = dx * Math.sin(a) + dy * Math.cos(a) + p.cy;
+    const clampPoly = p.poly.map(([px, py]) => [clamp(px, 0, TWI), clamp(py, 0, THI)]);
+    if (inPoly(lx, ly, clampPoly) || Math.hypot(dx, dy) < Math.min(p.rad, 40) * 0.6) return p;
+  }
+  return null;
+}
+function slotAt(x, y) {
+  const L = layout();
+  for (const p of pieces) {
+    if (p.placed) continue;
+    const T = L.tabs[p.tab];
+    const lx = (x - T.x) / L.k, ly = (y - T.y) / L.k;
+    if (lx < -5 || ly < -5 || lx > TWI + 5 || ly > THI + 5) continue;
+    if (inPoly(clamp(lx, 0, TWI), clamp(ly, 0, THI), p.poly.map(([px, py]) => [clamp(px, 0, TWI), clamp(py, 0, THI)]))) return p;
+  }
+  return null;
+}
+function overTablets(x, y) {
+  const L = layout();
+  return L.tabs.some((T) => x > T.x - 10 && x < T.x + L.tw + 10 && y > T.y - 10 && y < T.y + L.th + 10);
+}
+
+function turnPiece(p) {
+  if (!cfg.rot) return;
+  p.rot = (p.rot + 1) % 4;
+  p.anim = -Math.PI / 2;
+  sfx.scrape();
+}
+
+function placePiece(p, fly = false) {
+  p.placed = !fly;
+  if (fly) p.ft = 1;
+  else landPiece(p);
+  if (sel === p) sel = null;
+}
+function landPiece(p) {
+  p.placed = true; p.ft = 0;
+  const h = homePos(p);
+  sparkleBurst(h.x, h.y, 12);
+  sfx.clunk();
+  sfx.tap(0.3 + 0.7 * pieces.filter((q) => q.placed).length / pieces.length);
+  levelPts += 50;
+  if (pieces.every((q) => q.placed)) { phase = 'glow'; phaseT = 0; bubble = { key: 'fingerShort', t: 2.6 }; flashT = 0.3; sfx.holy(); }
+}
+
+function mistake(text, x, y) {
+  mistakes++;
+  sfx.bonk();
+  if (cfg.penalty) { timer = Math.max(0, timer - cfg.penalty); showMessage(`${text} −${cfg.penalty}s`, 1.4); }
+  else showMessage(text, 1.4);
+}
+
+function pressPuzzle(x, y, id) {
+  const p = pieceAt(x, y);
+  if (p) {
+    drag = { p, x: piecePos(p).x, y: piecePos(p).y, ox: piecePos(p).x - x, oy: piecePos(p).y - y, sx: x, sy: y, moved: false, id, wasSel: sel === p };
+    sel = p;
+    sfx.pick();
+    return;
+  }
+  // tap on the tablets with a piece chosen: put it there
+  if (sel && overTablets(x, y)) {
+    const s = slotAt(x, y);
+    if (s === sel) {
+      if (sel.rot) { mistake('Turn it the right way up first!', x, y); return; }
+      placePiece(sel, true);
+    } else if (s) mistake('That piece goes somewhere else', x, y);
+  }
+}
+function movePuzzle(x, y) {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(x - drag.sx, y - drag.sy) > 10) drag.moved = true;
+  if (drag.moved) { drag.x = x + drag.ox; drag.y = y + drag.oy * 0.4; }
+}
+function endDrag() {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  const p = d.p;
+  if (state !== 'play' || phase !== 'puzzle' || p.placed) return;
+  if (!d.moved) {
+    // a tap: turn it (on turning levels), or just choose it
+    if (cfg.rot && (d.wasSel || p.rot)) turnPiece(p);
+    if (!told.tapPlace && !cfg.rot) { told.tapPlace = true; showMessage('Now tap its place on the tablets (or drag it there)', 2); }
+    return;
+  }
+  const h = homePos(p);
+  if (Math.hypot(d.x - h.x, d.y - h.y) < Math.max(34, p.rad * layout().k * 0.45)) {
+    if (p.rot) { mistake('Turn it the right way up first!', d.x, d.y); return; }
+    placePiece(p);
+  } else if (overTablets(d.x, d.y)) {
+    mistake('Not there. Look at the edges!', d.x, d.y);
+  }
+}
+
+function pressMatch(x, y) {
+  const M = matchLayout();
+  kbd = false;
+  for (let i = 0; i < pairs.length; i++) {
+    const P = M.pics[i];
+    if (!pairs[i].matched && x > P.x - 4 && x < P.x + P.s + 4 && y > P.y - 8 && y < P.y + P.s + 4) {
+      selPic = selPic === i ? -1 : i; sfx.pick(); return;
+    }
+  }
+  for (let k = 0; k < wordOrder.length; k++) {
+    const Wd = M.words[k];
+    if (x > Wd.x && x < Wd.x + Wd.w && y > Wd.y && y < Wd.y + Wd.h) { chooseWord(k); return; }
+  }
+}
+function chooseWord(k) {
+  const pi = wordOrder[k];
+  if (pairs[pi].matched) return;
+  const M = matchLayout();
+  if (selPic < 0) { showMessage('First tap a picture, then its words', 1.6); return; }
+  if (pi === selPic) {
+    pairs[pi].matched = true;
+    levelPts += 100;
+    const Wd = M.words[k];
+    sparkleBurst(Wd.x + Wd.w / 2, Wd.y + Wd.h / 2, 18);
+    sfx.tap(0.4 + 0.6 * pairs.filter((p) => p.matched).length / pairs.length); sfx.ding();
+    selPic = -1;
+    if (pairs.every((p) => p.matched)) { phase = 'done'; phaseT = 0; showMessage('All matched!', 1.4); }
+  } else {
+    shakeWord = { i: k, t: 0.4 };
+    mistake('Those don’t match. Read it again!', 0, 0);
+  }
+}
+
+function updatePlay(dt) {
+  phaseT += dt;
+  timer -= dt;
+  for (const p of pieces) {
+    if (p.anim) p.anim = Math.min(0, p.anim + dt * 12);
+    if (p.ft > 0) { p.ft = Math.max(0, p.ft - dt * 3); if (p.ft === 0 && !p.placed) landPiece(p); }
+  }
+  if (phase === 'glow' && phaseT > 2.2) {
+    phase = 'match'; phaseT = 0;
+    showMessage('Match each picture to its words!', 2.2);
+  }
+  if (phase === 'done' && phaseT > 0.8) { winLevel(); return; }
+  if (timer <= 15 && !told.hurry) { told.hurry = true; showMessage('Hurry! Time is nearly up!', 1.6); }
+  if (timer <= 0) { timer = 0; fail(); }
+  if (phase === 'puzzle' && cfg.rot && !told.rot && phaseT > 1.5) { told.rot = true; showMessage(isTouch() ? 'Tap a piece to turn it' : 'Click a piece to turn it', 2); }
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(timer) * 10;
+  const care = Math.max(0, 300 - mistakes * 40);
+  const levelBonus = level * 200;
+  const score = levelPts + timeBonus + care + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('commandmentsBest', best); } catch (e) {} }
+  lastScore = { pts: levelPts, timeBonus, care, levelBonus };
+  sfx.win();
+  const L = layout();
+  sparkleBurst(W / 2, L.tabs[0].y + L.th / 2, 50);
+  endTimer = 2.2;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  drag = null;
+  showMessage('Out of time!', 2);
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+// Builds everything a level needs at once (config, pieces and pairs together), so what is
+// drawn behind a level card always matches the level it announces.
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildPieces();
+  buildPairs();
+  phase = 'puzzle'; phaseT = 0;
+  sel = null; drag = null; selPic = -1; selWord = -1; kbd = false;
+  timer = timerMax = cfg.time;
+  mistakes = 0; levelPts = 0;
+  particles = []; bubble = null;
+  endTimer = 0; winT = 0; failT = 0; flashT = 0;
+  shakeWord = { i: -1, t: 0 };
+  told = level > 1 ? { tapPlace: true } : {};
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevel();
+  syncAmbience();
+  showOverlay('The Ten Commandments', 'God’s words on tablets of stone',
+    `${verseHTML('finger')}
+     <ul>
+       <li>On Mount Sinai, God gave Moses His good words on <b>two tablets of stone</b>. Oh no, they are broken into pieces!</li>
+       <li><b>Drag</b> each piece back to its place on the tablets. (Or <b>tap a piece</b>, then <b>tap its place</b>.)</li>
+       <li>Later, pieces are turned around: <b>tap a piece to turn it</b> the right way up.</li>
+       <li>Then <b>match</b> each picture to its commandment: tap a <b>picture</b>, then tap its <b>words</b>.</li>
+       <li>Finish before the time runs out. Wrong guesses cost time on later levels.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd> choose, <kbd>Space</kbd> turns, <kbd>Enter</kbd> places; <kbd>&uarr;</kbd><kbd>&darr;</kbd> pick words to match.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+const CARD_VERSES = ['spake', 'likeFirst', 'finger', 'spake', 'likeFirst', 'finger'];
+function levelCard() {
+  state = 'card';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${cfg.tip}</p>
+     ${verseHTML(CARD_VERSES[level - 1])}
+     <p class="score">Score so far: <b>${totalScore}</b></p>`,
+    'Go!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 1.8);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    const shown = pairs.map((p) => p.cmd).sort((a, b) => a.n - b.n);
+    const ex = shown[Math.floor(Math.random() * shown.length)];
+    showOverlay(last ? 'God’s good words!' : 'Tablets made whole!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(ex.key)}
+       <p style="text-align:center">${last ? 'God gave His people His words to show them how to love Him and love each other.' : 'God’s words show us how to love Him and love each other.'}</p>
+       <p class="score">Pieces and matches: <b>${s.pts}</b><br>Time left: <b>${s.timeBonus}</b><br>Careful (${mistakes} wrong): <b>${s.care}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${last ? verseHTML('finger') : ''}
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', () => { if (last) titleScreen(); else { level++; levelCard(); } });
+  } else if (state === 'fail') {
+    showOverlay('Out of time!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">Look at the <b>jagged edges</b> and the lines of writing to see where each piece goes. Turn pieces the right way up first!</p>
+       ${verseHTML('hidden')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    drag = null;          // a piece being dragged goes back to the tray
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (phase === 'puzzle') {
+    const left = pieces.filter((p) => !p.placed && p.ft <= 0).sort((a, b) => a.tray - b.tray);
+    if (!left.length) return;
+    const i = sel ? left.indexOf(sel) : -1;
+    if (e.code === 'ArrowRight' || e.code === 'ArrowDown') sel = left[(i + 1) % left.length];
+    else if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') sel = left[(i - 1 + left.length) % left.length];
+    else if (e.code === 'Space') { if (!sel) sel = left[0]; else if (cfg.rot) turnPiece(sel); }
+    else if (e.code === 'Enter' && sel) { if (sel.rot) mistake('Turn it the right way up first!'); else placePiece(sel, true); }
+  } else if (phase === 'match') {
+    kbd = true;
+    const n = pairs.length;
+    if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+      const d = e.code === 'ArrowRight' ? 1 : -1;
+      let i = selPic;
+      for (let k = 0; k < n; k++) { i = (i + d + n) % n; if (!pairs[i].matched) break; }
+      selPic = i;
+    } else if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+      const d = e.code === 'ArrowDown' ? 1 : -1;
+      let k = selWord;
+      for (let j = 0; j < n; j++) { k = (k + d + n) % n; if (!pairs[wordOrder[k]].matched) break; }
+      selWord = k;
+    } else if ((e.code === 'Enter' || e.code === 'Space') && selWord >= 0) chooseWord(selWord);
+  }
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  const x = p.vx - offX, y = p.vy - offY;
+  if (phase === 'puzzle') {
+    if (drag) return;     // one finger at a time
+    pressPuzzle(x, y, e.pointerId);
+    if (drag) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+  } else if (phase === 'match') pressMatch(x, y);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const p = toView(e);
+  movePuzzle(p.vx - offX, p.vy - offY);
+});
+canvas.addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.id) endDrag(); });
+canvas.addEventListener('pointercancel', () => { drag = null; });
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+    syncAmbience();
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tap(height) { if (this.ctx) Music.tap(height); },
+  pick() { this.tone(520, 0.06, 'triangle', 0.1); },
+  scrape() { this.noiseBurst(700, 0.14, 0.22, 1.2, 400); },
+  clunk() { this.tone(160, 0.2, 'sine', 0.35, 0, 90); this.noiseBurst(500, 0.15, 0.2, 0.8, 200, 'lowpass'); },
+  bonk() { this.tone(200, 0.16, 'triangle', 0.22, 0, 120); },
+  ding() { this.tone(1568, 0.3, 'sine', 0.1, 0.05); },
+  holy() { if (!this.ctx) return; [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 1.2, 'sine', 0.07, i * 0.09)); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawBubble(text, ax, ay) {
+  ctx.save();
+  ctx.font = '700 20px Fredoka, sans-serif';
+  const lines = wrapText('“' + text + '”', Math.min(W - 60, 380));
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 30, h = lines.length * 24 + 18;
+  const bx = clamp(ax - w / 2, 12, W - w - 12), by = ay - h / 2;
+  ctx.fillStyle = '#fff6d0'; ctx.strokeStyle = '#f2a93b'; ctx.lineWidth = 3;
+  ctx.shadowColor = 'rgba(255,210,100,0.9)'; ctx.shadowBlur = 16;
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.fillStyle = '#9a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 15, by + 21 + i * 24));
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#3a2a10';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const inGame = state === 'play' || state === 'win' || state === 'fail' || state === 'pause';
+  ctx.fillText(inGame ? `Level ${level} · ${cfg.name}` : 'The Ten Commandments', 12, 26);
+  if (inGame) {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('TIME', 12, 49);
+    ctx.shadowBlur = 0;
+    const bw = Math.min(170, viewW - 230);
+    ctx.fillStyle = 'rgba(90,50,16,0.22)';
+    roundRect(48, 38, bw, 13, 6.5); ctx.fill();
+    const f = clamp(timer / timerMax, 0, 1);
+    ctx.fillStyle = f < 0.15 && Math.sin(t * 10) > 0 ? '#e0402a' : '#7a4fa0';
+    if (f > 0) { roundRect(48, 38, bw * f, 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#3a2a10'; ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'win' ? 0 : levelPts)}`, viewW - 12, 26);
+    ctx.font = '600 15px Fredoka, sans-serif';
+    if (phase === 'puzzle') ctx.fillText(`Pieces ${pieces.filter((p) => p.placed).length} / ${pieces.length}`, viewW - 12, 48);
+    else ctx.fillText(`Matched ${pairs.filter((p) => p.matched).length} / ${pairs.length}`, viewW - 12, 48);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  // just under the tablets, where the eye is
+  const L = layout();
+  const y0 = L.tabs[0].y + offY + 26;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 26;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#6a2a7a';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawSinai();
+  if (pieces.length) drawPuzzle();
+  if (pairs.length && (phase === 'match' || phase === 'done')) drawMatch();
+  drawParticles();
+  if (bubble) { const L = layout(); drawBubble(Bible.verse(VERSES[bubble.key]).text, W / 2, L.tabs[0].y + L.th * 0.45); }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(60,40,30,${0.25 * clamp(failT, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  if (shakeWord.t > 0) shakeWord.t -= dt;
+  MOSES.blinkT -= dt;
+  if (MOSES.blinkT <= 0) { MOSES.blink = 0.13; MOSES.blinkT = rand(1.5, 4); }
+  if (MOSES.blink > 0) MOSES.blink -= dt;
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') { winT += dt; if (Math.random() < dt * 8) spawn(rand(0, W), rand(200, 700), 0, -20, 1.2, '#fff6d0', 3, 0, 'star'); }
+  else if (state === 'fail') failT += dt;
+  flashT = Math.max(0, flashT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+titleScreen();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
