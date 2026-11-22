@@ -1,0 +1,1303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a2048">
+<title>The Writing on the Wall</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2a2048;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Writing on the Wall</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'oComeAllYeFaithful', instrument: 'harp', accent: 'strings', ambience: 'crowd', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  hand: { ref: 'Daniel 5:5', KJV: "In the same hour came forth fingers of a man's hand, and wrote over against the candlestick upon the plaister of the wall of the king's palace", NKJV: 'In the same hour the fingers of a man’s hand appeared and wrote opposite the lampstand on the plaster of the wall of the king’s palace', NIV: 'Suddenly the fingers of a human hand appeared and wrote on the plaster of the wall, near the lampstand in the royal palace.', NLT: 'Suddenly, they saw the fingers of a human hand writing on the plaster wall of the king’s palace, near the lampstand.' },
+  // Daniel reads the writing (one part at the end of each level)
+  writing: { ref: 'Daniel 5:25', KJV: 'And this is the writing that was written, Mene, Mene, Tekel, Upharsin.', NKJV: 'And this is the inscription that was written: MENE, MENE, TEKEL, UPHARSIN.', NIV: 'This is the inscription that was written: mene, mene, tekel, parsin', NLT: 'This is the message that was written: Mene, mene, tekel, and Parsin.' },
+  mene: { ref: 'Daniel 5:26', KJV: 'Mene; God hath numbered thy kingdom, and finished it.', NKJV: 'MENE: God has numbered your kingdom, and finished it;', NIV: 'Mene : God has numbered the days of your reign and brought it to an end.', NLT: 'Mene means ‘numbered’—God has numbered the days of your reign and has brought it to an end.' },
+  tekel: { ref: 'Daniel 5:27', KJV: 'Tekel; Thou art weighed in the balances, and art found wanting.', NKJV: 'TEKEL: You have been weighed in the balances, and found wanting;', NIV: 'Tekel : You have been weighed on the scales and found wanting.', NLT: 'Tekel means ‘weighed’—you have been weighed on the balances and have not measured up.' },
+  peres: { ref: 'Daniel 5:28', KJV: 'Peres; Thy kingdom is divided, and given to the Medes and Persians.', NKJV: 'PERES: Your kingdom has been divided, and given to the Medes and Persians.', NIV: 'Peres : Your kingdom is divided and given to the Medes and Persians.', NLT: 'Parsin means ‘divided’—your kingdom has been divided and given to the Medes and Persians.' },
+  // Fail card
+  wisdom: { ref: 'Daniel 5:14', KJV: 'light and understanding and excellent wisdom is found in thee.', NKJV: 'light and understanding and excellent wisdom are found in you.', NIV: 'you have insight, intelligence and outstanding wisdom.', NLT: 'you are filled with insight, understanding, and wisdom.' },
+  // Last win card
+  honour: { ref: 'Daniel 5:29', KJV: 'they clothed Daniel with scarlet, and put a chain of gold about his neck', NKJV: 'they clothed Daniel with purple and put a chain of gold around his neck', NIV: 'Daniel was clothed in purple, a gold chain was placed around his neck', NLT: 'Daniel was dressed in purple robes, a gold chain was hung around his neck' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function bubbleText(key) {
+  return Bible.verse(VERSES[key]).text.replace(/\.\.\.\s*/g, '… ');
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const bump = (v, a, b) => Math.max(0, Math.sin(clamp((v - a) / (b - a), 0, 1) * Math.PI));
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function mix(c1, c2, f) {
+  const a = parseInt(c1.slice(1), 16), b = parseInt(c2.slice(1), 16);
+  const r = Math.round(lerp(a >> 16, b >> 16, f)), g = Math.round(lerp((a >> 8) & 255, (b >> 8) & 255, f)), bl = Math.round(lerp(a & 255, b & 255, f));
+  return `rgb(${r},${g},${bl})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  The symbols the hand writes (strokes in a -1..1 box)
+// ============================================================
+const circle = (r, n = 28, cx = 0, cy = 0) => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos(-Math.PI / 2 + i / n * TAU) * r, cy + Math.sin(-Math.PI / 2 + i / n * TAU) * r]);
+const GLYPHS = {
+  ring:   [circle(0.72), circle(0.16, 12)],
+  ring2:  [circle(0.72)],
+  tri:    [[[0, -0.78], [0.76, 0.6], [-0.76, 0.6], [0, -0.78]]],
+  tri2:   [[[0, 0.78], [0.76, -0.6], [-0.76, -0.6], [0, 0.78]]],
+  wave:   [Array.from({ length: 25 }, (_, i) => [-0.85 + i / 24 * 1.7, Math.sin(i / 24 * TAU * 1.25) * 0.4])],
+  cross:  [[[0, -0.82], [0, 0.82]], [[-0.7, -0.22], [0.7, -0.22]]],
+  zig:    [[[-0.82, -0.55], [-0.41, 0.6], [0, -0.55], [0.41, 0.6], [0.82, -0.55]]],
+  zig2:   [[[-0.82, 0.55], [-0.41, -0.6], [0, 0.55], [0.41, -0.6], [0.82, 0.55]]],
+  bars:   [[[-0.5, -0.8], [-0.5, 0.8]], [[0.5, -0.8], [0.5, 0.8]], [[-0.5, 0], [0.5, 0]]],
+  hook:   [[[0.35, -0.82], [0.35, 0.35], [0.15, 0.7], [-0.15, 0.78], [-0.45, 0.55]]],
+  hookR:  [[[-0.35, -0.82], [-0.35, 0.35], [-0.15, 0.7], [0.15, 0.78], [0.45, 0.55]]],
+  spiral: [Array.from({ length: 40 }, (_, i) => { const a = i / 39 * TAU * 1.7; const r = 0.08 + i / 39 * 0.72; return [Math.cos(a) * r, Math.sin(a) * r]; })],
+};
+// stroke lengths for tracing
+const GLYPH_LEN = {};
+for (const [k, strokes] of Object.entries(GLYPHS)) {
+  GLYPH_LEN[k] = strokes.map((st) => { let l = 0; for (let i = 1; i < st.length; i++) l += Math.hypot(st[i][0] - st[i - 1][0], st[i][1] - st[i - 1][1]); return l; });
+}
+// point at fraction f (0..1) along the whole glyph
+function glyphPoint(k, f) {
+  const lens = GLYPH_LEN[k], total = lens.reduce((a, b) => a + b, 0);
+  let d = clamp(f, 0, 1) * total;
+  for (let s = 0; s < lens.length; s++) {
+    const st = GLYPHS[k][s];
+    if (d <= lens[s] || s === lens.length - 1) {
+      for (let i = 1; i < st.length; i++) {
+        const seg = Math.hypot(st[i][0] - st[i - 1][0], st[i][1] - st[i - 1][1]);
+        if (d <= seg || i === st.length - 1) { const u = seg ? clamp(d / seg, 0, 1) : 1; return [lerp(st[i - 1][0], st[i][0], u), lerp(st[i - 1][1], st[i][1], u)]; }
+        d -= seg;
+      }
+    }
+    d -= lens[s];
+  }
+  return [0, 0];
+}
+// draw glyph k centred at (x, y), half-size h; f = how much is drawn (0..1)
+function glyphPath(k, x, y, h, f = 1) {
+  const lens = GLYPH_LEN[k], total = lens.reduce((a, b) => a + b, 0);
+  let d = f * total;
+  ctx.beginPath();
+  GLYPHS[k].forEach((st, s) => {
+    if (d <= 0) return;
+    ctx.moveTo(x + st[0][0] * h, y + st[0][1] * h);
+    for (let i = 1; i < st.length; i++) {
+      const seg = Math.hypot(st[i][0] - st[i - 1][0], st[i][1] - st[i - 1][1]);
+      if (d <= 0) break;
+      if (d < seg) { const u = d / seg; ctx.lineTo(x + lerp(st[i - 1][0], st[i][0], u) * h, y + lerp(st[i - 1][1], st[i][1], u) * h); d = 0; break; }
+      ctx.lineTo(x + st[i][0] * h, y + st[i][1] * h);
+      d -= seg;
+    }
+  });
+}
+
+// ============================================================
+//  Levels
+// ============================================================
+const TOPH = 110;
+const LAMPS = 3;
+const LEVELS = [
+  { name: 'Four Strange Signs',   glyphs: ['ring', 'tri', 'wave', 'cross'],                                start: 2, rounds: 3, dur: 0.95, wander: false, shuffle: false, time: [6, 2.0], read: 'writing' },
+  { name: 'Six Signs on the Wall', glyphs: ['ring', 'tri', 'wave', 'cross', 'zig', 'bars'],                start: 3, rounds: 3, dur: 0.8,  wander: false, shuffle: false, time: [5, 1.7], read: 'mene' },
+  { name: 'Look-Alike Letters',   glyphs: ['hook', 'hookR', 'ring', 'ring2', 'wave', 'tri'],               start: 3, rounds: 4, dur: 0.7,  wander: false, shuffle: false, time: [4.5, 1.5], read: 'tekel' },
+  { name: 'The Hand Moves About', glyphs: ['hook', 'hookR', 'ring', 'ring2', 'tri', 'tri2', 'wave', 'spiral'], start: 4, rounds: 4, dur: 0.6, wander: true, shuffle: false, time: [4, 1.3], read: 'peres' },
+  { name: 'The Signs Move Too',   glyphs: ['zig', 'zig2', 'ring', 'ring2', 'tri', 'tri2', 'hook', 'hookR'],  start: 4, rounds: 4, dur: 0.55, wander: true, shuffle: true,  time: [4, 1.3], read: 'writing' },
+];
+const NEXT_TIPS = [
+  'Next time there are <b>six signs</b> and longer messages!',
+  'Next time some signs <b>look alike</b>. Look closely: a dot, or which way a hook bends, makes all the difference!',
+  'Next time the hand <b>moves all around the wall</b> and writes faster. Keep your eyes on it!',
+  'The last wall: after the hand writes, <b>the signs swap places</b>! Remember their <b>shapes</b>, not where they were.',
+];
+const READ_WORDS = { writing: 'MENE, MENE, TEKEL, UPHARSIN', mene: 'MENE', tekel: 'TEKEL', peres: 'PERES' };
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | pause | win | fail | done
+let phase = 'show';       // show | input | between | read
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('wallWritingBest') || 0; } catch (e) {}
+
+let cfg = LEVELS[0];
+let t = 0, phaseT = 0, winT = 0, failT = 0;
+let tiles = [];           // { g, slot, x, y, fromX, fromY, lit, flash, wrong }
+let seq = [];             // glyph keys the hand wrote
+let round = 0, pos = 0, lamps = LAMPS, mistakes = 0;
+let show = null;          // { steps, i, t } the hand's script
+let hand = { x: 0, y: 0, vis: 0 };
+let inputT = 0, inputMax = 1, lastTapT = 0;
+let betweenNext = null, betweenT = 0;
+let shuffleT = 0;
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;
+let shakeT = 0, flashT = 0, endTimer = 0;
+let told = {};
+let lastScore = null;
+let kbdUsed = false;
+let danielIn = 0;         // 0..1 Daniel walks in to read
+
+// Layout of the hall and the wall
+const L = { wall: { x0: 40, y0: 160, x1: 560, y1: 560 }, cols: 2, rows: 2, cell: 100, table: 800, king: { x: 300, y: 800 } };
+function layout() {
+  const m = Math.max(18, W / 2 - 380);
+  L.wall = { x0: m, y0: 168, x1: W - m, y1: 570 };
+  const n = cfg.glyphs.length;
+  const ww = L.wall.x1 - L.wall.x0, wh = L.wall.y1 - L.wall.y0;
+  L.cols = n <= 4 ? (ww > 560 ? 4 : 2) : n === 6 ? 3 : 4;
+  L.rows = Math.ceil(n / L.cols);
+  L.cellW = (ww - 30) / L.cols; L.cellH = (wh - 54) / L.rows;
+  L.cell = Math.min(L.cellW, L.cellH);
+  L.king = { x: W / 2, y: 812 };
+  L.lamp = { x: L.wall.x0 + 26, y: 790 };
+  L.daniel = { x: lerp(W + offX + 60, W - Math.min(W * 0.2, 150), ease(danielIn)), y: 880 };
+}
+function slotPos(slot) {
+  const c = slot % L.cols, r = Math.floor(slot / L.cols);
+  return { x: L.wall.x0 + 15 + L.cellW * (c + 0.5), y: L.wall.y0 + 24 + L.cellH * (r + 0.5) };
+}
+function tilePos(tl) {
+  const p = slotPos(tl.slot);
+  if (shuffleT > 0 && tl.fromSlot !== undefined) {
+    const f = ease(1 - shuffleT / 0.9), q = slotPos(tl.fromSlot);
+    return { x: lerp(q.x, p.x, f), y: lerp(q.y, p.y, f) - Math.sin(f * Math.PI) * 30 };
+  }
+  return p;
+}
+
+function makeTiles() {
+  const keys = cfg.glyphs.slice().sort(() => Math.random() - 0.5);
+  tiles = keys.map((g, i) => ({ g, slot: i, lit: 0, flash: 0, wrong: 0, hint: 0 }));
+  layout();
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot', text = '') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, text });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffd27a']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 30, i % 3 ? 'dot' : 'star');
+  }
+}
+function floatText(x, y, text, color = '#fff6d0', size = 22, life = 1.2) {
+  spawn(x, y, rand(-8, 8), -45, life, color, size, 0, 'text', text);
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'z') p.vx = Math.sin(p.life * 3) * 14;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = p.kind === 'text' || p.kind === 'z' ? Math.min(1, a * 2) : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'text' || p.kind === 'z') {
+      ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(30,20,50,0.75)';
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillText(p.text, p.x, p.y);
+    } else if (p.kind === 'drop') {
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.size * 0.7, p.size, 0, 0, TAU); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  The hand writes a message
+// ============================================================
+function extendSeq() {
+  const want = cfg.start + round;
+  while (seq.length < want) {
+    let g;
+    do { g = pick(cfg.glyphs); } while (seq.length && g === seq[seq.length - 1]);
+    seq.push(g);
+  }
+}
+function startShow() {
+  phase = 'show'; phaseT = 0;
+  pos = 0;
+  const steps = [];
+  const W0 = L.wall;
+  let from = { x: hand.vis > 0 ? hand.x : W0.x1 - 30, y: hand.vis > 0 ? hand.y : W0.y0 + 30 };
+  steps.push({ type: 'wait', d: 0.5 });
+  for (const g of seq) {
+    const tl = tiles.find((q) => q.g === g);
+    const p = slotPos(tl.slot);
+    const h = L.cell * 0.32;
+    const [sx, sy] = glyphPoint(g, 0);
+    const to = { x: p.x + sx * h, y: p.y + sy * h };
+    if (cfg.wander) {
+      // a loop around the wall first, to keep you guessing
+      const via = { x: rand(W0.x0 + 40, W0.x1 - 40), y: rand(W0.y0 + 40, W0.y1 - 40) };
+      steps.push({ type: 'move', from, to: via, d: cfg.dur * 0.45, arc: rand(-80, 80) });
+      from = via;
+    }
+    steps.push({ type: 'move', from, to, d: cfg.dur * 0.45, arc: rand(-40, 40) });
+    steps.push({ type: 'trace', tile: tl, g, p, h, d: cfg.dur * 0.75 });
+    from = (() => { const [ex, ey] = glyphPoint(g, 1); return { x: p.x + ex * h, y: p.y + ey * h }; })();
+    steps.push({ type: 'wait', d: cfg.dur * 0.15 });
+  }
+  steps.push({ type: 'move', from, to: { x: W0.x1 - 40, y: W0.y0 + 20 }, d: 0.5, arc: -40, fade: true });
+  show = { steps, i: 0, t: 0 };
+  hand.vis = Math.max(hand.vis, 0.01);
+  sfx.whoosh();
+}
+function updateShow(dt) {
+  if (!show) return;
+  const st = show.steps[show.i];
+  show.t += dt;
+  const f = clamp(show.t / st.d, 0, 1);
+  if (st.type === 'move') {
+    const e = ease(f);
+    const mx = (st.from.x + st.to.x) / 2, my = (st.from.y + st.to.y) / 2 + st.arc;
+    hand.x = lerp(lerp(st.from.x, mx, e), lerp(mx, st.to.x, e), e);
+    hand.y = lerp(lerp(st.from.y, my, e), lerp(my, st.to.y, e), e);
+    if (st.fade) hand.vis = 1 - f; else hand.vis = Math.min(1, hand.vis + dt * 3);
+  } else if (st.type === 'trace') {
+    const [gx, gy] = glyphPoint(st.g, f);
+    hand.x = st.p.x + gx * st.h; hand.y = st.p.y + gy * st.h;
+    st.tile.lit = Math.max(st.tile.lit, 1);
+    st.tile.trace = f;
+    if (Math.random() < dt * 30) spawn(hand.x, hand.y, rand(-20, 20), rand(-20, 20), 0.5, pick(['#ffe27a', '#fff6d0', '#ffb33b']), 2.5);
+    if (!st.sounded) { st.sounded = true; sfx.note(cfg.glyphs.indexOf(st.g)); }
+  }
+  if (show.t >= st.d) {
+    if (st.type === 'trace') st.tile.trace = 1;
+    show.i++; show.t = 0;
+    if (show.i >= show.steps.length) { show = null; hand.vis = 0; endShow(); }
+  }
+}
+function endShow() {
+  if (cfg.shuffle) {
+    // the signs swap places!
+    const slots = tiles.map((q) => q.slot);
+    let perm;
+    do { perm = slots.slice().sort(() => Math.random() - 0.5); } while (perm.every((s, i) => s === slots[i]));
+    tiles.forEach((q, i) => { q.fromSlot = q.slot; q.slot = perm[i]; });
+    shuffleT = 0.9;
+    sfx.shuffle();
+    if (!told.shuffle) { told.shuffle = true; showMessage('The signs moved! Find them by their shape.', 2.6); }
+  }
+  phase = 'input'; phaseT = 0;
+  inputMax = cfg.time[0] + cfg.time[1] * seq.length + (cfg.shuffle ? 1 : 0);
+  inputT = inputMax;
+  lastTapT = 0;
+  if (!told.input) { told.input = true; showMessage(isTouch() ? 'Now tap the signs in the same order!' : 'Now click the signs in the same order (or press their numbers)!', 2.8); }
+}
+
+// ============================================================
+//  The player repeats it
+// ============================================================
+function tapTile(tl) {
+  if (state !== 'play' || phase !== 'input' || shuffleT > 0) return;
+  const p = tilePos(tl);
+  if (tl.g === seq[pos]) {
+    const quick = Math.max(0, 10 - Math.round((phaseT - lastTapT) * 5));
+    lastTapT = phaseT;
+    const pts = 10 + quick;
+    levelScore += pts;
+    tl.flash = 0.5;
+    sfx.note(cfg.glyphs.indexOf(tl.g));
+    sparkleBurst(p.x, p.y, 8);
+    pos++;
+    if (pos >= seq.length) roundDone();
+  } else {
+    tl.wrong = 0.6;
+    mistake('Oops! Not that one.');
+  }
+}
+function mistake(text) {
+  lamps--; mistakes++;
+  const want = tiles.find((q) => q.g === seq[pos]);
+  if (want) want.hint = 1.2;
+  shakeT = 0.3;
+  sfx.wrong();
+  if (lamps <= 0) { failLevel(); return; }
+  showMessage(`${text} ${lamps === 1 ? 'Only one lamp left!' : 'Watch again…'}`, 2.2);
+  phase = 'between'; betweenT = 1.6; betweenNext = 'replay';
+}
+function roundDone() {
+  const bonus = seq.length * 30;
+  levelScore += bonus;
+  round++;
+  sfx.roundWin();
+  if (round >= cfg.rounds) {
+    phase = 'read'; phaseT = 0;
+    showMessage('You read it all! Here comes Daniel…', 2.4);
+    return;
+  }
+  showMessage(pick(['Well done! Now a longer one…', 'That’s right! Watch the hand…', 'Wonderful! Here it comes again…']), 2);
+  phase = 'between'; betweenT = 1.5; betweenNext = 'next';
+}
+function updateInput(dt) {
+  if (shuffleT > 0) return;
+  inputT -= dt;
+  if (inputT <= 0) mistake('Too slow!');
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const lampBonus = lamps * 250;
+  const levelBonus = level * 250;
+  const score = levelScore + lampBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('wallWritingBest', best); } catch (e) {} }
+  lastScore = { play: levelScore, lampBonus, levelBonus, score };
+  sfx.win();
+  endTimer = 2.5;
+}
+function failLevel() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  showMessage('The lamps went out!', 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = LEVELS[0];
+  makeTiles();
+  showOverlay('The Writing on the Wall', 'King Belshazzar’s feast',
+    `${verseHTML('hand')}
+     <ul>
+       <li>At the king’s big party, a <b>glowing hand</b> appears and writes strange signs on the wall!</li>
+       <li><b>Watch</b> the hand carefully. Then <b>tap the signs in the same order</b>.</li>
+       <li>Each message gets <b>one sign longer</b>. Get it wrong (or take too long) and a <b>lamp goes out</b>. Keep at least one lamp burning!</li>
+       <li>At the end of each wall, <b>Daniel</b> reads what it says.</li>
+       <li><b>Keys:</b> press <kbd>1</kbd>–<kbd>8</kbd> for the signs (numbers show on the wall).</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function startLevel() {
+  cfg = LEVELS[level - 1];
+  makeTiles();
+  particles = [];
+  seq = []; round = 0; pos = 0; lamps = LAMPS; mistakes = 0; levelScore = 0;
+  phaseT = 0; winT = 0; failT = 0; shuffleT = 0;
+  shakeT = flashT = 0; endTimer = 0;
+  bubble = null; show = null; hand.vis = 0; danielIn = 0;
+  told = { input: level > 1, shuffle: false };
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 ? 'Look! A hand is writing on the wall!' : `Level ${level}: ${cfg.name}`, 2.4);
+  phase = 'between'; betweenT = 1.6; betweenNext = 'next0';
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const scoreHTML = `<p class="score">Signs remembered: <b>${s.play}</b><br>Lamps still burning (${lamps}): <b>${s.lampBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level >= LEVELS.length) {
+      state = 'done';
+      showOverlay('Daniel read it all!', 'Every wall complete!',
+        `${verseHTML('writing')}
+         ${verseHTML('honour', '…')}
+         <p style="text-align:center">God gave Daniel wisdom to understand what nobody else could. God gives wisdom to all who ask Him!</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; startLevel(); });
+    } else {
+      showOverlay('Daniel read the writing!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML(cfg.read)}
+         ${scoreHTML}
+         <p style="text-align:center">${NEXT_TIPS[level - 1]}</p>
+         ${creditHTML()}`,
+        'Next wall', () => { level++; startLevel(); });
+    }
+  } else if (state === 'fail') {
+    showOverlay('The lamps went out!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">That was tricky! Watch the hand <b>very carefully</b>, say the shapes to yourself, then tap them in order.</p>
+       ${verseHTML('wisdom', '…')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating
+// ============================================================
+function update(dt) {
+  t += dt;
+  layout();
+  updateParticles(dt);
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  const cur = show && show.steps[show.i];
+  for (const q of tiles) {
+    q.flash = Math.max(0, q.flash - dt); q.wrong = Math.max(0, q.wrong - dt); q.hint = Math.max(0, q.hint - dt);
+    if (!(cur && cur.type === 'trace' && cur.tile === q)) q.lit = Math.max(0, q.lit - dt * 1.6);
+  }
+  shuffleT = Math.max(0, shuffleT - dt);
+  if (state === 'play') {
+    phaseT += dt;
+    if (phase === 'show') updateShow(dt);
+    else if (phase === 'input') updateInput(dt);
+    else if (phase === 'between') {
+      betweenT -= dt;
+      if (betweenT <= 0) {
+        for (const q of tiles) q.trace = 0;
+        if (betweenNext === 'next' || betweenNext === 'next0') extendSeq();
+        startShow();
+      }
+    } else if (phase === 'read') {
+      danielIn = Math.min(1, danielIn + dt / 1.4);
+      if (phaseT > 1.6 && !bubble && !told.read) { told.read = true; bubble = { who: 'daniel', key: cfg.read, t: 4.2 }; sfx.chime(); }
+      if (phaseT > 6.2) winLevel();
+    }
+  } else if (state === 'win' || state === 'done') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, W), rand(TOPH, 600), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'fail') failT += dt;
+  shakeT = Math.max(0, shakeT - dt);
+  flashT = Math.max(0, flashT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+// ============================================================
+//  Input
+// ============================================================
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+function tapAt(x, y) {
+  let bestT = null, bd = Infinity;
+  for (const q of tiles) {
+    const p = tilePos(q);
+    const dx = Math.abs(x - p.x), dy = Math.abs(y - p.y);
+    if (dx < L.cellW / 2 && dy < L.cellH / 2) { const d = Math.hypot(dx, dy); if (d < bd) { bd = d; bestT = q; } }
+  }
+  if (bestT) tapTile(bestT);
+}
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  if (phase === 'read' && phaseT > 2.2) { winLevel(); return; }
+  kbdUsed = false;
+  tapAt(p.vx - offX, p.vy - offY);
+});
+
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (phase === 'read' && phaseT > 2.2 && (e.code === 'Space' || e.code === 'Enter')) { winLevel(); return; }
+  const m = e.code.match(/^(?:Digit|Numpad)([1-9])$/);
+  if (m) {
+    kbdUsed = true;
+    const q = tiles.find((x) => x.slot === +m[1] - 1);
+    if (q) tapTile(q);
+  }
+});
+
+function goHome() { location.href = 'index.html'; }
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  // each sign has its own harp note
+  note(i) {
+    if (!this.ctx) return;
+    Music.tap(0.15 + (i % 8) / 8 * 0.8);
+  },
+  wrong() { this.tone(220, 0.3, 'triangle', 0.18, 0, 160); this.tone(180, 0.35, 'triangle', 0.14, 0.12, 120); },
+  whoosh() { this.noiseBurst(1200, 0.5, 0.12, 0.6, 3200); },
+  shuffle() { for (let i = 0; i < 5; i++) setTimeout(() => this.noiseBurst(2600, 0.08, 0.1, 1.2), i * 90); },
+  roundWin() { [784, 988, 1175].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.1, i * 0.08)); },
+  chime() { [1568, 2093].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.09, i * 0.08)); },
+};
+
+// The feast's chatter only during play
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing the palace hall
+// ============================================================
+function drawHall() {
+  const x0 = -offX, x1 = W + offX, y0 = -offY;
+  const g = ctx.createLinearGradient(0, y0, 0, H);
+  g.addColorStop(0, '#2a2048'); g.addColorStop(0.6, '#4a3360'); g.addColorStop(1, '#5e3c4a');
+  ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, H - y0);
+  // drapes along the top
+  for (let i = 0; i < Math.ceil((x1 - x0) / 120) + 1; i++) {
+    const dx = x0 + i * 120;
+    ctx.fillStyle = i % 2 ? '#7a2e4a' : '#8a3a56';
+    ctx.beginPath(); ctx.moveTo(dx, y0); ctx.lineTo(dx + 120, y0); ctx.lineTo(dx + 120, 118); ctx.quadraticCurveTo(dx + 60, 160, dx, 118); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e0a526'; ctx.beginPath(); ctx.arc(dx + 60, 141, 5, 0, TAU); ctx.fill();
+  }
+  // columns
+  for (const cx of [x0 + 10, x1 - 10]) {
+    ctx.fillStyle = '#8a7a9a'; ctx.fillRect(cx - 22, 120, 44, 780);
+    ctx.fillStyle = '#a090b0'; ctx.fillRect(cx - 30, 120, 60, 18); ctx.fillRect(cx - 30, 740, 60, 18);
+  }
+  // the plaster wall (lit by the lampstand)
+  const Wl = L.wall;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; roundRect(Wl.x0 + 6, Wl.y0 + 8, Wl.x1 - Wl.x0, Wl.y1 - Wl.y0, 12); ctx.fill();
+  const pg = ctx.createRadialGradient(L.lamp.x, Wl.y1, 40, L.lamp.x, Wl.y1, Math.max(500, W * 0.8));
+  pg.addColorStop(0, '#f6e6c4'); pg.addColorStop(1, '#cbb592');
+  ctx.fillStyle = pg; roundRect(Wl.x0, Wl.y0, Wl.x1 - Wl.x0, Wl.y1 - Wl.y0, 12); ctx.fill();
+  ctx.strokeStyle = '#a88a5a'; ctx.lineWidth = 4; ctx.stroke();
+  // little cracks and patches in the plaster
+  ctx.strokeStyle = 'rgba(140,110,70,0.35)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 8; i++) {
+    const px = lerp(Wl.x0 + 20, Wl.x1 - 20, hash(i, 1)), py = lerp(Wl.y0 + 20, Wl.y1 - 20, hash(i, 2));
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 14, py + 8); ctx.lineTo(px + 20, py + 2); ctx.stroke();
+  }
+  // floor
+  ctx.fillStyle = '#6a4a40'; ctx.fillRect(x0, 640, x1 - x0, H - 640 + 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let i = 0; i < 20; i++) ctx.fillRect(x0 + i * 90, 640, 45, H - 640 + 10);
+}
+
+function drawTiles() {
+  // timer along the bottom of the wall while the player answers
+  const Wl = L.wall;
+  if (phase === 'input' && state === 'play') {
+    const f = clamp(inputT / inputMax, 0, 1);
+    ctx.fillStyle = 'rgba(90,60,30,0.25)'; roundRect(Wl.x0 + 16, Wl.y1 - 20, Wl.x1 - Wl.x0 - 32, 10, 5); ctx.fill();
+    ctx.fillStyle = f > 0.35 ? '#e0a526' : (Math.sin(t * 12) > 0 ? '#e0603a' : '#e0a526');
+    roundRect(Wl.x0 + 16, Wl.y1 - 20, (Wl.x1 - Wl.x0 - 32) * f, 10, 5); ctx.fill();
+    // which sign comes next: little dots
+    const n = seq.length, gap = 18;
+    for (let k = 0; k < n; k++) {
+      const x = (Wl.x0 + Wl.x1) / 2 + (k - (n - 1) / 2) * gap, y = Wl.y0 + 14;
+      ctx.fillStyle = k < pos ? '#e0a526' : 'rgba(90,60,30,0.3)';
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill();
+    }
+  }
+  for (const q of tiles) {
+    const p = tilePos(q);
+    const h = L.cell * 0.32;
+    // tile backing
+    const hl = Math.max(q.flash * 2, q.hint > 0 ? 0.5 + 0.5 * Math.sin(t * 14) : 0);
+    ctx.fillStyle = q.wrong > 0 ? `rgba(220,80,60,${q.wrong})` : hl > 0 ? `rgba(255,220,120,${0.5 * hl})` : 'rgba(255,255,255,0.18)';
+    roundRect(p.x - L.cell * 0.44, p.y - L.cell * 0.44, L.cell * 0.88, L.cell * 0.88, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(140,110,70,0.35)'; ctx.lineWidth = 2; ctx.stroke();
+    // carved (faint) sign
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(90,60,35,0.75)'; ctx.lineWidth = Math.max(4, h * 0.16);
+    glyphPath(q.g, p.x, p.y, h); ctx.stroke();
+    // glowing writing
+    const glow = Math.max(q.lit, q.flash * 2);
+    if (glow > 0) {
+      const f = q.lit > 0 && q.trace !== undefined && phase === 'show' ? q.trace : 1;
+      ctx.save();
+      ctx.globalAlpha = clamp(glow, 0, 1);
+      ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 18;
+      ctx.strokeStyle = '#ff9a1a'; ctx.lineWidth = Math.max(7, h * 0.24);
+      glyphPath(q.g, p.x, p.y, h, f); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#fff4c0'; ctx.lineWidth = Math.max(3, h * 0.09);
+      glyphPath(q.g, p.x, p.y, h, f); ctx.stroke();
+      ctx.restore();
+    }
+    if (kbdUsed) {
+      ctx.font = '700 14px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(90,60,35,0.8)';
+      ctx.fillText(String(q.slot + 1), p.x - L.cell * 0.36, p.y - L.cell * 0.3);
+    }
+  }
+}
+
+function drawHand() {
+  if (hand.vis <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(hand.vis, 0, 1);
+  const x = hand.x, y = hand.y;
+  const g = ctx.createRadialGradient(x + 20, y + 30, 0, x + 20, y + 30, 80);
+  g.addColorStop(0, 'rgba(255,245,200,0.6)'); g.addColorStop(1, 'rgba(255,245,200,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x + 20, y + 30, 80, 0, TAU); ctx.fill();
+  ctx.translate(x, y);
+  ctx.rotate(-0.5);
+  ctx.fillStyle = '#fff1d6'; ctx.strokeStyle = '#e8c890'; ctx.lineWidth = 2;
+  // the pointing finger, the palm and curled fingers (no arm: just the hand)
+  roundRect(-6, 0, 12, 40, 6); ctx.fill(); ctx.stroke();
+  roundRect(-16, 34, 38, 36, 14); ctx.fill(); ctx.stroke();
+  for (let k = 0; k < 3; k++) { roundRect(6 + k * 0, 30 + k * 10, 20, 11, 5.5); ctx.fill(); ctx.stroke(); }
+  roundRect(-26, 42, 16, 10, 5); ctx.fill(); ctx.stroke();
+  // a soft glowing cuff where the hand fades out
+  const cg = ctx.createLinearGradient(0, 62, 0, 96);
+  cg.addColorStop(0, 'rgba(255,241,214,0.9)'); cg.addColorStop(1, 'rgba(255,241,214,0)');
+  ctx.fillStyle = cg; ctx.fillRect(-14, 64, 32, 32);
+  ctx.restore();
+}
+
+function drawLampstand() {
+  const { x, y } = L.lamp;
+  ctx.fillStyle = '#c9961e';
+  ctx.fillRect(x - 4, y - 200, 8, 200);
+  ctx.beginPath(); ctx.ellipse(x, y, 30, 8, 0, 0, TAU); ctx.fill();
+  ctx.fillRect(x - 24, y - 210, 48, 10);
+  const fl = 1 + Math.sin(t * 13) * 0.08;
+  ctx.fillStyle = 'rgba(255,220,120,0.25)'; ctx.beginPath(); ctx.arc(x, y - 226, 46 * fl, 0, TAU); ctx.fill();
+  for (const dx of [-16, 0, 16]) {
+    ctx.fillStyle = '#ffb33b';
+    ctx.beginPath(); ctx.ellipse(x + dx, y - 220, 5 * fl, 11 * fl, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff2a8'; ctx.beginPath(); ctx.ellipse(x + dx, y - 217, 2.5, 5, 0, 0, TAU); ctx.fill();
+  }
+}
+
+// A guest or the king at the table: head and shoulders
+function drawBust(x, y, s, d, mood) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const shake = mood === 'scared' ? Math.sin(t * 40) * 1.5 : 0;
+  ctx.translate(shake, 0);
+  ctx.fillStyle = d.robe;
+  ctx.beginPath(); ctx.ellipse(0, 0, 30, 34, 0, Math.PI, TAU); ctx.fill();
+  ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(0, -46, 18, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath(); ctx.arc(0, -50, 18, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+  if (d.beard) { ctx.beginPath(); ctx.moveTo(-15, -42); ctx.quadraticCurveTo(0, -14, 15, -42); ctx.quadraticCurveTo(0, -32, -15, -42); ctx.fill(); }
+  if (d.crown) {
+    ctx.fillStyle = '#f2c230'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-17, -60); ctx.lineTo(-17, -78); ctx.lineTo(-8, -68); ctx.lineTo(0, -82); ctx.lineTo(8, -68); ctx.lineTo(17, -78); ctx.lineTo(17, -60); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (d.chain) { ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -30, 16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+  const dark = '#2b1d12', hy = -46;
+  ctx.lineCap = 'round';
+  if (mood === 'scared') {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-6, hy - 2, 5, 6.5, 0, 0, TAU); ctx.ellipse(6, hy - 2, 5, 6.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(-6, hy - 5, 2, 0, TAU); ctx.arc(6, hy - 5, 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(0, hy + 9, 4, 5.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#9fd3ff'; ctx.beginPath(); ctx.arc(15, hy - 8, 2.5, 0, TAU); ctx.fill();
+  } else if (mood === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(-6, hy, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6, hy, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.arc(0, hy + 7, 5, 0, Math.PI); ctx.fill();
+  } else {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-6, hy - 1, 3.5, 4.5, 0, 0, TAU); ctx.ellipse(6, hy - 1, 3.5, 4.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(-6, hy - 2, 2, 0, TAU); ctx.arc(6, hy - 2, 2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath();
+    if (mood === 'worried') { ctx.moveTo(-4, hy + 9); ctx.quadraticCurveTo(0, hy + 6, 4, hy + 9); } else ctx.arc(0, hy + 5, 4, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const GUESTS = [
+  { robe: '#3c8f86', skin: '#d9a066', hair: '#3a2716', beard: true },
+  { robe: '#c46b8c', skin: '#e3b184', hair: '#2e1d10', beard: false },
+  { robe: '#b08a2e', skin: '#c98d56', hair: '#4a2f1a', beard: true },
+  { robe: '#5a6475', skin: '#b87a48', hair: '#1f140c', beard: false },
+];
+const KING = { robe: '#7a3fa0', skin: '#d7a070', hair: '#3a2716', beard: true, crown: true };
+
+function drawFeast() {
+  const scared = phase === 'show' && state === 'play';
+  const mood = state === 'win' || state === 'done' ? 'joy' : scared ? 'scared' : phase === 'read' ? 'calm' : 'worried';
+  const s = clamp(W / 640, 0.85, 1.15);
+  const ty = 820;
+  // guests and the king behind the table
+  const sp = Math.min(W * 0.17, 150);
+  [-2, -1, 1, 2].forEach((k, i) => {
+    if (Math.abs(k) === 2 && W < 560) return;
+    drawBust(W / 2 + k * sp, ty - 30, s * 0.9, GUESTS[i], mood === 'calm' ? 'calm' : mood);
+  });
+  drawBust(L.king.x, ty - 26, s * 1.1, KING, mood);
+  // the long table, with gold cups and food
+  ctx.fillStyle = '#8a5a3a'; roundRect(-offX - 10, ty - 30, W + offX * 2 + 20, 26, 6); ctx.fill();
+  ctx.fillStyle = '#6a4228'; ctx.fillRect(-offX - 10, ty - 6, W + offX * 2 + 20, 90);
+  ctx.fillStyle = '#e8dcc0'; ctx.fillRect(-offX - 10, ty - 30, W + offX * 2 + 20, 8);
+  for (let i = 0; i < 9; i++) {
+    const cx = lerp(-offX + 30, W + offX - 30, i / 8);
+    if (i % 2) {
+      ctx.fillStyle = '#f2c230'; ctx.fillRect(cx - 7, ty - 50, 14, 16); ctx.fillRect(cx - 2, ty - 36, 4, 6); ctx.fillRect(cx - 7, ty - 31, 14, 3);
+    } else {
+      ctx.fillStyle = '#c0603a'; ctx.beginPath(); ctx.ellipse(cx, ty - 32, 18, 6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = i % 4 ? '#8a3a6a' : '#e0a526';
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(cx - 8 + k * 5, ty - 38 - (k % 2) * 3, 4, 0, TAU); ctx.fill(); }
+    }
+  }
+}
+
+function drawDaniel() {
+  if (danielIn <= 0) return;
+  const { x, y } = L.daniel;
+  const s = clamp(W / 600, 1, 1.25);
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const bob = Math.abs(Math.sin(t * 6)) * (danielIn < 1 ? 3 : 0);
+  ctx.translate(0, -bob);
+  ctx.fillStyle = '#3f6fb5';
+  ctx.beginPath(); ctx.moveTo(-16, -120); ctx.quadraticCurveTo(-28, -60, -26, 0); ctx.lineTo(26, 0); ctx.quadraticCurveTo(28, -60, 16, -120); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e0a526'; ctx.fillRect(-22, -70, 44, 6);
+  // pointing at the wall
+  ctx.strokeStyle = shade('#3f6fb5', -25); ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-10, -106); ctx.lineTo(-34, -142); ctx.stroke();
+  ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.arc(-34, -142, 5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.arc(0, -140, 19, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3a2716';
+  ctx.beginPath(); ctx.arc(0, -144, 19, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-17, -136); ctx.quadraticCurveTo(0, -104, 17, -136); ctx.quadraticCurveTo(0, -124, -17, -136); ctx.fill();
+  ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, -142, 18.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-7, -141, 3.5, 4.5, 0, 0, TAU); ctx.ellipse(5, -141, 3.5, 4.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(-8, -143, 2, 0, TAU); ctx.arc(4, -143, 2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(-1, -134, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+
+function drawReadWords() {
+  if (phase !== 'read' && state !== 'win' && state !== 'done') return;
+  // the words appear across the wall as Daniel reads them
+  const a = clamp((phaseT - 0.8) / 0.8, 0, 1) * (state === 'play' ? 1 : 1);
+  const Wl = L.wall;
+  ctx.save();
+  ctx.globalAlpha = state === 'play' ? a : 1;
+  ctx.fillStyle = 'rgba(246,230,196,0.85)';
+  roundRect(Wl.x0 + 10, (Wl.y0 + Wl.y1) / 2 - 40, Wl.x1 - Wl.x0 - 20, 80, 14); ctx.fill();
+  const word = READ_WORDS[cfg.read];
+  let size = 46;
+  ctx.font = `800 ${size}px Fredoka, sans-serif`;
+  while (ctx.measureText(word).width > Wl.x1 - Wl.x0 - 50 && size > 18) { size -= 2; ctx.font = `800 ${size}px Fredoka, sans-serif`; }
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 16;
+  ctx.fillStyle = '#e07a10';
+  ctx.fillText(word, (Wl.x0 + Wl.x1) / 2, (Wl.y0 + Wl.y1) / 2 + size * 0.35);
+  ctx.restore();
+}
+
+function drawBubble() {
+  if (!bubble) return;
+  const text = bubbleText(bubble.key);
+  ctx.save();
+  ctx.font = '600 19px Fredoka, sans-serif';
+  const maxW = Math.min(W - 40, 440);
+  const lines = wrapText(text, maxW - 28);
+  const bw = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28);
+  const bh = lines.length * 24 + 18;
+  const ax = L.daniel.x - 10, ay = L.daniel.y - 175 * clamp(W / 600, 1, 1.25);
+  const bx = clamp(ax - bw * 0.7, 12, W - bw - 12), by = Math.min(ay - bh - 20, L.wall.y1 + 6);
+  ctx.globalAlpha = clamp(bubble.t / 0.3, 0, 1);
+  ctx.fillStyle = 'rgba(255,252,240,0.97)'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+  const tip = clamp(ax, bx + 24, bx + bw - 24);
+  ctx.beginPath(); ctx.moveTo(tip - 10, by + bh); ctx.lineTo(ax, Math.max(ay, by + bh + 10)); ctx.lineTo(tip + 10, by + bh); ctx.fill();
+  ctx.fillStyle = '#3b2f1e'; ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 30 + i * 24));
+  ctx.restore();
+}
+
+function drawScene() {
+  drawHall();
+  drawTiles();
+  drawReadWords();
+  drawLampstand();
+  drawFeast();
+  drawDaniel();
+  drawHand();
+  drawParticles();
+  drawBubble();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(30,20,50,0.9)'); hg.addColorStop(1, 'rgba(30,20,50,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'The Writing on the Wall' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore + (state === 'win' || state === 'done' ? 0 : levelScore)}`, viewW - 12, 26);
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('LAMPS', viewW - 12 - LAMPS * 26 - 2, 52);
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < LAMPS; k++) {
+      const x = viewW - 24 - (LAMPS - 1 - k) * 26, y = 50;
+      const lit = k < lamps;
+      ctx.fillStyle = lit ? '#c47a45' : 'rgba(255,233,168,0.25)';
+      ctx.beginPath(); ctx.ellipse(x, y + 3, 10, 5, 0, 0, TAU); ctx.fill();
+      if (lit) {
+        ctx.fillStyle = '#ffb33b'; ctx.beginPath(); ctx.ellipse(x + 6, y - 4, 3.5, 6, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff2a8'; ctx.beginPath(); ctx.ellipse(x + 6, y - 3, 1.6, 3, 0, 0, TAU); ctx.fill();
+      }
+    }
+    // rounds
+    const bx0 = 134, bx1 = viewW - 30, y = 84;
+    const f = state === 'win' || state === 'done' || phase === 'read' ? 1 : round / cfg.rounds;
+    ctx.fillStyle = 'rgba(255,233,168,0.22)'; roundRect(bx0, y - 7, bx1 - bx0, 14, 7); ctx.fill();
+    ctx.fillStyle = '#e0a526';
+    if (f > 0) { roundRect(bx0, y - 7, Math.max(14, (bx1 - bx0) * f), 14, 7); ctx.fill(); }
+    ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = f > 0.5 ? '#3b2410' : '#ffe9a8';
+    const label = phase === 'read' || state === 'win' || state === 'done' ? 'Daniel reads the wall' : `Message ${Math.min(round + 1, cfg.rounds)} of ${cfg.rounds} · ${cfg.start + round} signs`;
+    ctx.fillText(label, (bx0 + bx1) / 2, y + 4.5);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#4a3a60'; ctx.strokeStyle = '#4a3a60'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0 || state === 'title') return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  // just under the wall, over the hall
+  const y0 = (L.wall.y1 + offY) + 40;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(30,20,50,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  drawScene();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

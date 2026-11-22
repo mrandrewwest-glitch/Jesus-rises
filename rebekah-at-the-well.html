@@ -1,0 +1,1748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fcbee">
+<title>Rebekah at the Well</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #e6c88a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Rebekah at the Well</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  came: { ref: 'Genesis 24:15', KJV: 'Rebekah came out... with her pitcher upon her shoulder.', NKJV: 'Rebekah... came out with her pitcher on her shoulder.', NIV: 'Rebekah came out with her jar on her shoulder.', NLT: 'he saw a young woman named Rebekah coming out with her water jug on her shoulder.' },
+  // The story at the well (speech bubbles)
+  ask: { ref: 'Genesis 24:17', KJV: 'Let me, I pray thee, drink a little water of thy pitcher.', NKJV: 'Please let me drink a little water from your pitcher.', NIV: 'Please give me a little water from your jar.', NLT: 'Please give me a little drink of water from your jug.' },
+  drink: { ref: 'Genesis 24:18', KJV: 'Drink, my lord', NKJV: 'Drink, my lord.', NIV: 'Drink, my lord', NLT: 'Yes, my lord... have a drink.' },
+  camels: { ref: 'Genesis 24:19', KJV: 'I will draw water for thy camels also, until they have done drinking.', NKJV: 'I will draw water for your camels also, until they have finished drinking.', NIV: 'I’ll draw water for your camels too, until they have had enough to drink.', NLT: 'I’ll draw water for your camels, too, until they have had enough to drink.' },
+  // Level cards
+  hasted: { ref: 'Genesis 24:18', KJV: 'Drink, my lord: and she hasted, and let down her pitcher upon her hand, and gave him drink.', NKJV: 'Drink, my lord. Then she quickly let her pitcher down to her hand, and gave him a drink.', NIV: 'Drink, my lord... and quickly lowered the jar to her hands and gave him a drink.', NLT: 'Yes, my lord... have a drink. And she quickly lowered her jug from her shoulder and gave him a drink.' },
+  filled: { ref: 'Genesis 24:16', KJV: 'she went down to the well, and filled her pitcher, and came up.', NKJV: 'And she went down to the well, filled her pitcher, and came up.', NIV: 'She went down to the spring, filled her jar and came up again.', NLT: 'She went down to the spring, filled her jug, and came up again.' },
+  // Win card
+  ranAgain: { ref: 'Genesis 24:20', KJV: 'And she hasted, and emptied her pitcher into the trough, and ran again unto the well to draw water, and drew for all his camels.', NKJV: 'Then she quickly emptied her pitcher into the trough, ran back to the well to draw water, and drew for all his camels.', NIV: 'So she quickly emptied her jar into the trough, ran back to the well to draw more water, and drew enough for all his camels.', NLT: 'So she quickly emptied her jug into the watering trough and ran back to the well to draw water for all his camels.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function mixColor(a, b, f) {
+  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(na >> 16, nb >> 16, f)), g = Math.round(lerp((na >> 8) & 255, (nb >> 8) & 255, f)), bl = Math.round(lerp(na & 255, nb & 255, f));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+
+// ============================================================
+//  Tuning
+// ============================================================
+const HEARTS = 3;
+const SPOTS = 3;               // places at the trough
+const PERFECT_PTS = 100, OK_PTS = 60;
+const LEVELS = [
+  { name: 'Drink, My Lord',          verse: 'hasted',   camels: 3,  need: 1,   thirst: 50, zone: 130, waterY: 640, vmax: 210, haul: 4, bob: 0 },
+  { name: 'Thirsty Camels',          verse: 'camels',   camels: 4,  need: 1,   thirst: 42, zone: 110, waterY: 670, vmax: 250, haul: 5, bob: 0 },
+  { name: 'Down to the Well',        verse: 'filled',   camels: 6,  need: 1.5, thirst: 36, zone: 92,  waterY: 710, vmax: 290, haul: 6, bob: 0 },
+  { name: 'A Deeper Well',           verse: 'came',     camels: 8,  need: 1.5, thirst: 28, zone: 78,  waterY: 750, vmax: 330, haul: 6, bob: 0 },
+  { name: 'The Water Goes Up and Down', verse: 'hasted', camels: 10, need: 2,  thirst: 24, zone: 68,  waterY: 760, vmax: 350, haul: 7, bob: 22 },
+  { name: 'All Ten Camels',          verse: 'ranAgain', camels: 10, need: 2,   thirst: 20, zone: 58,  waterY: 780, vmax: 380, haul: 7, bob: 32 },
+];
+const LAST_LEVEL = LEVELS.length;
+function makeConfig(n) { return LEVELS[Math.min(n, LAST_LEVEL) - 1]; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0, levelStartScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('rebekahBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let hearts = HEARTS;
+let jar = null;           // the pitcher on its rope
+let reb = null;           // Rebekah
+let spots = [];           // camels at the trough
+let queue = 0;            // camels still waiting in line
+let camelsDone = 0, perfects = 0, nextId = 0;
+let leaving = [];         // happy camels walking away
+let particles = [], popups = [];
+let message = { text: '', t: 0 };
+let flash = null;         // big 'Perfect!' / 'Too soon' word over the well
+let told = {};
+let introT = 0, introStep = 0, winT = 0, failT = 0, endTimer = 0, playT = 0;
+let lastScore = null;
+let attempted = 0;
+let bubble = null;        // speech bubble in the story { key, who }
+
+// ============================================================
+//  Layout (playfield coordinates; the playfield is W wide and H tall)
+// ============================================================
+const HORIZON = 380;
+const WELL_Y = 470;       // the stone mouth of the well
+const PANEL_TOP = 505, PANEL_BOT = 885;
+const JAR_TOP = 538;      // the jar hangs here at the top of the rope
+const TROUGH_Y = 724;     // water surface in the trough
+const CAMEL_Y = 752;      // the camels' feet (hidden behind the trough)
+const POUR_Y = 812;       // Rebekah stands here to pour
+function wellX() { return clamp(W * 0.15, 72, 200); }
+function panelW() { return clamp(W * 0.22, 112, 190); }
+function troughX0() { return wellX() + panelW() / 2 + 26; }
+function troughX1() { return W - 10; }
+function spotW() { return (troughX1() - troughX0()) / SPOTS; }
+function spotX(i) { return troughX0() + spotW() * (i + 0.5); }
+function camelScale() { return clamp(spotW() / 118, 0.86, 1.6); }
+function rebHome() { return { x: wellX() + panelW() / 2 - 4, y: WELL_Y + 24 }; }
+function peopleScale() { return clamp(W / 560, 1.05, 1.45); }
+function waterTop() { return cfg.waterY + (cfg.bob ? Math.sin(t * 1.9) * cfg.bob : 0); }
+function badgePos(i) { const cs = camelScale(); return { x: spotX(i) + 14 * cs, y: CAMEL_Y - 162 * cs }; }
+
+// ============================================================
+//  People
+// ============================================================
+const REBEKAH = { robe: '#2f8fa8', hair: '#3a2716', beard: false, skin: '#d9a066', scarf: '#e86f5a', sash: '#ffd166', i: 1, mood: 'watch', blinkT: 2, blink: 0, phase: 0 };
+const SERVANT = { robe: '#7a6a4a', hair: '#6b5a48', beard: true, skin: '#c98d56', scarf: '#d8c7a0', sash: '#b5503f', i: 0, mood: 'watch', blinkT: 3, blink: 0, phase: 2 };
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -30); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3, 2);
+      brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'tired':
+      // droopy half-closed eyes and a big sigh
+      ctx.fillStyle = dark;
+      for (const sx of [-ex, ex]) { ctx.beginPath(); ctx.ellipse(sx, ey + 1, 3.5, 2, 0, 0, Math.PI); ctx.fill(); }
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-ex - 4, ey); ctx.lineTo(-ex + 4, ey + 1); ctx.moveTo(ex - 4, ey + 1); ctx.lineTo(ex + 4, ey); ctx.stroke();
+      mouthFill(() => ctx.ellipse(0, mouthY, 2.6, 3.4, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'joy':
+    case 'laugh':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, mood === 'laugh' ? 7 : 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// pose: 'stand' | 'carry' | 'bow' | 'wash' | 'cheer' | 'eat'
+function drawPerson(d, x, y, s, lookX, lookY, pose = 'stand', bob = 0) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy' || pose === 'cheer') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(80,50,10,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 21 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -(jump + bob) * s);
+  ctx.scale(s, s);
+  if (d.flip) ctx.scale(-1, 1);
+  const bowA = pose === 'bow' ? 0.45 : pose === 'wash' ? 0.6 : 0;
+  const sleeve = shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // feet with sandals
+  ctx.fillStyle = '#7a4a22';
+  ctx.beginPath(); ctx.ellipse(-8, -1, 7, 3.5, 0, 0, TAU); ctx.ellipse(8, -1, 7, 3.5, 0, 0, TAU); ctx.fill();
+  if (d.dusty) {
+    ctx.fillStyle = 'rgba(170,130,80,0.55)';
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-14 + k * 7, -2 + Math.sin(t * 3 + k) * 1.5, 5, 0, TAU); ctx.fill(); }
+  }
+  ctx.save();
+  ctx.translate(0, -18);
+  ctx.rotate(bowA);
+  ctx.translate(0, 18);
+  if (pose === 'cheer' || mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.sash || '#c9b07a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  if (pose === 'stand' && mood !== 'joy') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (pose === 'carry') { arm(-11, -32, -8, -30); arm(11, -32, 8, -30); }
+  else if (pose === 'bow') { arm(-11, -32, -4, -24); arm(11, -32, 4, -24); }
+  else if (pose === 'wash') { arm(-11, -32, -10, -4); arm(11, -32, 10, -4); }
+  else if (pose === 'eat') { arm(-11, -32, -6, -40 + Math.sin(t * 6 + d.phase) * 3); arm(11, -32, 15, -12); }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, d.flip ? -lx : lx, ly);
+  ctx.restore();
+  ctx.restore();
+}
+
+
+function blinkAll(dt) {
+  for (const d of [REBEKAH, SERVANT]) {
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+}
+
+// ============================================================
+//  Level set-up
+// ============================================================
+function newCamel(enter = true) {
+  return { id: nextId++, need: cfg.need, got: 0, thirst: 0, drinkT: 0, grumpT: 0, joyT: 0, enterX: enter ? 1 : 0, look: CAMEL_LOOKS[nextId % CAMEL_LOOKS.length], blinkT: rand(1, 4), blink: 0 };
+}
+const CAMEL_LOOKS = [
+  { body: '#d9a95b', blanket: '#c0392b', trim: '#ffd166' },
+  { body: '#c99550', blanket: '#2f7f9a', trim: '#fff1c1' },
+  { body: '#e0b36a', blanket: '#7a4fa0', trim: '#ffd166' },
+  { body: '#cf9f5c', blanket: '#3c8f56', trim: '#ffe9a8' },
+];
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  hearts = HEARTS;
+  camelsDone = 0; perfects = 0; levelScore = 0; nextId = 0;
+  particles = []; popups = []; leaving = [];
+  told = {};
+  introT = 0; introStep = 0; winT = 0; failT = 0; endTimer = 0; playT = 0;
+  flash = null; bubble = null;
+  jar = { st: 'top', y: JAR_TOP, vy: 0, fill: 0, mud: false, perfect: false, catchY: 0 };
+  const h = rebHome();
+  reb = { x: h.x, y: h.y, st: 'well', target: -1, t: 0, pending: false, face: 1 };
+  spots = [];
+  queue = cfg.camels;
+  for (let i = 0; i < SPOTS; i++) { spots.push(queue > 0 ? newCamel(false) : null); if (queue > 0) queue--; }
+  keys.clear();
+}
+
+// ============================================================
+//  The jar, the rope and the well
+// ============================================================
+function wellAction() {
+  if (state !== 'play') return;
+  if (jar.st === 'top') {
+    if (reb.st !== 'well') { reb.pending = true; return; }
+    jar.st = 'fall'; jar.vy = 60; jar.fill = 0; jar.mud = false; jar.perfect = false;
+    sfx.drop();
+  } else if (jar.st === 'fall') {
+    catchJar();
+  } else if (jar.st === 'haul') {
+    const step = (PANEL_BOT - JAR_TOP) / (cfg.haul + 1);
+    jar.y = Math.max(JAR_TOP, jar.y - step);
+    jar.pull = 0.18;
+    sfx.creak(1 - (jar.y - JAR_TOP) / (PANEL_BOT - JAR_TOP));
+    if (jar.fill > 0 && Math.random() < 0.6) splashAt(wellX() + rand(-6, 6), jar.y - 10, 2);
+  } else if (jar.st === 'full') {
+    showMessage('Now tap a thirsty camel to pour!', 1.6);
+  } else if (jar.st === 'carried') {
+    reb.pending = true;
+  }
+}
+
+function catchJar() {
+  const wt = waterTop();
+  const mudY = wt + cfg.zone;
+  const y = jar.y;
+  jar.st = 'haul';
+  jar.catchY = y;
+  if (y < wt - 4) {
+    jar.fill = 0;
+    setFlash('Too soon!', '#c0392b');
+    sfx.bump();
+    if (!told.soon && level <= 3) { told.soon = true; showMessage('Wait until the jar is in the blue water', 2); }
+  } else {
+    const f = (y - wt) / cfg.zone;   // 0 at the surface, 1 at the mud
+    jar.perfect = f > 0.22 && f < 0.78;
+    jar.fill = jar.perfect ? 1 : 0.6;
+    setFlash(jar.perfect ? 'Perfect!' : 'Good', jar.perfect ? '#2e7d32' : '#2f7f9a');
+    sfx.fill(jar.perfect);
+    splashAt(wellX(), wt, jar.perfect ? 14 : 8);
+    if (!told.haul) { told.haul = true; showMessage('Tap, tap, tap to pull the rope up!', 2); }
+  }
+}
+
+function updateJar(dt) {
+  if (jar.pull > 0) jar.pull -= dt;
+  if (jar.st === 'fall') {
+    jar.vy = Math.min(cfg.vmax, jar.vy + 700 * dt);
+    jar.y += jar.vy * dt;
+    const mudY = waterTop() + cfg.zone;
+    if (jar.y >= mudY) {
+      // sank into the mud at the bottom
+      jar.y = mudY;
+      jar.st = 'haul';
+      jar.fill = 0; jar.mud = true;
+      setFlash('Too late!', '#8a5a2b');
+      sfx.thud();
+      if (!told.late && level <= 3) { told.late = true; showMessage('Muddy! Tap sooner, while the jar is in the water', 2.2); }
+    }
+  } else if (jar.st === 'haul') {
+    jar.y = Math.max(JAR_TOP, jar.y - 26 * dt);   // Rebekah keeps a slow, steady pull
+    if (jar.y <= JAR_TOP + 0.5) {
+      if (jar.fill > 0) {
+        jar.st = 'full';
+        sfx.ready();
+        if (!told.pour) { told.pour = true; showMessage('Tap a camel to pour the water for it', 2.2); }
+      } else {
+        // empty or muddy: tip it out and try again
+        jar.st = 'top';
+        if (jar.mud) { splashAt(wellX() + 30, WELL_Y + 10, 10, ['#9c7a4a', '#b8945e', '#7a5a32']); addScore(-20, wellX(), WELL_Y - 60); }
+        jar.mud = false;
+      }
+    }
+  }
+}
+
+function setFlash(text, color) { flash = { text, color, t: 1.1 }; }
+
+// ============================================================
+//  Rebekah carries the water to a camel
+// ============================================================
+function pourFor(i) {
+  if (state !== 'play') return;
+  const c = spots[i];
+  if (jar.st !== 'full' || reb.st !== 'well') {
+    if (jar.st === 'top' || jar.st === 'haul' || jar.st === 'fall') showMessage(jar.st === 'top' ? 'First draw some water: tap the well' : 'Pull the jar up first', 1.4);
+    return;
+  }
+  if (!c || c.got >= c.need) return;
+  reb.st = 'go'; reb.target = i; reb.t = 0;
+  jar.st = 'carried';
+  sfx.tick();
+}
+
+function rebSpot(i) { return { x: spotX(i) - 6 * camelScale(), y: POUR_Y }; }
+
+function updateReb(dt) {
+  const sp = abeSpeedLike();
+  if (reb.st === 'go' || reb.st === 'back') {
+    const to = reb.st === 'go' ? rebSpot(reb.target) : rebHome();
+    const dx = to.x - reb.x, dy = to.y - reb.y, d = Math.hypot(dx, dy);
+    if (Math.abs(dx) > 2) reb.face = dx > 0 ? 1 : -1;
+    if (d > sp * dt) { reb.x += dx / d * sp * dt; reb.y += dy / d * sp * dt; return; }
+    reb.x = to.x; reb.y = to.y;
+    if (reb.st === 'go') { reb.st = 'pour'; reb.t = 0; sfx.pour(); }
+    else {
+      reb.st = 'well'; reb.face = 1;
+      jar.st = 'top'; jar.y = JAR_TOP;
+      if (reb.pending) { reb.pending = false; wellAction(); }
+    }
+  } else if (reb.st === 'pour') {
+    reb.t += dt;
+    if (Math.random() < dt * 40) splashAt(reb.x - 26, TROUGH_Y - 4 + rand(-4, 4), 1);
+    if (reb.t >= 0.55) {
+      const c = spots[reb.target];
+      if (c) giveWater(c, reb.target);
+      reb.st = 'back';
+      jar.fill = 0;
+    }
+  }
+}
+function abeSpeedLike() { return W * 0.9 + 260; }
+
+function giveWater(c, i) {
+  c.got = Math.min(c.need, c.got + jar.fill);
+  c.drinkT = 1.2;
+  c.thirst = 0;
+  const p = badgePos(i);
+  const pts = jar.perfect ? PERFECT_PTS : OK_PTS;
+  if (jar.perfect) perfects++;
+  addScore(pts, p.x, p.y - 30);
+  if (c.got >= c.need - 0.001) {
+    c.joyT = 1.5;
+    camelsDone++;
+    addScore(100, p.x, p.y - 60);
+    hearts3(spotX(i), CAMEL_Y - 130 * camelScale());
+    sfx.happy();
+    if (camelsDone >= cfg.camels) win();
+  }
+}
+
+// ============================================================
+//  The camels
+// ============================================================
+function updateCamels(dt) {
+  for (let i = 0; i < SPOTS; i++) {
+    const c = spots[i];
+    if (!c) continue;
+    c.blinkT -= dt; if (c.blinkT <= 0) { c.blink = 0.15; c.blinkT = rand(1.5, 5); } if (c.blink > 0) c.blink -= dt;
+    c.enterX = Math.max(0, c.enterX - dt * 1.4);
+    c.drinkT = Math.max(0, c.drinkT - dt);
+    c.grumpT = Math.max(0, c.grumpT - dt);
+    if (c.joyT > 0) {
+      c.joyT -= dt;
+      if (c.joyT <= 0 && state === 'play') {
+        // off it goes, happy; the next camel in line steps up
+        leaving.push({ c, x: spotX(i), t: 0 });
+        spots[i] = null;
+        if (queue > 0) { spots[i] = newCamel(true); queue--; }
+      }
+      continue;
+    }
+    if (state !== 'play' || c.enterX > 0 || c.drinkT > 0) continue;
+    c.thirst += dt / cfg.thirst;
+    if (c.thirst > 0.75 && !c.warned) { c.warned = true; sfx.grunt(); }
+    if (c.thirst < 0.7) c.warned = false;
+    if (c.thirst >= 1) {
+      c.thirst = 0.35;
+      c.grumpT = 1.6;
+      hearts--;
+      sfx.grumble();
+      const p = badgePos(i);
+      for (let k = 0; k < 8; k++) particles.push({ x: p.x + rand(-20, 20), y: p.y + 40, vx: rand(-30, 30), vy: rand(-80, -40), life: 0.9, max: 0.9, color: 'rgba(255,255,255,0.8)', size: rand(5, 9), grav: 0, kind: 'puff' });
+      showMessage(hearts > 0 ? 'Hmph! That camel got grumpy' : 'The camels are too grumpy…', 1.8);
+      if (hearts <= 0) { fail(); return; }
+    }
+  }
+  for (let k = leaving.length - 1; k >= 0; k--) { leaving[k].t += dt; if (leaving[k].t > 2.5) leaving.splice(k, 1); }
+}
+
+// ============================================================
+//  What should she do next? (hint arrow, and the test bot)
+// ============================================================
+function thirstiest() {
+  let bestI = -1, bestV = -1;
+  spots.forEach((c, i) => { if (c && c.joyT <= 0 && c.got < c.need && c.enterX <= 0.3) { const v = c.thirst + (c.drinkT > 0 ? -1 : 0); if (v > bestV) { bestV = v; bestI = i; } } });
+  return bestI;
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * 200;
+  const levelBonus = level * 250;
+  totalScore += heartBonus + levelBonus;
+  lastScore = { poured: levelScore, heartBonus, levelBonus, perfects };
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('rebekahBest', best); } catch (e) {} }
+  showMessage(level === LAST_LEVEL ? 'All ten camels have had enough!' : 'The camels have had enough to drink!', 2.4);
+  sfx.win();
+  endTimer = 3;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+function addScore(pts, x, y) {
+  levelScore += pts; totalScore += pts;
+  popups.push({ text: (pts > 0 ? '+' : '') + pts, x, y, t: 1.2, bad: pts < 0 });
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function splashAt(x, y, n, cols = ['#7cc4f2', '#a8dcff', '#ffffff']) {
+  for (let k = 0; k < n; k++) particles.push({ x: x + rand(-10, 10), y, vx: rand(-80, 80), vy: rand(-150, -50), life: rand(0.4, 0.8), max: 0.8, color: pick(cols), size: rand(2.5, 4.5), grav: 420, kind: 'dot' });
+}
+function splash(x, y, n) { splashAt(x, y, n); }
+function sparkle(x, y, n) {
+  for (let k = 0; k < n; k++) { const a = rand(0, TAU), sp = rand(40, 160); particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.5, 1.1), max: 1.1, color: pick(['#ffe27a', '#fff6d0', '#ffffff']), size: rand(2, 4), grav: 30, kind: 'star' }); }
+}
+function hearts3(x, y) {
+  for (let k = 0; k < 3; k++) particles.push({ x: x + rand(-14, 14), y, vx: rand(-20, 20), vy: rand(-70, -40), life: 1.2, max: 1.2, color: '#ff7a8a', size: 6, grav: 0, kind: 'heart' });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    if (p.kind === 'puff') { p.vx *= Math.pow(0.3, dt); p.size += dt * 6; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; popups[i].y -= 40 * dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = p.kind === 'puff' ? a * 0.8 : a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'heart') {
+      const s = p.size;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y + s * 0.9);
+      ctx.bezierCurveTo(p.x - s * 1.4, p.y - s * 0.2, p.x - s * 0.5, p.y - s * 1.3, p.x, p.y - s * 0.4);
+      ctx.bezierCurveTo(p.x + s * 0.5, p.y - s * 1.3, p.x + s * 1.4, p.y - s * 0.2, p.x, p.y + s * 0.9);
+      ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = makeConfig(1);
+  resetLevel();
+  showOverlay('Rebekah at the Well', 'Water for ten thirsty camels',
+    `${verseHTML('came')}
+     <ul>
+       <li>Abraham's servant and his camels are hot and thirsty. Help kind <b>Rebekah</b> draw water for them all!</li>
+       <li><b>Tap</b> to drop the jar down the well. <b>Tap again</b> when it is in the <b>blue water</b> to fill it. Too soon, and it's empty; too late, and it's muddy!</li>
+       <li><b>Tap, tap, tap</b> to pull the rope up.</li>
+       <li>Then <b>tap a camel</b> to pour the water into its trough. Help the thirstiest camel first, before it gets grumpy!</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> for the well, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> for the camels.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Draw water', () => { level = 1; totalScore = 0; attempted = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(level);
+  resetLevel();
+  const tips = [
+    'Three thirsty camels. Fill the jar in the <b>middle of the water</b> for a <b>Perfect!</b>',
+    'Four camels, and the jar falls a little faster.',
+    'Each camel now needs <b>more than one</b> jar. Perfect jars hold more water!',
+    'The well is deeper and the water band is thinner. Help the <b>thirstiest</b> camel first!',
+    'The water in the well <b>goes up and down</b>. Watch it carefully!',
+    'All ten camels, and they are very thirsty. You can do it!',
+  ][level - 1];
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${tips}<br>Water <b>${cfg.camels}</b> camels. Don't let <b>3</b> camels get grumpy.</p>
+     <p class="score">Score: <b>${totalScore}</b></p>`,
+    'Go!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  levelStartScore = totalScore;
+  sfx.levelStart();
+  if (retry || attempted > 0 || level > 1) { attempted++; beginPlay(); return; }
+  attempted++;
+  state = 'intro';
+  syncAmbience();
+  introT = 0; introStep = 0;
+  bubble = { key: 'ask', who: 'servant' };
+}
+
+const INTRO = [{ key: 'ask', who: 'servant', dur: 3.4 }, { key: 'drink', who: 'rebekah', dur: 2.6 }, { key: 'camels', who: 'rebekah', dur: 3.8 }];
+function advanceIntro() {
+  introStep++;
+  introT = 0;
+  if (introStep >= INTRO.length) { beginPlay(); return; }
+  bubble = { key: INTRO[introStep].key, who: INTRO[introStep].who };
+  if (introStep === 1) sfx.pour();
+}
+function updateIntro(dt) {
+  introT += dt;
+  if (introT > INTRO[introStep].dur) advanceIntro();
+}
+
+function beginPlay() {
+  state = 'play';
+  syncAmbience();
+  bubble = null;
+  showMessage(level === 1 ? 'Tap to drop the jar into the well' : `Level ${level}: ${cfg.name}`, 2.4);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const scoreHTML = `<p class="score">Water poured: <b>${s.poured}</b> (${s.perfects} perfect)<br>Happy camels bonus: <b>${s.heartBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level === LAST_LEVEL) {
+      showOverlay('Ten happy camels!', 'Rebekah was kind and worked hard',
+        `${verseHTML('ranAgain')}
+         <p style="text-align:center">Abraham's servant had prayed for a kind young woman who would offer water to his camels too. God answered his prayer: Rebekah became the wife of Abraham's son, <b>Isaac</b>!</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => titleScreen());
+    } else {
+      showOverlay('Enough to drink!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML('ranAgain')}
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Next level', () => { level++; attempted = 0; levelCard(); });
+    }
+  } else if (state === 'fail') {
+    totalScore = levelStartScore;
+    showOverlay('Grumpy camels!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The camels got too thirsty. Tap when the jar is <b>in the middle of the water</b>, and always help the camel with the <b>shortest bar</b> first.</p>
+       ${verseHTML('filled')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'intro') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => { totalScore = levelStartScore; startLevel(true); });
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { totalScore = levelStartScore; startLevel(true); return; }
+  if (state === 'intro' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { advanceIntro(); return; }
+  if (state === 'play') {
+    if ((e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'ArrowUp' || e.code === 'Enter') && !e.repeat) wellAction();
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= SPOTS) pourFor(n - 1);
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+function camelAt(px, py) {
+  const cs = camelScale();
+  for (let i = 0; i < SPOTS; i++) {
+    if (!spots[i]) continue;
+    if (Math.abs(px - spotX(i)) < spotW() / 2 && py > CAMEL_Y - 190 * cs && py < POUR_Y + 60) return i;
+  }
+  return -1;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'intro') { if (introT > 0.3) advanceIntro(); return; }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  const px = p.vx - offX, py = p.vy - offY;
+  const ci = camelAt(px, py);
+  if (jar.st === 'full' && reb.st === 'well') {
+    if (ci >= 0) pourFor(ci);
+    else showMessage('Tap a thirsty camel to pour', 1.4);
+    return;
+  }
+  if (jar.st === 'top' && ci >= 0 && reb.st === 'well') { showMessage('First draw some water: tap the well', 1.5); return; }
+  wellAction();
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  tick() { this.tone(880, 0.05, 'triangle', 0.08); },
+  drop() { this.tone(500, 0.35, 'sine', 0.12, 0, 200); },
+  creak(f) { this.tone(260 + f * 260, 0.08, 'sawtooth', 0.04); this.noiseBurst(900, 0.08, 0.08, 3); },
+  fill(perfect) { this.noiseBurst(1400, 0.35, 0.28, 0.7, 500); if (perfect && this.ctx) { Music.tap(0.95); this.tone(1568, 0.3, 'sine', 0.1, 0.08); } },
+  thud() { this.tone(110, 0.25, 'sine', 0.4, 0, 60); this.noiseBurst(300, 0.25, 0.3, 0.7, 150, 'lowpass'); },
+  bump() { this.tone(220, 0.15, 'triangle', 0.16, 0, 150); },
+  ready() { if (this.ctx) Music.tap(0.6); },
+  pour() { this.noiseBurst(2200, 0.6, 0.22, 0.5, 900); },
+  happy() { if (this.ctx) { Music.tap(0.7); Music.tap(1); } },
+  grunt() { this.tone(160, 0.25, 'sawtooth', 0.06, 0, 120); },
+  grumble() { this.tone(140, 0.5, 'sawtooth', 0.1, 0, 90); this.noiseBurst(400, 0.5, 0.2, 0.6, 200, 'lowpass'); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+
+// ============================================================
+//  Rendering: the scene
+// ============================================================
+function drawCloud(cx, cy, w, h) {
+  const n = Math.max(3, Math.round(w / 22));
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.42 + 0.38 * Math.sin(f * Math.PI));
+    const px = cx - w / 2 + h * 0.4 + f * (w - h * 0.8), py = cy - r * 0.3;
+    ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU);
+  }
+  ctx.fill();
+}
+
+
+function drawBackdrop() {
+  const g = ctx.createLinearGradient(0, -offY, 0, HORIZON);
+  g.addColorStop(0, '#f6b26b'); g.addColorStop(0.45, '#ffd59a'); g.addColorStop(1, '#ffeec8');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, -offY, viewW, HORIZON + offY + 10);
+  // evening sun ("at the time of evening, the time that women go out to draw water")
+  const sx = W * 0.8, sy = HORIZON - 70;
+  const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 150);
+  sg.addColorStop(0, 'rgba(255,248,210,1)'); sg.addColorStop(0.3, 'rgba(255,220,140,0.7)'); sg.addColorStop(1, 'rgba(255,200,120,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 150, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff2c6'; ctx.beginPath(); ctx.arc(sx, sy, 38, 0, TAU); ctx.fill();
+  for (let k = 0; k < 4; k++) {
+    const cw = 80 + hash(k, 5) * 80;
+    const cx = ((hash(k, 4) * (viewW + 300) + t * (4 + k * 2)) % (viewW + 300)) - offX - 150;
+    const cy = lerp(-offY + 60, 240, hash(k, 6));
+    ctx.globalAlpha = 0.85;
+    drawCloud(cx, cy, cw, cw * 0.3);
+    ctx.globalAlpha = 1;
+  }
+  // the town of Nahor on the hill
+  ctx.fillStyle = '#d8b07a';
+  ctx.beginPath(); ctx.moveTo(-offX, HORIZON + 10);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, HORIZON - 40 + Math.sin(x / 130) * 20 + Math.sin(x / 47) * 6);
+  ctx.lineTo(W + offX, HORIZON + 10); ctx.fill();
+  for (let k = 0; k < 7; k++) {
+    const hx = W * 0.3 + k * 38, hy = HORIZON - 70 + Math.sin(hx / 130) * 20 + (k % 3) * 6;
+    ctx.fillStyle = k % 2 ? '#ecd6ac' : '#e2c796';
+    ctx.fillRect(hx, hy, 32, 26);
+    ctx.fillStyle = '#b89a6a'; ctx.fillRect(hx - 2, hy - 4, 36, 5);
+    ctx.fillStyle = '#6b5238'; ctx.fillRect(hx + 12, hy + 12, 8, 14);
+  }
+  // ground
+  const gg = ctx.createLinearGradient(0, HORIZON, 0, H);
+  gg.addColorStop(0, '#e8c88c'); gg.addColorStop(1, '#d6b070');
+  ctx.fillStyle = gg;
+  ctx.fillRect(-offX, HORIZON, viewW, H - HORIZON + 40);
+  for (let k = 0; k < 26; k++) {
+    const x = hash(k, 1) * (W + 2 * offX) - offX, y = HORIZON + 20 + hash(k, 2) * (H - HORIZON - 40);
+    if (k % 3) { ctx.fillStyle = '#c9a466'; ctx.beginPath(); ctx.ellipse(x, y, 4, 2.5, 0, 0, TAU); ctx.fill(); }
+    else {
+      ctx.strokeStyle = '#a3b45a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y - 9); ctx.moveTo(x, y); ctx.lineTo(x + 1, y - 11); ctx.moveTo(x, y); ctx.lineTo(x + 5, y - 8); ctx.stroke();
+    }
+  }
+  // two palm trees by the spring
+  drawPalm(W * 0.05 - 10, HORIZON + 30, 0.9);
+  drawPalm(W * 0.98, HORIZON + 10, 0.75);
+}
+
+function drawPalm(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#8a6a42'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, -80, 0, -170); ctx.stroke();
+  ctx.fillStyle = '#5f9a3a';
+  for (let k = 0; k < 6; k++) {
+    const a = -Math.PI / 2 + (k - 2.5) * 0.55 + Math.sin(t * 1.5 + k) * 0.04;
+    ctx.save(); ctx.translate(0, -170); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(40, -18, 80, 8); ctx.quadraticCurveTo(40, -2, 0, 0); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// --------- The well (with a cut-away view of the shaft) ---------
+function drawWellHead() {
+  const x = wellX(), pw = panelW();
+  // wooden frame and pulley
+  ctx.strokeStyle = '#7a5332'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 40, WELL_Y); ctx.lineTo(x - 34, WELL_Y - 90); ctx.moveTo(x + 40, WELL_Y); ctx.lineTo(x + 34, WELL_Y - 90); ctx.moveTo(x - 44, WELL_Y - 88); ctx.lineTo(x + 44, WELL_Y - 88); ctx.stroke();
+  ctx.fillStyle = '#5a3e26'; ctx.beginPath(); ctx.arc(x, WELL_Y - 88, 9, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c69a68'; ctx.beginPath(); ctx.arc(x, WELL_Y - 88, 4, 0, TAU); ctx.fill();
+  // stone ring
+  ctx.fillStyle = '#9a8e80';
+  ctx.beginPath(); ctx.ellipse(x, WELL_Y, pw / 2 + 4, 20, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2a2420';
+  ctx.beginPath(); ctx.ellipse(x, WELL_Y - 2, pw / 2 - 12, 11, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#b5a998';
+  for (let k = 0; k < 9; k++) {
+    const a = k / 9 * TAU;
+    ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * (pw / 2 - 4), WELL_Y + Math.sin(a) * 14, 11, 7, 0, 0, TAU); ctx.fill();
+  }
+  // the rope from the pulley down into the well
+  ctx.strokeStyle = '#d9b77a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(x, WELL_Y - 88); ctx.lineTo(x, WELL_Y + 2); ctx.stroke();
+  // rope end held by Rebekah while she works the well
+  if (reb.st === 'well' && jar.st !== 'carried') {
+    ctx.beginPath(); ctx.moveTo(x + 6, WELL_Y - 86); ctx.quadraticCurveTo(x + 30, WELL_Y - 60, reb.x - 10, reb.y - 46 * peopleScale()); ctx.stroke();
+  }
+}
+
+function drawPanel() {
+  const x = wellX(), pw = panelW();
+  const x0 = x - pw / 2, y0 = PANEL_TOP, h = PANEL_BOT - PANEL_TOP;
+  ctx.save();
+  roundRect(x0, y0, pw, h, 18);
+  ctx.save(); ctx.clip();
+  // earth
+  const eg = ctx.createLinearGradient(0, y0, 0, PANEL_BOT);
+  eg.addColorStop(0, '#a87a4a'); eg.addColorStop(1, '#6b4a2a');
+  ctx.fillStyle = eg; ctx.fillRect(x0, y0, pw, h);
+  for (let k = 0; k < 18; k++) {
+    ctx.fillStyle = k % 2 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+    ctx.beginPath(); ctx.ellipse(x0 + hash(k, 3) * pw, y0 + hash(k, 7) * h, 8 + hash(k, 1) * 6, 5, 0, 0, TAU); ctx.fill();
+  }
+  // the shaft
+  const sw = pw * 0.56;
+  ctx.fillStyle = '#3a2a1e';
+  ctx.fillRect(x - sw / 2, y0, sw, h);
+  ctx.strokeStyle = 'rgba(160,140,120,0.5)'; ctx.lineWidth = 2;
+  for (let yy = y0 + 10; yy < PANEL_BOT; yy += 26) {
+    ctx.beginPath(); ctx.moveTo(x - sw / 2, yy); ctx.lineTo(x - sw / 2 + 10, yy); ctx.moveTo(x + sw / 2 - 10, yy + 13); ctx.lineTo(x + sw / 2, yy + 13); ctx.stroke();
+  }
+  // water and mud
+  const wt = waterTop(), mud = wt + cfg.zone;
+  ctx.fillStyle = '#6b4a2a';
+  ctx.fillRect(x - sw / 2, mud, sw, PANEL_BOT - mud);
+  ctx.fillStyle = '#5a3e22';
+  for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(x - sw / 2 + (k + 0.5) * sw / 5, mud + 6, 6, 0, TAU); ctx.fill(); }
+  const wg = ctx.createLinearGradient(0, wt, 0, mud);
+  wg.addColorStop(0, '#5fbff0'); wg.addColorStop(1, '#2f7fb8');
+  ctx.fillStyle = wg;
+  ctx.fillRect(x - sw / 2, wt, sw, cfg.zone);
+  // the 'perfect' middle of the water (shown on the early levels)
+  if (level <= 3) {
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(x - sw / 2, wt + cfg.zone * 0.22, sw, cfg.zone * 0.56);
+  }
+  ctx.strokeStyle = '#c9ecff'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let xx = x - sw / 2; xx <= x + sw / 2; xx += 4) ctx.lineTo(xx, wt + Math.sin(xx / 6 + t * 5) * 2);
+  ctx.stroke();
+  // rope and jar
+  ctx.strokeStyle = '#d9b77a'; ctx.lineWidth = 2.5;
+  if (jar.st !== 'carried' && jar.st !== 'full') {
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, jar.y - 22); ctx.stroke();
+    const sway = jar.st === 'fall' ? Math.sin(t * 20) * 1.5 : jar.pull > 0 ? Math.sin(t * 40) * 2 : 0;
+    drawJar(x + sway, jar.y, 1, jar.mud ? 'mud' : jar.fill > 0 ? 'water' : 'empty');
+  }
+  // 'Tap now!' for the youngest players
+  if (state === 'play' && jar.st === 'fall' && level <= 2) {
+    const inZone = jar.y > wt + cfg.zone * 0.1 && jar.y < wt + cfg.zone * 0.9;
+    const near = jar.y > wt - 80;
+    if (near) {
+      ctx.font = '700 20px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = inZone ? '#ffffff' : 'rgba(255,255,255,0.5)';
+      ctx.fillText(inZone ? 'TAP NOW!' : 'Get ready…', x, wt - 26);
+    }
+  }
+  ctx.restore();
+  // frame
+  ctx.strokeStyle = '#5a3e26'; ctx.lineWidth = 4;
+  roundRect(x0, y0, pw, h, 18); ctx.stroke();
+  ctx.restore();
+  // flash word over the well
+  if (flash && flash.t > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(flash.t / 0.4, 0, 1);
+    ctx.font = '700 26px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    const fy = clamp(jar.catchY - 40, PANEL_TOP + 40, PANEL_BOT - 20) - (1.1 - flash.t) * 30;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.strokeText(flash.text, x + 10, fy);
+    ctx.fillStyle = flash.color; ctx.fillText(flash.text, x + 10, fy);
+    ctx.restore();
+  }
+}
+
+function drawJar(x, y, s, content) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#c47a45';
+  ctx.beginPath(); ctx.moveTo(-8, -20); ctx.quadraticCurveTo(-20, -6, -14, 12); ctx.quadraticCurveTo(-8, 20, 0, 20); ctx.quadraticCurveTo(8, 20, 14, 12); ctx.quadraticCurveTo(20, -6, 8, -20); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#a05a30'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(-15, -8, 6, 1.6, 4.6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(15, -8, 6, -1.4, 1.5); ctx.stroke();
+  ctx.fillStyle = '#a05a30'; ctx.fillRect(-9, -24, 18, 6);
+  ctx.strokeStyle = '#e8b57a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-15, 2); ctx.quadraticCurveTo(0, 6, 15, 2); ctx.stroke();
+  if (content === 'water') { ctx.fillStyle = '#7cc4f2'; ctx.beginPath(); ctx.ellipse(0, -22, 8, 2.5, 0, 0, TAU); ctx.fill(); }
+  if (content === 'mud') { ctx.fillStyle = '#7a5a32'; ctx.beginPath(); ctx.ellipse(0, -22, 8, 2.5, 0, 0, TAU); ctx.fill(); ctx.fillRect(-12, 6, 24, 6); }
+  ctx.restore();
+}
+
+// --------- Camels ---------
+function drawCamel(c, x, y, s, pose) {
+  const L = c.look;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  const walk = pose === 'walk' ? t * 9 : 0;
+  ctx.fillStyle = 'rgba(80,50,10,0.18)';
+  ctx.beginPath(); ctx.ellipse(6, 0, 46, 8, 0, 0, TAU); ctx.fill();
+  // legs
+  const legC = shade(L.body, -22);
+  for (const [lx, ph] of [[-22, 0], [-10, Math.PI], [24, Math.PI], [36, 0]]) {
+    const sw = pose === 'walk' ? Math.sin(walk + ph) * 6 : 0;
+    ctx.strokeStyle = legC; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(lx, -46); ctx.lineTo(lx + sw, -4); ctx.stroke();
+    ctx.fillStyle = shade(L.body, -50); ctx.beginPath(); ctx.ellipse(lx + sw, -2, 6, 3.5, 0, 0, TAU); ctx.fill();
+  }
+  // tail
+  ctx.strokeStyle = shade(L.body, -30); ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(50, -62); ctx.quadraticCurveTo(58, -50 + Math.sin(t * 3 + c.id) * 4, 54, -36); ctx.stroke();
+  // body and hump
+  ctx.fillStyle = L.body;
+  ctx.beginPath(); ctx.ellipse(8, -62, 46, 25, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(14, -84, 24, 22, 0, 0, TAU); ctx.fill();
+  // saddle blanket
+  ctx.fillStyle = L.blanket;
+  ctx.beginPath(); ctx.moveTo(-6, -86); ctx.quadraticCurveTo(14, -112, 34, -86); ctx.lineTo(38, -58); ctx.lineTo(-10, -58); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = L.trim; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-10, -60); ctx.lineTo(38, -60); ctx.stroke();
+  ctx.fillStyle = L.trim;
+  for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-6 + k * 11, -54, 2.5, 0, TAU); ctx.fill(); }
+  // neck and head
+  let hx, hy;
+  const drinking = pose === 'drink';
+  if (drinking) { hx = -46; hy = (TROUGH_Y - 16 - CAMEL_Y) / s + Math.sin(t * 8) * 2; }
+  else if (pose === 'grump') { hx = -40; hy = -118; }
+  else { hx = -44; hy = -112 + Math.sin(t * 2 + c.id) * 2; }
+  ctx.strokeStyle = L.body; ctx.lineWidth = 17; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-26, -66); ctx.quadraticCurveTo(drinking ? -46 : -40, drinking ? -40 : -84, hx + 6, hy + 2); ctx.stroke();
+  ctx.save(); ctx.translate(hx, hy);
+  ctx.fillStyle = L.body;
+  ctx.beginPath(); ctx.ellipse(0, 0, 17, 12, drinking ? 0.5 : -0.1, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-12, 4, 10, 8, drinking ? 0.5 : -0.1, 0, TAU); ctx.fill();
+  // ear
+  ctx.fillStyle = shade(L.body, -20);
+  ctx.beginPath(); ctx.ellipse(10, -10, 4, 7, 0.6, 0, TAU); ctx.fill();
+  // eye with long lashes
+  const ex = 2, ey = -3;
+  const grumpy = pose === 'grump';
+  const thirsty = c.thirst > 0.6 && !drinking && c.joyT <= 0;
+  if (c.blink > 0 || drinking) {
+    ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0.2, Math.PI - 0.2); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, ey, 5.5, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(ex - 1.5, ey + 1, 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - 2.5, ey, 1, 0, TAU); ctx.fill();
+    if (grumpy || thirsty) {
+      ctx.fillStyle = L.body;
+      ctx.beginPath(); ctx.rect(ex - 7, ey - 8, 14, grumpy ? 6 : 4); ctx.fill();
+      ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ex - 6, ey - (grumpy ? 6 : 3.5)); ctx.lineTo(ex + 6, ey - (grumpy ? 1 : 3)); ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ex - 4, ey - 5); ctx.lineTo(ex - 7, ey - 9); ctx.moveTo(ex, ey - 6); ctx.lineTo(ex - 1, ey - 10); ctx.stroke();
+  // nostril and mouth
+  ctx.fillStyle = '#5a3e26'; ctx.beginPath(); ctx.ellipse(-19, 1, 1.6, 2.4, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#5a3e26'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (c.joyT > 0) ctx.arc(-13, 7, 6, 0.2, Math.PI - 0.6);
+  else if (grumpy) { ctx.moveTo(-20, 11); ctx.quadraticCurveTo(-14, 6, -7, 11); }
+  else { ctx.moveTo(-20, 9); ctx.lineTo(-8, 10); }
+  ctx.stroke();
+  if (thirsty) {
+    // tongue out, panting
+    ctx.fillStyle = '#e8728a';
+    ctx.beginPath(); ctx.ellipse(-16, 13 + Math.abs(Math.sin(t * 8)) * 2, 4, 5, 0.2, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawTrough() {
+  const x0 = troughX0() - 8, x1 = troughX1() + 6;
+  ctx.fillStyle = '#8b8178';
+  roundRect(x0, TROUGH_Y - 8, x1 - x0, 56, 10); ctx.fill();
+  ctx.fillStyle = '#a2978a';
+  roundRect(x0, TROUGH_Y - 10, x1 - x0, 14, 7); ctx.fill();
+  // stones
+  ctx.strokeStyle = 'rgba(90,80,70,0.5)'; ctx.lineWidth = 2;
+  for (let xx = x0 + 30; xx < x1; xx += 46) { ctx.beginPath(); ctx.moveTo(xx, TROUGH_Y + 6); ctx.lineTo(xx, TROUGH_Y + 46); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(x0, TROUGH_Y + 26); ctx.lineTo(x1, TROUGH_Y + 26); ctx.stroke();
+  // water in each camel's part of the trough
+  for (let i = 0; i < SPOTS; i++) {
+    const c = spots[i];
+    const lvl = c ? clamp(c.drinkT / 1.2, 0, 1) : 0;
+    const cx = spotX(i), w = spotW() - 20;
+    ctx.fillStyle = '#4a4038';
+    roundRect(cx - w / 2, TROUGH_Y - 6, w, 9, 4); ctx.fill();
+    if (lvl > 0) { ctx.fillStyle = `rgba(110,190,240,${0.4 + lvl * 0.6})`; roundRect(cx - w / 2, TROUGH_Y - 6, w, 9, 4); ctx.fill(); }
+    if (!isTouch() && c) {
+      ctx.font = '600 12px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText(String(i + 1), cx, TROUGH_Y + 40);
+    }
+  }
+}
+
+function drawBadge(c, i) {
+  if (!c || c.joyT > 0 || state === 'intro' || state === 'title') return;
+  const p = badgePos(i);
+  const n = Math.ceil(c.need * 2) / 2;
+  const drops = Math.ceil(c.need);
+  const w = Math.max(70, 24 + drops * 22), h = 50;
+  const x = p.x - w / 2, y = p.y - h / 2;
+  const f = clamp(1 - c.thirst, 0, 1);
+  const urgent = f < 0.3;
+  const wob = urgent ? Math.sin(t * 20) * 2 : 0;
+  ctx.save();
+  ctx.translate(wob, 0);
+  ctx.fillStyle = '#fffdf2';
+  ctx.strokeStyle = urgent ? '#e8572a' : '#e0a526'; ctx.lineWidth = 3;
+  roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
+  // water drops: how much it still needs
+  for (let k = 0; k < drops; k++) {
+    const dx = x + w / 2 + (k - (drops - 1) / 2) * 22, dy = y + 20;
+    const filled = clamp(c.got - k, 0, 1);
+    drawDrop(dx, dy, 9, 'rgba(120,160,190,0.25)');
+    if (filled > 0) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(dx - 10, dy + 10 - 22 * filled, 20, 22 * filled); ctx.clip();
+      drawDrop(dx, dy, 9, '#3fa2e0');
+      ctx.restore();
+    }
+    void n;
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  roundRect(x + 8, y + h - 12, w - 16, 7, 3.5); ctx.fill();
+  ctx.fillStyle = f > 0.55 ? '#5cb85c' : f > 0.3 ? '#f0ad4e' : '#e8572a';
+  roundRect(x + 8, y + h - 12, (w - 16) * f, 7, 3.5); ctx.fill();
+  ctx.restore();
+}
+
+function drawDrop(x, y, r, col) {
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r * 1.4);
+  ctx.quadraticCurveTo(x + r, y - r * 0.2, x + r, y + r * 0.3);
+  ctx.arc(x, y + r * 0.3, r, 0, Math.PI);
+  ctx.quadraticCurveTo(x - r, y - r * 0.2, x, y - r * 1.4);
+  ctx.fill();
+}
+
+function drawQueue() {
+  // camels still waiting in line, and Abraham's servant beside them
+  const cs = camelScale() * 0.5;
+  const y = HORIZON + 62;
+  const x0 = troughX0() + 30;
+  const maxN = Math.max(1, Math.floor((W - 20 - x0) / (78 * cs)));
+  const n = Math.min(queue, maxN);
+  for (let k = n - 1; k >= 0; k--) {
+    drawCamel({ id: 50 + k, look: CAMEL_LOOKS[(k + 1) % CAMEL_LOOKS.length], thirst: 0.3, joyT: 0, blink: 0 }, x0 + 30 + k * 78 * cs, y, cs, 'stand');
+  }
+}
+
+function drawCamels() {
+  const cs = camelScale();
+  for (const l of leaving) {
+    const f = l.t / 2.5;
+    ctx.globalAlpha = 1 - f;
+    drawCamel(l.c, l.x + 22 * cs + f * 260, CAMEL_Y - f * 40, cs * (1 - f * 0.3), 'walk');
+    ctx.globalAlpha = 1;
+  }
+  for (let i = SPOTS - 1; i >= 0; i--) {
+    const c = spots[i];
+    if (!c) continue;
+    const pose = c.enterX > 0 ? 'walk' : c.grumpT > 0 ? 'grump' : c.drinkT > 0 || c.joyT > 0 ? 'drink' : 'stand';
+    drawCamel(c, spotX(i) + 22 * cs + c.enterX * 300, CAMEL_Y, cs, pose);
+  }
+}
+
+function drawSpeech(text, ax, ay, side) {
+  ctx.save();
+  ctx.font = '700 18px Fredoka, sans-serif';
+  const maxW = Math.min(W - 40, 380);
+  const lines = wrapText(text, maxW);
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 28, h = lines.length * 23 + 18;
+  const bx = clamp(ax - w / 2 + side * w * 0.25, 12, W - w - 12), by = ay - h - 24;
+  ctx.fillStyle = '#fffbe8'; ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 3;
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.stroke();
+  const tx = clamp(ax - 10, bx + 16, bx + w - 36);
+  ctx.beginPath(); ctx.moveTo(tx, by + h - 1.5); ctx.lineTo(ax, ay - 4); ctx.lineTo(tx + 20, by + h - 1.5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(tx, by + h); ctx.lineTo(ax, ay - 4); ctx.lineTo(tx + 20, by + h); ctx.stroke();
+  ctx.fillStyle = '#8a5a00'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 14, by + 9 + 11.5 + i * 23));
+  ctx.restore();
+}
+
+function servantPos() {
+  if (state === 'intro' || (state === 'pause' && pausedFrom === 'intro')) return { x: rebHome().x + 70 * peopleScale(), y: WELL_Y + 30 };
+  return { x: Math.min(W - 40, troughX0() + 6), y: HORIZON + 70 };
+}
+
+function drawPeople() {
+  const ps = peopleScale();
+  // the servant
+  const sp = servantPos();
+  SERVANT.mood = state === 'win' ? 'joy' : 'watch';
+  SERVANT.flip = true;
+  const sScale = state === 'intro' || (state === 'pause' && pausedFrom === 'intro') ? ps : ps * 0.7;
+  drawPerson(SERVANT, sp.x, sp.y, sScale, reb.x, reb.y - 60, state === 'win' ? 'cheer' : 'stand');
+  // Rebekah
+  REBEKAH.mood = state === 'win' ? 'joy' : state === 'fail' ? 'worried' : reb.st === 'pour' || (flash && flash.t > 0 && flash.color === '#2e7d32') ? 'joy' : 'watch';
+  REBEKAH.flip = reb.face < 0;
+  const moving = reb.st === 'go' || reb.st === 'back';
+  let pose = 'stand';
+  if (reb.st === 'pour') pose = 'carry';
+  else if (jar.st === 'haul' || jar.st === 'fall') pose = 'carry';
+  if (state === 'win') pose = 'cheer';
+  const bob = moving ? Math.abs(Math.sin(t * 16)) * 4 : 0;
+  drawPerson(REBEKAH, reb.x, reb.y, ps, reb.x + reb.face * 100, reb.y - 60, pose, bob);
+  // the jar on her shoulder (or tipped to pour)
+  if (jar.st === 'full' || jar.st === 'carried') {
+    if (reb.st === 'pour') drawJarTipped(reb.x - 22 * ps, reb.y - 30 * ps, ps);
+    else drawJar(reb.x + 16 * ps * reb.face, reb.y - (62 + bob) * ps, ps * 0.8, 'water');
+  }
+  if (state === 'intro' && introStep >= 1 && jar.st === 'top') drawJar(reb.x + 22 * ps, reb.y - 34 * ps, ps * 0.7, 'water');
+}
+
+function drawJarTipped(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-1.4); drawJar(0, 0, s * 0.85, 'water'); ctx.restore();
+  ctx.strokeStyle = 'rgba(124,196,242,0.9)'; ctx.lineWidth = 6 * s; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 18 * s, y - 2 * s); ctx.quadraticCurveTo(x - 30 * s, y + 10, x - 30 * s, TROUGH_Y - 2); ctx.stroke();
+}
+
+function drawHint() {
+  if (state !== 'play' || level > 2) return;
+  if (jar.st === 'full' && reb.st === 'well') {
+    const i = thirstiest();
+    if (i < 0) return;
+    const p = badgePos(i);
+    drawArrow(p.x, p.y - 40);
+  } else if (jar.st === 'top' && reb.st === 'well' && playT > 1) {
+    drawArrow(wellX(), WELL_Y - 110);
+  }
+}
+function drawArrow(x, y) {
+  const bob = Math.sin(t * 7) * 8;
+  ctx.save();
+  ctx.translate(x, y - 10 + bob);
+  ctx.fillStyle = '#ff8a3c'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-12, -26); ctx.lineTo(12, -26); ctx.lineTo(12, -8); ctx.lineTo(22, -8); ctx.lineTo(0, 14); ctx.lineTo(-22, -8); ctx.lineTo(-12, -8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPopups() {
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.bad ? '#c0392b' : '#2e7d32';
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHeart(x, y, s, full) {
+  ctx.fillStyle = full ? '#ff5d73' : 'rgba(255,255,255,0.45)';
+  ctx.strokeStyle = full ? '#b8324a' : 'rgba(120,80,40,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill(); ctx.stroke();
+}
+
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a4210';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const label = state === 'title' ? 'Rebekah at the Well' : `Level ${level} · ${cfg.name}`;
+  ctx.fillText(label, 12, 26);
+  if (state !== 'title') {
+    ctx.font = '600 14px Fredoka, sans-serif';
+    ctx.fillText(`Camels ${camelsDone} of ${cfg.camels}${queue ? ` (${queue} waiting)` : ''}   ·   Score ${totalScore}`, 12, 48);
+    for (let k = 0; k < HEARTS; k++) drawHeart(viewW - 24 - k * 28, 26, 9, k < hearts);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 560));
+  const y0 = offY + HORIZON - 30 - (lines.length - 1) * 26;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 26;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#7a4a00';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawBackdrop();
+  if (reb) {
+    drawQueue();
+    drawWellHead();
+    drawCamels();
+    drawTrough();
+    drawPanel();
+    drawPeople();
+    for (let i = 0; i < SPOTS; i++) drawBadge(spots[i], i);
+    drawParticles();
+    drawPopups();
+    drawHint();
+    if (bubble) {
+      const who = bubble.who === 'servant' ? servantPos() : reb;
+      drawSpeech('“' + Bible.verse(VERSES[bubble.key]).text.replace(/\.\.\.\s*/g, '… ') + '”', who.x, who.y - 95 * peopleScale(), bubble.who === 'servant' ? 1 : -1);
+    }
+    if (state === 'intro') {
+      ctx.font = '600 15px Fredoka, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(90,66,16,${0.5 + 0.3 * Math.sin(t * 4)})`;
+      ctx.fillText(isTouch() ? 'Tap to continue' : 'Click or press Space to continue', W / 2, H - 24);
+    }
+  }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(60,40,20,${clamp(failT, 0, 0.3)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  blinkAll(dt);
+  updateParticles(dt);
+  if (flash) { flash.t -= dt; if (flash.t <= 0) flash = null; }
+  if (state === 'intro') {
+    updateIntro(dt);
+  } else if (state === 'play') {
+    playT += dt;
+    updateJar(dt);
+    updateReb(dt);
+    updateCamels(dt);
+  } else if (state === 'win') {
+    winT += dt;
+    updateCamels(dt);
+    if (Math.random() < dt * 6) sparkle(rand(W * 0.3, W), rand(300, 600), 2);
+  } else if (state === 'fail') {
+    failT += dt;
+  }
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

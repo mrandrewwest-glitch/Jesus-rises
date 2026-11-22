@@ -1,0 +1,1679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#6b4a22">
+<title>Let My People Go</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #6b4a22;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(70, 40, 10, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Let My People Go</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'market', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card and Moses' speech bubble
+  letGo: { ref: 'Exodus 5:1', KJV: 'Thus saith the Lord God of Israel, Let my people go, that they may hold a feast unto me in the wilderness.', NKJV: 'Thus says the Lord God of Israel: ‘Let My people go, that they may hold a feast to Me in the wilderness.’', NIV: 'This is what the Lord, the God of Israel, says: ‘Let my people go, so that they may hold a festival to me in the wilderness.’', NLT: 'This is what the Lord, the God of Israel, says: Let my people go so they may hold a festival in my honor in the wilderness.' },
+  // Pharaoh's answer (speech bubble)
+  no: { ref: 'Exodus 5:2', KJV: 'I know not the Lord, neither will I let Israel go.', NKJV: 'I do not know the Lord, nor will I let Israel go.', NIV: 'I do not know the Lord and I will not let Israel go.', NLT: 'I don’t know the Lord, and I will not let Israel go.' },
+  // Moses asks again (speech bubble on later levels)
+  again: { ref: 'Exodus 9:1', KJV: 'Thus saith the Lord God of the Hebrews, Let my people go, that they may serve me.', NKJV: 'Thus says the Lord God of the Hebrews: “Let My people go, that they may serve Me.', NIV: 'This is what the Lord, the God of the Hebrews, says: “Let my people go, so that they may worship me.', NLT: 'This is what the Lord, the God of the Hebrews, says: Let my people go, so they can worship me.' },
+  // The plagues (level cards)
+  frogs: { ref: 'Exodus 8:6', KJV: 'And Aaron stretched out his hand over the waters of Egypt; and the frogs came up, and covered the land of Egypt.', NKJV: 'So Aaron stretched out his hand over the waters of Egypt, and the frogs came up and covered the land of Egypt.', NIV: 'So Aaron stretched out his hand over the waters of Egypt, and the frogs came up and covered the land.', NLT: 'So Aaron raised his hand over the waters of Egypt, and frogs came up and covered the whole land!' },
+  frogsHouse: { ref: 'Exodus 8:3', KJV: 'frogs abundantly, which shall go up and come into thine house, and into thy bedchamber, and upon thy bed', NKJV: 'frogs abundantly, which shall go up and come into your house, into your bedroom, on your bed', NIV: 'The Nile will teem with frogs. They will come up into your palace and your bedroom and onto your bed', NLT: 'The Nile River will swarm with frogs. They will come up out of the river and into your palace, even into your bedroom and onto your bed!' },
+  flies: { ref: 'Exodus 8:24', KJV: 'And the Lord did so; and there came a grievous swarm of flies into the house of Pharaoh', NKJV: 'And the Lord did so. Thick swarms of flies came into the house of Pharaoh', NIV: 'And the Lord did this. Dense swarms of flies poured into Pharaoh’s palace', NLT: 'And the Lord did just as he had said. A thick swarm of flies filled Pharaoh’s palace' },
+  locusts: { ref: 'Exodus 10:13', KJV: 'And the Lord brought an east wind upon the land all that day, and all that night; and when it was morning, the east wind brought the locusts.', NKJV: 'And the Lord brought an east wind on the land all that day and all that night. When it was morning, the east wind brought the locusts.', NIV: 'And the Lord made an east wind blow across the land all that day and all that night. By morning the wind had brought the locusts', NLT: 'And the Lord caused an east wind to blow over the land all that day and through the night. When morning arrived, the east wind had brought the locusts.' },
+  // Pharaoh promises (first win card)
+  entreat: { ref: 'Exodus 8:8', KJV: 'Intreat the Lord, that he may take away the frogs from me, and from my people; and I will let the people go', NKJV: 'Entreat the Lord that He may take away the frogs from me and from my people; and I will let the people go', NIV: 'Pray to the Lord to take the frogs away from me and my people, and I will let your people go', NLT: 'Plead with the Lord to take the frogs away from me and my people. I will let your people go' },
+  // ...and changes his mind (later win cards, fail card)
+  hardened: { ref: 'Exodus 8:15', KJV: 'But when Pharaoh saw that there was respite, he hardened his heart, and hearkened not unto them', NKJV: 'But when Pharaoh saw that there was relief, he hardened his heart and did not heed them', NIV: 'But when Pharaoh saw that there was relief, he hardened his heart and would not listen to Moses and Aaron', NLT: 'But when Pharaoh saw that relief had come, he became stubborn. He refused to listen to Moses and Aaron' },
+  // The finale: Pharaoh says Go!
+  go: { ref: 'Exodus 12:31', KJV: 'Rise up, and get you forth from among my people, both ye and the children of Israel; and go, serve the Lord, as ye have said.', NKJV: 'Rise, go out from among my people, both you and the children of Israel. And go, serve the Lord as you have said.', NIV: 'Up! Leave my people, you and the Israelites! Go, worship the Lord as you have requested.', NLT: 'Leave my people—and take the rest of the Israelites with you! Go and worship the Lord as you have requested.' },
+  out: { ref: 'Exodus 12:41', KJV: 'All the hosts of the Lord went out from the land of Egypt.', NKJV: 'All the armies of the Lord went out from the land of Egypt.', NIV: 'All the Lord’s divisions left Egypt.', NLT: 'All the Lord’s forces left the land.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+function bubbleText(key) {
+  return Bible.verse(VERSES[key]).text.replace(/^[‘“'"]+|[’”'"]+$/g, '');
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes palace wall above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip at the top of the screen
+const TAP_R = 50;          // how close a tap must be to shoo a critter
+const SWIPE_R = 40;        // reach of a swipe
+const SHOO_PTS = 10;
+
+// One plague per level, each faster and busier
+const PLAGUES = [
+  { name: 'Frogs Everywhere!', kinds: ['frog'], verse: 'frogs', dur: 30, every: 1.6, speed: 1 },
+  { name: 'Frogs on the Throne', kinds: ['frog'], verse: 'frogsHouse', dur: 35, every: 1.15, speed: 1.15 },
+  { name: 'Buzzing Flies', kinds: ['fly', 'frog'], mix: [0.8, 0.2], verse: 'flies', dur: 40, every: 0.95, speed: 1.2 },
+  { name: 'Locusts on the Feast', kinds: ['locust', 'fly'], mix: [0.75, 0.25], verse: 'locusts', dur: 45, every: 0.75, speed: 1.3 },
+  { name: 'Frogs and Flies', kinds: ['frog', 'fly', 'locust'], mix: [0.45, 0.4, 0.15], verse: 'frogs', dur: 50, every: 0.7, speed: 1.4 },
+  { name: 'The Whole Palace', kinds: ['frog', 'fly', 'locust'], mix: [0.35, 0.35, 0.3], verse: 'locusts', dur: 55, every: 0.62, speed: 1.55 },
+];
+const LAST = PLAGUES.length;
+const PLAGUE_NAMES = { frog: 'frogs', gnats: 'gnats', fly: 'flies', locust: 'locusts' };
+
+function makeConfig(n) {
+  const p = PLAGUES[Math.min(n, LAST) - 1];
+  return { ...p, mix: p.mix || [1] };
+}
+
+// How much each kind of critter fills the palace (% of the meter per second)
+const FILL = { frog: 0.95, frogHop: 0.45, gnats: 1.05, fly: 0.7, flyLand: 1.0, locust: 0.6, locustEat: 1.7 };
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause | finale
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('plaguesBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let critters = [];
+let particles = [];
+let swipes = [];
+let message = { text: '', t: 0 };
+let bubble = null;          // { key or text, who, t }
+let covered = 0;            // 0..100
+let timeLeft = 30;
+let spawnT = 0;
+let shooed = 0, combo = 0, comboT = 0, levelPts = 0, maxCovered = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0, finaleT = 0;
+let introT = 0, introStep = 0;
+let lastScore = null;
+let told = {};
+let flashT = 0, shakeT = 0;
+
+// ============================================================
+//  Palace layout (playfield coordinates: y 0..900, any extra height above)
+// ============================================================
+function L() {
+  const cx = viewW / 2, hw = W / 2;
+  return {
+    cx, hw,
+    floorY: 610,
+    winL: { x: cx - hw * 0.56, y: 250 }, winR: { x: cx + hw * 0.56, y: 250 },
+    throne: { x: cx, y: 590 },
+    table: { x: cx + hw * 0.6, y: 730, w: Math.min(180, hw * 0.58) },
+    moses: { x: cx - hw * 0.66, y: 820 },
+  };
+}
+function pharaohHead() { const l = L(); return { x: l.throne.x, y: l.throne.y - 1.35 * 53 - 8 }; }
+// Places a frog can hop to
+function frogSpots() {
+  const l = L(), ph = pharaohHead();
+  return [
+    { x: l.throne.x - 44, y: l.throne.y - 46, k: 'throne' }, { x: l.throne.x + 44, y: l.throne.y - 46, k: 'throne' },
+    { x: ph.x, y: ph.y - 22, k: 'head' },
+    { x: l.throne.x - 70, y: l.floorY + 2, k: 'step' }, { x: l.throne.x + 70, y: l.floorY + 2, k: 'step' },
+    ...foodSpots(),
+    { x: l.cx + rand(-l.hw * 0.8, l.hw * 0.8), y: rand(660, 870), k: 'floor' },
+    { x: l.cx + rand(-l.hw * 0.8, l.hw * 0.8), y: rand(660, 870), k: 'floor' },
+  ];
+}
+function foodSpots() {
+  const tb = L().table;
+  return [
+    { x: tb.x - tb.w * 0.3, y: tb.y - 30, k: 'food' }, { x: tb.x, y: tb.y - 36, k: 'food' }, { x: tb.x + tb.w * 0.3, y: tb.y - 30, k: 'food' },
+  ];
+}
+
+// ============================================================
+//  People
+// ============================================================
+const MOSES = { robe: '#9c5a3c', hair: '#d8d2c4', beard: true, skin: '#c98d56', i: 0, mood: 'watch', blinkT: 2, blink: 0, phase: 0, staff: true };
+const AARON = { robe: '#3f6fb5', hair: '#4a2f1a', beard: true, skin: '#d39a66', i: 1, mood: 'watch', blinkT: 3, blink: 0, phase: 1, scarf: '#e8dcc0' };
+const PHARAOH = { robe: '#f6f1e2', hair: '#1b130c', skin: '#b87a48', egypt: true, nemes: true, collar: true, i: 2, mood: 'grumpy', blinkT: 2, blink: 0, phase: 2, pose: 'cross' };
+const SERVANTS = [
+  { robe: '#e9dcc0', hair: '#1b130c', skin: '#a8703f', egypt: true, i: 3, mood: 'shock', blinkT: 1, blink: 0, phase: 3 },
+  { robe: '#dfe9e0', hair: '#24170d', skin: '#c58a55', egypt: true, i: 4, mood: 'shock', blinkT: 2, blink: 0, phase: 4 },
+];
+// The people of Israel marching out (finale)
+const CROWD = [
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#f0c9a0' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true, skin: '#c98d56' },
+  { robe: '#d9a13a', hair: '#6b3f1d', skin: '#e3b184', kid: true },
+  { robe: '#7a4fa0', hair: '#3a2716', skin: '#c58a55', scarf: '#e8a13a', timbrel: true },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070' },
+  { robe: '#3c8f86', hair: '#1f140c', skin: '#b87a48', scarf: '#d8c7a0' },
+  { robe: '#e07a5f', hair: '#5c3a1c', skin: '#dca678', kid: true },
+  { robe: '#5a6475', hair: '#2a1a0e', beard: true, skin: '#c88e5a' },
+  { robe: '#b08a2e', hair: '#1c120b', skin: '#c78f5c', scarf: '#c0392b', timbrel: true },
+  { robe: '#4b7f4b', hair: '#2d1b0f', skin: '#bf8150', kid: true },
+].map((d, i) => ({ ...d, i: i + 5, mood: 'joy', blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) }));
+
+function blinkTick(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+      if (d.egypt) { ctx.strokeStyle = '#1b130c'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(sx + (sx < 0 ? -rx - 2 : rx + 2), ey - 1); ctx.lineTo(sx + (sx < 0 ? -rx : rx), ey); ctx.stroke(); }
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'grumpy':
+      eyes(3.5, 3.5, 2);
+      brows(-5, -9, -5, -9);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+function drawBob(d, hy) {
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-19, hy + 12); ctx.lineTo(-19, hy - 4);
+  ctx.arc(0, hy - 3, 19, Math.PI, 0);
+  ctx.lineTo(19, hy + 12); ctx.lineTo(12, hy + 12); ctx.lineTo(12, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 13, -12, hy - 6);
+  ctx.lineTo(-12, hy + 12);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e8b53a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 3, 18.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+}
+
+// Pharaoh's striped royal head-cloth
+function drawNemes(hy) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-14, hy - 10);
+  ctx.quadraticCurveTo(0, hy - 30, 14, hy - 10);
+  ctx.lineTo(22, hy + 22); ctx.lineTo(13, hy + 22); ctx.lineTo(13, hy - 4);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 4);
+  ctx.lineTo(-13, hy + 22); ctx.lineTo(-22, hy + 22);
+  ctx.closePath();
+  ctx.fillStyle = '#e8b53a'; ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = '#2f5fa8'; ctx.lineWidth = 3;
+  for (let k = -30; k < 40; k += 7) { ctx.beginPath(); ctx.moveTo(-30, hy + k); ctx.lineTo(30, hy + k + 4); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = '#e8b53a';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 3.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 1.6, 0, TAU); ctx.fill();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.walk) jump = Math.abs(Math.sin(t * 8 + d.phase)) * 5;
+  if (d.kid) s *= 0.78;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.egypt ? d.skin : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = d.egypt ? 6 : 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // the staff stands beside Moses
+  if (d.staff) {
+    const up = d.pose === 'stretch';
+    ctx.strokeStyle = '#7a5226'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (up) { ctx.moveTo(22, -40); ctx.lineTo(34, -112); }
+    else { ctx.moveTo(22, 0); ctx.lineTo(22, -92); ctx.quadraticCurveTo(22, -100, 15, -98); }
+    ctx.stroke();
+  }
+  if (mood === 'joy' && !d.timbrel) {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (d.collar) {
+    ctx.fillStyle = '#e8b53a';
+    ctx.beginPath(); ctx.ellipse(0, -36, 13, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3c8fc0';
+    ctx.beginPath(); ctx.ellipse(0, -35, 9, 3.5, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = d.egypt ? '#e8b53a' : '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (d.timbrel) {
+    // a timbrel shaken high
+    const sh = Math.sin(t * 14 + d.phase) * 3;
+    arm(11, -32, 20, -64 + sh);
+    arm(-11, -32, -15, -12);
+    ctx.fillStyle = '#e9c36e'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(24, -72 + sh, 8, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c0392b';
+    for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + t * 3; ctx.beginPath(); ctx.arc(24 + Math.cos(a) * 8, -72 + sh + Math.sin(a) * 8, 1.8, 0, TAU); ctx.fill(); }
+  } else if (d.pose === 'cross') { arm(-11, -32, 6, -24); arm(11, -32, -6, -22); }
+  else if (d.pose === 'point') { arm(-11, -32, -15, -12); arm(11, -32, 34, -50); }
+  else if (d.pose === 'stretch') { arm(-11, -32, -15, -12); arm(11, -32, 30, -46); }
+  else if (d.staff && mood !== 'joy') { arm(-11, -32, -15, -12); arm(11, -32, 20, -50); }
+  else if (mood === 'watch' || mood === 'wow' || mood === 'grumpy') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.nemes) drawNemes(hy);
+  else if (d.egypt) drawBob(d, hy);
+  else if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  if (d.nemes) { ctx.fillStyle = '#8a5a2a'; roundRect(-3, hy + 14, 6, 12, 2); ctx.fill(); }
+  drawFace(d, mood, hy, lx, ly);
+  if (mood === 'shock') { arm(-11, -32, -15, hy + 4); arm(11, -32, 15, hy + 4); }
+  ctx.restore();
+}
+
+// ============================================================
+//  The palace
+// ============================================================
+function drawPalace() {
+  const l = L();
+  const top = -offY;
+  // back wall
+  const g = ctx.createLinearGradient(0, top, 0, l.floorY);
+  g.addColorStop(0, '#d9b678'); g.addColorStop(1, '#ecd3a0');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, viewW, l.floorY - top);
+  // painted frieze bands
+  for (const [y, h] of [[150, 26], [l.floorY - 70, 18]]) {
+    ctx.fillStyle = '#2f5fa8'; ctx.fillRect(0, y, viewW, h);
+    ctx.fillStyle = '#e8b53a'; ctx.fillRect(0, y - 4, viewW, 4); ctx.fillRect(0, y + h, viewW, 4);
+    ctx.fillStyle = '#c0392b';
+    for (let x = (viewW / 2) % 40 - 40; x < viewW + 40; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, y + h - 3); ctx.lineTo(x + 10, y + 4); ctx.lineTo(x + 20, y + h - 3); ctx.fill();
+    }
+  }
+  // painted lotus and reeds on the wall
+  ctx.globalAlpha = 0.35;
+  for (let x = l.cx - l.hw + 30; x < l.cx + l.hw; x += 70) {
+    if (Math.abs(x - l.cx) < 120) continue;
+    ctx.strokeStyle = '#3c7f3c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, l.floorY - 76); ctx.lineTo(x, 470); ctx.stroke();
+    ctx.fillStyle = '#3c8fc0';
+    for (const a of [-0.6, 0, 0.6]) { ctx.beginPath(); ctx.ellipse(x + Math.sin(a) * 8, 462 - Math.cos(a) * 6, 4, 10, a, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  // windows (the flies and locusts come in here)
+  for (const w of [l.winL, l.winR]) {
+    ctx.fillStyle = '#b08a52';
+    roundRect(w.x - 52, w.y - 78, 104, 150, [50, 50, 6, 6]); ctx.fill();
+    const sg = ctx.createLinearGradient(0, w.y - 70, 0, w.y + 66);
+    sg.addColorStop(0, '#7cc4f2'); sg.addColorStop(1, '#f4e3b5');
+    ctx.fillStyle = sg;
+    roundRect(w.x - 42, w.y - 68, 84, 134, [42, 42, 4, 4]); ctx.fill();
+    // a pyramid far away
+    ctx.fillStyle = '#e0bd7a';
+    ctx.beginPath(); ctx.moveTo(w.x - 30, w.y + 66); ctx.lineTo(w.x + 2, w.y + 24); ctx.lineTo(w.x + 34, w.y + 66); ctx.fill();
+    ctx.fillStyle = '#d6a75e';
+    roundRect(w.x - 58, w.y + 66, 116, 12, 4); ctx.fill();
+  }
+  // columns
+  for (const x of [l.cx - l.hw + 30, l.cx + l.hw - 30]) drawColumn(x, top, l.floorY);
+  // floor
+  const fg = ctx.createLinearGradient(0, l.floorY, 0, 900);
+  fg.addColorStop(0, '#c9a46a'); fg.addColorStop(1, '#e6c991');
+  ctx.fillStyle = fg;
+  ctx.fillRect(0, l.floorY, viewW, 900 - l.floorY);
+  ctx.strokeStyle = 'rgba(140,100,50,0.25)'; ctx.lineWidth = 2;
+  for (let y = l.floorY + 30, k = 0; y < 900; y += 34 + k * 6, k++) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewW, y); ctx.stroke(); }
+  for (let x = l.cx % 90 - 90; x < viewW + 90; x += 90) { ctx.beginPath(); ctx.moveTo(l.cx + (x - l.cx) * 0.6, l.floorY); ctx.lineTo(x * 1.0 + (x - l.cx) * 0.5, 900); ctx.stroke(); }
+  // a carpet up to the throne
+  ctx.fillStyle = '#b5503f';
+  ctx.beginPath(); ctx.moveTo(l.cx - 60, l.floorY + 14); ctx.lineTo(l.cx + 60, l.floorY + 14); ctx.lineTo(l.cx + 110, 900); ctx.lineTo(l.cx - 110, 900); ctx.fill();
+  ctx.strokeStyle = '#e8b53a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(l.cx - 50, l.floorY + 14); ctx.lineTo(l.cx - 94, 900); ctx.moveTo(l.cx + 50, l.floorY + 14); ctx.lineTo(l.cx + 94, 900); ctx.stroke();
+  // dais and throne
+  ctx.fillStyle = '#e8d6ad';
+  roundRect(l.cx - 120, l.floorY - 20, 240, 36, 6); ctx.fill();
+  ctx.fillStyle = '#d9c393';
+  roundRect(l.cx - 100, l.floorY - 34, 200, 18, 5); ctx.fill();
+  const th = l.throne;
+  ctx.fillStyle = '#c99a2e';
+  roundRect(th.x - 50, th.y - 170, 100, 150, [30, 30, 6, 6]); ctx.fill();
+  ctx.fillStyle = '#2f5fa8';
+  roundRect(th.x - 38, th.y - 158, 76, 120, [24, 24, 4, 4]); ctx.fill();
+  ctx.fillStyle = '#e8b53a';
+  roundRect(th.x - 60, th.y - 50, 26, 30, 6); ctx.fill();
+  roundRect(th.x + 34, th.y - 50, 26, 30, 6); ctx.fill();
+}
+
+function drawColumn(x, top, bottom) {
+  ctx.fillStyle = '#e8d6ad';
+  ctx.fillRect(x - 22, top, 44, bottom - top);
+  ctx.fillStyle = 'rgba(160,120,60,0.25)';
+  ctx.fillRect(x + 8, top, 8, bottom - top);
+  ctx.fillStyle = '#3c8f86';
+  ctx.beginPath(); ctx.moveTo(x - 36, 120); ctx.quadraticCurveTo(x, 70, x + 36, 120); ctx.lineTo(x + 22, 132); ctx.lineTo(x - 22, 132); ctx.fill();
+  ctx.fillStyle = '#c0392b'; ctx.fillRect(x - 22, 200, 44, 8); ctx.fillRect(x - 22, 214, 44, 4);
+  ctx.fillStyle = '#d9c393'; ctx.fillRect(x - 28, bottom - 14, 56, 14);
+}
+
+function drawTable() {
+  const tb = L().table;
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.beginPath(); ctx.ellipse(tb.x, tb.y + 60, tb.w * 0.55, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8a5a2a';
+  ctx.fillRect(tb.x - tb.w / 2 + 10, tb.y, 10, 60); ctx.fillRect(tb.x + tb.w / 2 - 20, tb.y, 10, 60);
+  ctx.fillStyle = '#a8703a';
+  roundRect(tb.x - tb.w / 2, tb.y - 12, tb.w, 16, 6); ctx.fill();
+  const eaten = clamp(critters.filter((c) => c.kind === 'locust' && c.eating).length / 6, 0, 0.8);
+  // bread, grapes, fruit
+  const s = 1 - eaten * 0.4;
+  ctx.fillStyle = '#d9a35a';
+  ctx.beginPath(); ctx.ellipse(tb.x - tb.w * 0.3, tb.y - 22, 22 * s, 12 * s, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#b0773a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(tb.x - tb.w * 0.3 - 8, tb.y - 28); ctx.lineTo(tb.x - tb.w * 0.3 - 2, tb.y - 18); ctx.moveTo(tb.x - tb.w * 0.3 + 4, tb.y - 30); ctx.lineTo(tb.x - tb.w * 0.3 + 10, tb.y - 20); ctx.stroke();
+  ctx.fillStyle = '#e8d6ad';
+  ctx.beginPath(); ctx.ellipse(tb.x, tb.y - 16, 30, 9, 0, 0, TAU); ctx.fill();
+  const fruit = ['#e0503a', '#f2b33d', '#7bb24a', '#e0503a', '#f2b33d'];
+  fruit.forEach((c, k) => { if (k / fruit.length < 1 - eaten) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(tb.x - 16 + k * 8, tb.y - 24 - (k % 2) * 6, 7, 0, TAU); ctx.fill(); } });
+  ctx.fillStyle = '#7a4fa0';
+  for (let k = 0; k < 6 * (1 - eaten); k++) { ctx.beginPath(); ctx.arc(tb.x + tb.w * 0.3 + (k % 3 - 1) * 6, tb.y - 30 + Math.floor(k / 3) * 7 + (k % 3 === 1 ? 2 : 0), 4.5, 0, TAU); ctx.fill(); }
+}
+
+// ============================================================
+//  The critters (cartoon and friendly)
+// ============================================================
+function drawFrog(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  const sq = c.hop ? 1.15 : 1 + Math.sin(t * 6 + c.ph) * 0.04;
+  ctx.scale(c.face * (c.s || 1), sq * (c.s || 1));
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  if (!c.hop) { ctx.beginPath(); ctx.ellipse(0, 2, 16, 4, 0, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#5cb84a';
+  // back legs
+  ctx.beginPath(); ctx.ellipse(-10, -4, 9, 6, -0.4, 0, TAU); ctx.ellipse(10, -4, 9, 6, 0.4, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -10, 14, 11, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c8eaa0';
+  ctx.beginPath(); ctx.ellipse(2, -6, 8, 6, 0, 0, TAU); ctx.fill();
+  // eyes on top
+  for (const sx of [-6, 6]) {
+    ctx.fillStyle = '#5cb84a'; ctx.beginPath(); ctx.arc(sx, -21, 6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, -21, 4.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(sx + 1, -21, 2.2, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = '#2f6a2a'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(1, -11, 6, 0.2, Math.PI - 0.2); ctx.stroke();
+  ctx.restore();
+}
+function drawFly(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.scale(c.s || 1, c.s || 1);
+  const flap = Math.sin(t * 60 + c.ph) * 0.5;
+  ctx.fillStyle = 'rgba(220,240,255,0.75)';
+  ctx.beginPath(); ctx.ellipse(-6, -7, 7, 4, -0.6 + flap, 0, TAU); ctx.ellipse(6, -7, 7, 4, 0.6 - flap, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3b3b48';
+  ctx.beginPath(); ctx.ellipse(0, 0, 7, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.arc(-3.5, -6, 3, 0, TAU); ctx.arc(3.5, -6, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-3, -7, 1, 0, TAU); ctx.arc(4, -7, 1, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function drawLocust(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.scale(c.face * (c.s || 1), c.s || 1);
+  const flap = c.eating ? 0 : Math.sin(t * 40 + c.ph) * 0.6;
+  if (!c.eating) {
+    ctx.fillStyle = 'rgba(230,240,200,0.7)';
+    ctx.beginPath(); ctx.ellipse(-2, -10, 12, 5, -0.4 + flap, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#9cbc3a';
+  ctx.beginPath(); ctx.ellipse(-4, 0, 16, 6, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6f8f2a'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(-14, -8); ctx.lineTo(-18, 6); ctx.stroke();
+  ctx.fillStyle = '#b0cc4a';
+  ctx.beginPath(); ctx.arc(12, -2, 6.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(14, -4, 2.8, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(15, -4, 1.5, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6f8f2a'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(14, -8); ctx.quadraticCurveTo(18, -16, 24, -16); ctx.stroke();
+  if (c.eating) { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.arc(17, 1, 1.6 + Math.abs(Math.sin(t * 12)) * 1.2, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+function drawGnats(c) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(80,70,60,0.12)';
+  ctx.beginPath(); ctx.arc(c.x, c.y, 30 * (c.s || 1), 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3b3530';
+  for (let k = 0; k < 14; k++) {
+    const a = t * (3 + k % 3) + k * 1.7 + c.ph, r = (10 + (k * 7) % 18) * (c.s || 1);
+    ctx.beginPath(); ctx.arc(c.x + Math.cos(a) * r, c.y + Math.sin(a * 1.3) * r * 0.7, 1.8, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawCritter(c) {
+  ctx.globalAlpha = c.leaving ? clamp(1 - c.leaveT / 0.8, 0, 1) : 1;
+  if (c.kind === 'frog') drawFrog(c);
+  else if (c.kind === 'fly') drawFly(c);
+  else if (c.kind === 'locust') drawLocust(c);
+  else drawGnats(c);
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Critter behaviour
+// ============================================================
+function spawnCritter(kind) {
+  const l = L();
+  const sp = cfg.speed;
+  if (kind === 'frog') {
+    // frogs hop in from the front edge of the floor
+    const x = l.cx + rand(-l.hw * 0.9, l.hw * 0.9);
+    const c = { kind, x, y: 930, face: Math.random() < 0.5 ? -1 : 1, ph: rand(0, 5), rest: 0.2, hop: null, s: 0 };
+    critters.push(c);
+    hopTo(c, pick(frogSpots()));
+    return c;
+  }
+  if (kind === 'gnats') {
+    const c = { kind, x: l.cx + rand(-l.hw * 0.8, l.hw * 0.8), y: rand(680, 860), ph: rand(0, 5), s: 0, tx: 0, ty: 0 };
+    const tgt = Math.random() < 0.5 ? pharaohHead() : pick(foodSpots());
+    c.tx = tgt.x; c.ty = tgt.y;
+    c.v = 28 * sp;
+    critters.push(c);
+    return c;
+  }
+  // flies and locusts come in through the windows
+  const w = Math.random() < 0.5 ? l.winL : l.winR;
+  const c = { kind, x: w.x + rand(-30, 30), y: w.y + rand(-40, 40), ph: rand(0, 5), face: 1, s: 0, landT: 0, flyT: rand(1.5, 3) };
+  if (kind === 'fly') { c.vx = rand(-1, 1) * 140 * sp; c.vy = rand(0.3, 1) * 100 * sp; }
+  else { const f = pick(foodSpots()); c.tx = f.x + rand(-12, 12); c.ty = f.y + rand(-4, 6); c.v = 120 * sp; }
+  critters.push(c);
+  return c;
+}
+
+function hopTo(c, spot) {
+  c.hop = { x0: c.x, y0: c.y, x1: spot.x + rand(-8, 8), y1: spot.y, k: spot.k, f: 0, dur: clamp(Math.hypot(spot.x - c.x, spot.y - c.y) / 380, 0.45, 1.1) / Math.sqrt(cfg.speed) };
+  c.face = spot.x < c.x ? -1 : 1;
+  c.spot = spot.k;
+}
+
+function updateCritters(dt) {
+  const l = L();
+  let fill = 0;
+  for (let i = critters.length - 1; i >= 0; i--) {
+    const c = critters[i];
+    c.s = Math.min(1, (c.s || 0) + dt * 4);
+    if (c.leaving) {
+      c.leaveT += dt;
+      c.x += c.vx * dt; c.y += c.vy * dt; c.vy += (c.kind === 'frog' ? 900 : -100) * dt;
+      if (c.leaveT > 0.8) critters.splice(i, 1);
+      continue;
+    }
+    if (c.kind === 'frog') {
+      if (c.hop) {
+        const h = c.hop;
+        h.f += dt / h.dur;
+        const f = Math.min(1, h.f);
+        c.x = lerp(h.x0, h.x1, f);
+        c.y = lerp(h.y0, h.y1, f) - Math.sin(f * Math.PI) * (60 + Math.abs(h.y1 - h.y0) * 0.3);
+        if (f >= 1) { c.hop = null; c.rest = rand(1.0, 2.4) / cfg.speed; if (Math.random() < 0.4) sfx.ribbit(); }
+        fill += FILL.frogHop;
+      } else {
+        c.rest -= dt;
+        if (c.rest <= 0) hopTo(c, pick(frogSpots()));
+        fill += FILL.frog;
+      }
+    } else if (c.kind === 'gnats') {
+      const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+      if (d > 6) { c.x += dx / d * c.v * dt; c.y += dy / d * c.v * dt; }
+      else { const tgt = Math.random() < 0.5 ? pharaohHead() : pick(foodSpots()); c.tx = tgt.x + rand(-60, 60); c.ty = tgt.y + rand(-30, 30); }
+      fill += FILL.gnats;
+    } else if (c.kind === 'fly') {
+      if (c.landT > 0) {
+        c.landT -= dt;
+        fill += FILL.flyLand;
+        if (c.landT <= 0) { c.vx = rand(-1, 1) * 160 * cfg.speed; c.vy = rand(-1, 0.2) * 120 * cfg.speed; c.flyT = rand(1.2, 2.6); }
+      } else {
+        // zig-zag buzzing
+        c.vx += Math.sin(t * 7 + c.ph) * 600 * dt * cfg.speed;
+        c.vy += Math.cos(t * 5.3 + c.ph) * 500 * dt * cfg.speed;
+        const sp = Math.hypot(c.vx, c.vy), mx = 210 * cfg.speed;
+        if (sp > mx) { c.vx *= mx / sp; c.vy *= mx / sp; }
+        c.x += c.vx * dt; c.y += c.vy * dt;
+        if (c.x < l.cx - l.hw + 20 || c.x > l.cx + l.hw - 20) { c.vx *= -1; c.x = clamp(c.x, l.cx - l.hw + 20, l.cx + l.hw - 20); }
+        if (c.y < 150 || c.y > 880) { c.vy *= -1; c.y = clamp(c.y, 150, 880); }
+        c.flyT -= dt;
+        if (c.flyT <= 0) {
+          // land on Pharaoh or the food for a moment
+          const s = Math.random() < 0.5 ? pharaohHead() : pick(foodSpots());
+          c.x = lerp(c.x, s.x + rand(-20, 20), 0.6); c.y = lerp(c.y, s.y + rand(-10, 10), 0.6);
+          c.landT = rand(1.2, 2.4);
+        }
+        fill += FILL.fly;
+        if (Math.random() < dt * 0.4) sfx.buzz();
+      }
+    } else if (c.kind === 'locust') {
+      if (!c.eating) {
+        const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+        c.face = dx < 0 ? -1 : 1;
+        if (d > 5) { c.x += dx / d * c.v * dt; c.y += dy / d * c.v * dt + Math.sin(t * 9 + c.ph) * 30 * dt; fill += FILL.locust; }
+        else { c.eating = true; sfx.munch(); }
+      } else fill += FILL.locustEat;
+    }
+  }
+  return fill;
+}
+
+// Shoo every critter near a point (tap) or along a stroke (swipe)
+function shooAt(x, y, r = TAP_R) {
+  let n = 0;
+  for (const c of critters) {
+    if (c.leaving) continue;
+    const cr = c.kind === 'gnats' ? r + 14 : r;
+    const cy = c.kind === 'frog' ? c.y - 12 : c.y;
+    if (Math.hypot(c.x - x, cy - y) < cr) { shoo(c); n++; }
+  }
+  if (n === 0) swipes.push({ x, y, t: 0.25, miss: true });
+  return n;
+}
+function shooAlong(x0, y0, x1, y1) {
+  const d = Math.hypot(x1 - x0, y1 - y0);
+  const steps = Math.max(1, Math.ceil(d / 16));
+  for (let k = 1; k <= steps; k++) {
+    const x = lerp(x0, x1, k / steps), y = lerp(y0, y1, k / steps);
+    for (const c of critters) {
+      if (c.leaving) continue;
+      const cy = c.kind === 'frog' ? c.y - 12 : c.y;
+      if (Math.hypot(c.x - x, cy - y) < SWIPE_R + (c.kind === 'gnats' ? 14 : 0)) shoo(c);
+    }
+  }
+  swipes.push({ x0, y0, x1, y1, t: 0.3 });
+}
+
+function shoo(c) {
+  const l = L();
+  c.leaving = true; c.leaveT = 0; c.eating = false; c.hop = null;
+  const out = c.x < l.cx ? -1 : 1;
+  if (c.kind === 'frog') { c.vx = out * 260; c.vy = -380; c.face = out; }
+  else { c.vx = out * 420; c.vy = -260; }
+  shooed++;
+  combo = comboT > 0 ? Math.min(combo + 1, 5) : 1;
+  comboT = 0.9;
+  const pts = SHOO_PTS * combo;
+  levelPts += pts;
+  covered = Math.max(0, covered - (c.kind === 'locust' && c.eating ? 1.2 : 0.6));
+  for (let k = 0; k < 5; k++) { const a = k * TAU / 5; spawn(c.x + Math.cos(a) * 14, c.y - 10 + Math.sin(a) * 10, Math.cos(a) * 60, Math.sin(a) * 60 - 30, 0.6, '#ffe27a', 3.5, 0, 'star'); }
+  floaters.push({ x: c.x, y: c.y - 30, text: `+${pts}`, t: 0.9 });
+  if (c.kind === 'frog') sfx.boing(); else if (c.kind === 'gnats') sfx.poof(); else sfx.swat();
+}
+let floaters = [];
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot', scr = false) {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, scr });
+}
+function sparkleBurst(x, y, n, scr = false, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#f6a6c4']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.4), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star', scr);
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 40 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+  for (let i = swipes.length - 1; i >= 0; i--) { swipes[i].t -= dt; if (swipes[i].t <= 0) swipes.splice(i, 1); }
+}
+function drawParticles(scr) {
+  for (const p of particles) {
+    if (p.scr !== scr) continue;
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Playing a plague
+// ============================================================
+function updatePlay(dt) {
+  playT += dt;
+  timeLeft -= dt;
+  comboT -= dt;
+  // more and more critters as the plague goes on
+  const prog = clamp(playT / cfg.dur, 0, 1);
+  spawnT -= dt;
+  if (spawnT <= 0 && timeLeft > 1.5) {
+    const kind = pickKind();
+    spawnCritter(kind);
+    if (level >= 3 && Math.random() < 0.12 + prog * 0.2) spawnCritter(pickKind());   // a little wave
+    spawnT = cfg.every * (1 - 0.3 * prog) * rand(0.8, 1.2);
+    if (!told[kind]) {
+      told[kind] = true;
+      showMessage({ frog: 'Frogs! Tap them to send them hopping out', gnats: 'Gnats! Tap the little clouds', fly: 'Flies! Tap or swipe the buzzing flies', locust: 'Locusts! Shoo them off the food' }[kind], 2.4);
+    }
+  }
+  const fill = updateCritters(dt);
+  covered = clamp(covered + (fill - 0.4) * dt * (1 + level * 0.06), 0, 100);
+  maxCovered = Math.max(maxCovered, covered);
+  if (covered > 70 && !told.full) { told.full = true; showMessage('The palace is nearly covered! Quick!', 2); }
+  // Pharaoh's face
+  const ph = pharaohHead();
+  const onHim = critters.some((c) => !c.leaving && Math.hypot(c.x - ph.x, c.y - ph.y) < 50);
+  PHARAOH.mood = onHim ? 'shock' : covered > 60 ? 'worried' : 'grumpy';
+  PHARAOH.pose = onHim ? null : 'cross';
+  SERVANTS.forEach((s) => (s.mood = covered > 35 ? 'shock' : 'wow'));
+  if (covered >= 100) fail();
+  else if (timeLeft <= 0) win();
+}
+
+function pickKind() {
+  let r = Math.random(), acc = 0;
+  for (let k = 0; k < cfg.kinds.length; k++) { acc += cfg.mix[k] || 0; if (r < acc) return cfg.kinds[k]; }
+  return cfg.kinds[0];
+}
+
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  // God takes the plague away: every critter leaves
+  for (const c of critters) if (!c.leaving) { c.leaving = true; c.leaveT = 0; c.vx = (c.x < L().cx ? -1 : 1) * 300; c.vy = -300; }
+  const clearBonus = Math.round((100 - covered) * 5);
+  const calmBonus = maxCovered < 50 ? 300 : 0;
+  const levelBonus = 150 * level;
+  const sum = levelPts + clearBonus + calmBonus + levelBonus;
+  totalScore += sum;
+  saveBest();
+  lastScore = { shooPts: levelPts, clearBonus, calmBonus, levelBonus, sum };
+  flashT = 0.5;
+  sfx.win();
+  endTimer = 2.6;
+}
+function saveBest() {
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('plaguesBest', String(best)); } catch (e) {} }
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  saveBest();
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = makeConfig(1);
+  resetLevel();
+  showOverlay('Let My People Go', 'Moses goes to Pharaoh',
+    `${verseHTML('letGo')}
+     <ul>
+       <li>God's people are slaves in Egypt. Moses asks Pharaoh to <b>let them go</b>, but Pharaoh keeps saying <b>no</b>!</li>
+       <li>So God sends plagues into the palace: <b>frogs</b>, <b>flies</b> and <b>locusts</b>.</li>
+       <li><b>Tap</b> a critter to shoo it out. <b>Swipe</b> across lots of them at once! Quick taps in a row score more.</li>
+       <li>Don't let the <b>Covered</b> meter fill up before the plague is over. Locusts eating the feast fill it fastest!</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Go to Pharaoh', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  critters = []; particles = []; floaters = []; swipes = [];
+  covered = 0; maxCovered = 0; timeLeft = cfg.dur; spawnT = 1.2;
+  shooed = 0; combo = 0; comboT = 0; levelPts = 0;
+  playT = 0; winT = 0; failT = 0; endTimer = 0; finaleT = 0;
+  told = {};
+  bubble = null;
+  flashT = shakeT = 0;
+  PHARAOH.mood = 'grumpy'; PHARAOH.pose = 'cross';
+  MOSES.pose = null; MOSES.mood = 'watch'; MOSES.walk = false;
+  down = null;
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  sfx.levelStart();
+  if (retry) { beginPlay(); return; }
+  // Moses asks; Pharaoh says no
+  state = 'intro';
+  syncAmbience();
+  introT = 0; introStep = 0;
+  MOSES.pose = 'stretch';
+  bubble = { key: level === 1 ? 'letGo' : 'again', who: 'moses' };
+  showMessage(`Plague ${level}: ${cfg.name}`, 2.4);
+}
+
+function advanceIntro() {
+  if (introStep === 0) { introStep = 1; introT = 0; bubble = { key: 'no', who: 'pharaoh' }; PHARAOH.pose = 'point'; MOSES.pose = null; sfx.harrumph(); }
+  else beginPlay();
+}
+function updateIntro(dt) {
+  introT += dt;
+  if (introT > (introStep === 0 ? 3.4 : 2.8)) advanceIntro();
+}
+
+function beginPlay() {
+  state = 'play';
+  syncAmbience();
+  bubble = null;
+  PHARAOH.pose = 'cross';
+  MOSES.pose = null;
+  flashT = 0.3;
+  sfx.plague();
+  showMessage(`Plague ${level}: ${cfg.name}`, 2);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const what = cfg.kinds.map((k) => PLAGUE_NAMES[k]).join(' and ');
+    const scoreHTML = `<p class="score">Shooed (${shooed}): <b>${s.shooPts}</b><br>Palace kept clear: <b>${s.clearBonus}</b><br>${s.calmBonus ? `Never half covered: <b>${s.calmBonus}</b><br>` : ''}Plague bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level >= LAST) {
+      showOverlay('Pharaoh gives in!', `Plague ${level} — ${cfg.name}`,
+        `<p style="text-align:center">After all the plagues, Pharaoh finally listens…</p>
+         ${scoreHTML}`,
+        'Hear what Pharaoh says', startFinale);
+      return;
+    }
+    const next = makeConfig(level + 1);
+    showOverlay(level === 1 ? 'The frogs are gone!' : 'God took them away!', `Plague ${level} — ${cfg.name}`,
+      `${level === 1 ? verseHTML('entreat') : ''}
+       <p style="text-align:center">Moses prayed, and God took the ${what} away. But then…</p>
+       ${verseHTML('hardened')}
+       ${scoreHTML}
+       <p style="text-align:center"><b>Next:</b> ${next.name}</p>
+       ${verseHTML(next.verse)}
+       ${creditHTML()}`,
+      'Moses asks again', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('The palace is covered!', `Plague ${level} — ${cfg.name}`,
+      `<p style="text-align:center">There were too many ${cfg.kinds.map((k) => PLAGUE_NAMES[k]).join(' and ')}! Tap the ones on the <b>food</b> and on <b>Pharaoh</b> first, and <b>swipe</b> through crowds.</p>
+       ${verseHTML(cfg.verse)}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+// ============================================================
+//  Finale: Pharaoh says Go! and the people march out with joy
+// ============================================================
+function startFinale() {
+  hideOverlay();
+  state = 'finale';
+  syncAmbience();
+  finaleT = 0;
+  critters = [];
+  PHARAOH.pose = 'point'; PHARAOH.mood = 'worried';
+  bubble = { key: 'go', who: 'pharaoh' };
+  sfx.levelStart();
+}
+function updateFinale(dt) {
+  finaleT += dt;
+  if (finaleT > 3.6 && bubble) { bubble = null; Music.win && sfx.win(); }
+  if (finaleT > 3.6 && Math.random() < dt * 6) spawn(rand(0, viewW), rand(150, 600), rand(-20, 20), -30, 1.6, pick(['#ffe27a', '#f6a6c4', '#7fd0e8', '#ffffff']), rand(3, 5), 20, 'star');
+  if (finaleT > 11 && state === 'finale') finaleCard();
+}
+function finaleCard() {
+  state = 'win';
+  endTimer = 0;
+  saveBest();
+  showOverlay('Free at last!', 'God set His people free',
+    `${verseHTML('go')}
+     ${verseHTML('out')}
+     <p style="text-align:center">God kept His promise. The people of Israel marched out of Egypt singing and dancing!</p>
+     <p class="score" style="font-size:1.3rem">Final score: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+     ${creditHTML()}`,
+    'Play again', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function drawExodus() {
+  // sunrise over the desert road out of Egypt
+  const f = clamp((finaleT - 3.6) / 1.2, 0, 1);
+  const top = -offY;
+  const g = ctx.createLinearGradient(0, top, 0, 640);
+  g.addColorStop(0, '#7cc4f2'); g.addColorStop(0.7, '#ffe0a0'); g.addColorStop(1, '#ffc87a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, viewW, 640 - top);
+  ctx.fillStyle = 'rgba(255,240,180,0.9)';
+  ctx.beginPath(); ctx.arc(viewW * 0.78, 470, 60, 0, TAU); ctx.fill();
+  // pyramids left behind
+  for (const [x, s] of [[0.14, 1], [0.27, 0.7]]) {
+    ctx.fillStyle = '#e0bd7a';
+    ctx.beginPath(); ctx.moveTo(viewW * x - 110 * s, 640); ctx.lineTo(viewW * x, 640 - 150 * s); ctx.lineTo(viewW * x + 110 * s, 640); ctx.fill();
+    ctx.fillStyle = '#c9a25e';
+    ctx.beginPath(); ctx.moveTo(viewW * x, 640 - 150 * s); ctx.lineTo(viewW * x + 110 * s, 640); ctx.lineTo(viewW * x + 30 * s, 640); ctx.fill();
+  }
+  ctx.fillStyle = '#e6c78a';
+  ctx.fillRect(0, 640, viewW, 260);
+  ctx.fillStyle = '#d9b46e';
+  ctx.beginPath(); ctx.moveTo(0, 740); ctx.quadraticCurveTo(viewW / 2, 700, viewW, 760); ctx.lineTo(viewW, 820); ctx.quadraticCurveTo(viewW / 2, 770, 0, 810); ctx.fill();
+  // the people march from left to right
+  const walk = (finaleT - 3.6) * 70;
+  const n = CROWD.length + 6;
+  for (let k = n - 1; k >= 0; k--) {
+    const x = -60 + walk - k * 62 + (k === 0 ? 40 : 0);
+    if (x < -60 || x > viewW + 60) continue;
+    const y = 790 + (k % 2) * 20;
+    if (k === 0) { MOSES.walk = true; MOSES.mood = 'joy'; MOSES.pose = null; drawPerson(MOSES, x, y, 1.15, x + 100, y - 60); continue; }
+    if (k % 4 === 3) { drawSheep(x, y + 8); continue; }
+    const d = CROWD[k % CROWD.length];
+    d.walk = true;
+    drawPerson(d, x, y, 1.05, x + 100, y - 60);
+  }
+  ctx.globalAlpha = 1 - f;
+  ctx.fillStyle = '#fff6d0';
+  ctx.fillRect(0, top, viewW, 900 - top);
+  ctx.globalAlpha = 1;
+}
+function drawSheep(x, y) {
+  const b = Math.abs(Math.sin(t * 9 + x)) * 4;
+  ctx.save();
+  ctx.translate(x, y - b);
+  ctx.fillStyle = '#4a3a2a';
+  ctx.fillRect(-12, -4, 4, 12); ctx.fillRect(8, -4, 4, 12);
+  ctx.fillStyle = '#fbf7ec';
+  for (const [dx, dy, r] of [[-10, -14, 10], [0, -18, 11], [10, -14, 10], [0, -8, 12]]) { ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#4a3a2a';
+  ctx.beginPath(); ctx.ellipse(20, -16, 7, 8, 0.3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(22, -18, 2.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'intro') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Plague ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The critters are waiting. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+let down = null;          // the press in progress
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'intro' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { advanceIntro(); return; }
+  if (state === 'finale' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && finaleT > 2) { finaleCard(); return; }
+  // Keyboard players: Space shoos the critter that is filling the palace most
+  if (state === 'play' && e.code === 'Space' && !e.repeat) {
+    const c = worstCritter();
+    if (c) shooAt(c.x, c.kind === 'frog' ? c.y - 12 : c.y);
+  }
+});
+
+// The critter doing the most harm right now (keyboard and hints)
+function worstCritter() {
+  let bestC = null, bestV = -1;
+  for (const c of critters) {
+    if (c.leaving) continue;
+    const v = c.kind === 'locust' && c.eating ? 3 : c.kind === 'gnats' ? 2 : c.kind === 'frog' && !c.hop ? 2 : 1;
+    if (v > bestV) { bestV = v; bestC = c; }
+  }
+  return bestC;
+}
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'intro') { advanceIntro(); return; }
+  if (state === 'finale' && finaleT > 2) { finaleCard(); return; }
+  if (state !== 'play') return;
+  const x = p.vx, y = p.vy - offY;
+  // Tap-first: shoo at once on touch
+  shooAt(x, y);
+  down = { x, y };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!down || state !== 'play') return;
+  const p = toView(e);
+  const x = p.vx, y = p.vy - offY;
+  if (Math.hypot(x - down.x, y - down.y) > 10) { shooAlong(down.x, down.y, x, y); down.x = x; down.y = y; }
+});
+const endPress = () => { down = null; };
+canvas.addEventListener('pointerup', endPress);
+canvas.addEventListener('pointercancel', endPress);
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false, buzzT: 0,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  boing() { this.tone(300, 0.25, 'sine', 0.25, 0, 700); if (this.ctx) Music.tap(0.3 + combo * 0.12); },
+  swat() { this.noiseBurst(2600, 0.12, 0.25, 1, 900); if (this.ctx) Music.tap(0.3 + combo * 0.12); },
+  poof() { this.noiseBurst(900, 0.25, 0.25, 0.6, 2400); if (this.ctx) Music.tap(0.3 + combo * 0.12); },
+  ribbit() { this.tone(180, 0.08, 'square', 0.05, 0, 140); this.tone(200, 0.1, 'square', 0.05, 0.1, 150); },
+  buzz() { if (!this.ctx || this.ctx.currentTime < this.buzzT) return; this.buzzT = this.ctx.currentTime + 0.6; this.tone(210, 0.4, 'sawtooth', 0.03, 0, 240); },
+  munch() { for (let i = 0; i < 3; i++) this.noiseBurst(3000, 0.05, 0.08, 2); },
+  harrumph() { this.tone(150, 0.3, 'triangle', 0.25, 0, 110); this.tone(120, 0.35, 'triangle', 0.2, 0.25, 90); },
+  plague() { this.noiseBurst(500, 0.6, 0.3, 0.7, 1800); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['intro', 'play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(60,36,14,0.85)'); hg.addColorStop(1, 'rgba(60,36,14,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffe9a8';
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const title = state === 'title' ? 'Let My People Go' : state === 'finale' ? 'Let My People Go!' : `Plague ${level} · ${cfg.name}`;
+  ctx.fillText(title, 12, 26);
+  if (state !== 'title' && state !== 'finale') {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore + (state === 'play' || state === 'pause' ? levelPts : 0)}`, viewW - 12, 26);
+    // the Covered meter
+    ctx.textAlign = 'left';
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('COVERED', 12, 52);
+    ctx.shadowBlur = 0;
+    const x0 = 76, x1 = viewW - 120;
+    ctx.fillStyle = 'rgba(255,233,168,0.22)';
+    roundRect(x0, 42, x1 - x0, 13, 6.5); ctx.fill();
+    const g = ctx.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, '#9cd36a'); g.addColorStop(0.6, '#f2c84a'); g.addColorStop(1, '#e8506a');
+    ctx.fillStyle = covered > 75 && Math.sin(t * 12) > 0 ? '#ff6b6b' : g;
+    if (covered > 0) { roundRect(x0, 42, (x1 - x0) * covered / 100, 13, 6.5); ctx.fill(); }
+    // time left until Moses asks again (a little sun dial)
+    const f = clamp(timeLeft / cfg.dur, 0, 1);
+    const cx = viewW - 60, cy = 50;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffd34d';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 15, -Math.PI / 2, -Math.PI / 2 + TAU * f); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.font = '700 14px Fredoka, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${Math.ceil(Math.max(0, timeLeft))}s`, cx + 20, cy + 5);
+    if (combo > 1 && comboT > 0 && state === 'play') {
+      ctx.textAlign = 'right';
+      ctx.font = '700 18px Fredoka, sans-serif';
+      ctx.fillText(`Combo ×${combo}!`, viewW - 12, 90);
+    }
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = viewH - 40 - (lines.length - 1) * 28;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(60,36,14,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+// Speech bubble (playfield coordinates)
+function drawBubble(text, x, y, below = false) {
+  ctx.save();
+  ctx.font = '600 16px Fredoka, sans-serif';
+  const maxW = Math.min(300, viewW - 30);
+  const lines = wrapText(text, maxW - 24);
+  const w = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 26), h = lines.length * 20 + 18;
+  const bx = clamp(x - w / 2, 12, viewW - w - 12);
+  const by = below ? y + 16 : Math.max(TOPH + 8 - offY, y - h - 16);
+  ctx.fillStyle = 'rgba(255,252,240,0.97)';
+  ctx.shadowColor = 'rgba(60,40,0,0.3)'; ctx.shadowBlur = 8;
+  roundRect(bx, by, w, h, 14); ctx.fill();
+  ctx.shadowBlur = 0;
+  const tx = clamp(x, bx + 18, bx + w - 18);
+  ctx.beginPath();
+  if (below) { ctx.moveTo(tx - 9, by); ctx.lineTo(tx, by - 14); ctx.lineTo(tx + 9, by); }
+  else { ctx.moveTo(tx - 9, by + h); ctx.lineTo(tx, Math.min(by + h + 14, y)); ctx.lineTo(tx + 9, by + h); }
+  ctx.fill();
+  ctx.fillStyle = '#5a4210';
+  ctx.textAlign = 'left';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 13, by + 24 + i * 20));
+  ctx.restore();
+}
+
+function drawScene() {
+  const l = L();
+  drawPalace();
+  // Pharaoh on his throne
+  const ph = pharaohHead();
+  const look = critters.find((c) => !c.leaving) || { x: l.moses.x, y: l.moses.y - 60 };
+  drawPerson(PHARAOH, l.throne.x, l.throne.y, 1.35, state === 'play' ? look.x : l.moses.x, state === 'play' ? look.y : l.moses.y - 60);
+  // two servants flapping beside the throne
+  if (l.hw > 300) {
+    drawPerson(SERVANTS[0], l.throne.x - 150, l.floorY + 40, 1.05, l.throne.x, ph.y);
+    drawPerson(SERVANTS[1], l.throne.x + 150, l.floorY + 40, 1.05, l.throne.x, ph.y);
+  }
+  drawTable();
+  // Moses and Aaron
+  drawPerson(AARON, l.moses.x + 34, l.moses.y - 18, 1.15, l.throne.x, ph.y);
+  drawPerson(MOSES, l.moses.x - 10, l.moses.y, 1.2, l.throne.x, ph.y);
+  if (MOSES.pose === 'stretch') {
+    ctx.fillStyle = 'rgba(255,240,170,0.35)';
+    ctx.beginPath(); ctx.arc(l.moses.x - 10 + 34 * 1.2, l.moses.y - 112 * 1.2, 16 + Math.sin(t * 6) * 3, 0, TAU); ctx.fill();
+  }
+  // critters: things on the floor first
+  const list = critters.slice().sort((a, b) => a.y - b.y);
+  for (const c of list) drawCritter(c);
+  drawParticles(false);
+  // swipe trails and points
+  for (const s of swipes) {
+    ctx.globalAlpha = s.t / 0.3;
+    if (s.miss) { ctx.strokeStyle = '#fff6d0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x, s.y, 20 + (0.25 - s.t) * 60, 0, TAU); ctx.stroke(); }
+    else { ctx.strokeStyle = '#fff6d0'; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(s.x0, s.y0); ctx.lineTo(s.x1, s.y1); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(60,36,14,0.8)'; ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = '#ffe27a'; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  // the palace fills up: a greenish haze as it gets covered
+  if (covered > 40) {
+    ctx.fillStyle = `rgba(90,120,40,${(covered - 40) / 60 * 0.22})`;
+    ctx.fillRect(0, -offY, viewW, viewH);
+  }
+  // speech bubbles
+  if (bubble) {
+    const text = bubble.text || bubbleText(bubble.key);
+    if (bubble.who === 'moses') drawBubble(text, l.moses.x, l.moses.y - 160);
+    else drawBubble(text, ph.x, ph.y - 34);
+  }
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, (offY + sy) * scale);
+  if (state === 'finale' && finaleT > 3.6) drawExodus();
+  else drawScene();
+  if (state === 'finale') drawParticles(false);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.2})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawParticles(true);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  [MOSES, AARON, PHARAOH, ...SERVANTS, ...CROWD].forEach((d) => blinkTick(d, dt));
+  if (state === 'intro') updateIntro(dt);
+  else if (state === 'play') updatePlay(dt);
+  else if (state === 'win') {
+    winT += dt;
+    updateCritters(dt);
+    PHARAOH.mood = 'worried'; PHARAOH.pose = null;
+    MOSES.mood = 'joy';
+  } else if (state === 'fail') {
+    failT += dt;
+    PHARAOH.mood = 'shock';
+  } else if (state === 'finale') updateFinale(dt);
+  else if (state === 'title') { MOSES.mood = 'watch'; }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

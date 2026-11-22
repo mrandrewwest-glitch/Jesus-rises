@@ -1,0 +1,1740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a1f3e">
+<title>Spies in Jericho</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2a1f3e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 30, 70, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Spies in Jericho</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'pipe', accent: 'strings', ambience: 'night', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  sent: { ref: 'Joshua 2:1', KJV: 'Joshua the son of Nun sent out of Shittim two men to spy secretly, saying, Go view the land, even Jericho.', NKJV: 'Joshua the son of Nun sent out two men from Acacia Grove to spy secretly, saying, “Go, view the land, especially Jericho.”', NIV: 'Joshua son of Nun secretly sent two spies from Shittim. “Go, look over the land,” he said, “especially Jericho.”', NLT: 'Joshua secretly sent out two spies from the Israelite camp at Acacia Grove. He instructed them, “Scout out the land on the other side of the Jordan River, especially around Jericho.”' },
+  // Level cards
+  view: { ref: 'Joshua 2:1', KJV: 'Go view the land, even Jericho.', NKJV: 'Go, view the land, especially Jericho.', NIV: 'Go, look over the land... especially Jericho.', NLT: 'Scout out the land on the other side of the Jordan River, especially around Jericho.' },
+  flax: { ref: 'Joshua 2:6', KJV: 'She had brought them up to the roof of the house, and hid them with the stalks of flax, which she had laid in order upon the roof.', NKJV: 'She had brought them up to the roof and hidden them with the stalks of flax, which she had laid in order on the roof.', NIV: 'She had taken them up to the roof and hidden them under the stalks of flax she had laid out on the roof.', NLT: 'She had taken them up to the roof and hidden them beneath bundles of flax she had laid out.' },
+  rope: { ref: 'Joshua 2:15', KJV: 'Then she let them down by a cord through the window: for her house was upon the town wall, and she dwelt upon the wall.', NKJV: 'Then she let them down by a rope through the window, for her house was on the city wall; she dwelt on the wall.', NIV: 'So she let them down by a rope through the window, for the house she lived in was part of the city wall.', NLT: 'Then, since Rahab’s house was built into the town wall, she let them down by a rope through the window.' },
+  // Win cards
+  scarlet: { ref: 'Joshua 2:18', KJV: 'Thou shalt bind this line of scarlet thread in the window which thou didst let us down by.', NKJV: 'You bind this line of scarlet cord in the window through which you let us down.', NIV: 'You have tied this scarlet cord in the window through which you let us down.', NLT: 'You must leave this scarlet rope hanging from the window through which you let us down.' },
+  family: { ref: 'Joshua 2:18', KJV: 'Thou shalt bring thy father, and thy mother, and thy brethren, and all thy father’s household, home unto thee.', NKJV: 'Bring your father, your mother, your brothers, and all your father’s household to your own home.', NIV: 'You have brought your father and mother, your brothers and all your family into your house.', NLT: 'All your family members—your father, mother, brothers, and all your relatives—must be here inside the house.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+// Small seeded random so every level has the same, tested layout
+function seeded(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(s ^ (s >>> 15), 1 | s);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const GROUND = 790;       // where feet stand on the street (playfield y)
+const RUN = 300;          // spies' running speed (px/s)
+const SCURRY = 620;       // speed when they dash back to hiding after being seen
+const CHANCES = 3;
+const NOTE_PTS = 200;
+
+const LEVELS = [
+  { name: 'To Rahab’s House', verse: 'view', time: 45, guards: ['stand', 'stand'], rest: [3.0, 4.0], warn: 1.3, look: 2.2, range: 230, both: false, notes: 0, night: 0,
+    tip: 'Tap a <b>hiding place</b> to run to it. When the guard wakes up and says <b>“Hmm?”</b>, be hidden before he looks!' },
+  { name: 'The Busy Street', verse: 'sent', time: 50, guards: ['stand', 'stand', 'stand'], rest: [2.2, 3.0], warn: 1.1, look: 2.4, range: 250, both: false, notes: 1, night: 0.3,
+    tip: 'Two guards now. Tap the <b>eye</b> spots and stand still there to <b>view the land</b> for bonus points.' },
+  { name: 'The Night Watch', verse: 'view', time: 65, guards: ['stand', 'patrol', 'stand', 'stand'], rest: [1.9, 2.7], warn: 0.95, look: 2.5, range: 260, both: false, notes: 2, night: 1,
+    tip: 'A guard is <b>walking</b> with his lantern. Hide and let him pass, then run on <b>behind</b> him.' },
+  { name: 'The King’s Men', verse: 'flax', time: 65, guards: ['stand', 'patrol', 'both', 'stand', 'both'], rest: [1.6, 2.4], warn: 0.8, look: 2.5, range: 270, both: true, notes: 2, night: 1,
+    tip: 'Some guards look <b>both ways</b> now. Watch which way they turn!' },
+  { name: 'Over the Flax Roofs', verse: 'flax', time: 72, guards: ['both', 'patrol', 'stand', 'patrol', 'both', 'stand'], rest: [1.4, 2.2], warn: 0.65, look: 2.6, range: 280, both: true, notes: 3, night: 1, roof: true,
+    tip: 'Run across the <b>rooftops</b> and hide under the <b>flax</b> like Rahab showed you.' },
+  { name: 'Down by the Red Cord', verse: 'rope', time: 40, rope: true, ledges: 8, night: 1,
+    tip: 'Tap to <b>slide down</b> the scarlet cord to the next ledge. Only slide when the <b>lantern light</b> is far from the rope!' },
+];
+
+function makeConfig(n) {
+  const L = LEVELS[n - 1];
+  return { ...L, n };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('spiesBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let lv = null;              // the level's data (street or rope)
+let spies = null;
+let chances = CHANCES, timeLeft = 60, notes = 0;
+let particles = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let endTimer = 0;
+let lastScore = null;
+let playT = 0, winT = 0, failT = 0;
+let failWhy = '';
+let told = {};
+const cam = { x: 0 };
+
+// ============================================================
+//  Building a level
+// ============================================================
+const COVER_KINDS = ['flax', 'jars', 'cart', 'baskets', 'door', 'flax'];
+
+function buildLevel() {
+  const rng = seeded(level * 977 + 13);
+  const r = (a, b) => a + rng() * (b - a);
+  lv = { covers: [], guards: [], notes: [], houses: [], goal: null, rope: null };
+  if (cfg.rope) { buildRope(rng); return; }
+  let x = 90;
+  const kinds = cfg.roof ? ['flax', 'flax', 'baskets', 'flax', 'jars'] : COVER_KINDS;
+  let ki = Math.floor(rng() * kinds.length);
+  const cover = (cx) => { lv.covers.push({ x: cx, kind: lv.covers.length === 0 ? 'gate' : kinds[ki++ % kinds.length], wob: 0 }); };
+  cover(x);
+  for (const type of cfg.guards) {
+    x += r(150, 190);
+    cover(x);
+    if (type === 'patrol') {
+      // a guard walking up and down past two hiding places
+      const a = x + 70;
+      x += r(170, 200); cover(x);
+      x += r(170, 200); cover(x);
+      const b = x + 90;
+      lv.guards.push({ type, x: lerp(a, b, rng()), a, b, dir: rng() < 0.5 ? -1 : 1, st: 'walk', t: 0, speed: 55 + level * 6, range: 175, seenT: 0, head: 0 });
+      x += r(200, 230); cover(x);
+    } else {
+      const gx = x + r(115, 135);
+      const both = type === 'both';
+      lv.guards.push({ type: 'stand', both, x: gx, dir: -1, st: 'rest', t: r(cfg.rest[0], cfg.rest[1]) * 0.6 + 0.8, range: cfg.range, seenT: 0, head: -1 });
+      x = gx + r(115, 135);
+      cover(x);
+    }
+  }
+  x += r(170, 200);
+  lv.goal = { x: x + 60 };
+  // Places to "view the land": out in the open, between hiding places
+  const gaps = [];
+  for (let i = 1; i < lv.covers.length - 1; i++) gaps.push((lv.covers[i].x + lv.covers[i + 1].x) / 2);
+  for (let i = 0; i < cfg.notes && gaps.length; i++) {
+    const k = Math.floor(rng() * gaps.length);
+    const what = ['the strong walls', 'the city gate', 'the grain stores', 'the watchtower', 'the palm trees'][i % 5];
+    lv.notes.push({ x: gaps.splice(k, 1)[0], got: false, hold: 0, what });
+  }
+  // Houses along the street (behind the hiding places)
+  for (let hx = -200, i = 0; hx < lv.goal.x - 160; i++) {
+    const w = 150 + Math.floor(hash(i, level) * 90);
+    lv.houses.push({ x: hx, w, h: 210 + Math.floor(hash(level, i) * 120), col: pick(['#d9b48a', '#cfa77a', '#e2c39a', '#c99a6c']), door: hash(i, 3) > 0.35 });
+    hx += w + 14;
+  }
+}
+
+function buildRope(rng) {
+  const n = cfg.ledges;
+  const top = 250, bottom = GROUND;
+  const ledges = [];
+  for (let i = 0; i < n; i++) ledges.push(lerp(top, bottom, i / (n - 1)));
+  const beams = [];
+  for (let i = 0; i < n - 1; i++) {
+    beams.push({ i, y0: ledges[i], y1: ledges[i + 1], w: 0.9 + 0.15 * i + rng() * 0.2, ph: rng() * TAU, x: 0, dir: 1, seenT: 0 });
+  }
+  lv.rope = { ledges, beams, at: 0, slide: null };
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = [];
+  chances = CHANCES; timeLeft = cfg.time; notes = 0;
+  playT = 0; winT = 0; failT = 0;
+  flashT = shakeT = 0;
+  endTimer = 0;
+  message = { text: '', t: 0 };
+  told = {};
+  keys.clear();
+  buildLevel();
+  spies = { x: 90, tx: 90, run: 0, hidden: true, cover: 0, lastCover: 0, scurry: false, seen: 0, face: 1, wait: 0, inside: 0 };
+  if (cfg.rope) { spies.y = lv.rope.ledges[0]; }
+  updateBeams(0);
+  cam.x = camTarget();
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+  overlay.querySelector('.card').scrollTop = 0;
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('Spies in Jericho', 'Sneak to Rahab’s house',
+    `${verseHTML('sent')}
+     <ul>
+       <li>Help Joshua’s <b>two spies</b> slip through Jericho to Rahab’s house, where she will hide them.</li>
+       <li><b>Tap a hiding place</b> (flax, jars, carts, doorways) to run to it. <b>Tap the spies</b> to stop.</li>
+       <li>When a guard wakes up and says <b>“Hmm?”</b>, get hidden! If he sees you, you must start again from your last hiding place.</li>
+       <li>Get there before the <b>city gate shuts</b>. Stand on an <b>eye</b> to view the land for bonus points.</li>
+       <li><b>Keys:</b> <kbd>&rarr;</kbd> run to the next hiding place, <kbd>&larr;</kbd> back one, <kbd>&darr;</kbd> stop.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+// The level card: the level's data is rebuilt at the same time, so what is drawn behind it is ready
+function levelCard() {
+  resetLevel();
+  state = 'level';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${cfg.tip}</p>`,
+    'Begin', () => startLevel());
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.2);
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(timeLeft) * 10;
+  const chanceBonus = chances * 150;
+  const noteBonus = notes * NOTE_PTS;
+  const levelBonus = level * 300;
+  const score = timeBonus + chanceBonus + noteBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('spiesBest', best); } catch (e) {} }
+  lastScore = { timeBonus, chanceBonus, noteBonus, levelBonus, score };
+  showMessage(cfg.rope ? 'Safe on the ground!' : 'Rahab lets them in!', 2);
+  sfx.win();
+  endTimer = 2.6;
+}
+
+function fail(why) {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  failWhy = why;
+  showMessage(why, 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LEVELS.length;
+    const scoreHTML = `<p class="score">Time left: <b>${s.timeBonus}</b><br>Chances kept (${chances}): <b>${s.chanceBonus}</b><br>Land viewed (${notes}): <b>${s.noteBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (last) {
+      state = 'done';
+      showOverlay('Safe and sound!', 'The spies got home to Joshua',
+        `${verseHTML('scarlet')}
+         <p style="text-align:center">Rahab trusted God and helped the spies. They promised that the <b>scarlet cord</b> in her window would keep her whole family safe.</p>
+         ${verseHTML('family')}
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; levelCard(); });
+    } else {
+      showOverlay('Well done!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML('scarlet')}
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Next level', () => { level++; levelCard(); });
+    }
+  } else if (state === 'fail') {
+    showOverlay('Oh no!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${failWhy} Wait for the guards to <b>rest</b> or look away, then run to the next hiding place.</p>
+       ${verseHTML('view')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    keys.clear();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Shh&hellip; the spies are waiting. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Street play
+// ============================================================
+function coverAt(i) { return lv.covers[clamp(i, 0, lv.covers.length - 1)]; }
+function nearestCoverIndex(x) {
+  let bi = 0, bd = Infinity;
+  lv.covers.forEach((c, i) => { const d = Math.abs(c.x - x); if (d < bd) { bd = d; bi = i; } });
+  return bi;
+}
+
+function runTo(x) {
+  if (state !== 'play' || spies.scurry) return;
+  spies.tx = clamp(x, 40, lv.goal.x);
+  if (Math.abs(spies.tx - spies.x) > 2) {
+    spies.hidden = false; spies.cover = -1;
+    spies.face = spies.tx > spies.x ? 1 : -1;
+    sfx.step();
+  }
+}
+function runToCover(i) { if (!lv.covers.length) return; i = clamp(i, 0, lv.covers.length - 1); spies.target = i; runTo(lv.covers[i].x); }
+function stopSpies() { if (state !== 'play' || spies.scurry) return; spies.tx = spies.x; spies.target = null; }
+
+function nextCoverIndex(dir) {
+  // the next hiding place ahead of (or behind) where the spies are now
+  if (dir > 0) {
+    for (let i = 0; i < lv.covers.length; i++) if (lv.covers[i].x > spies.x + 4) return i;
+    return -1;   // past the last one: run to Rahab's door
+  }
+  for (let i = lv.covers.length - 1; i >= 0; i--) if (lv.covers[i].x < spies.x - 4) return i;
+  return 0;
+}
+
+function guardCone(g) {
+  // the stretch of street the guard can see right now (or null)
+  if (g.type === 'stand') {
+    if (g.st !== 'look') return null;
+    return g.dir < 0 ? [g.x - g.range, g.x + 24] : [g.x - 24, g.x + g.range];
+  }
+  return g.dir < 0 ? [g.x - g.range, g.x + 20] : [g.x - 20, g.x + g.range];
+}
+
+function updateGuards(dt, live = true) {
+  for (const g of lv.guards) {
+    g.seenT = Math.max(0, g.seenT - dt);
+    if (g.type === 'stand') {
+      g.t -= dt;
+      if (g.t <= 0) {
+        if (g.st === 'rest') {
+          g.st = 'warn'; g.t = cfg.warn;
+          g.dir = g.both && Math.random() < 0.5 ? 1 : -1;
+          if (live) sfx.hmm();
+          if (live && !told.warn) { told.warn = true; showMessage('“Hmm?” — the guard is waking up. Hide!', 2.4); }
+        } else if (g.st === 'warn') { g.st = 'look'; g.t = cfg.look; }
+        else { g.st = 'rest'; g.t = rand(cfg.rest[0], cfg.rest[1]); }
+      }
+      const want = g.st === 'rest' ? 0 : g.dir;
+      g.head += (want - g.head) * Math.min(1, dt * 8);
+    } else {
+      if (g.st === 'turn') {
+        g.t -= dt;
+        if (g.t <= 0) { g.st = 'walk'; g.dir = -g.dir; }
+      } else {
+        g.x += g.dir * g.speed * dt;
+        if ((g.dir > 0 && g.x >= g.b) || (g.dir < 0 && g.x <= g.a)) { g.x = clamp(g.x, g.a, g.b); g.st = 'turn'; g.t = 1.1; }
+      }
+      g.head = g.dir;
+      if (live && !told.patrol && Math.abs(g.x - spies.x) < viewW * 0.7) { told.patrol = true; showMessage('This guard walks with a lantern. Hide and let him pass!', 2.6); }
+    }
+  }
+}
+
+function seenBy() {
+  if (spies.hidden || spies.scurry || spies.seen > 0 || spies.inside) return null;
+  for (const g of lv.guards) {
+    const c = guardCone(g);
+    if (c && spies.x > c[0] && spies.x < c[1]) return g;
+  }
+  return null;
+}
+
+function spotted(g) {
+  chances--;
+  g.seenT = 1.6;
+  if (g.type === 'stand') { g.st = 'look'; g.t = 1.4; }
+  sfx.spotted();
+  shakeT = 0.3;
+  for (let i = 0; i < 10; i++) spawn(spies.x + rand(-20, 20), GROUND - 70 + rand(-20, 10), rand(-60, 60), rand(-120, -40), 0.8, '#fff6c0', 4, 200, 'star');
+  if (chances <= 0) { fail('The guards saw the spies too many times!'); return; }
+  showMessage(chances === 1 ? '“Who’s there?” Back to hiding! Last chance!' : '“Who’s there?” Back to hiding!', 2.2);
+  spies.scurry = true;
+  spies.target = spies.lastCover;
+  spies.tx = lv.covers[spies.lastCover].x;
+  spies.face = spies.tx > spies.x ? 1 : -1;
+  spies.seen = 0.01;
+}
+
+function updateSpies(dt) {
+  const sp = spies;
+  const speed = sp.scurry ? SCURRY : RUN;
+  const d = sp.tx - sp.x;
+  if (Math.abs(d) > 0.5) {
+    sp.x += Math.sign(d) * Math.min(Math.abs(d), speed * dt);
+    sp.run += dt * (sp.scurry ? 18 : 12);
+    sp.hidden = false;
+    sp.wait = 0;
+  } else {
+    sp.x = sp.tx;
+    if (sp.scurry) { sp.scurry = false; sp.seen = 1.2; }
+    const ci = nearestCoverIndex(sp.x);
+    const atCover = Math.abs(lv.covers[ci].x - sp.x) < 4;
+    if (atCover && !sp.hidden) { sp.hidden = true; sp.cover = ci; lv.covers[ci].wob = 1; sfx.hide(); }
+    if (atCover) sp.lastCover = ci;
+    if (!atCover) sp.hidden = false;
+    sp.wait += dt;
+  }
+  if (sp.seen > 0 && !sp.scurry) sp.seen = Math.max(0, sp.seen - dt);
+  // viewing the land: stand still on the eye
+  for (const n of lv.notes) {
+    if (n.got) continue;
+    if (Math.abs(sp.x - n.x) < 26 && Math.abs(d) <= 0.5 && !sp.scurry) {
+      n.hold += dt;
+      if (n.hold >= 0.8) {
+        n.got = true; notes++;
+        sfx.note();
+        showMessage(`You viewed ${n.what}! +${NOTE_PTS}`, 1.8);
+        for (let i = 0; i < 14; i++) spawn(n.x, GROUND - 150, rand(-90, 90), rand(-120, -20), 0.9, '#ffe27a', 4, 120, 'star');
+      }
+    } else n.hold = Math.max(0, n.hold - dt * 2);
+  }
+  // Rahab's door
+  if (sp.x >= lv.goal.x - 1 && !sp.scurry) { sp.inside = 1; winLevel(); return; }
+  const g = seenBy();
+  if (g) spotted(g);
+}
+
+function camTarget() {
+  if (!lv || cfg.rope) return 0;
+  const lead = viewW < 700 ? 0.3 : 0.28;
+  return clamp(spies.x - viewW * lead, -60, Math.max(-60, lv.goal.x + 220 - viewW));
+}
+
+// ============================================================
+//  Rope play
+// ============================================================
+function ropeX() { return viewW / 2; }
+function beamReach() { return Math.min(W / 2 - 50, 230); }
+function updateBeams(dt) {
+  if (!lv || !lv.rope) return;
+  const R = lv.rope;
+  for (const b of R.beams) {
+    b.ph += dt * b.w;
+    b.x = ropeX() + Math.sin(b.ph) * beamReach();
+    b.seenT = Math.max(0, b.seenT - dt);
+  }
+}
+const POOL_W = 80;     // half-width of a lantern's pool of light
+function beamOnRope(b) { return Math.abs(b.x - ropeX()) < POOL_W + 18; }
+
+function ropeSlide() {
+  if (state !== 'play' || !cfg.rope) return;
+  const R = lv.rope;
+  if (R.slide || R.at >= R.ledges.length - 1) return;
+  R.slide = { from: R.at, to: R.at + 1, t: 0, dur: 0.45, back: false };
+  sfx.slide();
+}
+
+function updateRope(dt) {
+  const R = lv.rope;
+  updateBeams(dt);
+  if (R.slide) {
+    const s = R.slide;
+    s.t += dt;
+    const f = clamp(s.t / s.dur, 0, 1);
+    spies.y = lerp(R.ledges[s.from], R.ledges[s.to], s.back ? ease(f) : f);
+    if (!s.back) {
+      const b = R.beams[s.from];
+      if (beamOnRope(b)) {
+        // seen: scramble back up to the ledge
+        chances--;
+        b.seenT = 1.5;
+        sfx.spotted();
+        shakeT = 0.3;
+        if (chances <= 0) { R.slide = null; fail('The watchmen saw the spies too many times!'); return; }
+        showMessage(chances === 1 ? '“Who’s there?” Back up! Last chance!' : '“Who’s there?” Back up to the ledge!', 2.2);
+        R.slide = { from: s.from, to: s.from, t: 0, dur: 0.35, back: true, y0: spies.y };
+        return;
+      }
+    } else spies.y = lerp(s.y0, R.ledges[s.to], ease(f));
+    if (f >= 1) {
+      R.at = s.to; R.slide = null;
+      spies.y = R.ledges[R.at];
+      if (!s.back) sfx.hide();
+      if (R.at >= R.ledges.length - 1) { winLevel(); return; }
+      if (R.at === 1 && !told.ledge) { told.ledge = true; showMessage('Safe on the ledge. Wait for the light to move away…', 2.2); }
+    }
+  }
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.6, p.size * 0.7);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStar(x, y, R, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (cfg.rope) {
+    if (['Space', 'ArrowDown', 'KeyS', 'Enter'].includes(e.code)) ropeSlide();
+    return;
+  }
+  if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'Space') {
+    const i = nextCoverIndex(1);
+    if (i < 0) runTo(lv.goal.x); else runToCover(i);
+  } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') runToCover(nextCoverIndex(-1));
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') stopSpies();
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  if (cfg.rope) { ropeSlide(); return; }
+  tapStreet(p.vx + cam.x, p.vy - offY);
+});
+
+// A tap on the street: the spies (stop), a hiding place, Rahab's door, or open ground
+function tapStreet(wx, wy) {
+  if (Math.abs(wx - spies.x) < 34 && wy > GROUND - 140 && Math.abs(spies.tx - spies.x) > 1) { stopSpies(); return; }
+  if (Math.abs(wx - lv.goal.x) < 80) { runTo(lv.goal.x); return; }
+  let bi = -1, bd = 70;
+  lv.covers.forEach((c, i) => { const d = Math.abs(c.x - wx); if (d < bd) { bd = d; bi = i; } });
+  if (bi >= 0) { runToCover(bi); return; }
+  for (const n of lv.notes) if (!n.got && Math.abs(n.x - wx) < 50) { spies.target = null; runTo(n.x); return; }
+  spies.target = null;
+  runTo(wx);
+}
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  step() { this.noiseBurst(1800, 0.12, 0.12, 1.2, 900); },
+  hide() { this.noiseBurst(3200, 0.25, 0.14, 0.8, 1200); },
+  hmm() { this.tone(200, 0.18, 'triangle', 0.16, 0, 260); this.tone(260, 0.22, 'triangle', 0.14, 0.18, 210); },
+  spotted() { this.tone(520, 0.12, 'square', 0.1); this.tone(700, 0.18, 'square', 0.1, 0.12); },
+  note() { if (this.ctx) { Music.tap(0.8); Music.tap(1); } },
+  slide() { this.noiseBurst(900, 0.45, 0.16, 0.7, 400); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: people
+// ============================================================
+const SPY1 = { robe: '#4f7f3a', scarf: '#d8c7a0', band: '#7a4f2a', skin: '#c98d56', beard: '#3a2716' };
+const SPY2 = { robe: '#3f6fb5', scarf: '#e8dcc0', band: '#a0673a', skin: '#d9a066', beard: '#5c3a1c' };
+const RAHAB = { robe: '#8a4fa0', scarf: '#c0392b', skin: '#d7a070' };
+
+function eyes(x, y, lookX, open, big = 1) {
+  const dark = '#2b1d12';
+  for (const sx of [-6, 6]) {
+    if (!open) {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x + sx, y, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(x + sx, y, 4 * big, 5 * big, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big, y + 0.5, 2.2 * big, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big - 0.8, y - 0.8, 0.8, 0, TAU); ctx.fill();
+  }
+}
+
+// A spy: crouching (hidden) or running; x,y = feet
+function drawSpy(d, x, y, face, run, crouch, look) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20, 5, 0, 0, TAU); ctx.fill();
+  const bob = crouch ? 0 : Math.abs(Math.sin(run)) * 4;
+  const squash = crouch ? 0.72 : 1;
+  ctx.translate(0, -bob);
+  ctx.scale(face, 1);
+  // legs
+  ctx.strokeStyle = shade(d.robe, -45); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  const sw = crouch ? 0 : Math.sin(run) * 12;
+  ctx.beginPath(); ctx.moveTo(-5, -20 * squash); ctx.lineTo(-5 + sw, -2); ctx.moveTo(5, -20 * squash); ctx.lineTo(5 - sw, -2); ctx.stroke();
+  ctx.fillStyle = '#6b4a2a';
+  ctx.beginPath(); ctx.ellipse(-5 + sw + 3, -2, 6, 3, 0, 0, TAU); ctx.ellipse(5 - sw + 3, -2, 6, 3, 0, 0, TAU); ctx.fill();
+  // robe
+  const top = -62 * squash;
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-15, -14 * squash);
+  ctx.quadraticCurveTo(-15, top + 14, -9, top + 6);
+  ctx.quadraticCurveTo(0, top + 2, 10, top + 6);
+  ctx.quadraticCurveTo(17, top + 14, 16, -14 * squash);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = d.band; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-14, top + 30); ctx.lineTo(15, top + 30); ctx.stroke();
+  // arm (pumping when running, finger to lips when hiding)
+  ctx.strokeStyle = shade(d.robe, -20); ctx.lineWidth = 6.5;
+  ctx.beginPath();
+  if (crouch) { ctx.moveTo(6, top + 14); ctx.lineTo(13, top - 8); }
+  else { ctx.moveTo(4, top + 14); ctx.lineTo(10 - sw * 0.8, top + 32); }
+  ctx.stroke();
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(crouch ? 13 : 10 - sw * 0.8, crouch ? top - 8 : top + 32, 3.6, 0, TAU); ctx.fill();
+  // head
+  const hy = top - 12;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(2, hy, 14, 0, TAU); ctx.fill();
+  // beard
+  ctx.fillStyle = d.beard;
+  ctx.beginPath(); ctx.moveTo(-10, hy + 2); ctx.quadraticCurveTo(-6, hy + 18, 4, hy + 17); ctx.quadraticCurveTo(14, hy + 16, 15, hy + 3); ctx.quadraticCurveTo(6, hy + 9, -10, hy + 2); ctx.fill();
+  // headscarf
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(2, hy - 1, 15.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(17, hy + 2); ctx.lineTo(12, hy - 4);
+  ctx.quadraticCurveTo(2, hy - 9, -10, hy - 4); ctx.lineTo(-14, hy + 14); ctx.lineTo(-18, hy + 12);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = d.band; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(2, hy - 1, 14.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  eyes(4, hy, look, true, 1);
+  // mouth: "shh" o when hiding, grin when running
+  ctx.fillStyle = '#7a2e22';
+  ctx.beginPath();
+  if (crouch) ctx.ellipse(6, hy + 8, 2.2, 2.6, 0, 0, TAU);
+  else ctx.arc(6, hy + 6, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSpies(x, y, face, run, crouch, look = 1) {
+  drawSpy(SPY2, x - 16 * face, y - 2, face, run + 1.4, crouch, look);
+  drawSpy(SPY1, x + 10 * face, y, face, run, crouch, look);
+}
+
+// A guard of Jericho (friendly-looking, with a staff and a lantern)
+function drawGuard(g) {
+  const x = g.x, y = GROUND;
+  const walking = g.type === 'patrol' && g.st === 'walk';
+  const step = walking ? Math.sin(t * 7 + g.x * 0.02) : 0;
+  const resting = g.type === 'stand' && g.st === 'rest';
+  const face = g.head >= 0 ? 1 : -1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 24, 6, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -Math.abs(step) * 3 + (resting ? Math.sin(t * 2) * 1.2 : 0));
+  // staff behind
+  ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-22 * face, 0); ctx.lineTo(-20 * face + (resting ? 6 * face : 0), -118); ctx.stroke();
+  // legs
+  ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(-6, -24); ctx.lineTo(-6 + step * 8, -2); ctx.moveTo(6, -24); ctx.lineTo(6 - step * 8, -2); ctx.stroke();
+  // tunic and cloak
+  ctx.fillStyle = '#b5503f'; ctx.strokeStyle = '#7a3026'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-19, -18); ctx.quadraticCurveTo(-20, -60, -12, -72); ctx.quadraticCurveTo(0, -78, 12, -72); ctx.quadraticCurveTo(20, -60, 19, -18);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#c9a146';
+  roundRect(-17, -54, 34, 16, 5); ctx.fill();
+  ctx.fillStyle = '#8f6a2a';
+  for (let i = -12; i <= 12; i += 8) { ctx.beginPath(); ctx.arc(i, -46, 2, 0, TAU); ctx.fill(); }
+  // head
+  const hy = -90;
+  ctx.fillStyle = '#d39a66';
+  ctx.beginPath(); ctx.arc(0, hy, 17, 0, TAU); ctx.fill();
+  // round bronze helmet
+  ctx.fillStyle = '#c98a3a';
+  ctx.beginPath(); ctx.arc(0, hy - 3, 18, Math.PI, TAU); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e0a84f';
+  ctx.beginPath(); ctx.ellipse(-5, hy - 12, 6, 3, -0.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#9a6a2a';
+  roundRect(-20, hy - 5, 40, 5, 2); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.ellipse(0, hy - 23, 4, 6, 0, 0, TAU); ctx.fill();
+  // face
+  const open = !resting;
+  const lx = g.head;
+  eyes(lx * 3, hy + 2, lx, open, g.st === 'look' || g.seenT > 0 ? 1.15 : 1);
+  ctx.fillStyle = '#3a2716';
+  ctx.beginPath(); ctx.ellipse(lx * 3 - 6, hy + 11, 7, 3, 0.2, 0, TAU); ctx.ellipse(lx * 3 + 6, hy + 11, 7, 3, -0.2, 0, TAU); ctx.fill();
+  if (resting) {
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.ellipse(lx * 3, hy + 16, 3, 2 + Math.sin(t * 2) * 1, 0, 0, TAU); ctx.fill();
+  }
+  // arm with lantern
+  const lanternUp = g.st === 'look' || g.type === 'patrol';
+  const lxp = face * (lanternUp ? 30 : 16), lyp = lanternUp ? -84 : -40;
+  ctx.strokeStyle = '#8f3a2e'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(face * 10, -66); ctx.lineTo(lxp, lyp - 6); ctx.stroke();
+  drawLantern(lxp, lyp, open);
+  ctx.restore();
+
+  // Zzz / Hmm? / ! bubbles
+  ctx.save();
+  ctx.textAlign = 'center';
+  if (resting) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '700 16px Fredoka, sans-serif';
+    for (let k = 0; k < 3; k++) {
+      const f = ((t * 0.6 + k / 3) % 1);
+      ctx.globalAlpha = 1 - f;
+      ctx.fillText('z', x + 16 + f * 22, y - 120 - f * 34);
+    }
+    ctx.globalAlpha = 1;
+  } else if (g.type === 'stand' && g.st === 'warn') {
+    const p = 1 - g.t / cfg.warn;
+    bubbleAt(x, y - 150, 'Hmm?', '#fff3c4', 1 + Math.sin(t * 16) * 0.05);
+    // a ring that fills up: when it is full, he looks
+    ctx.strokeStyle = '#e07a2f'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(x + 44, y - 152, 9, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke();
+  }
+  if (g.seenT > 0) bubbleAt(x, y - 150, 'Who’s there?', '#ffd9c4', 1);
+  ctx.restore();
+}
+
+function drawLantern(x, y, lit) {
+  ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(x, y - 8, 4, Math.PI, TAU); ctx.stroke();
+  if (lit) {
+    const g = ctx.createRadialGradient(x, y + 2, 1, x, y + 2, 26);
+    g.addColorStop(0, 'rgba(255,230,140,0.7)'); g.addColorStop(1, 'rgba(255,230,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y + 2, 26, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#5a4a3a';
+  roundRect(x - 7, y - 6, 14, 18, 3); ctx.fill();
+  ctx.fillStyle = lit ? '#ffd860' : '#a08850';
+  roundRect(x - 4.5, y - 3, 9, 12, 2); ctx.fill();
+}
+
+function bubbleAt(x, y, text, col, s) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const w = ctx.measureText(text).width + 22;
+  ctx.fillStyle = col; ctx.strokeStyle = 'rgba(80,50,20,0.6)'; ctx.lineWidth = 2;
+  roundRect(-w / 2, -17, w, 32, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(0, 26); ctx.lineTo(6, 14); ctx.fill();
+  ctx.fillStyle = '#5a3210'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function drawRahab(x, y, wave) {
+  ctx.save();
+  ctx.translate(x, y);
+  const d = RAHAB;
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-17, 0); ctx.quadraticCurveTo(-16, -30, -10, -38); ctx.quadraticCurveTo(0, -42, 10, -38); ctx.quadraticCurveTo(16, -30, 17, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = shade(d.robe, -25); ctx.lineWidth = 6.5; ctx.lineCap = 'round';
+  const wv = Math.sin(t * 6) * 6 * wave;
+  ctx.beginPath(); ctx.moveTo(10, -32); ctx.lineTo(24 + wv, -62 * wave - 14 * (1 - wave)); ctx.stroke();
+  ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(24 + wv, -62 * wave - 14 * (1 - wave), 4, 0, TAU); ctx.fill();
+  const hy = -54;
+  ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(0, hy, 15, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 0.95, Math.PI * 2.05); ctx.lineTo(17, hy + 10); ctx.lineTo(12, hy + 4); ctx.lineTo(12, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 11, -12, hy - 6); ctx.lineTo(-12, hy + 4); ctx.lineTo(-17, hy + 10); ctx.closePath(); ctx.fill();
+  eyes(0, hy, 0, true);
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy + 5, 5, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,120,120,0.4)';
+  ctx.beginPath(); ctx.arc(-10, hy + 5, 3, 0, TAU); ctx.arc(10, hy + 5, 3, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering: the city
+// ============================================================
+function nightness() { return cfg.night || 0; }
+
+function drawSky() {
+  const n = nightness();
+  const g = ctx.createLinearGradient(0, -offY, 0, H);
+  if (n >= 1) { g.addColorStop(0, '#141a3c'); g.addColorStop(0.6, '#2f3468'); g.addColorStop(1, '#4a4478'); }
+  else if (n > 0) { g.addColorStop(0, '#3a3a78'); g.addColorStop(0.55, '#c0607a'); g.addColorStop(1, '#f2a65e'); }
+  else { g.addColorStop(0, '#6aa8e0'); g.addColorStop(0.6, '#f4c98a'); g.addColorStop(1, '#f6a96a'); }
+  ctx.fillStyle = g;
+  ctx.fillRect(0, -offY, viewW, H + offY);
+  if (n > 0) {
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 60; i++) {
+      const sx = hash(i, 1) * viewW, sy = -offY + hash(i, 2) * (offY + 380);
+      ctx.globalAlpha = n * (0.4 + 0.6 * Math.abs(Math.sin(t * 1.3 + i)));
+      ctx.beginPath(); ctx.arc(sx, sy, 1.2 + hash(i, 3) * 1.3, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // moon or sun
+  const mx = viewW * 0.78, my = Math.max(-offY + 70, 120);
+  if (n >= 1) {
+    ctx.fillStyle = 'rgba(255,250,220,0.18)'; ctx.beginPath(); ctx.arc(mx, my, 56, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff6d0'; ctx.beginPath(); ctx.arc(mx, my, 34, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(200,190,150,0.5)'; ctx.beginPath(); ctx.arc(mx - 10, my - 6, 7, 0, TAU); ctx.arc(mx + 9, my + 10, 5, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = n > 0 ? '#ffb86b' : '#ffe08a';
+    ctx.beginPath(); ctx.arc(mx, n > 0 ? 470 : 200, 46, 0, TAU); ctx.fill();
+  }
+}
+
+function drawFarCity() {
+  // the great wall of Jericho in the distance (slow parallax)
+  const n = nightness();
+  const px = cam.x * 0.3;
+  const wallCol = n >= 1 ? '#5a5070' : n > 0 ? '#a0707a' : '#c9a27a';
+  ctx.fillStyle = wallCol;
+  ctx.fillRect(0, 380, viewW, 200);
+  const step = 26;
+  for (let x = -((px) % (step * 2)) - step * 2; x < viewW + step; x += step * 2) ctx.fillRect(x, 362, step, 20);
+  // towers
+  for (let k = Math.floor(px / 320) - 1; k < (px + viewW) / 320 + 1; k++) {
+    const tx = k * 320 - px + 120;
+    ctx.fillStyle = shade(n >= 1 ? '#5a5070' : n > 0 ? '#a0707a' : '#c9a27a', -15);
+    ctx.fillRect(tx, 320, 70, 140);
+    for (let c = 0; c < 3; c++) ctx.fillRect(tx + c * 26, 306, 18, 16);
+    ctx.fillStyle = n >= 1 ? '#ffd860' : '#5a3a2a';
+    roundRect(tx + 27, 360, 16, 24, 8); ctx.fill();
+  }
+  // mid row of houses and palms
+  const px2 = cam.x * 0.6;
+  for (let k = Math.floor(px2 / 120) - 1; k < (px2 + viewW) / 120 + 1; k++) {
+    const hx = k * 120 - px2;
+    const hh = 90 + hash(k, 7) * 70;
+    const col = n >= 1 ? '#6a5f7a' : n > 0 ? '#b8857a' : '#dcb68a';
+    ctx.fillStyle = shade(col, Math.round(hash(k, 9) * 20 - 10));
+    ctx.fillRect(hx, 560 - hh, 104, hh + 40);
+    ctx.fillStyle = shade(col, -25);
+    ctx.fillRect(hx - 3, 556 - hh, 110, 8);
+    ctx.fillStyle = n >= 1 && hash(k, 4) > 0.4 ? '#ffd860' : shade(col, -50);
+    roundRect(hx + 20, 560 - hh + 24, 16, 18, 4); ctx.fill();
+    if (hash(k, 5) > 0.6) { roundRect(hx + 64, 560 - hh + 24, 16, 18, 4); ctx.fill(); }
+    if (hash(k, 6) > 0.7) drawPalm(hx + 110, 600, 0.8, n);
+  }
+}
+
+function drawPalm(x, y, s, n) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = n >= 1 ? '#4a3a40' : '#8a6038'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, -70, 2, -140); ctx.stroke();
+  ctx.fillStyle = n >= 1 ? '#2f5a48' : '#4f9a4a';
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i - 2.5) * 0.55 + Math.sin(t + i) * 0.04;
+    ctx.save(); ctx.translate(2, -140); ctx.rotate(a);
+    ctx.beginPath(); ctx.ellipse(36, 0, 38, 9, 0.25, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawStreetHouses() {
+  const n = nightness();
+  for (const h of lv.houses) {
+    if (h.x + h.w < cam.x - 20 || h.x > cam.x + viewW + 20) continue;
+    const top = GROUND - 40 - h.h;
+    const col = n >= 1 ? shade(h.col, -70) : n > 0 ? shade(h.col, -25) : h.col;
+    ctx.fillStyle = col;
+    ctx.fillRect(h.x, top, h.w, h.h + 30);
+    ctx.fillStyle = shade(h.col, n >= 1 ? -100 : n > 0 ? -55 : -30);
+    ctx.fillRect(h.x - 6, top - 8, h.w + 12, 12);
+    // roof beams
+    ctx.fillStyle = '#6a4a2a';
+    for (let bx = h.x + 10; bx < h.x + h.w - 6; bx += 34) ctx.fillRect(bx, top + 2, 6, 6);
+    // window
+    const lit = n >= 1 && hash(h.x, 2) > 0.3;
+    ctx.fillStyle = lit ? '#ffd860' : '#4a3424';
+    roundRect(h.x + h.w * 0.62, top + 40, 26, 30, 10); ctx.fill();
+    if (h.door) {
+      ctx.fillStyle = '#5a3a22';
+      roundRect(h.x + h.w * 0.18, GROUND - 40 - 96, 46, 96, [20, 20, 0, 0]); ctx.fill();
+      ctx.strokeStyle = '#3a2412'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(h.x + h.w * 0.18 + 23, GROUND - 130); ctx.lineTo(h.x + h.w * 0.18 + 23, GROUND - 40); ctx.stroke();
+    }
+    if (cfg.roof) {
+      // laid-out flax drying on the roofs
+      ctx.fillStyle = '#d9c070';
+      for (let k = 0; k < 4; k++) roundRect(h.x + 14 + k * 30, top - 14, 24, 8, 4), ctx.fill();
+    }
+  }
+}
+
+function drawGround() {
+  const n = nightness();
+  const g = ctx.createLinearGradient(0, GROUND - 40, 0, H);
+  if (cfg.roof) { g.addColorStop(0, n >= 1 ? '#6a5a5a' : '#c9a77a'); g.addColorStop(1, n >= 1 ? '#3f3440' : '#9a7a50'); }
+  else { g.addColorStop(0, n >= 1 ? '#5a4a52' : '#d6b27a'); g.addColorStop(1, n >= 1 ? '#3a2f3a' : '#b08a58'); }
+  ctx.fillStyle = g;
+  ctx.fillRect(cam.x - 10, GROUND - 40, viewW + 20, H - GROUND + 40 + 10);
+  // paving stones / roof edge
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 2;
+  const s0 = Math.floor(cam.x / 70) * 70;
+  for (let x = s0; x < cam.x + viewW + 70; x += 70) {
+    ctx.beginPath(); ctx.moveTo(x, GROUND + 10); ctx.lineTo(x + 20, H); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(cam.x - 10, GROUND + 10); ctx.lineTo(cam.x + viewW + 10, GROUND + 10); ctx.stroke();
+  if (cfg.roof) {
+    ctx.fillStyle = n >= 1 ? '#4a3c48' : '#a88660';
+    ctx.fillRect(cam.x - 10, GROUND + 50, viewW + 20, 14);
+  }
+}
+
+// The hiding places
+function drawCover(c, front) {
+  const x = c.x, y = GROUND;
+  const w = 1 + Math.sin(c.wob * 20) * c.wob * 0.05;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(w, 1 / w);
+  const n = nightness();
+  const dim = (col) => (n >= 1 ? shade(col, -40) : col);
+  switch (c.kind) {
+    case 'gate': {
+      // the shadow of the city gate where the spies start
+      if (front) break;
+      ctx.fillStyle = dim('#8a6a4a');
+      ctx.fillRect(-70, -200, 34, 200); ctx.fillRect(36, -200, 34, 200);
+      ctx.fillRect(-76, -220, 152, 30);
+      ctx.fillStyle = 'rgba(20,10,30,0.55)';
+      ctx.fillRect(-36, -190, 72, 190);
+      break;
+    }
+    case 'flax': {
+      // a big pile of flax stalks
+      for (let i = 0; i < 26; i++) {
+        const a = -0.45 + (i / 25) * 0.9;
+        ctx.strokeStyle = dim(i % 3 ? '#d9c070' : '#b89a48'); ctx.lineWidth = 5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(Math.sin(a) * 30, -2); ctx.lineTo(Math.sin(a) * 52, -88 - Math.cos(i) * 8); ctx.stroke();
+      }
+      ctx.fillStyle = dim('#c9a84f');
+      ctx.beginPath(); ctx.ellipse(0, -30, 44, 30, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = dim('#8a5a2a'); ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-42, -34); ctx.quadraticCurveTo(0, -22, 42, -34); ctx.stroke();
+      break;
+    }
+    case 'jars': {
+      for (const [jx, s] of [[-22, 1.05], [20, 0.95]]) {
+        ctx.fillStyle = dim(jx < 0 ? '#b8683a' : '#c47a45');
+        ctx.beginPath(); ctx.ellipse(jx, -42 * s, 26 * s, 42 * s, 0, 0, TAU); ctx.fill();
+        ctx.fillRect(jx - 11 * s, -94 * s, 22 * s, 14 * s);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(jx - 9 * s, -52 * s, 6 * s, 16 * s, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(jx, -50 * s, 24 * s, 6 * s, 0, 0, Math.PI); ctx.stroke();
+      }
+      break;
+    }
+    case 'cart': {
+      ctx.fillStyle = dim('#8a5a32');
+      roundRect(-56, -70, 112, 40, 6); ctx.fill();
+      ctx.fillStyle = dim('#e0c068');
+      ctx.beginPath(); ctx.ellipse(0, -72, 52, 26, 0, Math.PI, TAU); ctx.fill();
+      ctx.strokeStyle = dim('#5a3a1a'); ctx.lineWidth = 6;
+      for (const wx of [-34, 34]) { ctx.beginPath(); ctx.arc(wx, -22, 20, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.moveTo(wx - 20, -22); ctx.lineTo(wx + 20, -22); ctx.moveTo(wx, -42); ctx.lineTo(wx, -2); ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 6; }
+      break;
+    }
+    case 'baskets': {
+      for (const [bx, by, s] of [[-24, 0, 1], [24, 0, 0.9], [0, -52, 0.8]]) {
+        ctx.fillStyle = dim('#b88a44');
+        roundRect(bx - 26 * s, by - 52 * s, 52 * s, 52 * s, 10 * s); ctx.fill();
+        ctx.strokeStyle = dim('#8a6228'); ctx.lineWidth = 2;
+        for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(bx - 25 * s, by - 13 * k * s); ctx.lineTo(bx + 25 * s, by - 13 * k * s); ctx.stroke(); }
+        ctx.fillStyle = dim(by < 0 ? '#e05a3a' : '#7aa84a');
+        ctx.beginPath(); ctx.ellipse(bx, by - 52 * s, 22 * s, 7 * s, 0, 0, TAU); ctx.fill();
+      }
+      break;
+    }
+    case 'door': {
+      // a doorway with a striped awning
+      if (!front) {
+        ctx.fillStyle = 'rgba(30,15,20,0.6)';
+        roundRect(-38, -130, 76, 130, [30, 30, 0, 0]); ctx.fill();
+      } else {
+        ctx.fillStyle = dim('#c0392b');
+        ctx.beginPath(); ctx.moveTo(-58, -150); ctx.lineTo(58, -150); ctx.lineTo(66, -118); ctx.lineTo(-66, -118); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = dim('#f0dcb0');
+        for (let k = -2; k <= 2; k += 2) { ctx.beginPath(); ctx.moveTo(k * 13 - 6, -150); ctx.lineTo(k * 13 + 6, -150); ctx.lineTo(k * 14.5 + 7, -118); ctx.lineTo(k * 14.5 - 7, -118); ctx.fill(); }
+        ctx.fillStyle = dim('#7aa84a');
+        ctx.beginPath(); ctx.ellipse(-44, -14, 16, 18, 0, 0, TAU); ctx.ellipse(44, -14, 16, 18, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = dim('#b8683a');
+        roundRect(-56, -16, 24, 16, 4); ctx.fill(); roundRect(32, -16, 24, 16, 4); ctx.fill();
+      }
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+
+function drawNote(n) {
+  if (n.got) return;
+  const x = n.x, y = GROUND - 150 + Math.sin(t * 3 + n.x) * 5;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,240,180,0.25)';
+  ctx.beginPath(); ctx.ellipse(x, GROUND + 4, 26, 7, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff8dc'; ctx.strokeStyle = '#c98a2a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.ellipse(x, y, 13, 8, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#3a7ab5'; ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill();
+  if (n.hold > 0) {
+    ctx.strokeStyle = '#e0a526'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(x, y, 25, -Math.PI / 2, -Math.PI / 2 + (n.hold / 0.8) * TAU); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawGoalHouse() {
+  // Rahab's house, built into the town wall, with the scarlet cord at the window
+  const x = lv.goal.x;
+  const n = nightness();
+  const wallCol = n >= 1 ? '#6a5a6a' : '#b8936a';
+  ctx.fillStyle = wallCol;
+  ctx.fillRect(x - 40, GROUND - 470, 700, 500);
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 2;
+  for (let r = 0; r < 12; r++) for (let c = 0; c < 10; c++) {
+    const bx = x - 40 + c * 70 + (r % 2) * 35, by = GROUND - 470 + r * 42;
+    ctx.strokeRect(bx, by, 70, 42);
+  }
+  ctx.fillStyle = wallCol;
+  for (let c = 0; c < 14; c++) ctx.fillRect(x - 40 + c * 52, GROUND - 494, 30, 26);
+  // the house on the wall
+  ctx.fillStyle = n >= 1 ? '#8a7068' : '#e2c39a';
+  ctx.fillRect(x - 10, GROUND - 330, 200, 330);
+  ctx.fillStyle = '#6a4a2a';
+  ctx.fillRect(x - 18, GROUND - 340, 216, 14);
+  // window with scarlet cord
+  ctx.fillStyle = '#ffd860';
+  roundRect(x + 110, GROUND - 290, 46, 52, 14); ctx.fill();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(x + 133, GROUND - 244);
+  ctx.quadraticCurveTo(x + 140 + Math.sin(t * 2) * 6, GROUND - 160, x + 134, GROUND - 60); ctx.stroke();
+  // door
+  ctx.fillStyle = state === 'win' ? '#ffd860' : '#5a3a22';
+  roundRect(x + 10, GROUND - 120, 60, 120, [28, 28, 0, 0]); ctx.fill();
+  if (state !== 'win') {
+    drawRahab(x + 40, GROUND - 4, 1);
+  }
+  ctx.fillStyle = '#fff6d0';
+  ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  if (state === 'play' && spies.x > x - viewW) {
+    ctx.strokeStyle = 'rgba(40,20,30,0.8)'; ctx.lineWidth = 4;
+    ctx.strokeText('Rahab’s house', x + 90, GROUND - 360);
+    ctx.fillText('Rahab’s house', x + 90, GROUND - 360);
+  }
+}
+
+function drawCones() {
+  for (const g of lv.guards) {
+    const c = guardCone(g);
+    if (!c) continue;
+    const lxp = g.x + g.dir * 30, lyp = GROUND - 84;
+    const far = g.dir < 0 ? c[0] : c[1];
+    const grad = ctx.createLinearGradient(lxp, 0, far, 0);
+    const a = g.type === 'patrol' ? 0.28 : 0.38;
+    grad.addColorStop(0, `rgba(255,226,120,${a})`); grad.addColorStop(1, 'rgba(255,226,120,0.04)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(lxp, lyp);
+    ctx.lineTo(far, GROUND - 150);
+    ctx.lineTo(far, GROUND + 30);
+    ctx.lineTo(g.x - g.dir * 20, GROUND + 30);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawStreet() {
+  ctx.setTransform(scale, 0, 0, scale, 0, offY * scale);
+  drawSky();
+  drawFarCity();
+  ctx.setTransform(scale, 0, 0, scale, -cam.x * scale, offY * scale);
+  drawStreetHouses();
+  drawGround();
+  if (lv.goal) drawGoalHouse();
+  for (const c of lv.covers) drawCover(c, false);
+  for (const n of lv.notes) drawNote(n);
+  drawCones();
+  for (const g of lv.guards) drawGuard(g);
+  // the spies
+  const sp = spies;
+  const moving = Math.abs(sp.tx - sp.x) > 0.5;
+  const showSpies = !(state === 'win' && winT > 0.6) && !(state !== 'play' && state !== 'pause' && state !== 'win' && state !== 'fail' && false);
+  if (showSpies) {
+    let look = sp.face;
+    const near = lv.guards.find((g) => Math.abs(g.x - sp.x) < 360);
+    if (!moving && near) look = Math.sign(near.x - sp.x) * sp.face;
+    if (state === 'fail') { drawSpies(sp.x, GROUND, sp.face, 0, false, look); drawDizzy(sp.x, GROUND - 120); }
+    else drawSpies(sp.x, GROUND, sp.face, sp.run, sp.hidden && !moving, look);
+  }
+  for (const c of lv.covers) if (c.kind !== 'gate') drawCover(c, true);
+  drawParticles();
+  // a pointer at the first hiding place
+  if (state === 'play' && level === 1 && sp.lastCover === 0 && sp.hidden && playT > 1.2) {
+    const c = lv.covers[1];
+    const bob = Math.sin(t * 6) * 8;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(c.x, GROUND - 120 + bob); ctx.lineTo(c.x - 16, GROUND - 148 + bob); ctx.lineTo(c.x + 16, GROUND - 148 + bob); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.font = '700 18px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(40,20,30,0.85)'; ctx.lineWidth = 4;
+    ctx.strokeText('Tap here!', c.x, GROUND - 160 + bob); ctx.fillText('Tap here!', c.x, GROUND - 160 + bob);
+  }
+}
+
+function drawDizzy(x, y) {
+  ctx.fillStyle = '#ffe27a';
+  for (let k = 0; k < 3; k++) {
+    const a = t * 4 + k * TAU / 3;
+    drawStar(x + Math.cos(a) * 26, y + Math.sin(a) * 7, 7, 3);
+  }
+}
+
+// ---- The rope level ----
+function drawRopeScene() {
+  const R = lv.rope;
+  ctx.setTransform(scale, 0, 0, scale, 0, offY * scale);
+  drawSky();
+  const rx = ropeX();
+  const wx0 = rx - beamReach() - 90, wx1 = rx + beamReach() + 90;
+  // hills far away where the spies will hide
+  ctx.fillStyle = '#2a3a3a';
+  ctx.beginPath(); ctx.moveTo(0, 700);
+  for (let x = 0; x <= viewW; x += 40) ctx.lineTo(x, 640 + Math.sin(x * 0.01) * 40);
+  ctx.lineTo(viewW, 900); ctx.lineTo(0, 900); ctx.fill();
+  // the wall face
+  ctx.fillStyle = '#6a5a6a';
+  ctx.fillRect(wx0, 130, wx1 - wx0, GROUND - 130);
+  ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 2;
+  for (let r = 0; r * 44 < GROUND - 130; r++) for (let c = -1; c * 80 < wx1 - wx0; c++) {
+    ctx.strokeRect(wx0 + c * 80 + (r % 2) * 40, 130 + r * 44, 80, 44);
+  }
+  ctx.fillStyle = '#5a4a5a';
+  for (let x = wx0; x < wx1; x += 56) ctx.fillRect(x, 100, 32, 34);
+  // ground below
+  ctx.fillStyle = '#3a4a3a';
+  ctx.fillRect(0, GROUND, viewW, H - GROUND);
+  // Rahab's window at the top with her waving
+  ctx.fillStyle = '#ffd860';
+  roundRect(rx - 34, R.ledges[0] - 110, 68, 74, 20); ctx.fill();
+  drawRahab(rx + 4, R.ledges[0] - 40, 1);
+  ctx.fillStyle = '#6a5a6a';
+  ctx.fillRect(rx - 40, R.ledges[0] - 40, 80, 12);
+  // ledges
+  for (let i = 1; i < R.ledges.length - 1; i++) {
+    const y = R.ledges[i];
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(rx - 60, y + 6, 120, 30);
+    ctx.fillStyle = '#8a7a8a';
+    roundRect(rx - 66, y - 2, 132, 12, 4); ctx.fill();
+  }
+  // lantern light pools from the watchmen on top of the wall
+  for (const b of R.beams) {
+    const cy = (b.y0 + b.y1) / 2 + 6;
+    const hgt = (b.y1 - b.y0) - 26;
+    const on = beamOnRope(b);
+    const gg = ctx.createRadialGradient(b.x, cy, 4, b.x, cy, POOL_W + 10);
+    gg.addColorStop(0, on ? 'rgba(255,220,120,0.75)' : 'rgba(255,226,130,0.6)');
+    gg.addColorStop(1, 'rgba(255,226,130,0)');
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.ellipse(b.x, cy, POOL_W + 10, hgt / 2, 0, 0, TAU); ctx.fill();
+    // faint beam up to the watchman's lantern
+    ctx.fillStyle = 'rgba(255,226,130,0.07)';
+    ctx.beginPath(); ctx.moveTo(b.x - 8, 120); ctx.lineTo(b.x - POOL_W, cy); ctx.lineTo(b.x + POOL_W, cy); ctx.lineTo(b.x + 8, 120); ctx.fill();
+    if (b.seenT > 0) bubbleAt(b.x, cy - 30, 'Who’s there?', '#ffd9c4', 1);
+  }
+  // watchmen leaning over the top of the wall
+  for (const b of R.beams) drawWatchman(b.x, 104);
+  // the scarlet cord
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(rx + 2, R.ledges[0] - 36);
+  ctx.quadraticCurveTo(rx + 6 + Math.sin(t * 2) * 3, (R.ledges[0] + GROUND) / 2, rx + 2, GROUND - 6); ctx.stroke();
+  ctx.strokeStyle = '#e8705a'; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.moveTo(rx + 2, R.ledges[0] - 36); ctx.lineTo(rx + 2, GROUND - 6); ctx.stroke();
+  ctx.setLineDash([]);
+  // the spies on the rope
+  const sy = spies.y + 40;
+  if (state !== 'win' || winT < 0.8) {
+    drawSpy(SPY2, rx - 14, sy + 30, 1, 0, false, 0);
+    drawSpy(SPY1, rx + 16, sy, -1, 0, false, 0);
+  } else {
+    const f = clamp((winT - 0.8) / 1.5, 0, 1);
+    drawSpies(rx + 60 + f * 400, GROUND, 1, t * 12, false, 1);
+  }
+  if (state === 'fail') drawDizzy(rx, sy - 100);
+  drawParticles();
+  if (state === 'play' && R.at === 0 && !R.slide && playT > 1) {
+    const bob = Math.sin(t * 6) * 6;
+    ctx.font = '700 20px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(40,20,30,0.85)'; ctx.lineWidth = 4; ctx.fillStyle = '#fff';
+    ctx.strokeText('Tap to slide down', rx, R.ledges[1] - 60 + bob); ctx.fillText('Tap to slide down', rx, R.ledges[1] - 60 + bob);
+  }
+}
+
+function drawWatchman(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#8f3a2e';
+  ctx.beginPath(); ctx.ellipse(0, 10, 18, 14, 0, Math.PI, TAU); ctx.fill();
+  ctx.fillStyle = '#d39a66';
+  ctx.beginPath(); ctx.arc(0, -8, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c98a3a';
+  ctx.beginPath(); ctx.arc(0, -11, 14, Math.PI, TAU); ctx.fill();
+  eyes(0, -6, 0, true, 0.8);
+  drawLantern(16, 14, true);
+  ctx.restore();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const hg = ctx.createLinearGradient(0, 0, 0, 112);
+  hg.addColorStop(0, 'rgba(20,14,34,0.85)'); hg.addColorStop(1, 'rgba(20,14,34,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, 112);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Spies in Jericho' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    // the time left before the gate shuts (or dawn comes)
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(cfg.rope ? 'DAWN' : 'GATE', 12, 50);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,233,168,0.22)';
+    roundRect(50, 40, 130, 13, 6.5); ctx.fill();
+    const f = clamp(timeLeft / cfg.time, 0, 1);
+    ctx.fillStyle = f < 0.2 && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#ffd860';
+    if (f > 0) { roundRect(50, 40, 130 * f, 13, 6.5); ctx.fill(); }
+    // chances: little scarlet cords
+    for (let i = 0; i < CHANCES; i++) {
+      const cx = 200 + i * 22;
+      ctx.strokeStyle = i < chances ? '#e0453a' : 'rgba(255,255,255,0.25)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx, 38); ctx.quadraticCurveTo(cx + 6, 46, cx, 56); ctx.stroke();
+    }
+    if (!cfg.rope && lv.notes.length) {
+      ctx.fillStyle = '#ffe9a8'; ctx.font = '600 13px Fredoka, sans-serif';
+      ctx.fillText(`Views ${notes}/${lv.notes.length}`, 272, 52);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffe9a8'; ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore}`, viewW - 14, 26);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  const y0 = Math.max(150, offY + 170);
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,12,34,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!lv || !spies) { ctx.fillStyle = '#2a1f3e'; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
+  const sx = shakeT > 0 ? rand(-4, 4) * shakeT * 2 : 0;
+  ctx.save();
+  ctx.translate(sx * scale, 0);
+  if (cfg.rope) { if (lv.rope) drawRopeScene(); }
+  else drawStreet();
+  ctx.restore();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (state === 'play' && playT < 0.5) {
+    ctx.fillStyle = `rgba(20,14,34,${1 - playT / 0.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (lv) for (const c of lv.covers) c.wob = Math.max(0, c.wob - dt * 2);
+  if (state === 'play') {
+    playT += dt;
+    timeLeft -= dt;
+    if (timeLeft <= 0) {
+      timeLeft = 0;
+      fail(cfg.rope ? 'Morning came before the spies got down!' : 'The city gate was shut before the spies got there!');
+    } else if (cfg.rope) {
+      updateRope(dt);
+    } else {
+      updateGuards(dt);
+      updateSpies(dt);
+    }
+    if (!cfg.rope && spies) cam.x += (camTarget() - cam.x) * Math.min(1, dt * 5);
+  } else if (state === 'win') {
+    winT += dt;
+    if (!cfg.rope) { updateGuards(dt, false); if (winT < 0.6) spies.x += dt * 60; }
+    else updateBeams(dt);
+    if (Math.random() < dt * 8) spawn(cam.x + rand(0, viewW), rand(200, 600), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'level' || state === 'title' || state === 'done') {
+    if (lv && !cfg.rope) updateGuards(dt * 0.5, false);
+    if (lv && cfg.rope) updateBeams(dt * 0.5);
+  }
+  if (lv && !cfg.rope && state !== 'play') cam.x += (camTarget() - cam.x) * Math.min(1, dt * 5);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

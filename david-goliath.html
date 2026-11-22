@@ -1,0 +1,1700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a4a2a">
+<title>David and Goliath</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #5a4a2a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">David and Goliath</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'harp', accent: 'pipe', ambience: 'wind', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  stones: { ref: '1 Samuel 17:40', KJV: 'And he took his staff in his hand, and chose him five smooth stones out of the brook, and put them in a shepherd\'s bag which he had... and his sling was in his hand: and he drew near to the Philistine.', NKJV: 'Then he took his staff in his hand; and he chose for himself five smooth stones from the brook, and put them in a shepherd’s bag... and his sling was in his hand. And he drew near to the Philistine.', NIV: 'Then he took his staff in his hand, chose five smooth stones from the stream, put them in the pouch of his shepherd’s bag and, with his sling in his hand, approached the Philistine.', NLT: 'He picked up five smooth stones from a stream and put them into his shepherd’s bag. Then, armed only with his shepherd’s staff and sling, he started across the valley to fight the Philistine.' },
+  // Level cards
+  fiveSmooth: { ref: '1 Samuel 17:40', KJV: 'chose him five smooth stones out of the brook', NKJV: 'he chose for himself five smooth stones from the brook', NIV: 'chose five smooth stones from the stream', NLT: 'He picked up five smooth stones from a stream' },
+  name: { ref: '1 Samuel 17:45', KJV: 'Thou comest to me with a sword, and with a spear, and with a shield: but I come to thee in the name of the Lord of hosts', NKJV: 'You come to me with a sword, with a spear, and with a javelin. But I come to you in the name of the Lord of hosts', NIV: 'You come against me with sword and spear and javelin, but I come against you in the name of the Lord Almighty', NLT: 'You come to me with sword, spear, and javelin, but I come to you in the name of the Lord of Heaven’s Armies' },
+  battle: { ref: '1 Samuel 17:47', KJV: 'the battle is the Lord\'s', NKJV: 'the battle is the Lord’s', NIV: 'the battle is the Lord’s', NLT: 'This is the Lord’s battle' },
+  // Win card
+  sling: { ref: '1 Samuel 17:49', KJV: 'And David put his hand in his bag, and took thence a stone, and slang it, and smote the Philistine in his forehead... and he fell upon his face to the earth.', NKJV: 'Then David put his hand in his bag and took out a stone; and he slung it and struck the Philistine in his forehead... and he fell on his face to the earth.', NIV: 'Reaching into his bag and taking out a stone, he slung it and struck the Philistine on the forehead... and he fell facedown on the ground.', NLT: 'Reaching into his shepherd’s bag and taking out a stone, he hurled it with his sling and hit the Philistine in the forehead... and Goliath stumbled and fell face down on the ground.' },
+  prevailed: { ref: '1 Samuel 17:50', KJV: 'So David prevailed over the Philistine with a sling and with a stone', NKJV: 'So David prevailed over the Philistine with a sling and a stone', NIV: 'So David triumphed over the Philistine with a sling and a stone', NLT: 'So David triumphed over the Philistine with only a sling and a stone' },
+  fled: { ref: '1 Samuel 17:51', KJV: 'And when the Philistines saw their champion was dead, they fled.', NKJV: 'And when the Philistines saw that their champion was dead, they fled.', NIV: 'When the Philistines saw that their hero was dead, they turned and ran.', NLT: 'When the Philistines saw that their champion was dead, they turned and ran.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+let HZ = 0;             // the horizon lifts a little on tall screens
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  HZ = -clamp(offY, 0, 300) * 0.5;
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 104;         // HUD strip at the top of the screen
+const GROUND = 836;       // the valley floor where David and Goliath stand
+const GRAV = 900;         // pull on a flying stone (scene units / s²)
+const POWER = 6.2;        // stone speed per unit of pull
+const MAX_PULL = 178;     // longest pull back
+const STONE_R = 7;
+const GH = 300;           // how high Goliath's head is above the ground
+const BAG = 5;
+
+const LEVELS = [
+  { name: 'The Brook of Elah',        brookT: 22, smooth: 0.7,  flow: 42, jag: 1.0,  dist: 280, sway: 0,  walk: 0,  walkSp: 0,   shield: 0,   wind: 0,   dots: 18, gap: 25 },
+  { name: 'Goliath Stomps',           brookT: 18, smooth: 0.6,  flow: 56, jag: 0.85, dist: 305, sway: 10, walk: 30, walkSp: 0.6, shield: 0,   wind: 0,   dots: 12, gap: 21 },
+  { name: 'The Shield-Bearer',        brookT: 16, smooth: 0.55, flow: 66, jag: 0.7,  dist: 330, sway: 12, walk: 45, walkSp: 0.8, shield: 4.2, wind: 0,   dots: 9,  gap: 19 },
+  { name: 'A Windy Valley',           brookT: 15, smooth: 0.5,  flow: 76, jag: 0.6,  dist: 350, sway: 14, walk: 55, walkSp: 0.9, shield: 4.0, wind: 90,  dots: 7,  gap: 17 },
+  { name: 'The Giant on the Move',    brookT: 14, smooth: 0.45, flow: 86, jag: 0.5,  dist: 370, sway: 16, walk: 75, walkSp: 1.1, shield: 3.6, wind: 130, dots: 5,  gap: 16 },
+  { name: 'The Battle Is the Lord’s', brookT: 13, smooth: 0.4,  flow: 96, jag: 0.4,  dist: 390, sway: 18, walk: 85, walkSp: 1.3, shield: 3.2, wind: 170, dots: 4,  gap: 15 },
+];
+const LAST_LEVEL = LEVELS.length;
+const LEVEL_VERSE = ['fiveSmooth', 'name', 'fiveSmooth', 'battle', 'name', 'battle'];
+const LEVEL_TIPS = [
+  'First <b>tap the smooth, round stones</b> in the brook (not the rough, jagged ones!). Then <b>pull back</b> from David and <b>let go</b> to sling a stone at Goliath’s <b>forehead</b>.',
+  'Goliath <b>stomps about</b> now. Watch him and let go at the right moment.',
+  'His <b>shield-bearer</b> sometimes lifts the big shield up high. Wait for it to come down!',
+  'The <b>wind</b> blows across the valley. Look at the flag and aim a little into the wind.',
+  'Goliath moves faster and stands further away. The aiming dots are shorter, too.',
+  'The last battle: strong wind, a busy shield-bearer and only a few aiming dots. Trust God and be brave!',
+];
+const makeConfig = (n) => Object.assign({}, LEVELS[Math.min(n, LAST_LEVEL) - 1]);
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail
+let pausedFrom = 'play';
+let phase = 'brook';      // brook | walk | sling (inside 'play')
+let level = 1;
+let totalScore = 0, levelScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('davidGoliathBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0, playT = 0, endTimer = 0, phaseT = 0, bt = 0;
+let particles = [], popups = [], rings = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0;
+let told = {};
+let lastScore = null;
+// the brook
+let stones = [], flyers = [], bagged = 0, roughTaps = 0, brookLeft = 0, spawnT = 0;
+// the battle
+let ammo = 0, throws = 0, stone = null, aim = null, reloadT = 0, wind = 0, fallT = -1, fellThud = false, failWhy = '';
+let outT = 0;             // a short pause after the last stone misses
+let kbAim = { ang: 0.75, pull: 0.7, on: false };
+const david = { mood: 'watch', moodT: 0, blink: 0, blinkT: 2, hair: '#7a3a1a', i: 0, throwT: 0 };
+const goliath = { mood: 'grump', laughT: 0, blink: 0, blinkT: 3 };
+
+// ============================================================
+//  The brook: pick five smooth stones
+// ============================================================
+const streamTop = () => 440 + HZ * 1.2;
+const streamBot = () => 700;
+const bagPos = () => ({ x: W / 2 + 34, y: 828 });
+
+function makeStone(x) {
+  const smooth = Math.random() < cfg.smooth;
+  const r = rand(24, 32);
+  const n = 11;
+  const jag = cfg.jag;
+  const shape = [];
+  for (let i = 0; i < n; i++) shape.push(smooth ? 1 + Math.sin(i * 1.7) * 0.03 : 1 - (i % 2 ? rand(0.18, 0.34) * jag : 0) + rand(-0.05, 0.05));
+  const grey = smooth ? pick(['#9aa7b4', '#a9b3bd', '#8f9eac', '#b4b0a6']) : (jag > 0.65 ? pick(['#8a6b4a', '#7a5e44', '#94704c']) : pick(['#9a9286', '#8e887e', '#a39a8c']));
+  return { x, y: rand(streamTop() + 36, streamBot() - 30), r, smooth, shape, col: grey, rot: rand(0, TAU), spin: rand(-0.4, 0.4), bob: rand(0, TAU), flat: smooth ? rand(0.68, 0.8) : rand(0.8, 0.95), gone: false, shake: 0 };
+}
+
+function fillStream() {
+  stones = [];
+  const x0 = -offX - 40, x1 = W + offX + 40;
+  const n = Math.max(6, Math.round((x1 - x0) / 74));
+  for (let i = 0; i < n; i++) stones.push(makeStone(lerp(x0, x1, (i + 0.5) / n) + rand(-14, 14)));
+  // make sure enough smooth stones are showing at the start
+  let sm = stones.filter((s) => s.smooth).length;
+  for (const s of stones) if (sm < Math.ceil(n * 0.45) && !s.smooth) { const ns = makeStoneOf(true, s.x); Object.assign(s, ns); sm++; }
+}
+function makeStoneOf(smooth, x) {
+  for (let k = 0; k < 30; k++) { const s = makeStone(x); if (s.smooth === smooth) return s; }
+  return makeStone(x);
+}
+
+function updateBrook(dt) {
+  brookLeft -= dt;
+  const x0 = -offX - 50, x1 = W + offX + 50;
+  for (const s of stones) {
+    s.x += cfg.flow * dt;
+    s.rot += s.spin * dt;
+    s.bob += dt * 2;
+    s.shake = Math.max(0, s.shake - dt);
+  }
+  stones = stones.filter((s) => !s.gone && s.x < x1);
+  // new stones float in from upstream
+  spawnT -= dt;
+  const gap = 74 / cfg.flow;
+  if (spawnT <= 0) {
+    // keep a fair number of smooth stones coming
+    const smoothNow = stones.filter((s) => s.smooth).length;
+    stones.push(smoothNow < 3 ? makeStoneOf(true, x0) : makeStone(x0));
+    spawnT = gap * rand(0.8, 1.2);
+  }
+  if (bagged >= BAG) { toBattle(); return; }
+  if (brookLeft <= 0) {
+    brookLeft = 0;
+    if (bagged === 0) { failWhy = 'stones'; fail(); return; }
+    showMessage(`Time to go! You have ${bagged} stone${bagged === 1 ? '' : 's'}.`, 2.4);
+    toBattle();
+  }
+}
+
+function tapStone(x, y) {
+  let bestS = null, bd = 1e9;
+  for (const s of stones) {
+    if (s.gone) continue;
+    const d = Math.hypot(x - s.x, y - s.y);
+    if (d < s.r + 18 && d < bd) { bd = d; bestS = s; }
+  }
+  if (!bestS) { splash(x, y, 6); return; }
+  if (bestS.smooth) {
+    bestS.gone = true;
+    bagged++;
+    flyers.push({ x: bestS.x, y: bestS.y, s: bestS, t: 0 });
+    addScore(50, bestS.x, bestS.y - 30, bagged === BAG ? 'Five!' : `${bagged}`);
+    sfx.clink(bagged);
+    david.mood = 'joy'; david.moodT = 0.7;
+    splash(bestS.x, bestS.y, 8);
+  } else {
+    bestS.shake = 0.4;
+    roughTaps++;
+    brookLeft = Math.max(0, brookLeft - 2);
+    popText(bestS.x, bestS.y - 34, 'Too rough! −2s', '#ffd0c8');
+    sfx.bonk();
+    david.mood = 'dismay'; david.moodT = 0.8;
+    if (!told.rough) { told.rough = true; showMessage('Only the smooth, round stones fly true!', 2.6); }
+  }
+}
+
+function splash(x, y, n) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-10, 10), y, rand(-80, 80), rand(-160, -60), 0.6, pick(['#dff3ff', '#aee0ff', '#ffffff']), rand(3, 5), 500);
+  sfx.splash();
+}
+
+function toBattle() {
+  phase = 'walk';
+  phaseT = 0;
+  ammo = bagged;
+  const bonus = Math.round(brookLeft) * 10;
+  if (bonus > 0) addScore(bonus, W / 2, 380, `Quick! +${bonus}`);
+  showMessage(bagged >= BAG ? 'Five smooth stones!' : 'Off to the battle!', 2);
+  sfx.levelStart();
+}
+
+// ============================================================
+//  The battle: David's sling against Goliath
+// ============================================================
+// The battle scene has its own little units: David's feet at (0, 0), Goliath's feet at (dist, 0), up is -y
+function sceneK() { return clamp(W / (cfg.dist + 260 + cfg.walk), 0.62, 1.3); }
+function sceneOX() { const k = sceneK(); return W / 2 - ((cfg.dist + cfg.walk + 80) / 2) * k; }
+function toScene(wx, wy) { const k = sceneK(); return { x: (wx - sceneOX()) / k, y: (wy - GROUND) / k }; }
+function toWorld(sx, sy) { const k = sceneK(); return { x: sceneOX() + sx * k, y: GROUND + sy * k }; }
+const HAND = { x: 16, y: -122 };      // where the stone leaves David's sling
+
+// Where Goliath (and the forehead gap in his helmet) is at battle time tt
+function goliathPose(tt) {
+  const walk = cfg.walk * Math.sin(tt * cfg.walkSp);
+  const step = cfg.walk ? Math.abs(Math.sin(tt * cfg.walkSp * 3.2)) : 0;
+  const sway = cfg.sway * Math.sin(tt * 1.7 + 1);
+  const x = cfg.dist + walk;
+  const hx = x + sway - 4, hy = -GH - step * 8;
+  return { x, step, sway, head: { x: hx, y: hy, r: 40 }, gap: { x: hx - 22, y: hy - 9, r: cfg.gap } };
+}
+// How high the shield is lifted (0 = down, 1 = up in front of his face)
+function shieldUp(tt) {
+  if (!cfg.shield) return 0;
+  const P = cfg.shield, ph = ((tt + 1.3) % P + P) % P, upAt = P - 1.9, dur = 1.5;
+  if (ph < upAt - 0.6) return 0;
+  if (ph < upAt) return 0.12 * Math.abs(Math.sin(ph * 30));     // he wobbles before he lifts
+  const f = ph - upAt;
+  if (f < 0.25) return f / 0.25;
+  if (f < dur - 0.25) return 1;
+  if (f < dur) return (dur - f) / 0.25;
+  return 0;
+}
+function shieldRect(tt) {
+  const g = goliathPose(tt), u = shieldUp(tt);
+  const cx = g.x - 92, cy = lerp(-96, -GH + 6, ease(clamp(u, 0, 1)));
+  return { x0: cx - 36, x1: cx + 36, y0: cy - 70, y1: cy + 70, cx, cy };
+}
+
+function newWind() {
+  wind = cfg.wind ? Math.round(rand(-cfg.wind, cfg.wind) / 10) * 10 : 0;
+  if (cfg.wind && Math.abs(wind) < cfg.wind * 0.3) wind = Math.sign(wind || 1) * Math.round(cfg.wind * 0.3 / 10) * 10;
+}
+
+function launchVel(pullX, pullY) {
+  let l = Math.hypot(pullX, pullY);
+  if (l > MAX_PULL) { pullX *= MAX_PULL / l; pullY *= MAX_PULL / l; }
+  return { vx: -pullX * POWER, vy: -pullY * POWER };
+}
+
+function throwStone(vx, vy) {
+  if (ammo <= 0 || stone || phase !== 'sling') return;
+  ammo--; throws++;
+  stone = { x: HAND.x, y: HAND.y, vx, vy, t: 0, trail: [] };
+  david.throwT = 0.4;
+  sfx.whoosh();
+  aim = null;
+}
+
+function updateStone(dt) {
+  if (!stone) return;
+  const s = stone;
+  s.t += dt;
+  s.vx += wind * dt;
+  s.vy += GRAV * dt;
+  const steps = 3;
+  for (let k = 0; k < steps; k++) {
+    s.x += s.vx * dt / steps; s.y += s.vy * dt / steps;
+    const res = collide(s.x, s.y, bt);
+    if (res) { stoneDone(res, s); return; }
+  }
+  s.trail.push({ x: s.x, y: s.y });
+  if (s.trail.length > 10) s.trail.shift();
+}
+
+// What a stone at (x, y) touches at battle time tt
+function collide(x, y, tt) {
+  const g = goliathPose(tt);
+  if (Math.hypot(x - g.gap.x, y - g.gap.y) < g.gap.r + STONE_R * 0.5) return 'hit';
+  const sr = shieldRect(tt);
+  if (x > sr.x0 - STONE_R && x < sr.x1 + STONE_R && y > sr.y0 - STONE_R && y < sr.y1 + STONE_R) return 'shield';
+  // the face in front is a little flatter than the round helmet, so a stone at forehead height reaches the gap first
+  const dh = Math.hypot(x - g.head.x, y - g.head.y);
+  const front = x < g.head.x - 8 && y > g.head.y - 26;
+  if (dh < (front ? g.head.r - 6 : g.head.r + STONE_R)) return y > g.head.y + 8 ? 'beard' : 'helmet';
+  if (x > g.x - 58 && x < g.x + 58 && y > -GH + 30 && y < 0) return 'armour';
+  if (y > 0) return 'ground';
+  if (x > cfg.dist + cfg.walk + 500 || x < -300) return 'away';
+  return null;
+}
+
+function stoneDone(res, s) {
+  stone = null;
+  const w = toWorld(s.x, s.y);
+  if (res === 'hit') { hitGoliath(w); return; }
+  if (res === 'shield') { popText(w.x, w.y - 30, 'Bonk! The shield!', '#ffe9a8'); sfx.clang(0.7); sparks(w.x, w.y); }
+  else if (res === 'helmet') { popText(w.x, w.y - 30, 'Clang! The helmet!', '#ffe9a8'); sfx.clang(1); sparks(w.x, w.y); }
+  else if (res === 'beard') { popText(w.x, w.y - 30, 'Boing! Just his beard!', '#ffe9a8'); sfx.bonk(); }
+  else if (res === 'armour') { popText(w.x, w.y - 30, 'Clang! Bronze armour!', '#ffe9a8'); sfx.clang(0.85); sparks(w.x, w.y); }
+  else if (res === 'ground') { popText(w.x, w.y - 40, 'Missed!', '#fff2b0'); sfx.thud(0.4); for (let i = 0; i < 8; i++) spawn(w.x, w.y, rand(-60, 60), rand(-90, -30), 0.7, 'rgba(190,160,110,0.8)', rand(4, 8), 200); }
+  else popText(clamp(w.x, 100, W - 100), clamp(w.y, 200, 700), 'Too far!', '#fff2b0');
+  goliath.laughT = 1.6;
+  sfx.laugh();
+  if (ammo <= 0) { failWhy = 'ammo'; outT = 1.0; return; }
+  reloadT = 0.7;
+  newWind();
+  if (!told.miss) { told.miss = true; showMessage(ammo === 1 ? 'Last stone! Aim for the forehead.' : `${ammo} stones left. Aim for the forehead!`, 2.4); }
+}
+
+function sparks(x, y) {
+  for (let i = 0; i < 10; i++) spawn(x, y, rand(-160, 160), rand(-160, 40), 0.5, pick(['#ffe27a', '#fff6d0']), 3, 300, i % 2 ? 'dot' : 'star');
+}
+
+function hitGoliath(w) {
+  state = 'win';
+  syncAmbience();
+  fallT = 0; fellThud = false;
+  flashT = 0.3;
+  sfx.bonk();
+  sfx.whoosh();
+  for (let i = 0; i < 14; i++) spawn(w.x, w.y, rand(-140, 140), rand(-200, -40), 1, pick(['#ffe27a', '#fff6d0', '#ffffff']), 4, 200, 'star');
+  popText(w.x, w.y - 50, 'Right on the forehead!', '#fff2b0');
+  const stonesLeft = ammo;
+  const hitBonus = 500;
+  const stoneBonus = stonesLeft * 200;
+  const firstBonus = throws === 1 ? 300 : 0;
+  const levelBonus = level * 300;
+  levelScore += hitBonus + stoneBonus + firstBonus + levelBonus;
+  totalScore += levelScore;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('davidGoliathBest', best); } catch (e) {} }
+  lastScore = { stonesLeft, stoneBonus, firstBonus, levelBonus, hitBonus, levelScore };
+  endTimer = 5;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevel();
+  phase = 'sling';
+  syncAmbience();
+  showOverlay('David and Goliath', 'Five smooth stones and a sling',
+    `${verseHTML('stones')}
+     <ul>
+       <li>The giant Goliath dares anyone to fight him. Young David trusts God and steps forward!</li>
+       <li><b>At the brook:</b> quickly <b>tap five smooth, round stones</b>. Rough, jagged stones waste time.</li>
+       <li><b>The sling:</b> put your finger down, <b>pull back</b> away from Goliath, watch the aiming dots, then <b>let go</b>.</li>
+       <li>Hit the giant right on his <b>forehead</b>, the gap in his bronze helmet. You only have the stones you picked!</li>
+       <li><b>Keys:</b> <kbd>&uarr;</kbd><kbd>&darr;</kbd> aim, <kbd>&larr;</kbd><kbd>&rarr;</kbd> power, <kbd>Space</kbd> sling the stone.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'level';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(LEVEL_VERSE[level - 1])}
+     <p style="text-align:center">${LEVEL_TIPS[level - 1]}</p>
+     <p class="score">Brook time: <b>${cfg.brookT}s</b>${cfg.wind ? ' &middot; Wind!' : ''}${cfg.shield ? ' &middot; Shield-bearer' : ''}</p>`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; popups = []; rings = []; flyers = [];
+  levelScore = 0; playT = 0; endTimer = 0; phaseT = 0; bt = 0;
+  bagged = 0; roughTaps = 0; brookLeft = cfg.brookT; spawnT = 0;
+  ammo = 0; throws = 0; stone = null; aim = null; reloadT = 0; fallT = -1; fellThud = false; failWhy = ''; outT = 0;
+  kbAim = { ang: 0.75, pull: 0.7, on: false };
+  flashT = shakeT = 0;
+  told = { rough: level > 1, aim: level > 1, miss: level > 2, shield: !cfg.shield || level > 3, wind: !cfg.wind || level > 4 };
+  phase = 'brook';
+  newWind();
+  fillStream();
+  keys.clear();
+  david.mood = 'watch'; goliath.laughT = 0;
+}
+
+function startLevel(retry = false) {
+  if (retry || state !== 'level') resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(level === 1 && !retry ? 'Tap the smooth, round stones!' : `Level ${level}: ${cfg.name}`, 2.6);
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  sfx.fail();
+  showMessage(failWhy === 'stones' ? 'No stones in the bag…' : 'Out of stones…', 2.4);
+  goliath.laughT = 3;
+  endTimer = 2.4;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LAST_LEVEL;
+    showOverlay(last ? 'The Giant Has Fallen!' : 'Goliath falls!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'prevailed' : level % 2 ? 'sling' : 'fled')}
+       ${last ? '<p style="text-align:center">David was only a boy, but he trusted God, and God gave him the victory.</p>' + verseHTML('battle') : ''}
+       <p class="score">Smooth stones picked: <b>${bagged}</b>${roughTaps ? ` (rough taps: ${roughTaps})` : ''}<br>Direct hit: <b>${s.hitBonus}</b>${s.firstBonus ? `<br>First throw!: <b>${s.firstBonus}</b>` : ''}<br>Stones left (${s.stonesLeft}): <b>${s.stoneBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', last ? () => { level = 1; totalScore = 0; levelCard(); } : () => { level++; levelCard(); });
+  } else if (state === 'fail') {
+    showOverlay('Try again, David!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${failWhy === 'stones' ? 'You need stones for your sling! <b>Tap the smooth, round stones</b> in the brook before the time runs out.' : 'All your stones are used up. Pull back, watch the <b>aiming dots</b>, and let go when Goliath’s <b>forehead</b> is in the path.'}</p>
+       ${verseHTML('name')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    aim = null;
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'play' && phase === 'sling') {
+    if (e.code.startsWith('Arrow')) kbAim.on = true;
+    if (e.code === 'Space' && !e.repeat && kbAim.on && !stone && reloadT <= 0) {
+      const v = kbVel(); throwStone(v.vx, v.vy); return;
+    }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function kbVel() {
+  const sp = kbAim.pull * MAX_PULL * POWER;
+  return { vx: Math.cos(kbAim.ang) * sp, vy: -Math.sin(kbAim.ang) * sp };
+}
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+let dragId = null;
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && endTimer > 0 && endTimer < 2.5) { endTimer = 0.01; return; }
+  if (state !== 'play') return;
+  const wx = p.vx - offX, wy = p.vy - offY;
+  rings.push({ x: wx, y: wy, t: 0 });
+  if (phase === 'brook') { tapStone(wx, wy); return; }
+  if (phase === 'sling' && !stone && reloadT <= 0 && ammo > 0 && p.vy > TOPH) {
+    aim = { sx: wx, sy: wy, x: wx, y: wy };
+    kbAim.on = false;
+    dragId = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    sfx.stretch();
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!aim || e.pointerId !== dragId) return;
+  const p = toView(e);
+  aim.x = p.vx - offX; aim.y = p.vy - offY;
+});
+function release(e) {
+  if (!aim || e.pointerId !== dragId) return;
+  const p = toView(e);
+  aim.x = p.vx - offX; aim.y = p.vy - offY;
+  const k = sceneK();
+  const px = (aim.x - aim.sx) / k, py = (aim.y - aim.sy) / k;
+  aim = null; dragId = null;
+  if (state !== 'play' || phase !== 'sling') return;
+  if (Math.hypot(px, py) < 14) { if (!told.pull) { told.pull = true; showMessage('Pull back further, then let go!', 2); } return; }
+  const v = launchVel(px, py);
+  throwStone(v.vx, v.vy);
+}
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', (e) => { if (e.pointerId === dragId) { aim = null; dragId = null; } });
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+
+  win() { if (this.ctx) Music.win(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  fail() { if (this.ctx) Music.fail(); },
+  clink(n) { if (this.ctx) { Music.tap(0.2 + n * 0.15); this.tone(1400 + n * 120, 0.12, 'triangle', 0.12, 0.05); } },
+  splash() { this.noiseBurst(1800, 0.25, 0.14, 0.7, 600); },
+  bonk() { this.tone(520, 0.12, 'triangle', 0.25, 0, 260); this.tone(180, 0.15, 'sine', 0.3, 0.02, 90); },
+  whoosh() { this.noiseBurst(900, 0.35, 0.22, 0.8, 3000); },
+  stretch() { this.tone(300, 0.15, 'triangle', 0.06, 0, 420); },
+  clang(v = 1) { this.tone(880 * v, 0.5, 'triangle', 0.16); this.tone(1320 * v, 0.4, 'sine', 0.08, 0.01); this.tone(2090 * v, 0.25, 'sine', 0.05, 0.01); },
+  thud(v = 1) { this.tone(110, 0.3 + v * 0.4, 'sine', 0.5 * v, 0, 40); this.noiseBurst(260, 0.3 + v * 0.5, 0.45 * v, 0.7, 70, 'lowpass'); },
+  laugh() { for (let i = 0; i < 3; i++) this.tone(150 - i * 8, 0.16, 'sawtooth', 0.05, i * 0.2, 120 - i * 8); },
+  cheer() { this.noiseBurst(1200, 1.6, 0.18, 0.5, 2200); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && ['play'].includes(state));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Particles, popups and messages
+// ============================================================
+// ============================================================
+//  Particles, popups and messages
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind, rot: rand(0, TAU) });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+  for (let i = rings.length - 1; i >= 0; i--) { rings[i].t += dt; if (rings[i].t > 0.5) rings.splice(i, 1); }
+}
+function drawStar(x, y, s) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const an = k * Math.PI / 5 - Math.PI / 2, r = k % 2 ? s * 0.45 : s; ctx.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r); }
+  ctx.closePath(); ctx.fill();
+}
+function drawHeart(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.8);
+    else if (p.kind === 'heart') drawHeart(p.x, p.y, p.size);
+    else if (p.kind === 'leaf') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.size * 1.4, p.size * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  for (const r of rings) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - r.t / 0.5)})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 14 + r.t * 90, 0, TAU); ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  ctx.lineJoin = 'round';
+  for (const p of popups) {
+    const a = clamp(p.t / 0.4, 0, 1), y = p.y - (1.4 - p.t) * 30;
+    ctx.globalAlpha = a;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(40,30,10,0.85)';
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+function popText(x, y, text, col = '#fff2b0') {
+  ctx.font = '700 22px Fredoka, sans-serif';
+  const hw = ctx.measureText(text).width / 2 + 12;
+  x = clamp(x, -offX + hw, W + offX - hw);
+  popups.push({ x, y, text, col, t: 1.4 });
+}
+function addScore(n, x, y, text) {
+  levelScore += n;
+  if (x != null) popText(x, y, text || `+${n}`);
+}
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Faces (shared by David and the sheep)
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'shout':
+      eyes(4, 5, 2.1);
+      brows(-8, -11, -8, -11);
+      mouthFill(() => ctx.ellipse(0, mouthY, 4.5, 5, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4, 5, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+    case 'dismay':
+      eyes(3.5, 4, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+  }
+}
+
+// ============================================================
+//  Drawing: people
+// ============================================================
+// David: a ruddy shepherd boy with curly hair, a tunic, his bag and his sling
+function drawDavid(x, y, s, opts = {}) {
+  const d = david;
+  const mood = d.moodT > 0 ? d.mood : (state === 'win' && fallT > 1 ? 'joy' : state === 'fail' ? 'dismay' : opts.mood || 'watch');
+  let jump = mood === 'joy' && state === 'win' ? Math.abs(Math.sin(t * 7)) * 12 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 7 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump);
+  ctx.scale(s, s);
+  const skin = '#e3ad78', robe = '#d4782f', sleeve = shade(robe, -25);
+  ctx.fillStyle = skin;
+  roundRect(-9, -8, 7, 9, 3); ctx.fill(); roundRect(2, -8, 7, 9, 3); ctx.fill();
+  ctx.fillStyle = '#7a4a22';
+  roundRect(-11, -2, 10, 4, 2); ctx.fill(); roundRect(1, -2, 10, 4, 2); ctx.fill();
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  // shepherd's bag (with the stones in it)
+  ctx.fillStyle = '#8a6a3a';
+  roundRect(-22, -32, 15, 17, 5); ctx.fill();
+  ctx.fillStyle = shade('#8a6a3a', -25);
+  roundRect(-22, -32, 15, 5, 3); ctx.fill();
+  if (opts.staff) {
+    ctx.save(); ctx.translate(-14, -24); ctx.rotate(-0.1);
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 24); ctx.lineTo(0, -48); ctx.arc(-9, -48, 9, 0, Math.PI, true); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-16, -6); ctx.quadraticCurveTo(-15, -30, -10, -37); ctx.quadraticCurveTo(0, -41, 10, -37); ctx.quadraticCurveTo(15, -30, 16, -6);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#7a3f1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-15, -20); ctx.quadraticCurveTo(0, -17, 15, -20); ctx.stroke();
+  ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-15, -28); ctx.stroke();
+  // arms and the sling
+  if (opts.sling) {
+    const sl = opts.sling;
+    if (sl.whirl) {
+      // whirling the sling round over his head
+      const a = t * 16;
+      const hx = 8, hy = -78;
+      arm(10, -32, hx, hy);
+      const px = hx + Math.cos(a) * 22, py = hy - 8 + Math.sin(a) * 8;
+      ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill();
+      arm(-10, -32, -18, -22);
+    } else if (sl.thrown) {
+      arm(10, -32, 26, -60);
+      ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(26, -60); ctx.quadraticCurveTo(36, -58, 34, -46); ctx.stroke();
+      arm(-10, -32, -18, -22);
+    } else {
+      arm(10, -32, 16, -16);
+      ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(16, -16); ctx.lineTo(18, 0); ctx.stroke();
+      if (sl.loaded) { ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(18, 0, 3.5, 0, TAU); ctx.fill(); }
+      arm(-10, -32, -14, -14);
+    }
+  } else if (mood === 'joy') { arm(-10, -32, -22, -62); arm(10, -32, 22, -62); }
+  else { arm(-10, -32, -14, -14); arm(10, -32, 14, -14); }
+  const hy = -53;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  for (const [hx, hy2, r] of [[-12, -6, 6], [-6, -12, 7], [2, -14, 7], [10, -10, 6.5], [14, -3, 5], [-15, 1, 5]]) { ctx.moveTo(hx + r, hy + hy2); ctx.arc(hx, hy + hy2, r, 0, TAU); }
+  ctx.fill();
+  ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  drawFace(d, mood, hy, opts.lx || 0.5, opts.ly || -0.2);
+  ctx.restore();
+}
+
+// Goliath: a huge cartoon giant in bronze, with a bushy beard and a grumpy face
+function drawGoliath(g, fall) {
+  ctx.save();
+  // he staggers back a few steps, then falls forward onto his face
+  ctx.translate(g.x + fallBack(fall), 0);
+  if (fall > 0) ctx.rotate(-ease(clamp((fall - 0.25) / 0.75, 0, 1)) * Math.PI * 0.47);
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  if (fall <= 0) { ctx.beginPath(); ctx.ellipse(0, 0, 70, 14, 0, 0, TAU); ctx.fill(); }
+  const skin = '#d9a066', bronze = '#c98a2e', bronzeD = '#8f5f1c', tunic = '#7a3b52';
+  const lift = g.step * 10;
+  // spear (held upright behind him)
+  ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(50, -10); ctx.lineTo(50, -GH - 90); ctx.stroke();
+  ctx.fillStyle = '#9aa3ad';
+  ctx.beginPath(); ctx.moveTo(50, -GH - 130); ctx.lineTo(60, -GH - 92); ctx.lineTo(40, -GH - 92); ctx.closePath(); ctx.fill();
+  // legs with bronze greaves (stomping)
+  for (const [lx, up] of [[-24, lift], [24, 10 - lift]]) {
+    ctx.fillStyle = skin;
+    roundRect(lx - 14, -120 - up * 0.3, 28, 70, 10); ctx.fill();
+    ctx.fillStyle = bronze;
+    roundRect(lx - 16, -70 - up, 32, 64, 10); ctx.fill();
+    ctx.fillStyle = bronzeD;
+    roundRect(lx - 22, -12 - up, 40, 14, 6); ctx.fill();
+  }
+  // tunic skirt
+  ctx.fillStyle = tunic;
+  ctx.beginPath(); ctx.moveTo(-50, -150); ctx.lineTo(50, -150); ctx.lineTo(58, -100); ctx.lineTo(-58, -100); ctx.closePath(); ctx.fill();
+  // back arm (holding the spear)
+  ctx.strokeStyle = skin; ctx.lineWidth = 20;
+  ctx.beginPath(); ctx.moveTo(34, -238); ctx.lineTo(50, -170); ctx.stroke();
+  // body in scale armour
+  const ag = ctx.createLinearGradient(-60, 0, 60, 0);
+  ag.addColorStop(0, '#e0a843'); ag.addColorStop(1, bronzeD);
+  ctx.fillStyle = ag;
+  roundRect(-58, -258, 116, 116, 30); ctx.fill();
+  ctx.strokeStyle = 'rgba(110,70,20,0.45)'; ctx.lineWidth = 2;
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 6; c++) {
+    const sx = -48 + c * 19 + (r % 2) * 9, sy = -240 + r * 21;
+    ctx.beginPath(); ctx.arc(sx, sy, 8, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+  }
+  ctx.fillStyle = '#6b3a1a';
+  roundRect(-60, -156, 120, 12, 5); ctx.fill();
+  // front arm (fist on hip, or pointing and laughing)
+  ctx.strokeStyle = skin; ctx.lineWidth = 20; ctx.lineCap = 'round';
+  const laughing = goliath.laughT > 0 && state !== 'win';
+  ctx.beginPath(); ctx.moveTo(-40, -238);
+  if (laughing) ctx.lineTo(-86, -232); else ctx.lineTo(-62, -180);
+  ctx.stroke();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(laughing ? -90 : -62, laughing ? -232 : -176, 12, 0, TAU); ctx.fill();
+  // head (relative to the pose: sway)
+  const hx = g.head.x - g.x, hy = g.head.y;
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.fillStyle = skin;
+  roundRect(-14, 20, 28, 26, 8); ctx.fill();                       // neck
+  ctx.beginPath(); ctx.arc(0, 0, 36, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(30, 4, 8, 0, TAU); ctx.fill();          // ear
+  // big bushy beard
+  ctx.fillStyle = '#3a2414';
+  ctx.beginPath();
+  ctx.moveTo(-34, 4); ctx.quadraticCurveTo(-40, 52, -6, 60); ctx.quadraticCurveTo(26, 56, 30, 14); ctx.quadraticCurveTo(0, 26, -34, 4);
+  ctx.fill();
+  // face looking left at David
+  const dazed = state === 'win';
+  ctx.fillStyle = '#fff';
+  for (const ex of [-22, -4]) { ctx.beginPath(); ctx.ellipse(ex, -2, 6, dazed ? 6 : 5, 0, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#2b1d12';
+  if (dazed) {
+    ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
+    for (const ex of [-22, -4]) { ctx.beginPath(); ctx.moveTo(ex - 4, -6); ctx.lineTo(ex + 4, 2); ctx.moveTo(ex + 4, -6); ctx.lineTo(ex - 4, 2); ctx.stroke(); }
+  } else for (const ex of [-22, -4]) { ctx.beginPath(); ctx.arc(ex - 2, -1, 3, 0, TAU); ctx.fill(); }
+  // grumpy brows (under the forehead gap)
+  ctx.strokeStyle = '#3a2414'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-30, -10); ctx.lineTo(-16, -6); ctx.moveTo(-10, -6); ctx.lineTo(4, -10); ctx.stroke();
+  // nose
+  ctx.fillStyle = shade(skin, -20);
+  ctx.beginPath(); ctx.ellipse(-30, 8, 8, 6, 0, 0, TAU); ctx.fill();
+  // mouth
+  ctx.fillStyle = '#7a2e22';
+  if (laughing) { ctx.beginPath(); ctx.ellipse(-16, 24, 10, 7 + Math.abs(Math.sin(t * 18)) * 3, 0, 0, TAU); ctx.fill(); }
+  else if (dazed) { ctx.beginPath(); ctx.ellipse(-16, 24, 6, 8, 0, 0, TAU); ctx.fill(); }
+  else { ctx.strokeStyle = '#7a2e22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-16, 30, 8, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke(); }
+  // bronze helmet: a dome with a crest, a cheek guard, and one gap at the forehead
+  const hg = ctx.createLinearGradient(-40, -50, 40, 0);
+  hg.addColorStop(0, '#f0c060'); hg.addColorStop(1, bronzeD);
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.moveTo(-40, -22);
+  ctx.quadraticCurveTo(-36, -54, 2, -56);
+  ctx.quadraticCurveTo(42, -54, 42, -8);
+  ctx.lineTo(40, 30); ctx.lineTo(20, 30); ctx.lineTo(16, -4);
+  ctx.quadraticCurveTo(10, -22, -10, -24);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = bronzeD; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#c0392b';                                            // crest
+  ctx.beginPath(); ctx.moveTo(-10, -54); ctx.quadraticCurveTo(16, -84, 40, -60); ctx.quadraticCurveTo(20, -66, 6, -52); ctx.fill();
+  ctx.strokeStyle = '#f7d27a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-38, -24); ctx.quadraticCurveTo(-26, -30, -10, -24); ctx.stroke();   // brim over the forehead
+  ctx.restore();
+  ctx.restore();
+}
+
+const fallBack = (fall) => ease(clamp(fall / 0.5, 0, 1)) * 190;
+
+// The little shield-bearer and his very big shield
+function drawShieldBearer(tt) {
+  const sr = shieldRect(tt), u = shieldUp(tt);
+  const x = sr.cx + 22;
+  ctx.save();
+  ctx.translate(x, 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 24, 7, 0, 0, TAU); ctx.fill();
+  const skin = '#c98d56';
+  ctx.fillStyle = skin;
+  roundRect(-10, -14, 8, 14, 3); ctx.fill(); roundRect(3, -14, 8, 14, 3); ctx.fill();
+  ctx.fillStyle = '#5a6475';
+  ctx.beginPath(); ctx.moveTo(-17, -8); ctx.quadraticCurveTo(-16, -44, 0, -48); ctx.quadraticCurveTo(16, -44, 17, -8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, -62, 14, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8a8f98';
+  ctx.beginPath(); ctx.arc(0, -66, 14.5, Math.PI, TAU); ctx.fill();
+  ctx.fillStyle = '#fff';
+  for (const ex of [-8, -1]) { ctx.beginPath(); ctx.arc(ex, -62, 3.2, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#2b1d12';
+  for (const ex of [-8, -1]) { ctx.beginPath(); ctx.arc(ex - 1, -62, 1.6, 0, TAU); ctx.fill(); }
+  if (u > 0.3) { ctx.fillStyle = '#7cc4f2'; ctx.beginPath(); ctx.arc(10, -70, 3, 0, TAU); ctx.fill(); }   // a drop of sweat
+  ctx.restore();
+  // arms up to the shield
+  ctx.strokeStyle = '#4a5363'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 6, -40); ctx.lineTo(sr.cx + 20, sr.cy + 6); ctx.stroke();
+  // the shield: a big tall shield of wood and bronze
+  const sg = ctx.createLinearGradient(sr.x0, 0, sr.x1, 0);
+  sg.addColorStop(0, '#b07a3a'); sg.addColorStop(1, '#7a5020');
+  ctx.fillStyle = sg;
+  roundRect(sr.x0, sr.y0, sr.x1 - sr.x0, sr.y1 - sr.y0, 20); ctx.fill();
+  ctx.strokeStyle = '#d8a548'; ctx.lineWidth = 5;
+  roundRect(sr.x0 + 3, sr.y0 + 3, sr.x1 - sr.x0 - 6, sr.y1 - sr.y0 - 6, 18); ctx.stroke();
+  ctx.fillStyle = '#e0b050';
+  ctx.beginPath(); ctx.arc(sr.cx, sr.cy, 11, 0, TAU); ctx.fill();
+}
+
+// Small far-away soldiers on the two hills
+function drawSoldier(x, y, s, col, helmet, mood, phase) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const hop = mood === 'cheer' ? Math.abs(Math.sin(t * 8 + phase)) * 10 : mood === 'run' ? Math.abs(Math.sin(t * 14 + phase)) * 4 : 0;
+  ctx.translate(0, -hop);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(-12, 0); ctx.quadraticCurveTo(-11, -26, 0, -30); ctx.quadraticCurveTo(11, -26, 12, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d7a070';
+  ctx.beginPath(); ctx.arc(0, -40, 10, 0, TAU); ctx.fill();
+  ctx.fillStyle = helmet;
+  ctx.beginPath(); ctx.arc(0, -43, 10.5, Math.PI, TAU); ctx.fill();
+  if (mood === 'cheer') {
+    ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-8, -24); ctx.lineTo(-16, -46); ctx.moveTo(8, -24); ctx.lineTo(16, -46); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(12, -58); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawSky(night = 0) {
+  const x0 = -offX - 2, x1 = W + offX + 2, top = -offY - 2;
+  const g = ctx.createLinearGradient(0, top, 0, 500);
+  g.addColorStop(0, '#7ab8e8'); g.addColorStop(1, '#f3e2b8');
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, top, x1 - x0, 900 - top);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  for (let i = 0; i < 4; i++) {
+    const cx = ((hash(i, 7) * (x1 - x0) + t * (5 + i * 3) + (wind || 0) * t * 0.05) % (x1 - x0 + 300)) + x0 - 150;
+    drawCloud(cx, lerp(top + 140, 220 + HZ, hash(i, 8)), 120 + hash(i, 9) * 80, 30);
+  }
+}
+
+function drawCloud(cx, cy, w, h) {
+  const n = Math.max(3, Math.round(w / 22));
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1), bulge = Math.sin(f * Math.PI);
+    const r = h * (0.42 + 0.38 * bulge);
+    const px = cx - w / 2 + h * 0.4 + f * (w - h * 0.8), py = cy - r * 0.3;
+    ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU);
+  }
+  ctx.fill();
+}
+
+function hillLine(x, base, amp, f, ph) { return base + Math.sin(x * f + ph) * amp; }
+
+function drawBrookScene() {
+  const x0 = -offX - 2, x1 = W + offX + 2;
+  drawSky();
+  // far hills
+  ctx.fillStyle = '#c9b77e';
+  ctx.beginPath(); ctx.moveTo(x0, 460);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, hillLine(x, 330 + HZ, 26, 0.007, 1));
+  ctx.lineTo(x1, 460); ctx.fill();
+  // far bank
+  ctx.fillStyle = '#9bbf62';
+  ctx.beginPath(); ctx.moveTo(x0, streamTop() + 20);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, hillLine(x, streamTop() - 40, 10, 0.012, 2));
+  ctx.lineTo(x1, streamTop() + 20); ctx.fill();
+  // the stream
+  const st = streamTop(), sb = streamBot();
+  const wg = ctx.createLinearGradient(0, st, 0, sb);
+  wg.addColorStop(0, '#5fb0d8'); wg.addColorStop(1, '#3a86b8');
+  ctx.fillStyle = wg;
+  ctx.beginPath(); ctx.moveTo(x0, st);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, st + Math.sin(x * 0.02 + 1) * 4);
+  ctx.lineTo(x1, sb);
+  for (let x = x1; x >= x0 - 20; x -= 20) ctx.lineTo(x, sb + Math.sin(x * 0.018) * 5);
+  ctx.closePath(); ctx.fill();
+  // ripples flowing downstream
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const span = x1 - x0 + 120;
+    const rx = x0 - 60 + ((hash(i, 3) * span + t * cfg.flow * 1.2) % span), ry = lerp(st + 18, sb - 12, hash(i, 4));
+    ctx.beginPath(); ctx.moveTo(rx, ry); ctx.quadraticCurveTo(rx + 14, ry - 5, rx + 30, ry); ctx.stroke();
+  }
+  // stones in the water
+  for (const s of stones) drawStone(s);
+  // near bank
+  ctx.fillStyle = '#86b85e';
+  ctx.beginPath(); ctx.moveTo(x0, H + 2);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, sb + 10 + Math.sin(x * 0.015) * 8);
+  ctx.lineTo(x1, H + 2); ctx.fill();
+  ctx.fillStyle = '#c9b48a';
+  for (let i = 0; i < 18; i++) { ctx.beginPath(); ctx.ellipse(lerp(x0, x1, hash(i, 21)), lerp(sb + 30, H - 10, hash(i, 22)), 8, 5, 0, 0, TAU); ctx.fill(); }
+  // David waits on the bank with his bag
+  drawDavid(W / 2, 860, 1.5, { staff: true, lx: 0, ly: -0.8 });
+  // stones flying into his bag
+  for (const f of flyers) {
+    const b = bagPos();
+    const k = ease(clamp(f.t / 0.5, 0, 1));
+    const x = lerp(f.x, W / 2 - 22, k), y = lerp(f.y, 800, k) - Math.sin(k * Math.PI) * 90;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1 - k * 0.6, 1 - k * 0.6);
+    drawStone({ ...f.s, x: 0, y: 0, bob: 0 }, true);
+    ctx.restore();
+  }
+}
+
+function drawStone(s, plain) {
+  const bob = plain ? 0 : Math.sin(s.bob) * 2;
+  ctx.save();
+  ctx.translate(s.x + (s.shake > 0 ? Math.sin(t * 60) * 4 : 0), s.y + bob);
+  if (!plain) {
+    ctx.fillStyle = 'rgba(20,60,100,0.25)';
+    ctx.beginPath(); ctx.ellipse(0, s.r * 0.55, s.r * 1.1, s.r * 0.3, 0, 0, TAU); ctx.fill();
+  }
+  ctx.rotate(s.rot);
+  ctx.scale(1, s.flat);
+  ctx.fillStyle = s.col;
+  ctx.beginPath();
+  const n = s.shape.length;
+  if (s.smooth) ctx.ellipse(0, 0, s.r, s.r, 0, 0, TAU);
+  else for (let i = 0; i < n; i++) { const a = i / n * TAU; ctx.lineTo(Math.cos(a) * s.r * s.shape[i], Math.sin(a) * s.r * s.shape[i]); }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(s.col.length === 7 ? s.col : '#888888', -45); ctx.lineWidth = 2.5; ctx.stroke();
+  if (s.smooth) {
+    // a soft shine on the smooth ones
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(-s.r * 0.35, -s.r * 0.4, s.r * 0.35, s.r * 0.18, -0.4, 0, TAU); ctx.fill();
+  } else {
+    // cracks and chips on the rough ones
+    ctx.strokeStyle = 'rgba(40,25,10,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-s.r * 0.4, -s.r * 0.2); ctx.lineTo(0, s.r * 0.1); ctx.lineTo(s.r * 0.3, -s.r * 0.3); ctx.moveTo(0, s.r * 0.1); ctx.lineTo(-s.r * 0.1, s.r * 0.5); ctx.stroke();
+  }
+  ctx.restore();
+  if (!plain && !s.smooth) {
+    // little white foam where the water breaks on rough stones
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.arc(s.x - s.r, s.y + bob, 4, 0, TAU); ctx.arc(s.x - s.r - 6, s.y + 5 + bob, 3, 0, TAU); ctx.fill();
+  }
+}
+
+function drawValley() {
+  const x0 = -offX - 2, x1 = W + offX + 2;
+  drawSky();
+  // the two hills with the two armies (1 Samuel 17:3)
+  ctx.fillStyle = '#b9a56c';
+  ctx.beginPath(); ctx.moveTo(x0, 700);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 440 + HZ + Math.cos((x - W / 2) / (W * 0.5 + offX) * Math.PI) * 70 + Math.sin(x * 0.02) * 6);
+  ctx.lineTo(x1, 700); ctx.fill();
+  // Israel's tents on the left, the Philistines' on the right
+  const run = state === 'win' && fallT > 1.3 ? (fallT - 1.3) : 0;
+  for (let i = 0; i < 4; i++) {
+    for (const side of [-1, 1]) {
+      const x = side < 0 ? x0 + 30 + i * 46 : x1 - 30 - i * 46;
+      const y = 410 + HZ + i * 6;
+      ctx.fillStyle = side < 0 ? (i % 2 ? '#e8dcc0' : '#d0b88a') : (i % 2 ? '#c46b5a' : '#a65a4a');
+      ctx.beginPath(); ctx.moveTo(x - 22, y + 20); ctx.lineTo(x, y - 8); ctx.lineTo(x + 22, y + 20); ctx.closePath(); ctx.fill();
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    const ix = x0 + 40 + i * 30, iy = 470 + HZ + (i % 2) * 16;
+    drawSoldier(ix, iy, 0.75, ['#3f6fb5', '#6b8e3a', '#b08a2e'][i % 3], '#8a8f98', state === 'win' && fallT > 1.3 ? 'cheer' : 'watch', i);
+    const px = x1 - 40 - i * 30 + run * 260, py = 470 + HZ + (i % 2) * 16;
+    drawSoldier(px, py, 0.75, ['#7a3b52', '#5a6475', '#8a4a2a'][i % 3], '#c98a2e', run > 0 ? 'run' : 'watch', i);
+  }
+  // the valley floor
+  const fg = ctx.createLinearGradient(0, 560, 0, H);
+  fg.addColorStop(0, '#d8c48c'); fg.addColorStop(1, '#b89c62');
+  ctx.fillStyle = fg;
+  ctx.beginPath(); ctx.moveTo(x0, H + 2);
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 590 + HZ * 0.3 + Math.sin(x * 0.01) * 8);
+  ctx.lineTo(x1, H + 2); ctx.fill();
+  // the little brook across the valley
+  ctx.strokeStyle = '#6fb6d8'; ctx.lineWidth = 10;
+  ctx.beginPath();
+  for (let x = x0; x <= x1 + 20; x += 20) ctx.lineTo(x, 640 + HZ * 0.2 + Math.sin(x * 0.013 + 1) * 10);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(120,90,50,0.25)';
+  for (let i = 0; i < 30; i++) { ctx.beginPath(); ctx.ellipse(lerp(x0, x1, hash(i, 31)), lerp(660, H - 6, hash(i, 32)), 6, 3, 0, 0, TAU); ctx.fill(); }
+}
+
+// Wind flag on a pole behind David
+function drawWindFlag() {
+  if (!cfg.wind) return;
+  // a banner on a pole far off in the valley, between David and the nearest the shield-bearer comes
+  const x = lerp(toWorld(0, 0).x, toWorld(Math.max(60, cfg.dist - cfg.walk - 130), 0).x, 0.55), y = 640 + HZ * 0.2;
+  ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 140); ctx.stroke();
+  const f = wind / 170, len = 22 + Math.abs(f) * 40, dir = Math.sign(wind || 1);
+  ctx.fillStyle = '#e04a3a';
+  ctx.beginPath(); ctx.moveTo(x, y - 140);
+  const wav = Math.sin(t * (6 + Math.abs(f) * 10)) * 4;
+  ctx.quadraticCurveTo(x + dir * len * 0.5, y - 140 + wav, x + dir * len, y - 130 + (1 - Math.abs(f)) * 18);
+  ctx.lineTo(x, y - 114); ctx.closePath(); ctx.fill();
+}
+
+function drawBattle() {
+  drawValley();
+  drawWindFlag();
+  const k = sceneK(), ox = sceneOX();
+  ctx.save();
+  ctx.translate(ox, GROUND);
+  ctx.scale(k, k);
+  const g = goliathPose(bt);
+  // Goliath and his shield-bearer
+  drawGoliath(g, state === 'win' ? fallT / 1.1 : 0);
+  if (state !== 'win' || fallT < 0.4) drawShieldBearer(bt);
+  else {
+    // the shield-bearer drops the shield and runs away
+    const run = (fallT - 0.4) * 320;
+    ctx.save(); ctx.translate(run, 0); drawShieldBearer(bt); ctx.restore();
+  }
+  // the forehead target glows on the first levels
+  if (state === 'play' && phase === 'sling' && level <= 2) {
+    ctx.strokeStyle = `rgba(255,250,200,${0.6 + 0.3 * Math.sin(t * 5)})`; ctx.lineWidth = 3;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.arc(g.gap.x, g.gap.y, g.gap.r, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // dizzy stars
+  if (state === 'win' && fallT >= 0) {
+    ctx.save();
+    const fall = fallT / 1.1;
+    ctx.translate(g.x + fallBack(fall), 0);
+    ctx.rotate(-ease(clamp((fall - 0.25) / 0.75, 0, 1)) * Math.PI * 0.47);
+    ctx.fillStyle = '#ffe27a';
+    for (let s = 0; s < 4; s++) { const an = t * 5 + s * TAU / 4; drawStar(g.head.x - g.x + Math.cos(an) * 46, g.head.y - 50 + Math.sin(an) * 12, 9); }
+    ctx.restore();
+  }
+  // David with his sling
+  const loaded = ammo > 0 && !stone && reloadT <= 0 && state === 'play';
+  drawDavid(0, 0, 1.45, { sling: { whirl: !!aim || kbAim.on && loaded, thrown: david.throwT > 0, loaded }, lx: 0.9, ly: -0.4 });
+  // aiming: the pull band and the dotted path
+  const v = aimVel();
+  if (v && loaded) {
+    if (aim) {
+      const a0 = toScene(aim.sx, aim.sy), a1 = toScene(aim.x, aim.y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(a0.x, a0.y); ctx.lineTo(a1.x, a1.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(a0.x, a0.y, 8, 0, TAU); ctx.fill();
+    }
+    let x = HAND.x, y = HAND.y, vx = v.vx, vy = v.vy;
+    const dt = 0.045;
+    for (let i = 0; i < cfg.dots + 2; i++) {
+      vx += wind * dt; vy += GRAV * dt; x += vx * dt; y += vy * dt;
+      if (i < 2) continue;
+      const a = 1 - (i - 2) / (cfg.dots + 1);
+      ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.6 * a})`;
+      ctx.beginPath(); ctx.arc(x, y, 6 - (i - 2) * 0.2, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `rgba(90,60,20,${0.5 * a})`; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+  // the flying stone
+  if (stone) {
+    for (let i = 0; i < stone.trail.length; i++) {
+      const p = stone.trail[i];
+      ctx.fillStyle = `rgba(255,255,255,${i / stone.trail.length * 0.5})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, STONE_R * (i / stone.trail.length), 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#9aa7b4';
+    ctx.beginPath(); ctx.arc(stone.x, stone.y, STONE_R + 1, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath(); ctx.arc(stone.x - 2, stone.y - 2, 2.5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  // God's help: a soft glow of light round David
+  if (state === 'win') {
+    const d = toWorld(0, -60);
+    const gg = ctx.createRadialGradient(d.x, d.y, 10, d.x, d.y, 160);
+    gg.addColorStop(0, 'rgba(255,240,170,0.45)'); gg.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(d.x, d.y, 160, 0, TAU); ctx.fill();
+  }
+}
+
+function aimVel() {
+  if (aim) {
+    const k = sceneK();
+    const px = (aim.x - aim.sx) / k, py = (aim.y - aim.sy) / k;
+    if (Math.hypot(px, py) < 14) return null;
+    return launchVel(px, py);
+  }
+  if (kbAim.on) return kbVel();
+  return null;
+}
+
+// The walk from the brook to the battle: a quick wipe
+function drawWalk() {
+  drawBattle();
+  const f = clamp(1 - phaseT / 0.6, 0, 1);
+  if (f > 0) { ctx.fillStyle = `rgba(255,250,230,${f})`; ctx.fillRect(-offX - 2, -offY - 2, W + offX * 2 + 4, H + offY + 4); }
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawStoneIcon(x, y, r, full) {
+  ctx.fillStyle = full ? '#a9b3bd' : 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.75, 0, 0, TAU); ctx.fill();
+  if (full) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.3, r * 0.35, r * 0.18, -0.4, 0, TAU); ctx.fill(); }
+}
+
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(40,30,10,0.7)'); hg.addColorStop(1, 'rgba(40,30,10,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  const ink = '#fff4cc';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ink;
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'David and Goliath' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    if (phase === 'brook') {
+      ctx.fillText('BROOK', 12, 50);
+      const bx = 62, bw = 130, f = clamp(brookLeft / cfg.brookT, 0, 1);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,244,204,0.25)'; roundRect(bx, 39, bw, 13, 6.5); ctx.fill();
+      ctx.fillStyle = f < 0.25 && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#6fc0ee';
+      if (f > 0) { roundRect(bx, 39, Math.max(13, bw * f), 13, 6.5); ctx.fill(); }
+    } else if (cfg.wind) {
+      ctx.fillText('WIND', 12, 50);
+      ctx.shadowBlur = 0;
+      const n = Math.max(1, Math.round(Math.abs(wind) / 45));
+      ctx.fillStyle = '#bfe4ff'; ctx.font = '700 16px Fredoka, sans-serif';
+      ctx.fillText((wind < 0 ? '←' : '→').repeat(n), 56, 51);
+    }
+    // stones in the bag
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = ink;
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + levelScore}`, viewW - 12, 26);
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(phase === 'brook' ? 'BAG' : 'STONES', viewW - 12 - BAG * 26 - 2, 50);
+    ctx.shadowBlur = 0;
+    const have = phase === 'brook' ? bagged : ammo;
+    for (let i = 0; i < BAG; i++) drawStoneIcon(viewW - 24 - (BAG - 1 - i) * 26, 46, 10, i < have);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = TOPH + 40 + Math.max(0, offY) * 0.5;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(30,24,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff4cc';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-6, 6) * shakeT * 2; sy = rand(-6, 6) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, (offX + sx) * scale, (offY + sy) * scale);
+  if (phase === 'brook') drawBrookScene();
+  else if (phase === 'walk') drawWalk();
+  else drawBattle();
+  drawParticles();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  david.moodT = Math.max(0, david.moodT - dt);
+  david.throwT = Math.max(0, david.throwT - dt);
+  david.blinkT -= dt; if (david.blinkT <= 0) { david.blink = 0.13; david.blinkT = rand(1.5, 4); }
+  if (david.blink > 0) david.blink -= dt;
+  goliath.laughT = Math.max(0, goliath.laughT - dt);
+  for (let i = flyers.length - 1; i >= 0; i--) { flyers[i].t += dt; if (flyers[i].t > 0.5) flyers.splice(i, 1); }
+  if (state === 'play') {
+    playT += dt; phaseT += dt;
+    if (phase === 'brook') updateBrook(dt);
+    else if (phase === 'walk') {
+      bt += dt;
+      if (phaseT > 1.2) {
+        phase = 'sling'; phaseT = 0; reloadT = 0.3;
+        if (!told.aim) { told.aim = true; showMessage('Pull back and let go! Aim for his forehead.', 3); }
+        else if (!told.shield) { told.shield = true; showMessage('Watch the shield-bearer!', 2.6); }
+        else if (!told.wind) { told.wind = true; showMessage('Feel the wind! Watch the flag.', 2.6); }
+      }
+    } else {
+      bt += dt;
+      reloadT = Math.max(0, reloadT - dt);
+      // keyboard aim
+      if (keys.has('ArrowUp')) kbAim.ang = clamp(kbAim.ang + dt * 0.8, 0.1, 1.45);
+      if (keys.has('ArrowDown')) kbAim.ang = clamp(kbAim.ang - dt * 0.8, 0.1, 1.45);
+      if (keys.has('ArrowRight')) kbAim.pull = clamp(kbAim.pull + dt * 0.4, 0.15, 1);
+      if (keys.has('ArrowLeft')) kbAim.pull = clamp(kbAim.pull - dt * 0.4, 0.15, 1);
+      updateStone(dt);
+      if (outT > 0) { outT -= dt; if (outT <= 0 && state === 'play') fail(); }
+    }
+  } else if (state === 'win') {
+    fallT += dt;
+    if (fallT > 1.1 && !fellThud) {
+      fellThud = true;
+      shakeT = 0.6;
+      sfx.thud(1);
+      const g = goliathPose(bt);
+      for (let i = 0; i < 26; i++) { const p = toWorld(g.x + 190 - rand(0, 320), 0); spawn(p.x, p.y - 4, rand(-90, 90), rand(-120, -30), rand(0.8, 1.4), pick(['rgba(200,170,120,0.8)', 'rgba(220,200,160,0.75)']), rand(6, 12), 60); }
+      popText(W / 2, 420, 'THUD!', '#fff2b0');
+      setTimeout(() => { if (state === 'win') { sfx.cheer(); sfx.win(); } }, 300);
+    }
+  } else if (state === 'title' || state === 'level') {
+    bt += dt;
+    if (phase === 'brook') { for (const s of stones) { s.x += cfg.flow * dt * 0.5; s.bob += dt * 2; } stones = stones.filter((s) => s.x < W + offX + 50); if (stones.length < 6) stones.push(makeStone(-offX - 40)); }
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

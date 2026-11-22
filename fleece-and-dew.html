@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#18203e">
+<title>Fleece and Dew</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #18203e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 26, 60, 0.3);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Fleece and Dew</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'amazingGrace', instrument: 'harp', accent: 'pipe', ambience: 'night', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  withYou: { ref: 'Judges 6:12', KJV: 'The Lord is with thee, thou mighty man of valour.', NKJV: 'The Lord is with you, you mighty man of valor!', NIV: 'The Lord is with you, mighty warrior.', NLT: 'Mighty hero, the Lord is with you!' },
+  // Night 1 cards: a wet fleece on dry ground
+  fleeceOnly: { ref: 'Judges 6:37', KJV: 'if the dew be on the fleece only, and it be dry upon all the earth beside, then shall I know that thou wilt save Israel by mine hand', NKJV: 'if there is dew on the fleece only, and it is dry on all the ground, then I shall know that You will save Israel by my hand', NIV: 'If there is dew only on the fleece and all the ground is dry, then I will know that you will save Israel by my hand', NLT: 'If the fleece is wet with dew in the morning but the ground is dry, then I will know that you are going to help me rescue Israel' },
+  // Night 1 win card
+  bowl: { ref: 'Judges 6:38', KJV: 'And it was so: for he rose up early on the morrow, and thrust the fleece together, and wringed the dew out of the fleece, a bowl full of water.', NKJV: 'And it was so. When he rose early the next morning and squeezed the fleece together, he wrung the dew out of the fleece, a bowlful of water.', NIV: 'And that is what happened. Gideon rose early the next day; he squeezed the fleece and wrung out the dew—a bowlful of water.', NLT: 'And that is just what happened. When Gideon got up early the next morning, he squeezed the fleece and wrung out a whole bowlful of water.' },
+  // Night 2 cards: a dry fleece on wet ground
+  onceMore: { ref: 'Judges 6:39', KJV: 'let it now be dry only upon the fleece, and upon all the ground let there be dew.', NKJV: 'let it now be dry only on the fleece, but on all the ground let there be dew.', NIV: 'Allow me one more test with the fleece, but this time make the fleece dry and let the ground be covered with dew.', NLT: 'This time let the fleece remain dry while the ground around it is wet with dew.' },
+  // Night 2 win card
+  godDid: { ref: 'Judges 6:40', KJV: 'And God did so that night: for it was dry upon the fleece only, and there was dew on all the ground.', NKJV: 'And God did so that night. It was dry on the fleece only, but there was dew on all the ground.', NIV: 'That night God did so. Only the fleece was dry; all the ground was covered with dew.', NLT: 'So that night God did as Gideon asked. The fleece was dry in the morning, but the ground was covered with dew.' },
+  // Fail card
+  goStrength: { ref: 'Judges 6:14', KJV: 'Go in this thy might, and thou shalt save Israel from the hand of the Midianites: have not I sent thee?', NKJV: 'Go in this might of yours, and you shall save Israel from the hand of the Midianites. Have I not sent you?', NIV: 'Go in the strength you have and save Israel out of Midian’s hand. Am I not sending you?', NLT: 'Go with the strength you have, and rescue Israel from the Midianites. I am sending you!' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  if (world) layoutWorld();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const FLOOR_Y = 792;      // where dew lands on the threshing floor
+const SPAWN_Y = 150;      // where dew drops appear in the sky (higher on tall screens)
+const spawnY = () => SPAWN_Y - Math.max(0, offY) * 0.7;
+const EDGE = 46;          // gap between the screen edge and the floor
+const FLEECE_SPEED = 760; // px/s the fleece slides to where you tapped
+
+// Odd levels: night 1 (catch the dew on the fleece, keep the ground dry).
+// Even levels: night 2 (keep the fleece dry, let the dew cover every stone).
+const LEVELS = [
+  { name: 'The First Night',        mode: 'catch', need: 8,  misses: 5, fw: 150, fall: 2.7, gap: 1.55, wind: 0,   marker: 1 },
+  { name: 'One More Test',          mode: 'dry',   patches: 6, hits: 3, fw: 140, fall: 2.6, gap: 1.35, wind: 0,  marker: 1 },
+  { name: 'Heavy Dew',              mode: 'catch', need: 14, misses: 4, fw: 130, fall: 2.1, gap: 1.05, wind: 0,   marker: 0.5 },
+  { name: 'A Breezy Night',         mode: 'dry',   patches: 8, hits: 3, fw: 128, fall: 2.0, gap: 1.0,  wind: 70, marker: 0.5 },
+  { name: 'Wind in the Valley',     mode: 'catch', need: 18, misses: 4, fw: 116, fall: 1.8, gap: 0.88, wind: 110, marker: 0 },
+  { name: 'All the Ground Covered', mode: 'dry',   patches: 10, hits: 3, fw: 116, fall: 1.65, gap: 0.78, wind: 130, marker: 0 },
+];
+const NUM_LEVELS = LEVELS.length;
+function makeConfig(n) { return Object.assign({}, LEVELS[clamp(n, 1, NUM_LEVELS) - 1]); }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('fleeceBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let world = null;          // floor span and patches, rebuilt with each level
+let fleece = { x: 300, tx: 300, wet: 0, glow: 0, squish: 0 };
+let drops = [];
+let splashes = [];
+let particles = [];
+let caught = 0, misses = 0, hits = 0, streak = 0, bestStreak = 0;
+let playT = 0, nextLand = 0, lastLandX = 0;
+let wind = 0, windTarget = 0, windT = 0;
+let winT = 0, failT = 0, endTimer = 0;
+let lastScore = null;
+let message = { text: '', t: 0 };
+let told = {};
+let flashT = 0;
+let gideonMood = 'pray';
+
+// ============================================================
+//  The threshing floor
+// ============================================================
+function layoutWorld() {
+  const w = world;
+  w.x0 = EDGE; w.x1 = W - EDGE;
+  const n = w.patches.length;
+  const pw = (w.x1 - w.x0) / n;
+  w.patches.forEach((p, i) => { p.x0 = w.x0 + i * pw; p.x1 = p.x0 + pw; });
+  fleece.x = clamp(fleece.x, w.x0 + cfg.fw / 2, w.x1 - cfg.fw / 2);
+  fleece.tx = clamp(fleece.tx, w.x0 + cfg.fw / 2, w.x1 - cfg.fw / 2);
+}
+
+function buildWorld() {
+  // catch nights still mark the ground where dew lands, in a few wide patches
+  const n = cfg.mode === 'dry' ? cfg.patches : 8;
+  world = { patches: Array.from({ length: n }, (_, i) => ({ i, wet: 0, sparkle: rand(0, TAU) })) };
+  fleece = { x: W / 2, tx: W / 2, wet: 0, glow: 0, squish: 0 };
+  layoutWorld();
+}
+
+function patchAt(x) {
+  const w = world;
+  const i = clamp(Math.floor((x - w.x0) / ((w.x1 - w.x0) / w.patches.length)), 0, w.patches.length - 1);
+  return w.patches[i];
+}
+function dryPatches() { return world.patches.filter((p) => p.wet < 1); }
+function overFleece(x, pad = 8) { return Math.abs(x - fleece.x) < cfg.fw / 2 + pad; }
+
+// ============================================================
+//  Dew drops: each one is planned by when and where it lands
+// ============================================================
+function planDrop() {
+  const w = world, fw = cfg.fw;
+  const gap = cfg.gap * rand(0.85, 1.15);
+  const lo = w.x0 + 12, hi = w.x1 - 12;
+  let x;
+  if (cfg.mode === 'catch') {
+    // Always reachable from the last drop, but never right on top of it
+    const reach = Math.max(fw, FLEECE_SPEED * Math.max(0.2, gap - 0.18) * 0.8);
+    const minD = Math.min(fw * 0.8, reach * 0.9);
+    const fleeceLo = w.x0 + fw / 2, fleeceHi = w.x1 - fw / 2;
+    const from = clamp(lastLandX, fleeceLo, fleeceHi);
+    let dir = Math.random() < 0.5 ? -1 : 1;
+    let d = rand(minD, Math.min(reach, (hi - lo) * 0.7));
+    x = from + dir * d;
+    if (x < lo + 10 || x > hi - 10) { dir = -dir; x = from + dir * d; }
+    x = clamp(x, lo + 10, hi - 10);
+  } else {
+    const dry = dryPatches();
+    const r = Math.random();
+    if (dry.length && r < 0.62) {
+      const p = pick(dry);
+      x = rand(p.x0 + 6, p.x1 - 6);
+    } else if (r < 0.86) {
+      x = fleece.x + rand(-fw * 0.3, fw * 0.3);   // the dew falls right where the fleece is lying
+    } else x = rand(lo, hi);
+    x = clamp(x, lo, hi);
+  }
+  const fall = cfg.fall * rand(0.92, 1.08);
+  const vx = wind;
+  // keep the whole fall on screen: in a breeze the drop starts upwind of where it lands
+  const a = Math.max(lo, 8 + vx * fall), b = Math.min(hi, W - 8 + vx * fall);
+  if (a < b) x = clamp(x, a, b);
+  if (cfg.mode === 'catch') {
+    const from = clamp(lastLandX, w.x0 + fw / 2, w.x1 - fw / 2);
+    const reach = Math.max(fw, FLEECE_SPEED * Math.max(0.2, gap - 0.18) * 0.8);
+    if (Math.abs(x - from) > reach) x = from + Math.sign(x - from) * reach;
+  }
+  lastLandX = x;
+  drops.push({ landX: x, landT: nextLand, fall, vx, big: cfg.mode === 'catch' && level >= 3 && Math.random() < 0.12, done: false });
+  nextLand += gap;
+}
+
+function dropPos(d) {
+  const left = d.landT - playT;             // seconds until it lands
+  const f = clamp(1 - left / d.fall, 0, 1);
+  const y = lerp(spawnY(), FLOOR_Y - 10, f * f * 0.45 + f * 0.55);
+  return { x: d.landX - d.vx * left, y, f };
+}
+
+function updateDrops(dt) {
+  // plan ahead so every drop shows for its whole fall
+  while (nextLand - playT < cfg.fall * 1.1 + 0.2) planDrop();
+  for (const d of drops) {
+    if (d.done || playT < d.landT) continue;
+    d.done = true;
+    land(d);
+    if (state !== 'play') return;
+  }
+  drops = drops.filter((d) => !d.done);
+}
+
+function land(d) {
+  const x = d.landX;
+  if (cfg.mode === 'catch') {
+    if (overFleece(x)) {
+      const n = d.big ? 2 : 1;
+      caught = Math.min(cfg.need, caught + n);
+      streak++; bestStreak = Math.max(bestStreak, streak);
+      fleece.wet = caught / cfg.need; fleece.squish = 1; fleece.glow = 1;
+      sparkle(x + offX, FLOOR_Y - 26 + offY, d.big ? 16 : 9, ['#bfe7ff', '#ffffff', '#ffe9a8']);
+      sfx.catchDrop(caught / cfg.need);
+      if (!told.catch1) { told.catch1 = true; showMessage('Good catch!', 1.4); }
+      if (caught >= cfg.need) win();
+    } else {
+      misses++; streak = 0;
+      const p = patchAt(x); p.wet = Math.min(1, p.wet + 0.5);
+      splash(x);
+      sfx.plip();
+      if (misses === cfg.misses - 1) showMessage('Careful! The ground must stay dry', 2);
+      if (misses >= cfg.misses) fail();
+    }
+  } else {
+    if (overFleece(x, 4)) {
+      hits++; streak = 0;
+      fleece.wet = hits / cfg.hits; fleece.squish = 1;
+      splash(x, true);
+      sfx.squish();
+      flashT = 0.25;
+      if (hits === cfg.hits - 1) showMessage('Keep the fleece dry! Move it away', 2.2);
+      if (hits >= cfg.hits) fail();
+    } else {
+      const p = patchAt(x);
+      const was = p.wet;
+      p.wet = 1;
+      splash(x);
+      if (was < 1) {
+        streak++;
+        sfx.catchDrop(1 - dryPatches().length / world.patches.length);
+        sparkle(x + offX, FLOOR_Y + offY, 8, ['#bfe7ff', '#ffffff']);
+        if (!dryPatches().length) win();
+      } else sfx.plip(0.5);
+    }
+  }
+}
+
+function splash(x, onFleece = false) {
+  splashes.push({ x, y: onFleece ? FLOOR_Y - 22 : FLOOR_Y + 6, t: 0.5 });
+  for (let i = 0; i < 6; i++) spawn(x + offX, (onFleece ? FLOOR_Y - 22 : FLOOR_Y) + offY, rand(-70, 70), rand(-160, -60), 0.5, '#bfe7ff', 3, 500);
+}
+
+// ============================================================
+//  Particles (screen coordinates in the view)
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkle(x, y, n, cols) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), s = rand(40, 160);
+    spawn(x, y, Math.cos(a) * s, Math.sin(a) * s - 40, rand(0.5, 1), pick(cols), rand(2, 4), 60, 'star');
+  }
+}
+function updateParticles(dt) {
+  for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.grav * dt; }
+  particles = particles.filter((p) => p.life > 0);
+  for (const s of splashes) s.t -= dt;
+  splashes = splashes.filter((s) => s.t > 0);
+}
+function drawStar(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, rr = i % 2 ? r * 0.4 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.6);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  endTimer = 3.4;
+  gideonMood = 'joy';
+  drops = [];
+  const sc = scoreLevel();
+  lastScore = sc;
+  totalScore += sc.total;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('fleeceBest', String(best)); } catch (e) {} }
+  sfx.win();
+  showMessage(cfg.mode === 'catch' ? 'The fleece is soaked!' : 'All the ground is wet with dew!', 2.6);
+}
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  endTimer = 2.2;
+  gideonMood = 'worried';
+  sfx.fail();
+}
+function scoreLevel() {
+  if (cfg.mode === 'catch') {
+    const dew = caught * 10;
+    const careful = (cfg.misses - misses) * 60;
+    const streakB = bestStreak * 8;
+    const levelB = level * 100;
+    return { lines: [['Dew caught', dew], ['Ground kept dry', careful], [`Best streak (${bestStreak})`, streakB], ['Level bonus', levelB]], total: dew + careful + streakB + levelB };
+  }
+  const ground = world.patches.length * 15;
+  const careful = (cfg.hits - hits) * 90;
+  const quick = Math.max(0, Math.round(300 - playT * 6));
+  const levelB = level * 100;
+  return { lines: [['Ground covered', ground], ['Fleece kept dry', careful], ['Quick work', quick], ['Level bonus', levelB]], total: ground + careful + quick + levelB };
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  cfg = makeConfig(1);
+  resetLevel();
+  showOverlay('Fleece and Dew', 'Gideon asks God for a sign',
+    `${verseHTML('withYou')}
+     <ul>
+       <li>God called Gideon to save Israel. Gideon laid a <b>woolly fleece</b> on the threshing floor and asked God for a sign.</li>
+       <li><b>Tap</b> (or drag) on the floor to slide the fleece there. <b>Keys:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd>.</li>
+       <li><b>Night one:</b> <b>catch the dew</b> on the fleece. Every drop you miss wets the ground!</li>
+       <li><b>Night two:</b> the opposite! <b>Keep the fleece dry</b> and let the dew fall on <b>every dry stone</b>.</li>
+       <li>Later nights bring faster dew and a breeze that blows the drops sideways.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildWorld();
+  drops = []; splashes = []; particles = [];
+  caught = 0; misses = 0; hits = 0; streak = 0; bestStreak = 0;
+  playT = 0; nextLand = cfg.fall + 0.6; lastLandX = W / 2;
+  wind = 0; windTarget = 0; windT = 3;
+  winT = 0; failT = 0; endTimer = 0;
+  flashT = 0;
+  told = {};
+  gideonMood = 'pray';
+  keys.clear();
+  down = null;
+}
+
+// Level card: the config and the level's data change together, behind the card
+function startLevel(retry = false) {
+  resetLevel();
+  sfx.levelStart();
+  if (retry) { beginPlay(); return; }
+  state = 'card';
+  syncAmbience();
+  const catchN = cfg.mode === 'catch';
+  const night = catchN ? 'Night one: a wet fleece' : 'Night two: a dry fleece';
+  const how = catchN
+    ? `<li><b>Tap</b> under the falling dew to <b>catch ${cfg.need} drops</b> on the fleece.</li>
+       <li>Miss ${cfg.misses} and the ground gets wet: try again!</li>
+       ${level >= 3 ? '<li>A <b>big shiny drop</b> counts double.</li>' : ''}`
+    : `<li>Let the dew fall on <b>all ${cfg.patches} dry stones</b>.</li>
+       <li><b>Move the fleece out of the way!</b> If ${cfg.hits} drops land on it, it gets wet.</li>`;
+  const windLi = cfg.wind ? '<li><b>Wind!</b> Watch the arrow: the breeze blows the drops sideways as they fall.</li>' : '';
+  const markLi = cfg.marker === 0 ? '<li>No shiny spots on the floor tonight: <b>watch the drops</b> to see where they will land.</li>' : '';
+  showOverlay(`Level ${level}`, `${cfg.name} · ${night}`,
+    `${verseHTML(catchN ? 'fleeceOnly' : 'onceMore')}
+     <ul>${how}${windLi}${markLi}</ul>`,
+    'Begin', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(cfg.mode === 'catch' ? 'Tap under the dew to catch it!' : 'Keep the fleece dry!', 2.4);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    const catchN = cfg.mode === 'catch';
+    showOverlay(last ? 'God gave the sign!' : catchN ? 'A bowlful of water!' : 'Dry fleece, wet ground!',
+      `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(catchN ? 'bowl' : 'godDid')}
+       ${last ? '<p style="text-align:center">God answered Gideon every time. Now Gideon knew: God was with him!</p>' : ''}
+       <p class="score">${s.lines.map(([k, v]) => `${k}: <b>${v}</b>`).join('<br>')}</p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next night', last ? () => { level = 1; totalScore = 0; startLevel(); } : () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const catchN = cfg.mode === 'catch';
+    showOverlay('Oh… try again', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${catchN ? 'Too much dew fell on the ground. Tap <b>under</b> each drop before it lands!' : 'The fleece got wet. Slide it <b>away</b> from the falling dew!'}</p>
+       ${verseHTML('goStrength')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    keys.clear(); down = null;
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Updating play
+// ============================================================
+function updateFleece(dt) {
+  let kx = 0;
+  if (keys.has('ArrowLeft') || keys.has('KeyA')) kx -= 1;
+  if (keys.has('ArrowRight') || keys.has('KeyD')) kx += 1;
+  const lo = world.x0 + cfg.fw / 2, hi = world.x1 - cfg.fw / 2;
+  if (kx) fleece.tx = clamp(fleece.x + kx * FLEECE_SPEED * 0.12, lo, hi);
+  fleece.tx = clamp(fleece.tx, lo, hi);
+  const d = fleece.tx - fleece.x;
+  const step = FLEECE_SPEED * dt;
+  fleece.x += Math.abs(d) <= step ? d : Math.sign(d) * step;
+  fleece.squish = Math.max(0, fleece.squish - dt * 3);
+  fleece.glow = Math.max(0, fleece.glow - dt * 2);
+}
+
+// narrow (phone) floors get a gentler breeze so the drops stay on screen
+function windMax() { return cfg.wind * clamp(W / 900, 0.55, 1); }
+function updateWind(dt) {
+  if (!cfg.wind) { wind = 0; return; }
+  windT -= dt;
+  if (windT <= 0) {
+    windT = rand(3.5, 6);
+    const s = Math.random() < 0.5 ? -1 : 1;
+    windTarget = s * windMax() * rand(0.6, 1);
+    if (!told.wind) { told.wind = true; showMessage('A breeze! The drops lean in the wind', 2.4); }
+  }
+  // the wind changes gently; each drop keeps the wind it was born in, so its landing stays true
+  wind += clamp(windTarget - wind, -80 * dt, 80 * dt);
+}
+
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') {
+    playT += dt;
+    updateWind(dt);
+    updateFleece(dt);
+    updateDrops(dt);
+    const dp = state === 'play' && cfg.mode === 'dry' && !told.dryHint ? dryPatches() : [];
+    if (dp.length && playT > 5 && dp.every((p) => overFleece((p.x0 + p.x1) / 2, 0))) {
+      told.dryHint = true; showMessage('The stones under the fleece need dew too!', 2.4);
+    }
+  } else if (state === 'win') {
+    winT += dt;
+    if (cfg.mode === 'catch') {
+      // Gideon wrings the fleece into his bowl
+      fleece.squish = 0.5 + 0.5 * Math.sin(winT * 9);
+      if (Math.random() < dt * 14) spawn(fleece.x + offX + rand(-20, 20), FLOOR_Y - 10 + offY, 0, 120, 0.4, '#bfe7ff', 3, 300);
+    } else if (Math.random() < dt * 12) {
+      const p = pick(world.patches);
+      spawn(rand(p.x0, p.x1) + offX, FLOOR_Y + rand(-10, 30) + offY, 0, -30, 0.8, '#ffffff', 3, 0, 'star');
+    }
+  } else if (state === 'fail') {
+    failT += dt;
+  } else if (state === 'title' || state === 'card') {
+    // idle dew drifting past behind the cards
+    fleece.squish = Math.max(0, fleece.squish - dt * 3);
+  }
+  flashT = Math.max(0, flashT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+let down = null;
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) { return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale }; }
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  down = { id: e.pointerId };
+  fleece.tx = p.vx - offX;
+  if (!told.tap) { told.tap = true; }
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!down || state !== 'play') return;
+  fleece.tx = toView(e).vx - offX;
+});
+canvas.addEventListener('pointerup', () => { down = null; });
+canvas.addEventListener('pointercancel', () => { down = null; });
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  catchDrop(h) { if (this.ctx) { Music.tap(clamp(h, 0, 1)); this.tone(1800 + h * 600, 0.12, 'sine', 0.08); } },
+  plip(v = 1) { this.tone(520, 0.12, 'sine', 0.14 * v, 0, 260); },
+  squish() { this.noiseBurst(700, 0.25, 0.25, 0.7, 250); this.tone(300, 0.2, 'triangle', 0.12, 0, 160); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: night sky, hills, Gideon, the threshing floor
+// ============================================================
+const STARS = Array.from({ length: 90 }, (_, i) => ({ x: hash(i, 1), y: hash(i, 2), r: 0.8 + hash(i, 3) * 1.8, p: hash(i, 4) * TAU }));
+
+function dawn() {
+  // the morning comes after a win
+  return state === 'win' ? clamp((winT - 0.3) / 1.6, 0, 1) : 0;
+}
+
+function drawSky() {
+  const top = -offY, dn = dawn();
+  const g = ctx.createLinearGradient(0, top, 0, 700);
+  g.addColorStop(0, dn ? mix('#121a3c', '#6fa4d8', dn) : '#121a3c');
+  g.addColorStop(0.6, dn ? mix('#25306a', '#f6c48a', dn) : '#25306a');
+  g.addColorStop(1, dn ? mix('#3b3f7a', '#ffe3a8', dn) : '#3b3f7a');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, top, viewW, 700 - top + 2);
+  // stars
+  ctx.fillStyle = '#ffffff';
+  for (const s of STARS) {
+    const a = (0.45 + 0.45 * Math.sin(t * 1.5 + s.p)) * (1 - dn);
+    if (a <= 0.02) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(-offX + s.x * viewW, top + s.y * (620 - top), s.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // the moon (or the rising sun)
+  const mx = W - 110, my = Math.max(top + 90, 230);
+  if (dn < 1) {
+    ctx.globalAlpha = 1 - dn;
+    const mg = ctx.createRadialGradient(mx, my, 10, mx, my, 110);
+    mg.addColorStop(0, 'rgba(255,250,220,0.35)'); mg.addColorStop(1, 'rgba(255,250,220,0)');
+    ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, 110, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff6d6';
+    ctx.beginPath(); ctx.arc(mx, my, 38, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(220,210,170,0.5)';
+    ctx.beginPath(); ctx.arc(mx - 12, my - 8, 7, 0, TAU); ctx.arc(mx + 10, my + 10, 5, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (dn > 0) {
+    const sy = lerp(720, 600, dn);
+    const sg = ctx.createRadialGradient(110, sy, 10, 110, sy, 220);
+    sg.addColorStop(0, `rgba(255,240,180,${0.9 * dn})`); sg.addColorStop(1, 'rgba(255,220,150,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(110, sy, 220, 0, TAU); ctx.fill();
+    ctx.fillStyle = `rgba(255,214,110,${dn})`;
+    ctx.beginPath(); ctx.arc(110, sy, 46, 0, TAU); ctx.fill();
+  }
+}
+
+function mix(a, b, f) {
+  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(na >> 16, nb >> 16, f)), g = Math.round(lerp((na >> 8) & 255, (nb >> 8) & 255, f)), bl = Math.round(lerp(na & 255, nb & 255, f));
+  return `rgb(${r},${g},${bl})`;
+}
+
+function drawHills() {
+  const dn = dawn();
+  ctx.fillStyle = mix('#28365a', '#7d9a5a', dn * 0.8);
+  ctx.beginPath(); ctx.moveTo(-offX, 700);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, 620 + Math.sin(x * 0.006) * 34 + Math.sin(x * 0.017) * 12);
+  ctx.lineTo(W + offX, 900); ctx.lineTo(-offX, 900); ctx.fill();
+  ctx.fillStyle = mix('#2f4a4a', '#8fae62', dn * 0.8);
+  ctx.beginPath(); ctx.moveTo(-offX, 900);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, 690 + Math.sin(x * 0.011 + 1) * 16);
+  ctx.lineTo(W + offX, 900); ctx.fill();
+  // an oak tree (Gideon met the angel under the oak at Ophrah)
+  drawTree(W - 70, 700, dn);
+  // a little stone house
+  ctx.fillStyle = mix('#4a4560', '#c9a978', dn);
+  roundRect(W * 0.5 - 40, 652, 80, 52, 4); ctx.fill();
+  ctx.fillStyle = mix('#2a2638', '#7a5a3a', dn);
+  roundRect(W * 0.5 - 10, 672, 20, 32, 8); ctx.fill();
+  ctx.fillStyle = state === 'win' ? 'rgba(0,0,0,0)' : 'rgba(255,200,90,0.85)';
+  ctx.fillRect(W * 0.5 + 18, 664, 12, 10);
+}
+
+function drawTree(x, y, dn) {
+  ctx.fillStyle = mix('#3a2c26', '#6b4a2e', dn);
+  ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x - 6, y - 70); ctx.lineTo(x + 6, y - 70); ctx.lineTo(x + 9, y); ctx.fill();
+  ctx.fillStyle = mix('#1f3a34', '#4f8a3e', dn);
+  for (const [dx, dy, r] of [[-28, -84, 30], [24, -88, 32], [0, -114, 36], [-8, -76, 26], [32, -66, 22]]) {
+    ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, TAU); ctx.fill();
+  }
+}
+
+function drawFloor() {
+  const w = world, dn = dawn();
+  const cx = W / 2, cy = FLOOR_Y + 14, rx = (w.x1 - w.x0) / 2 + 22, ry = 58;
+  // rim of the threshing floor
+  ctx.fillStyle = mix('#3a3648', '#9a8466', dn);
+  ctx.beginPath(); ctx.ellipse(cx, cy + 8, rx + 10, ry + 8, 0, 0, TAU); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU); ctx.clip();
+  // stones: dry is dusty, wet is shiny blue
+  for (const p of w.patches) {
+    const dry = mix('#6a6070', '#c8ad80', dn), wet = mix('#4f7bb0', '#7fb6e6', dn);
+    ctx.fillStyle = p.wet > 0 ? mix(dry.startsWith('rgb') ? toHex(dry) : dry, toHex(wet), clamp(p.wet, 0, 1)) : dry;
+    ctx.fillRect(p.x0, cy - ry - 4, p.x1 - p.x0 + 1, ry * 2 + 8);
+    // seams between the stones
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x0, cy - ry); ctx.lineTo(p.x0, cy + ry); ctx.stroke();
+    // little pebbles
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let k = 0; k < 4; k++) {
+      ctx.beginPath(); ctx.ellipse(p.x0 + hash(p.i, k) * (p.x1 - p.x0), cy - 30 + hash(k, p.i) * 70, 7, 4, 0, 0, TAU); ctx.fill();
+    }
+    if (p.wet >= 1) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      for (let k = 0; k < 3; k++) {
+        const a = 0.5 + 0.5 * Math.sin(t * 3 + p.sparkle + k * 2);
+        ctx.globalAlpha = a;
+        drawStar(p.x0 + (0.2 + 0.3 * k) * (p.x1 - p.x0), cy - 20 + k * 16, 3.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+  // dry stones that still need dew glow softly on night two
+  if (cfg.mode === 'dry' && state === 'play') {
+    for (const p of w.patches) {
+      if (p.wet >= 1) continue;
+      ctx.strokeStyle = `rgba(255,233,168,${0.35 + 0.25 * Math.sin(t * 4 + p.i)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(p.x0 + 6, cy + ry + 14); ctx.lineTo(p.x1 - 6, cy + ry + 14); ctx.stroke();
+    }
+  }
+}
+function toHex(rgb) {
+  const m = rgb.match(/\d+/g).map(Number);
+  return '#' + m.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
+// The fleece: a fluffy white woolly rug that soaks up dew
+function drawFleece() {
+  const fw = cfg.fw, x = fleece.x, y = FLOOR_Y - 6;
+  const sq = fleece.squish;
+  const wet = clamp(fleece.wet, 0, 1);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1 + sq * 0.06, 1 - sq * 0.12);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 16, fw / 2 + 4, 12, 0, 0, TAU); ctx.fill();
+  if (fleece.glow > 0 || (state === 'win' && cfg.mode === 'catch')) {
+    const ga = state === 'win' ? 0.7 : fleece.glow * 0.6;
+    const g = ctx.createRadialGradient(0, -4, 10, 0, -4, fw * 0.8);
+    g.addColorStop(0, `rgba(190,230,255,${ga})`); g.addColorStop(1, 'rgba(190,230,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -4, fw * 0.8, 0, TAU); ctx.fill();
+  }
+  const base = cfg.mode === 'catch' ? mix('#f4efe2', '#9cc8ec', wet) : mix('#f4efe2', '#8fb8de', wet);
+  const n = Math.round(fw / 18);
+  ctx.fillStyle = shade(toHex(base), -28);
+  ctx.beginPath(); ctx.ellipse(0, 4, fw / 2, 16, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = base;
+  for (let i = 0; i <= n; i++) {
+    const px = -fw / 2 + 10 + i * ((fw - 20) / n);
+    ctx.beginPath(); ctx.arc(px, -2 + (i % 2) * 4, 12, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(px + 6, -12 + (i % 2) * 3, 10, 0, TAU); ctx.fill();
+  }
+  // little curls of wool
+  ctx.strokeStyle = shade(toHex(base), -36); ctx.lineWidth = 1.6;
+  for (let i = 0; i < n; i++) {
+    const px = -fw / 2 + 18 + i * ((fw - 30) / n);
+    ctx.beginPath(); ctx.arc(px, -6 + (i % 2) * 5, 4, 0.5, 4.5); ctx.stroke();
+  }
+  // dew beads in the wool
+  if (cfg.mode === 'catch' && wet > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    const k = Math.round(wet * 10);
+    for (let i = 0; i < k; i++) {
+      ctx.beginPath(); ctx.arc(-fw / 2 + 12 + hash(i, 7) * (fw - 24), -14 + hash(i, 9) * 18, 2.4, 0, TAU); ctx.fill();
+    }
+  }
+  if (cfg.mode === 'dry' && hits > 0) {
+    ctx.fillStyle = 'rgba(70,120,190,0.45)';
+    for (let i = 0; i < hits; i++) { ctx.beginPath(); ctx.ellipse(-fw / 4 + i * fw / 4, -4, 14, 8, 0, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+// Gideon kneels and prays beside the floor; a bowl waits for the dew
+function gideonPos() { return { x: Math.max(70, EDGE + 26), y: FLOOR_Y - 76 }; }
+function drawGideon() {
+  const { x, y } = gideonPos();
+  const mood = gideonMood;
+  const bob = mood === 'joy' ? Math.abs(Math.sin(t * 6)) * 8 : Math.sin(t * 1.6) * 1.5;
+  ctx.save();
+  ctx.translate(x, y - bob);
+  // kneeling robe
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath(); ctx.ellipse(0, 4 + bob, 26, 7, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a5a2e';
+  ctx.beginPath(); ctx.moveTo(-22, 2); ctx.quadraticCurveTo(-22, -34, -10, -40); ctx.quadraticCurveTo(0, -44, 10, -40); ctx.quadraticCurveTo(22, -30, 24, 2); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-18, -18); ctx.quadraticCurveTo(0, -14, 18, -18); ctx.stroke();
+  // stripes on the cloak
+  ctx.strokeStyle = '#9b7a3e'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-14, -34); ctx.lineTo(-16, 0); ctx.moveTo(14, -34); ctx.lineTo(16, 0); ctx.stroke();
+  const hy = -56;
+  ctx.fillStyle = '#d39a66';
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  // head cloth
+  ctx.fillStyle = '#e8dcc0';
+  ctx.beginPath(); ctx.arc(0, hy - 3, 17.5, Math.PI * 1.02, Math.PI * 1.98); ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 10); ctx.lineTo(13, hy - 4); ctx.quadraticCurveTo(0, hy - 10, -13, hy - 4); ctx.lineTo(-13, hy + 10); ctx.lineTo(-18, hy + 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a0673a'; ctx.fillRect(-17, hy - 8, 34, 4);
+  // beard
+  ctx.fillStyle = '#5c3a1c';
+  ctx.beginPath(); ctx.moveTo(-14, hy + 2); ctx.quadraticCurveTo(-13, hy + 22, 0, hy + 23); ctx.quadraticCurveTo(13, hy + 22, 14, hy + 2); ctx.quadraticCurveTo(8, hy + 8, 0, hy + 8); ctx.quadraticCurveTo(-8, hy + 8, -14, hy + 2); ctx.fill();
+  // face
+  const dark = '#2b1d12';
+  ctx.strokeStyle = dark; ctx.fillStyle = dark; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  if (mood === 'pray') {
+    ctx.beginPath(); ctx.arc(-6, hy - 1, 3.5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.moveTo(9.5, hy - 1); ctx.arc(6, hy - 1, 3.5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy + 6, 3, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  } else if (mood === 'joy') {
+    ctx.beginPath(); ctx.arc(-6, hy + 0.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6, hy + 0.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.moveTo(-6, hy + 6); ctx.arc(0, hy + 6, 6, 0, Math.PI); ctx.closePath(); ctx.fill();
+  } else {
+    for (const sx of [-6, 6]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, hy - 1, 3.6, 4.6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx, hy, 2, 0, TAU); ctx.fill();
+    }
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy + 10, 4, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke();
+  }
+  // praying hands, or arms up for joy
+  ctx.strokeStyle = '#5e4422'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  if (mood === 'joy') {
+    const wv = Math.sin(t * 9) * 4;
+    ctx.beginPath(); ctx.moveTo(-12, -34); ctx.lineTo(-26 + wv, -70); ctx.moveTo(12, -34); ctx.lineTo(26 - wv, -70); ctx.stroke();
+    ctx.fillStyle = '#d39a66'; ctx.beginPath(); ctx.arc(-26 + wv, -70, 4.5, 0, TAU); ctx.arc(26 - wv, -70, 4.5, 0, TAU); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-12, -34); ctx.lineTo(-2, -26); ctx.moveTo(12, -34); ctx.lineTo(2, -26); ctx.stroke();
+    ctx.fillStyle = '#d39a66'; ctx.beginPath(); ctx.ellipse(0, -30, 4, 7, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBowl() {
+  const g = gideonPos();
+  const x = g.x + 4, y = FLOOR_Y - 58;
+  let fill = 0;
+  if (cfg.mode === 'catch') fill = state === 'win' ? clamp(winT / 2.2, 0, 1) : 0;
+  ctx.fillStyle = '#a65a33';
+  ctx.beginPath(); ctx.moveTo(x - 22, y - 10); ctx.quadraticCurveTo(x, y + 18, x + 22, y - 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#7a3f20';
+  ctx.beginPath(); ctx.ellipse(x, y - 10, 22, 6, 0, 0, TAU); ctx.fill();
+  if (fill > 0) {
+    ctx.fillStyle = '#7fc0ee';
+    ctx.beginPath(); ctx.ellipse(x, y - 10, 19 * fill, 4.5 * fill, 0, 0, TAU); ctx.fill();
+  }
+}
+
+function drawDrops() {
+  const mk = cfg.marker;
+  for (const d of drops) {
+    const p = dropPos(d);
+    if (playT < d.landT - d.fall) continue;   // not born yet
+    // a little shiny spot on the floor shows where it will land
+    if (mk > 0) {
+      const show = mk >= 1 ? 1 : clamp((p.f - 0.45) / 0.3, 0, 1) * mk * 2;
+      if (show > 0) {
+        ctx.fillStyle = `rgba(200,235,255,${0.35 * show})`;
+        ctx.beginPath(); ctx.ellipse(d.landX, FLOOR_Y + 4, 14 + p.f * 6, 5, 0, 0, TAU); ctx.fill();
+      }
+    }
+    const r = d.big ? 11 : 8;
+    const lean = Math.atan2(d.vx, 320);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(-lean);
+    ctx.globalAlpha = clamp(p.f * 5, 0, 1);
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, r * 2.6);
+    g.addColorStop(0, d.big ? 'rgba(255,240,170,0.6)' : 'rgba(190,230,255,0.5)'); g.addColorStop(1, 'rgba(190,230,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * 2.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = d.big ? '#ffe9a8' : '#cdeeff';
+    ctx.beginPath(); ctx.moveTo(0, -r * 1.7); ctx.quadraticCurveTo(r, -r * 0.2, r, r * 0.3); ctx.arc(0, r * 0.3, r, 0, Math.PI); ctx.quadraticCurveTo(-r, -r * 0.2, 0, -r * 1.7); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, 0, r * 0.22, r * 0.38, -0.4, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  for (const s of splashes) {
+    const f = 1 - s.t / 0.5;
+    ctx.strokeStyle = `rgba(200,235,255,${1 - f})`; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, 8 + f * 26, 3 + f * 8, 0, 0, TAU); ctx.stroke();
+  }
+}
+
+function drawWindArrow() {
+  if (!cfg.wind || state !== 'play') return;
+  const a = clamp(Math.abs(wind) / windMax(), 0, 1);
+  if (a < 0.08) return;
+  const dir = Math.sign(wind), cx = W / 2, cy = spawnY() - 12;
+  ctx.save();
+  ctx.globalAlpha = 0.45 + 0.4 * a;
+  ctx.strokeStyle = '#e8f2ff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const ox = ((t * 90 * dir + i * 40) % 120) - 60;
+    ctx.beginPath(); ctx.moveTo(cx + ox - 26 * dir, cy - 14 + i * 14); ctx.quadraticCurveTo(cx + ox, cy - 20 + i * 14, cx + ox + 26 * dir, cy - 14 + i * 14); ctx.stroke();
+  }
+  ctx.fillStyle = '#e8f2ff';
+  ctx.beginPath(); ctx.moveTo(cx + 70 * dir, cy); ctx.lineTo(cx + 52 * dir, cy - 10); ctx.lineTo(cx + 52 * dir, cy + 10); ctx.fill();
+  ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('wind', cx, cy + 32);
+  ctx.restore();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const inLevel = state !== 'title';
+  ctx.fillText(inLevel ? `Level ${level} · ${cfg.name}` : 'Fleece and Dew', 12, 26);
+  if (inLevel) {
+    ctx.font = '600 13px Fredoka, sans-serif';
+    ctx.fillText(cfg.mode === 'catch' ? 'Night one: catch the dew' : 'Night two: keep the fleece dry', 12, 47);
+  }
+  ctx.shadowBlur = 0;
+  // Home / pause / mute buttons
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  if (inLevel) drawMeters();
+  ctx.restore();
+}
+
+// Right-hand side: progress (dew caught / stones wet) and the chances left
+function drawMeters() {
+  const rx = viewW - 14;
+  ctx.textAlign = 'right';
+  ctx.font = '700 15px Fredoka, sans-serif';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  const catchN = cfg.mode === 'catch';
+  const got = catchN ? caught : world.patches.filter((p) => p.wet >= 1).length;
+  const need = catchN ? cfg.need : world.patches.length;
+  ctx.fillText(catchN ? `Dew caught ${got} / ${need}` : `Stones wet ${got} / ${need}`, rx, 26);
+  ctx.shadowBlur = 0;
+  const bw = Math.min(170, viewW * 0.34);
+  ctx.fillStyle = 'rgba(255,233,168,0.22)';
+  roundRect(rx - bw, 36, bw, 12, 6); ctx.fill();
+  ctx.fillStyle = '#9fd6ff';
+  if (got > 0) { roundRect(rx - bw, 36, bw * clamp(got / need, 0, 1), 12, 6); ctx.fill(); }
+  // chances: drops of water (ground) or little fleeces
+  const left = catchN ? cfg.misses - misses : cfg.hits - hits;
+  const total = catchN ? cfg.misses : cfg.hits;
+  ctx.font = '600 12px Fredoka, sans-serif';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.shadowBlur = 4;
+  ctx.fillText(catchN ? 'Ground dry:' : 'Fleece dry:', rx - total * 22 - 4, 72);
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < total; i++) {
+    const x = rx - 10 - (total - 1 - i) * 22, y = 67;
+    const ok = i < left;
+    ctx.fillStyle = ok ? (catchN ? '#d9b97a' : '#f4efe2') : '#4f7bb0';
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (!ok) { ctx.fillStyle = '#cdeeff'; ctx.beginPath(); ctx.arc(x - 2, y - 2, 2.2, 0, TAU); ctx.fill(); }
+  }
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = offY + 430;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,16,40,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawSky();
+  drawHills();
+  if (world) {
+    drawFloor();
+    drawBowl();
+    drawGideon();
+    drawFleece();
+    drawDrops();
+    drawWindArrow();
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawParticles();
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(120,170,230,${flashT})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(10,12,30,${clamp(failT / 1.5, 0, 0.45)})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

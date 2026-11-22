@@ -1,0 +1,1538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#7a5226">
+<title>Bread from Heaven</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1f5f73;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 60, 80, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Bread from Heaven</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'pipe', accent: 'harp', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  rain: { ref: 'Exodus 16:4', KJV: 'Behold, I will rain bread from heaven for you; and the people shall go out and gather a certain rate every day', NKJV: 'Behold, I will rain bread from heaven for you. And the people shall go out and gather a certain quota every day', NIV: 'I will rain down bread from heaven for you. The people are to go out each day and gather enough for that day.', NLT: 'Look, I’m going to rain down food from heaven for you. Each day the people can go out and pick up as much food as they need for that day.' },
+  // Level cards
+  whatIsIt: { ref: 'Exodus 16:15', KJV: 'This is the bread which the Lord hath given you to eat.', NKJV: 'This is the bread which the Lord has given you to eat.', NIV: 'It is the bread the Lord has given you to eat.', NLT: 'It is the food the Lord has given you to eat.' },
+  quail: { ref: 'Exodus 16:13', KJV: 'And it came to pass, that at even the quails came up, and covered the camp', NKJV: 'So it was that quail came up at evening and covered the camp', NIV: 'That evening quail came and covered the camp', NLT: 'That evening vast numbers of quail flew in and covered the camp.' },
+  honey: { ref: 'Exodus 16:31', KJV: 'it was like coriander seed, white; and the taste of it was like wafers made with honey.', NKJV: 'it was like white coriander seed, and the taste of it was like wafers made with honey.', NIV: 'It was white like coriander seed and tasted like wafers made with honey.', NLT: 'It was white like coriander seed, and it tasted like honey wafers.' },
+  double: { ref: 'Exodus 16:22', KJV: 'And it came to pass, that on the sixth day they gathered twice as much bread, two omers for one man', NKJV: 'And so it was, on the sixth day, that they gathered twice as much bread, two omers for each one.', NIV: 'On the sixth day, they gathered twice as much—two omers for each person', NLT: 'On the sixth day, they gathered twice as much as usual' },
+  sabbath: { ref: 'Exodus 16:23', KJV: 'To morrow is the rest of the holy sabbath unto the Lord', NKJV: 'Tomorrow is a Sabbath rest, a holy Sabbath to the Lord.', NIV: 'Tomorrow is to be a day of sabbath rest, a holy sabbath to the Lord.', NLT: 'Tomorrow will be a day of complete rest, a holy Sabbath day set apart for the Lord.' },
+  // Win cards
+  enough: { ref: 'Exodus 16:18', KJV: 'he that gathered much had nothing over, and he that gathered little had no lack; they gathered every man according to his eating.', NKJV: 'he who gathered much had nothing left over, and he who gathered little had no lack. Every man had gathered according to each one’s need.', NIV: 'the one who gathered much did not have too much, and the one who gathered little did not have too little. Everyone had gathered just as much as they needed.', NLT: 'Those who gathered a lot had nothing left over, and those who gathered only a little had enough. Each family had just what it needed.' },
+  // Fail card
+  melted: { ref: 'Exodus 16:21', KJV: 'And they gathered it every morning, every man according to his eating: and when the sun waxed hot, it melted.', NKJV: 'So they gathered it every morning, every man according to his need. And when the sun became hot, it melted.', NIV: 'Each morning everyone gathered as much as they needed, and when the sun grew hot, it melted away.', NLT: 'After this the people gathered the food morning by morning, each family according to its need. And as the sun became hot, the flakes they had not picked up melted and disappeared.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes more sky above the playfield
+  if (tents && tents.length) layoutTents();
+  if (kid) kid.x = kid.tx = clamp(kid.x, offX + 40, offX + W - 40);
+}
+window.addEventListener('resize', () => resize());
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip at the top of the screen
+const GROUND_Y = 560;      // where the sky meets the desert
+const KID_Y = 646;         // the child with the basket walks along here
+const TENT_Y = 860;        // the tents' bottom edge
+const TENT_TOP = 775;      // taps below this line are taps on a tent
+const CATCH_R = 44;        // how wide the basket catches
+const KID_SPEED = 620;     // px/s when walking to a tapped spot
+const CATCH_PTS = 5;
+const EXACT_PTS = 100;
+const WORM_PTS = 50;       // lost each time a jar goes wormy
+
+// Each day (level) of gathering
+const DAYS = [
+  { name: 'Day 1: What Is It?', day: 1, kind: 'manna', tents: 2, need: [2, 3], fall: 120, every: 0.62, dur: 45, cap: 6, wind: 0, verse: 'whatIsIt' },
+  { name: 'Day 2: Enough for Everyone', day: 2, kind: 'manna', tents: 3, need: [2, 4], fall: 140, every: 0.6, dur: 44, cap: 6, wind: 0, verse: 'honey' },
+  { name: 'Evening: The Quail Come', day: 3, kind: 'quail', tents: 3, need: [2, 4], fall: 95, every: 0.85, dur: 42, cap: 6, wind: 0, verse: 'quail' },
+  { name: 'Day 4: A Windy Morning', day: 4, kind: 'manna', tents: 4, need: [2, 5], fall: 165, every: 0.6, dur: 36, cap: 6, wind: 1, verse: 'whatIsIt' },
+  { name: 'Day 5: Busy Camp', day: 5, kind: 'mix', tents: 5, need: [2, 5], fall: 185, every: 0.55, dur: 38, cap: 6, wind: 1.3, verse: 'honey' },
+  { name: 'Day 6: Twice as Much', day: 6, kind: 'manna', tents: 4, need: [4, 8], fall: 200, every: 0.42, dur: 36, cap: 10, wind: 1.5, verse: 'double' },
+];
+const LAST = DAYS.length;
+function makeConfig(n) {
+  const d = DAYS[Math.min(n, LAST) - 1];
+  const extra = Math.max(0, n - LAST);
+  return { ...d, fall: d.fall + extra * 12, dur: Math.max(32, d.dur - extra * 2) };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | intro | play | win | fail | pause | rest
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('mannaBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let tents = [];
+let falling = [];
+let flying = [];           // pieces flying from the basket into a tent
+let particles = [], floaters = [];
+let kid = null;
+let basket = { manna: 0, quail: 0 };
+let message = { text: '', t: 0 };
+let dayT = 0;              // 0..dur: the sun climbs; at the end the manna melts
+let spawnT = 0, gust = 0, gustT = 0;
+let caughtPts = 0, exactPts = 0, wormy = 0, exactCount = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0;
+let restT = 0, restBroken = 0;
+let lastScore = null;
+let told = {};
+let flashT = 0, shakeT = 0;
+
+// ============================================================
+//  Layout
+// ============================================================
+function layoutTents() {
+  const n = tents.length;
+  const span = Math.min(W - 30, n * 190);
+  const w = span / n;
+  for (let i = 0; i < n; i++) {
+    tents[i].x = viewW / 2 - span / 2 + w * (i + 0.5);
+    tents[i].w = Math.min(w - 12, 150);
+  }
+}
+function tentAt(x, y) {
+  if (y < TENT_TOP - 70) return null;
+  let bestT = null, bd = 1e9;
+  for (const tn of tents) {
+    const d = Math.abs(tn.x - x);
+    if (d < tn.w / 2 + 8 && d < bd) { bd = d; bestT = tn; }
+  }
+  return bestT;
+}
+function sunF() { return clamp(dayT / cfg.dur, 0, 1); }
+
+// ============================================================
+//  People
+// ============================================================
+function blinkTick(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+      if (d.egypt) { ctx.strokeStyle = '#1b130c'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(sx + (sx < 0 ? -rx - 2 : rx + 2), ey - 1); ctx.lineTo(sx + (sx < 0 ? -rx : rx), ey); ctx.stroke(); }
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'grumpy':
+      eyes(3.5, 3.5, 2);
+      brows(-5, -9, -5, -9);
+      mouthLine(() => ctx.arc(0, mouthY + 3, 4.5, 1.2 * Math.PI, 1.8 * Math.PI));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      ctx.fillStyle = '#7cc4f2';
+      ctx.beginPath();
+      ctx.moveTo(14, hy - 8); ctx.quadraticCurveTo(18, hy - 1, 14, hy); ctx.quadraticCurveTo(10, hy - 1, 14, hy - 8);
+      ctx.fill();
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+function drawBob(d, hy) {
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-19, hy + 12); ctx.lineTo(-19, hy - 4);
+  ctx.arc(0, hy - 3, 19, Math.PI, 0);
+  ctx.lineTo(19, hy + 12); ctx.lineTo(12, hy + 12); ctx.lineTo(12, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 13, -12, hy - 6);
+  ctx.lineTo(-12, hy + 12);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e8b53a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 3, 18.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+}
+
+// Pharaoh's striped royal head-cloth
+function drawNemes(hy) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-14, hy - 10);
+  ctx.quadraticCurveTo(0, hy - 30, 14, hy - 10);
+  ctx.lineTo(22, hy + 22); ctx.lineTo(13, hy + 22); ctx.lineTo(13, hy - 4);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 4);
+  ctx.lineTo(-13, hy + 22); ctx.lineTo(-22, hy + 22);
+  ctx.closePath();
+  ctx.fillStyle = '#e8b53a'; ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = '#2f5fa8'; ctx.lineWidth = 3;
+  for (let k = -30; k < 40; k += 7) { ctx.beginPath(); ctx.moveTo(-30, hy + k); ctx.lineTo(30, hy + k + 4); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = '#e8b53a';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 3.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.arc(0, hy - 19, 1.6, 0, TAU); ctx.fill();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.walk) jump = Math.abs(Math.sin(t * 8 + d.phase)) * 5;
+  if (d.kid) s *= 0.78;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.egypt ? d.skin : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = d.egypt ? 6 : 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // the staff stands beside Moses
+  if (d.staff) {
+    const up = d.pose === 'stretch';
+    ctx.strokeStyle = '#7a5226'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (up) { ctx.moveTo(22, -40); ctx.lineTo(34, -112); }
+    else { ctx.moveTo(22, 0); ctx.lineTo(22, -92); ctx.quadraticCurveTo(22, -100, 15, -98); }
+    ctx.stroke();
+  }
+  if (mood === 'joy' && !d.timbrel) {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (d.collar) {
+    ctx.fillStyle = '#e8b53a';
+    ctx.beginPath(); ctx.ellipse(0, -36, 13, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3c8fc0';
+    ctx.beginPath(); ctx.ellipse(0, -35, 9, 3.5, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = d.egypt ? '#e8b53a' : '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (d.timbrel) {
+    // a timbrel shaken high
+    const sh = Math.sin(t * 14 + d.phase) * 3;
+    arm(11, -32, 20, -64 + sh);
+    arm(-11, -32, -15, -12);
+    ctx.fillStyle = '#e9c36e'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(24, -72 + sh, 8, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c0392b';
+    for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + t * 3; ctx.beginPath(); ctx.arc(24 + Math.cos(a) * 8, -72 + sh + Math.sin(a) * 8, 1.8, 0, TAU); ctx.fill(); }
+  } else if (d.pose === 'cross') { arm(-11, -32, 6, -24); arm(11, -32, -6, -22); }
+  else if (d.pose === 'point') { arm(-11, -32, -15, -12); arm(11, -32, 34, -50); }
+  else if (d.pose === 'stretch') { arm(-11, -32, -15, -12); arm(11, -32, 30, -46); }
+  else if (d.staff && mood !== 'joy') { arm(-11, -32, -15, -12); arm(11, -32, 20, -50); }
+  else if (mood === 'watch' || mood === 'wow' || mood === 'grumpy') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.nemes) drawNemes(hy);
+  else if (d.egypt) drawBob(d, hy);
+  else if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 21, 0, hy + 22);
+    ctx.quadraticCurveTo(14, hy + 21, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  if (d.nemes) { ctx.fillStyle = '#8a5a2a'; roundRect(-3, hy + 14, 6, 12, 2); ctx.fill(); }
+  drawFace(d, mood, hy, lx, ly);
+  if (mood === 'shock') { arm(-11, -32, -15, hy + 4); arm(11, -32, 15, hy + 4); }
+  ctx.restore();
+}
+
+
+const FAMILIES = [
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#f0c9a0' },
+  { robe: '#6b8e3a', hair: '#4a2f1a', beard: true, skin: '#c98d56' },
+  { robe: '#3c8f86', hair: '#1f140c', skin: '#b87a48', scarf: '#d8c7a0' },
+  { robe: '#b5503f', hair: '#2e1d10', beard: true, skin: '#d7a070' },
+  { robe: '#7a4fa0', hair: '#3a2716', skin: '#c58a55', scarf: '#e8a13a' },
+  { robe: '#3f6fb5', hair: '#8a8a8a', beard: true, skin: '#d9a066' },
+];
+const TENT_COLS = ['#c98b52', '#b5734a', '#d9a86a', '#a8693e', '#c7955e', '#b98250'];
+const KID = { robe: '#e07a5f', hair: '#5c3a1c', skin: '#dca678', kid: true, i: 1, mood: 'watch', blinkT: 2, blink: 0, phase: 0 };
+
+// ============================================================
+//  Drawing: sky, desert, tents
+// ============================================================
+function skyCols() {
+  const f = sunF();
+  if (cfg.kind === 'quail') {
+    // evening: gold to dusky purple
+    return [[lerp(255, 70, f), lerp(170, 60, f), lerp(110, 120, f)], [lerp(255, 200, f), lerp(214, 120, f), lerp(150, 120, f)]];
+  }
+  if (state === 'rest' || state === 'title' || state === 'intro') return [[124, 196, 242], [255, 238, 200]];
+  // morning: soft dawn to hot white-gold
+  return [[lerp(150, 120, f), lerp(190, 200, f), lerp(240, 255, f)], [lerp(255, 255, f), lerp(214, 236, f), lerp(180, 170, f)]];
+}
+function drawSky() {
+  const top = -offY;
+  const [a, b] = skyCols();
+  const g = ctx.createLinearGradient(0, top, 0, GROUND_Y);
+  g.addColorStop(0, `rgb(${a.map(Math.round).join(',')})`);
+  g.addColorStop(1, `rgb(${b.map(Math.round).join(',')})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, viewW, GROUND_Y - top + 2);
+  // the sun climbs (or sets, in the evening)
+  const f = state === 'play' || state === 'win' || state === 'fail' ? sunF() : 0.15;
+  const sx = lerp(offX + 50, offX + W - 50, f);
+  const sy = cfg.kind === 'quail' ? lerp(200, 520, f) : lerp(500, 160, Math.sin(f * Math.PI / 2));
+  const hot = cfg.kind === 'quail' ? 0 : f;
+  const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 90 + hot * 60);
+  sg.addColorStop(0, `rgba(255,${Math.round(lerp(240, 200, hot))},${Math.round(lerp(170, 90, hot))},0.9)`); sg.addColorStop(1, 'rgba(255,230,150,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(sx - 160, sy - 160, 320, 320);
+  ctx.fillStyle = cfg.kind === 'quail' ? '#ffb070' : `rgb(255,${Math.round(lerp(236, 200, hot))},${Math.round(lerp(150, 80, hot))})`;
+  ctx.beginPath(); ctx.arc(sx, sy, 34, 0, TAU); ctx.fill();
+  if (cfg.kind !== 'quail' && hot > 0.7 && state === 'play') {
+    // heat shimmer warns the manna will soon melt
+    ctx.strokeStyle = `rgba(255,255,255,${(hot - 0.7) * 1.5})`; ctx.lineWidth = 2;
+    for (let k = 0; k < 8; k++) {
+      const x = offX + (k + 0.5) * W / 8, y = GROUND_Y - 30;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let j = 1; j < 6; j++) ctx.lineTo(x + Math.sin(t * 6 + j + k) * 5, y - j * 8);
+      ctx.stroke();
+    }
+  }
+  // the pillar of cloud over the camp
+  const px = offX + W * 0.82;
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.arc(px + Math.sin(t + k) * 5, GROUND_Y - 30 - k * 34, 24 + (k === 5 ? 10 : 0), 0, TAU); ctx.fill();
+  }
+  // mountains
+  ctx.fillStyle = cfg.kind === 'quail' ? '#a07a6a' : '#d9b07a';
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y);
+  for (let x = 0; x <= viewW + 40; x += 40) ctx.lineTo(x, GROUND_Y - 30 - Math.abs(Math.sin(x * 0.007)) * 60 - Math.sin(x * 0.03) * 6);
+  ctx.lineTo(viewW, GROUND_Y); ctx.fill();
+}
+function drawGround() {
+  const g = ctx.createLinearGradient(0, GROUND_Y, 0, H);
+  const ev = cfg.kind === 'quail' ? sunF() * 0.4 : 0;
+  g.addColorStop(0, `rgb(${Math.round(lerp(236, 170, ev))},${Math.round(lerp(204, 140, ev))},${Math.round(lerp(146, 120, ev))})`);
+  g.addColorStop(1, `rgb(${Math.round(lerp(214, 150, ev))},${Math.round(lerp(176, 120, ev))},${Math.round(lerp(118, 100, ev))})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, GROUND_Y, viewW, H - GROUND_Y + 2);
+  // little bushes and stones
+  for (let i = 0; i < 24; i++) {
+    const x = hash(i, 2) * viewW, y = GROUND_Y + 10 + hash(i, 5) * 150;
+    if (i % 3 === 0) { ctx.fillStyle = '#8aa858'; ctx.beginPath(); ctx.arc(x, y, 7, Math.PI, TAU); ctx.fill(); }
+    else { ctx.fillStyle = 'rgba(150,110,70,0.3)'; ctx.beginPath(); ctx.ellipse(x, y, 6, 3, 0, 0, TAU); ctx.fill(); }
+  }
+  // dew lying on the ground in the morning (manna days)
+  if (cfg.kind !== 'quail' && state === 'play') {
+    ctx.fillStyle = `rgba(255,255,255,${0.35 * (1 - sunF())})`;
+    for (let i = 0; i < 30; i++) { ctx.beginPath(); ctx.arc(hash(i, 9) * viewW, GROUND_Y + 8 + hash(i, 4) * 120, 1.8, 0, TAU); ctx.fill(); }
+  }
+}
+
+function drawTent(tn) {
+  const x = tn.x, w = tn.w, h = 100, y = TENT_Y;
+  ctx.save();
+  const bounce = tn.pop > 0 ? Math.sin(tn.pop * 20) * tn.pop * 6 : 0;
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(0, 4, w * 0.55, 10, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -bounce);
+  // goat-hair tent with stripes
+  ctx.fillStyle = tn.col;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, 0); ctx.lineTo(-w * 0.42, -h * 0.7); ctx.quadraticCurveTo(0, -h - 8, w * 0.42, -h * 0.7); ctx.lineTo(w / 2, 0); ctx.closePath();
+  ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = shade(tn.col, -30);
+  for (let k = -3; k <= 3; k++) ctx.fillRect(k * w * 0.16 - 4, -h - 10, 8, h + 10);
+  ctx.restore();
+  ctx.strokeStyle = shade(tn.col, -55); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(-w * 0.42, -h * 0.7); ctx.quadraticCurveTo(0, -h - 8, w * 0.42, -h * 0.7); ctx.lineTo(w / 2, 0); ctx.stroke();
+  // doorway with the family peeking out
+  ctx.fillStyle = '#4a3020';
+  ctx.beginPath(); ctx.moveTo(-20, 0); ctx.quadraticCurveTo(0, -66, 20, 0); ctx.fill();
+  ctx.restore();
+  const fam = tn.fam;
+  fam.mood = tn.wormT > 0 ? 'shock' : tn.got >= tn.need ? 'joy' : tn.pop > 0 ? 'wow' : 'watch';
+  drawPerson(fam, x, y - 2 - bounce, 0.62, kid ? kid.x : x, KID_Y - 40);
+  // the jar showing what this tent still needs
+  drawNeed(tn);
+  // little worms wriggling if too much went in
+  if (tn.worms > 0 && tn.wormT > 0) {
+    for (let k = 0; k < Math.min(tn.worms, 4); k++) {
+      const wx = x - w * 0.35 + k * 14, wy = y - 6;
+      ctx.strokeStyle = '#f2a0b0'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(wx - 5, wy);
+      ctx.quadraticCurveTo(wx, wy - 6 + Math.sin(t * 8 + k) * 4, wx + 5, wy);
+      ctx.stroke();
+      ctx.fillStyle = '#1b130c'; ctx.beginPath(); ctx.arc(wx + 5, wy - 1, 1.1, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawNeed(tn) {
+  const x = tn.x, y = TENT_Y - 120;
+  const done = tn.got >= tn.need;
+  const w = 74, h = 32;
+  ctx.save();
+  ctx.fillStyle = done ? 'rgba(220,255,210,0.96)' : 'rgba(255,252,240,0.96)';
+  roundRect(x - w / 2, y - h / 2, w, h, 12); ctx.fill();
+  ctx.strokeStyle = done ? '#5aa04a' : tn.flash > 0 ? '#e8506a' : 'rgba(168,116,26,0.7)'; ctx.lineWidth = 2.5; ctx.stroke();
+  // icon: a manna wafer or a quail
+  if (tn.kind === 'quail') drawQuailIcon(x - 20, y, 0.6);
+  else drawMannaIcon(x - 20, y, 9);
+  ctx.fillStyle = done ? '#2f7a2a' : '#5a4210';
+  ctx.font = '700 19px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(done ? '✓' : `${tn.got}/${tn.need}`, x + 12, y + 1);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  ctx.beginPath(); ctx.moveTo(x - 6, y + h / 2 - 1); ctx.lineTo(x, y + h / 2 + 7); ctx.lineTo(x + 6, y + h / 2 - 1); ctx.fill();
+}
+
+function drawMannaIcon(x, y, r) {
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#efe4c4');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,170,110,0.8)'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.fillStyle = 'rgba(220,190,130,0.6)';
+  ctx.beginPath(); ctx.arc(x - r * 0.3, y + r * 0.1, r * 0.15, 0, TAU); ctx.arc(x + r * 0.3, y - r * 0.2, r * 0.12, 0, TAU); ctx.fill();
+}
+
+function drawQuail(x, y, s, flap, face = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s * face, s);
+  // round brown bird with a little topknot
+  ctx.fillStyle = '#a8794a';
+  ctx.beginPath(); ctx.ellipse(0, 0, 16, 13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#d9b48a';
+  ctx.beginPath(); ctx.ellipse(2, 4, 10, 7, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a5230';
+  for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-6 + k * 5, -2 + (k % 2) * 3, 1.6, 0, TAU); ctx.fill(); }
+  // wing
+  ctx.fillStyle = '#8a5e36';
+  ctx.beginPath(); ctx.ellipse(-4, -4 - flap * 8, 10, 5 + flap * 3, -0.4 - flap * 0.6, 0, TAU); ctx.fill();
+  // head
+  ctx.fillStyle = '#a8794a';
+  ctx.beginPath(); ctx.arc(12, -9, 7, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#3a2716'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(12, -15); ctx.quadraticCurveTo(16, -22, 20, -19); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(14, -10, 2.6, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#1b130c'; ctx.beginPath(); ctx.arc(14.8, -10, 1.3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8a13a';
+  ctx.beginPath(); ctx.moveTo(18, -8); ctx.lineTo(23, -7); ctx.lineTo(18, -5); ctx.fill();
+  ctx.restore();
+}
+function drawQuailIcon(x, y, s) { drawQuail(x, y + 2, s, 0); }
+
+// The child and the basket
+function drawKid() {
+  const k = kid;
+  KID.walk = Math.abs(k.tx - k.x) > 4;
+  drawPerson(KID, k.x, KID_Y + 40, 1.05, k.x, KID_Y - 200);
+  // basket held up high
+  const bx = k.x, by = KID_Y - 36;
+  const cap = cfg.cap, n = basket.manna + basket.quail;
+  ctx.save();
+  ctx.translate(bx, by);
+  const sq = k.catchT > 0 ? 1 + k.catchT * 0.4 : 1;
+  ctx.scale(sq, 2 - sq);
+  // contents peeking over the rim
+  for (let i = 0; i < Math.min(n, 12); i++) {
+    const a = (i / Math.max(1, Math.min(n, 12))) * Math.PI;
+    const cx = Math.cos(a) * 22 * (i % 2 ? 0.6 : 1), cy = -6 - Math.sin(a) * 6 - Math.floor(i / 6) * 5;
+    if (i < basket.quail) drawQuail(cx, cy - 4, 0.45, 0);
+    else drawMannaIcon(cx, cy, 6);
+  }
+  ctx.fillStyle = '#c9954a';
+  ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(34, -6); ctx.lineTo(26, 20); ctx.lineTo(-26, 20); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#8a5e2a'; ctx.lineWidth = 1.6;
+  for (let r = 0; r < 3; r++) { ctx.beginPath(); ctx.moveTo(-32 + r * 2, r * 8); ctx.lineTo(32 - r * 2, r * 8); ctx.stroke(); }
+  for (let c = -3; c <= 3; c++) { ctx.beginPath(); ctx.moveTo(c * 9, -6); ctx.lineTo(c * 7.5, 20); ctx.stroke(); }
+  ctx.fillStyle = '#a8742f';
+  roundRect(-36, -10, 72, 7, 3); ctx.fill();
+  ctx.restore();
+  // the count, big and clear
+  const full = n >= cap;
+  ctx.save();
+  ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const label = `${n}`;
+  ctx.fillStyle = full ? '#e8506a' : '#3f8fc0';
+  ctx.beginPath(); ctx.arc(bx + 44, by - 24, 17, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillText(label, bx + 44, by - 23);
+  if (full) { ctx.font = '700 13px Fredoka, sans-serif'; ctx.fillStyle = '#e8506a'; ctx.fillText('full!', bx + 44, by - 50); }
+  ctx.restore();
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#f6d27a']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 200);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.2), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t -= dt; floaters[i].y -= 40 * dt; if (floaters[i].t <= 0) floaters.splice(i, 1); }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px Fredoka, sans-serif';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(80,50,10,0.8)'; ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.col || '#ffe9a8'; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Falling manna and fluttering quail
+// ============================================================
+function spawnFalling() {
+  const tentKinds = tents.filter((tn) => tn.got < tn.need).map((tn) => tn.kind);
+  let kind = cfg.kind === 'mix' ? pick(tentKinds.length ? tentKinds : ['manna', 'quail']) : cfg.kind;
+  if (cfg.kind === 'mix' && Math.random() < 0.3) kind = kind === 'manna' ? 'quail' : 'manna';
+  const x = rand(offX + 30, offX + W - 30);
+  if (kind === 'quail') falling.push({ kind, x, y: -offY - 30, vy: cfg.fall * 0.75 * rand(0.85, 1.15), ph: rand(0, TAU), face: pick([-1, 1]), sway: rand(50, 110), x0: x });
+  else falling.push({ kind, x, y: -offY - 20, vy: cfg.fall * rand(0.85, 1.2), ph: rand(0, TAU), r: rand(8, 11), x0: x, sway: rand(10, 24) });
+}
+
+function updateFalling(dt) {
+  const melt = cfg.kind !== 'quail' && sunF() > 0.97;
+  for (let i = falling.length - 1; i >= 0; i--) {
+    const f = falling[i];
+    f.y += f.vy * dt;
+    f.x0 = clamp(f.x0 + gust * 90 * dt, offX + 14 + f.sway, offX + W - 14 - f.sway);
+    if (f.kind === 'quail') f.x = f.x0 + Math.sin(t * 1.6 + f.ph) * f.sway;
+    else f.x = f.x0 + Math.sin(t * 2 + f.ph) * f.sway;
+    f.x = clamp(f.x, offX + 14, offX + W - 14);
+    // caught in the basket?
+    const bx = kid.x, by = KID_Y - 36;
+    if (f.y > by - 22 && f.y < by + 14 && Math.abs(f.x - bx) < CATCH_R) {
+      falling.splice(i, 1);
+      catchOne(f);
+      continue;
+    }
+    // missed: it lands on the sand (manna melts away later; quail run off)
+    if (f.y > KID_Y + 30 || melt) {
+      falling.splice(i, 1);
+      if (f.kind === 'quail') { for (let k = 0; k < 4; k++) spawn(f.x, Math.min(f.y, KID_Y + 30), rand(-60, 60), rand(-80, -30), 0.6, '#a8794a', 3, 200); }
+      else for (let k = 0; k < 3; k++) spawn(f.x, Math.min(f.y, KID_Y + 30), rand(-30, 30), rand(-50, -10), 0.5, '#ffffff', 2.5, 100);
+    }
+  }
+}
+
+function catchOne(f) {
+  const n = basket.manna + basket.quail;
+  if (n >= cfg.cap) {
+    // the basket is full: it bounces off
+    spawn(f.x, f.y, rand(-80, 80), -160, 0.6, f.kind === 'quail' ? '#a8794a' : '#ffffff', 4, 500);
+    if (!told.full) { told.full = true; showMessage('Your basket is full! Tap a tent to give it out', 2.4); }
+    sfx.bonk();
+    return;
+  }
+  basket[f.kind]++;
+  caughtPts += CATCH_PTS;
+  kid.catchT = 0.25;
+  sparkleBurst(f.x, f.y, 5);
+  sfx.catch(n + 1);
+  if (!told.give && n + 1 >= 2) { told.give = true; showMessage('Now tap a tent to give it what it needs', 2.6); }
+}
+
+function drawFalling() {
+  for (const f of falling) {
+    if (f.kind === 'quail') drawQuail(f.x, f.y, 0.9, (Math.sin(t * 18 + f.ph) + 1) / 2, Math.cos(t * 1.6 + f.ph) > 0 ? 1 : -1);
+    else {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r + 5, 0, TAU); ctx.fill();
+      drawMannaIcon(f.x, f.y, f.r);
+    }
+  }
+  for (const p of flying) {
+    const e = ease(clamp(p.f, 0, 1));
+    const x = lerp(p.x0, p.x1, e), y = lerp(p.y0, p.y1, e) - Math.sin(e * Math.PI) * 70;
+    if (p.kind === 'quail') drawQuail(x, y, 0.6, 0.5); else drawMannaIcon(x, y, 7);
+  }
+}
+
+// ============================================================
+//  Giving to a tent
+// ============================================================
+function giveTo(tn) {
+  if (!tn || state !== 'play') return;
+  if (basket[tn.kind] <= 0) {
+    tn.flash = 0.5;
+    const other = tn.kind === 'quail' ? 'manna' : 'quail';
+    showMessage(basket[other] > 0 ? `This tent needs ${tn.kind === 'quail' ? 'quail' : 'manna'}, not ${other}!` : 'Catch some first, then tap a tent', 1.8);
+    sfx.bonk();
+    return;
+  }
+  // the child carries the basket over to that tent, then pours
+  kid.tx = clamp(tn.x, offX + 36, offX + W - 36);
+  kid.giveTo = tn;
+}
+
+function pour(tn) {
+  kid.giveTo = null;
+  const have = basket[tn.kind];
+  if (have <= 0) return;
+  basket[tn.kind] = 0;
+  const bx = kid.x, by = KID_Y - 40;
+  for (let k = 0; k < have; k++) flying.push({ kind: tn.kind, x0: bx + rand(-12, 12), y0: by, x1: tn.x + rand(-10, 10), y1: TENT_Y - 70, f: -k * 0.08 });
+  const before = tn.got;
+  tn.pop = 0.6;
+  sfx.give();
+  pending.push({ tn, have, before, t: 0.35 + have * 0.06 });
+}
+
+function settle(q) {
+  const { tn, have, before } = q;
+  if (before + have > tn.need) {
+    // too much: the whole jar goes wormy and must be filled again
+    const lost = before + have;
+    tn.got = 0;
+    tn.worms = Math.min(6, lost); tn.wormT = 2.6;
+    wormy += 1;
+    floaters.push({ x: tn.x, y: TENT_Y - 150, text: `Too much! Wormy! −${WORM_PTS}`, t: 1.4, col: '#ffb0c0' });
+    sfx.ew();
+    shakeT = 0.15;
+    showMessage(told.worms ? 'Wormy! Fill that tent again' : 'Too much goes wormy! Give each tent just what it needs', 2.6);
+    told.worms = true;
+    return;
+  }
+  tn.got = before + have;
+  if (tn.got >= tn.need) {
+    tn.worms = 0;
+    if (before === 0) {
+      // filled in one go: just right!
+      exactPts += EXACT_PTS; exactCount++;
+      floaters.push({ x: tn.x, y: TENT_Y - 150, text: `Just right! +${EXACT_PTS}`, t: 1.2, col: '#c8ffb0' });
+      sparkleBurst(tn.x, TENT_Y - 120, 16);
+      sfx.exact();
+    } else {
+      floaters.push({ x: tn.x, y: TENT_Y - 150, text: 'Enough!', t: 1, col: '#c8ffb0' });
+      sparkleBurst(tn.x, TENT_Y - 120, 6);
+    }
+    if (tents.every((q2) => q2.got >= q2.need)) win();
+  }
+}
+let pending = [];
+
+// ============================================================
+//  Updating
+// ============================================================
+function updatePlay(dt) {
+  playT += dt;
+  dayT += dt;
+  spawnT -= dt;
+  if (spawnT <= 0 && sunF() < 0.96) {
+    spawnFalling();
+    spawnT = cfg.every * rand(0.75, 1.25);
+  }
+  // gusts of wind push falling things sideways
+  if (cfg.wind) {
+    gustT -= dt;
+    if (gustT <= 0) {
+      gust = gust ? 0 : pick([-1, 1]) * cfg.wind;
+      gustT = gust ? rand(2, 3.5) : rand(3, 6);
+      if (gust && !told.wind) { told.wind = true; showMessage('Whoosh! The wind blows the manna sideways', 2.2); }
+      if (gust) sfx.wind();
+    }
+  }
+  // the child walks toward where you tapped
+  const dx = kid.tx - kid.x;
+  kid.x += clamp(dx, -KID_SPEED * dt, KID_SPEED * dt);
+  if (kid.giveTo && Math.abs(kid.tx - kid.x) < 4) pour(kid.giveTo);
+  for (let i = pending.length - 1; i >= 0; i--) { pending[i].t -= dt; if (pending[i].t <= 0) { const q = pending.splice(i, 1)[0]; settle(q); if (state !== 'play') return; } }
+  kid.catchT = Math.max(0, kid.catchT - dt);
+  updateFalling(dt);
+  for (let i = flying.length - 1; i >= 0; i--) { flying[i].f += dt * 2.6; if (flying[i].f >= 1) flying.splice(i, 1); }
+  for (const tn of tents) { tn.pop = Math.max(0, tn.pop - dt); tn.flash = Math.max(0, tn.flash - dt); tn.wormT = Math.max(0, tn.wormT - dt); blinkTick(tn.fam, dt); }
+  if (cfg.kind !== 'quail' && sunF() > 0.75 && !told.hot) { told.hot = true; showMessage('The sun is getting hot! Hurry before the manna melts', 2.4); }
+  if (cfg.kind === 'quail' && sunF() > 0.75 && !told.hot) { told.hot = true; showMessage('It\'s getting dark! Hurry!', 2.2); }
+  if (dayT >= cfg.dur && flying.length === 0 && !pending.length) fail();
+}
+
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(Math.max(0, cfg.dur - dayT) * 8);
+  const wormLoss = wormy * WORM_PTS;
+  const levelBonus = 100 * level;
+  const sum = Math.max(0, caughtPts + exactPts + timeBonus + levelBonus - wormLoss);
+  totalScore += sum;
+  saveBest();
+  lastScore = { caughtPts, exactPts, timeBonus, wormLoss, levelBonus, sum };
+  falling = [];
+  sfx.win();
+  endTimer = 3;
+}
+function saveBest() {
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('mannaBest', String(best)); } catch (e) {} }
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  saveBest();
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Day 7: the Sabbath rest bonus
+// ============================================================
+const REST_DUR = 10;
+function startRest() {
+  hideOverlay();
+  state = 'rest';
+  syncAmbience();
+  restT = 0; restBroken = 0;
+  falling = []; flying = [];
+  basket = { manna: 0, quail: 0 };
+  for (const tn of tents) { tn.got = tn.need; tn.worms = 0; }
+  showMessage('Day 7: the Sabbath. Rest! Don\'t go out to gather.', 3.2);
+  sfx.levelStart();
+}
+function updateRest(dt) {
+  restT += dt;
+  for (const tn of tents) blinkTick(tn.fam, dt);
+  if (Math.random() < dt * 2) spawn(rand(offX, offX + W), rand(300, 520), rand(-10, 10), -12, 2, 'rgba(255,255,255,0.8)', 2, 0);
+  if (restT >= REST_DUR) restCard();
+}
+function restTap() {
+  restBroken++;
+  showMessage('There is no manna today — it\'s the day of rest!', 1.8);
+  sfx.bonk();
+  floaters.push({ x: kid.x, y: KID_Y - 90, text: '−100', t: 1, col: '#ffb0c0' });
+}
+function restCard() {
+  state = 'win';
+  endTimer = 0;
+  const restBonus = Math.max(0, 600 - restBroken * 100);
+  totalScore += restBonus;
+  saveBest();
+  showOverlay('A day of rest!', 'Day 7 — the Sabbath',
+    `${verseHTML('sabbath')}
+     <p style="text-align:center">God gave twice as much on day 6, so everyone could rest on day 7. ${restBroken ? 'You went out to look — but there was none!' : 'You rested, just as God said.'}</p>
+     <p class="score">Rest bonus: <b>${restBonus}</b></p>
+     ${verseHTML('enough')}
+     <p class="score" style="font-size:1.3rem">Final score: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+     ${creditHTML()}`,
+    'Play again', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('Bread from Heaven', 'God feeds His people in the desert',
+    `${verseHTML('rain')}
+     <ul>
+       <li>Every morning God sends <b>manna</b> — sweet bread from heaven! <b>Tap</b> or <b>drag</b> to move the basket and <b>catch</b> it.</li>
+       <li>Each tent shows how much it needs. <b>Tap a tent</b> to give it everything in your basket.</li>
+       <li>Fill a tent <b>in one go</b> with <b>just the right amount</b> for a big bonus. Too much and the whole jar goes <b>wormy</b>!</li>
+       <li>Fill every tent before the sun gets hot and the manna melts. In the evening, catch <b>quail</b>!</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>1</kbd>–<kbd>5</kbd> give to a tent.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start gathering', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+function levelCard() {
+  state = 'intro';
+  syncAmbience();
+  resetLevel();
+  const what = [
+    'Catch the manna and give each tent <b>just what it needs</b>.',
+    'Three hungry families today. Count carefully!',
+    'Quail are flying into the camp! Catch the <b>quail</b> this evening.',
+    'A windy morning: the manna <b>blows sideways</b>.',
+    'Some tents need <b>manna</b>, some need <b>quail</b>. Look at each tent!',
+    'Gather <b>twice as much</b> today, so you can rest tomorrow. Your basket holds 10.',
+  ][Math.min(level, LAST) - 1];
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${what}</p>
+     <p class="score"><b>${cfg.tents}</b> tents to fill</p>
+     ${verseHTML(cfg.verse)}`,
+    'Start', () => startLevel());
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  tents = [];
+  const fams = FAMILIES.slice().sort(() => Math.random() - 0.5);
+  for (let i = 0; i < cfg.tents; i++) {
+    const kind = cfg.kind === 'mix' ? (i % 2 ? 'quail' : 'manna') : cfg.kind;
+    let need = Math.round(rand(cfg.need[0], cfg.need[1]));
+    if (kind === 'quail') need = Math.max(1, need - 1);
+    if (cfg.day === 6) need = 2 * Math.round(rand(2, 4));       // two omers each
+    tents.push({ kind, need, got: 0, worms: 0, wormT: 0, pop: 0, flash: 0, col: TENT_COLS[i % TENT_COLS.length], fam: { ...fams[i % fams.length], i: i + 2, mood: 'watch', blinkT: rand(1, 4), blink: 0, phase: rand(0, TAU) }, x: 0, w: 100 });
+  }
+  layoutTents();
+  kid = { x: viewW / 2, tx: viewW / 2, catchT: 0, giveTo: null };
+  pending = [];
+  basket = { manna: 0, quail: 0 };
+  falling = []; flying = []; particles = []; floaters = [];
+  dayT = 0; spawnT = 0.5; gust = 0; gustT = 3;
+  caughtPts = 0; exactPts = 0; wormy = 0; exactCount = 0;
+  playT = 0; winT = 0; failT = 0; endTimer = 0;
+  told = {};
+  flashT = shakeT = 0;
+  down = null;
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  sfx.levelStart();
+  state = 'play';
+  syncAmbience();
+  showMessage(level === 1 ? 'Tap or drag to catch the falling manna' : cfg.name, 2.6);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const scoreHTML = `<p class="score">Caught: <b>${s.caughtPts}</b><br>Just right (${exactCount}): <b>${s.exactPts}</b><br>${s.wormLoss ? `Wormy jars (${wormy}): <b>−${s.wormLoss}</b><br>` : ''}Time to spare: <b>${s.timeBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (level === LAST) {
+      showOverlay('Twice as much!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML('double')}
+         ${scoreHTML}
+         <p style="text-align:center"><b>Tomorrow is the Sabbath.</b> Can you rest and not go out to gather?</p>`,
+        'Day 7', startRest);
+      return;
+    }
+    showOverlay('Everyone has enough!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('enough')}
+       ${scoreHTML}
+       ${creditHTML()}`,
+      'Next day', () => { level++; levelCard(); });
+  } else if (state === 'fail') {
+    const left = tents.filter((q) => q.got < q.need).length;
+    showOverlay(cfg.kind === 'quail' ? 'Night has come!' : 'The manna melted!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${left} tent${left === 1 ? '' : 's'} still needed food. Catch quickly, count carefully, and <b>tap a tent</b> as soon as you have enough for it.</p>
+       ${verseHTML('melted')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play' || state === 'rest') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The manna waits for you. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+let down = null;
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'rest' && !e.repeat && /^(Arrow|Digit|Space)/.test(e.code)) { restTap(); return; }
+  if (state === 'play' && !e.repeat) {
+    const m = /^Digit([1-9])$/.exec(e.code);
+    if (m && tents[+m[1] - 1]) giveTo(tents[+m[1] - 1]);
+    if (e.code === 'Space') { const tn = tentAt(kid.x, TENT_TOP + 10); if (tn) giveTo(tn); }
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'rest') { restTap(); return; }
+  if (state !== 'play') return;
+  const x = p.vx, y = p.vy - offY;
+  // Tap-first: a tap on a tent gives it the basket; anywhere else walks there
+  const tn = y >= TENT_TOP - 70 ? tentAt(x, y) : null;
+  if (tn && y >= TENT_TOP - 70) { giveTo(tn); return; }
+  kid.tx = clamp(x, offX + 36, offX + W - 36);
+  kid.giveTo = null;
+  down = { id: e.pointerId };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!down || state !== 'play') return;
+  const p = toView(e);
+  kid.tx = clamp(p.vx, offX + 36, offX + W - 36);
+  kid.giveTo = null;
+});
+const endPress = () => { down = null; };
+canvas.addEventListener('pointerup', endPress);
+canvas.addEventListener('pointercancel', endPress);
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  catch(n) { if (this.ctx) Music.tap(clamp(n / cfg.cap, 0, 1) * 0.8 + 0.1); },
+  give() { this.noiseBurst(1800, 0.2, 0.12, 0.8, 900); },
+  exact() { [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.12, i * 0.08)); },
+  ew() { this.tone(300, 0.25, 'triangle', 0.16, 0, 200); this.tone(260, 0.3, 'triangle', 0.14, 0.18, 170); },
+  bonk() { this.tone(220, 0.15, 'sine', 0.2, 0, 160); },
+  wind() { this.noiseBurst(500, 1.4, 0.12, 0.5, 1200); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && (state === 'play' || state === 'rest'));
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  const playing = state === 'play' || state === 'win' || state === 'fail' || state === 'pause' || state === 'rest';
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(70,40,10,0.75)'); hg.addColorStop(1, 'rgba(70,40,10,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffe9a8';
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(!playing ? 'Bread from Heaven' : state === 'rest' ? 'Day 7 · The Sabbath' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (playing) {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore}`, viewW - 12, 26);
+    ctx.shadowBlur = 0;
+    // the sun timer
+    const x0 = 22, x1 = viewW - 40, y = 50;
+    const f = state === 'rest' ? restT / REST_DUR : sunF();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(x0, y - 5, x1 - x0, 10, 5); ctx.fill();
+    ctx.fillStyle = state === 'rest' ? '#9fd8ff' : cfg.kind === 'quail' ? '#c9a0ff' : f > 0.75 ? '#ff9a6a' : '#ffd34d';
+    roundRect(x0, y - 5, (x1 - x0) * f, 10, 5); ctx.fill();
+    ctx.fillStyle = cfg.kind === 'quail' ? '#ffb070' : '#ffd34d';
+    ctx.beginPath(); ctx.arc(x0 + (x1 - x0) * f, y, 9, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe9a8'; ctx.shadowBlur = 4;
+    ctx.fillText(state === 'rest' ? '😴' : cfg.kind === 'quail' ? '🌙' : '☀', x1 + 20, y + 5);
+    // tents done
+    ctx.textAlign = 'right';
+    ctx.font = '700 16px Fredoka, sans-serif';
+    if (state !== 'rest') ctx.fillText(`Tents ${tents.filter((q) => q.got >= q.need).length} / ${tents.length}`, viewW - 12, 90);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = offY + 470 - (lines.length - 1) * 28;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(80,50,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, (sy + offY) * scale);
+  drawSky();
+  drawGround();
+  for (const tn of tents) drawTent(tn);
+  if (kid) {
+    if (state === 'rest') { KID.mood = restBroken ? 'worried' : 'joy'; }
+    else KID.mood = state === 'win' ? 'joy' : state === 'fail' ? 'worried' : kid.catchT > 0 ? 'wow' : 'watch';
+    drawKid();
+  }
+  drawFalling();
+  drawParticles();
+  if (state === 'rest') {
+    // a calm, quiet camp: little Zzz over the tents
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = '700 20px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    for (const tn of tents) { const z = (t * 0.6 + tn.x * 0.01) % 1; ctx.globalAlpha = 1 - z; ctx.fillText('z', tn.x + 30 + z * 20, TENT_Y - 120 - z * 40); }
+    ctx.globalAlpha = 1;
+  }
+  if (state === 'play' && playT < 0.5) {
+    ctx.fillStyle = `rgba(80,50,10,${1 - playT / 0.5})`;
+    ctx.fillRect(0, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  blinkTick(KID, dt);
+  if (state === 'play') {
+    updatePlay(dt);
+    if (keys.has('ArrowLeft') || keys.has('KeyA')) kid.giveTo = null, kid.tx = Math.max(offX + 36, kid.x - 40);
+    if (keys.has('ArrowRight') || keys.has('KeyD')) kid.giveTo = null, kid.tx = Math.min(offX + W - 36, kid.x + 40);
+  } else if (state === 'rest') updateRest(dt);
+  else if (state === 'win') {
+    winT += dt;
+    for (let i = flying.length - 1; i >= 0; i--) { flying[i].f += dt * 2.6; if (flying[i].f >= 1) flying.splice(i, 1); }
+    for (const tn of tents) { tn.pop = Math.max(0, tn.pop - dt); blinkTick(tn.fam, dt); }
+    if (winT < 2.5 && Math.random() < dt * 8) spawn(rand(offX, offX + W), rand(300, 600), rand(-20, 20), -40, 1.4, pick(['#ffe27a', '#ffffff', '#f6d27a']), rand(3, 5), 10, 'star');
+  } else if (state === 'fail') failT += dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

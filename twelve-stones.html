@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a1f3e">
+<title>Twelve Stones</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2a1f3e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 30, 70, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Twelve Stones</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'harp', accent: 'pipe', ambience: 'sea', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  take: { ref: 'Joshua 4:3', KJV: 'Take you hence out of the midst of Jordan, out of the place where the priests’ feet stood firm, twelve stones, and ye shall carry them over with you, and leave them in the lodging place, where ye shall lodge this night.', NKJV: 'Take for yourselves twelve stones from here, out of the midst of the Jordan, from the place where the priests’ feet stood firm. You shall carry them over with you and leave them in the lodging place where you lodge tonight.', NIV: 'Take up twelve stones from the middle of the Jordan, from right where the priests are standing, and carry them over with you and put them down at the place where you stay tonight.', NLT: 'Take twelve stones from the very place where the priests are standing in the middle of the Jordan. Carry them out and pile them up at the place where you will camp tonight.' },
+  // Level cards
+  ask: { ref: 'Joshua 4:6', KJV: 'When your children ask their fathers in time to come, saying, What mean ye by these stones?', NKJV: 'When your children ask in time to come, saying, ‘What do these stones mean to you?’', NIV: 'In the future, when your children ask you, ‘What do these stones mean?’', NLT: 'In the future your children will ask you, ‘What do these stones mean?’' },
+  answer: { ref: 'Joshua 4:7', KJV: 'The waters of Jordan were cut off before the ark of the covenant of the LORD... and these stones shall be for a memorial unto the children of Israel for ever.', NKJV: 'The waters of the Jordan were cut off before the ark of the covenant of the LORD... And these stones shall be for a memorial to the children of Israel forever.', NIV: 'The flow of the Jordan was cut off before the ark of the covenant of the LORD... These stones are to be a memorial to the people of Israel forever.', NLT: 'They remind us that the Jordan River stopped flowing when the Ark of the LORD’s Covenant went across. These stones will stand as a memorial among the people of Israel forever.' },
+  memorial: { ref: 'Joshua 4:7', KJV: 'These stones shall be for a memorial unto the children of Israel for ever.', NKJV: 'These stones shall be for a memorial to the children of Israel forever.', NIV: 'These stones are to be a memorial to the people of Israel forever.', NLT: 'These stones will stand as a memorial among the people of Israel forever.' },
+  gilgal: { ref: 'Joshua 4:20', KJV: 'And those twelve stones, which they took out of Jordan, did Joshua pitch in Gilgal.', NKJV: 'And those twelve stones which they took out of the Jordan, Joshua set up in Gilgal.', NIV: 'And Joshua set up at Gilgal the twelve stones they had taken out of the Jordan.', NLT: 'It was there at Gilgal that Joshua piled up the twelve stones taken from the Jordan River.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+// Small seeded random so every level has the same, tested layout
+function seeded(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(s ^ (s >>> 15), 1 | s);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const GROUND = 820;        // top of the ground the pile stands on (playfield y)
+const BASE_W = 190;        // the flat rock the pile is built on
+const BASE_H = 26;
+const CARRY_UP = 210;      // how far above the pile top the carrier walks
+const GRAV = 1500;
+const CHANCES = 3;
+const STONES = 12;
+const TRIBES = ['Reuben', 'Simeon', 'Judah', 'Issachar', 'Zebulun', 'Benjamin', 'Dan', 'Naphtali', 'Gad', 'Asher', 'Ephraim', 'Manasseh'];
+
+const LEVELS = [
+  { name: 'Out of the Riverbed', verse: 'take', w: [150, 172], h: [34, 40], speed: 105, wind: 0, round: 0, time: 110,
+    tip: '<b>Tap</b> to drop the stone when the man is right <b>over the pile</b>. Stack all twelve!' },
+  { name: 'A Taller Pile', verse: 'ask', w: [118, 160], h: [34, 42], speed: 140, wind: 0, round: 0, time: 95,
+    tip: 'The stones are smaller now. Keep the pile <b>straight</b> or the top will tumble off!' },
+  { name: 'The Wind by the Jordan', verse: 'answer', w: [100, 148], h: [34, 44], speed: 165, wind: 70, round: 0, time: 90,
+    tip: 'The <b>wind</b> blows the falling stone. Watch the little flag and drop a bit <b>upwind</b>.' },
+  { name: 'Round River Stones', verse: 'gilgal', w: [86, 138], h: [36, 46], speed: 190, wind: 90, round: 0.35, time: 85,
+    tip: '<b>Round</b> stones roll a little when they land. Drop them right in the <b>middle</b>!' },
+  { name: 'A Memorial for Ever', verse: 'memorial', w: [76, 128], h: [36, 48], speed: 220, wind: 130, round: 0.5, time: 80,
+    tip: 'Strong gusts, quick steps and odd stones. Twelve stones, steady and true!' },
+];
+function makeConfig(n) { return { ...LEVELS[n - 1], n }; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('twelveStonesBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let lv = null;            // { pile, next, carrier, falling, tumbling, wind, rng }
+let chances = CHANCES, timeLeft = 60, perfects = 0, levelPts = 0;
+let camY = 0;
+let particles = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0, endTimer = 0;
+let lastScore = null;
+let playT = 0, winT = 0, failT = 0;
+let failWhy = '';
+let told = {};
+
+// ============================================================
+//  Building a level
+// ============================================================
+function pileX() { return viewW / 2; }
+
+function makeStone(i) {
+  const r = lv.rng;
+  const w = lerp(cfg.w[0], cfg.w[1], r()), h = lerp(cfg.h[0], cfg.h[1], r());
+  const round = r() < cfg.round;
+  // a lumpy outline, kept the same for this stone
+  const pts = [];
+  const n = 14;
+  for (let k = 0; k < n; k++) {
+    const a = k / n * TAU;
+    const lump = 1 + (r() - 0.5) * (round ? 0.06 : 0.14);
+    const sq = round ? 1 : 1.0;
+    const cx = Math.cos(a), cy = Math.sin(a);
+    // rounded-rectangle-ish (flat stones) or an oval (round ones)
+    const px = round ? cx : Math.sign(cx) * Math.pow(Math.abs(cx), 0.55);
+    const py = round ? cy : Math.sign(cy) * Math.pow(Math.abs(cy), 0.55);
+    pts.push([px * w / 2 * lump * sq, py * h / 2 * lump]);
+  }
+  const cols = ['#9a9286', '#a89a86', '#8f8a82', '#b0a28c', '#968b7c', '#a3998c'];
+  return { i, tribe: TRIBES[i % 12], w, h, round, pts, col: cols[Math.floor(r() * cols.length)], x: 0, y: 0, rot: 0 };
+}
+
+function buildLevel() {
+  lv = { rng: seeded(level * 571 + 9), pile: [], next: 0, carrier: null, falling: null, tumbling: [], wind: 0, windPh: 0, tilt: 0, sway: 0 };
+  lv.base = { x: pileX(), w: BASE_W, top: GROUND - BASE_H };
+  lv.queue = [];
+  newCarrier();
+  camY = 0;
+}
+
+function newCarrier() {
+  const st = makeStone(lv.pile.length);
+  lv.carrier = { x: pileX() - carryRange(), dir: 1, stone: st, inT: 0.5 };
+}
+function carryRange() { return Math.min(viewW * 0.4, 250); }
+
+function topY() { return lv.pile.length ? lv.pile[lv.pile.length - 1].y - lv.pile[lv.pile.length - 1].h / 2 : lv.base.top; }
+function topSupport() { return lv.pile.length ? lv.pile[lv.pile.length - 1] : { x: lv.base.x, w: lv.base.w, round: false }; }
+function carryY() { return topY() - CARRY_UP; }
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = [];
+  chances = CHANCES; timeLeft = cfg.time; perfects = 0; levelPts = 0;
+  playT = 0; winT = 0; failT = 0;
+  flashT = shakeT = 0;
+  endTimer = 0;
+  message = { text: '', t: 0 };
+  told = {};
+  buildLevel();
+}
+
+// ============================================================
+//  Cards
+// ============================================================
+// ============================================================
+//  Overlay cards
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+  overlay.querySelector('.card').scrollTop = 0;
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  note(h) { if (this.ctx) Music.tap(h); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing helpers shared by the scenes
+// ============================================================
+function eyes(x, y, lookX, open, big = 1) {
+  const dark = '#2b1d12';
+  for (const sx of [-6, 6]) {
+    if (!open) {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x + sx, y, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(x + sx, y, 4 * big, 5 * big, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big, y + 0.5, 2.2 * big, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big - 0.8, y - 0.8, 0.8, 0, TAU); ctx.fill();
+  }
+}
+function bubbleAt(x, y, text, col, s = 1) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const w = ctx.measureText(text).width + 22;
+  ctx.fillStyle = col; ctx.strokeStyle = 'rgba(80,50,20,0.6)'; ctx.lineWidth = 2;
+  roundRect(-w / 2, -17, w, 32, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(0, 26); ctx.lineTo(6, 14); ctx.fill();
+  ctx.fillStyle = '#5a3210'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+function drawHudButtons() {
+  ctx.save();
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+// The HUD strip: title line, a time bar, chances, score
+function drawHudStrip(label, barName, frac, chancesLeft, chancesMax, extra) {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const hg = ctx.createLinearGradient(0, 0, 0, 112);
+  hg.addColorStop(0, 'rgba(20,14,34,0.8)'); hg.addColorStop(1, 'rgba(20,14,34,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, 112);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(label, 12, 26);
+  if (barName) {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(barName, 12, 50);
+    ctx.shadowBlur = 0;
+    const bx = 18 + ctx.measureText(barName).width;
+    ctx.fillStyle = 'rgba(255,233,168,0.22)';
+    roundRect(bx, 40, 120, 13, 6.5); ctx.fill();
+    ctx.fillStyle = frac < 0.2 && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#ffd860';
+    if (frac > 0) { roundRect(bx, 40, 120 * frac, 13, 6.5); ctx.fill(); }
+    for (let i = 0; i < chancesMax; i++) {
+      const cx = bx + 140 + i * 22;
+      ctx.fillStyle = i < chancesLeft ? '#ff6b7a' : 'rgba(255,255,255,0.25)';
+      ctx.beginPath(); ctx.moveTo(cx, 54); ctx.bezierCurveTo(cx - 12, 46, cx - 8, 36, cx, 42); ctx.bezierCurveTo(cx + 8, 36, cx + 12, 46, cx, 54); ctx.fill();
+    }
+    if (extra) { ctx.fillStyle = '#ffe9a8'; ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillText(extra, bx + 150 + chancesMax * 22, 52); }
+  }
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#ffe9a8'; ctx.font = '700 16px Fredoka, sans-serif';
+  ctx.shadowBlur = 4;
+  if (state !== 'title') ctx.fillText(`Score ${totalScore}`, viewW - 14, 26);
+  ctx.restore();
+  drawHudButtons();
+}
+function drawMessage(y0) {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,12,34,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('Twelve Stones', 'Build a memorial by the Jordan',
+    `${verseHTML('take')}
+     <ul>
+       <li>A man from each of the <b>twelve tribes</b> carries a stone from the middle of the river. Help them pile all <b>twelve</b> up at Gilgal!</li>
+       <li>The man walks to and fro. <b>Tap</b> to drop his stone when he is right <b>over the pile</b>.</li>
+       <li>If a stone hangs too far over the edge, the top of the pile <b>tumbles off</b>. Three tumbles and the level is over!</li>
+       <li>Later on, watch out for the <b>wind</b> and <b>round</b> stones that roll.</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> or <kbd>&darr;</kbd> to drop.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+// The level card: the new level is built at the same time, so the scene behind it is ready
+function levelCard() {
+  resetLevel();
+  state = 'level';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${cfg.tip}</p>`,
+    'Begin', () => startLevel());
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 2);
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const stoneBonus = levelPts;
+  const timeBonus = Math.round(timeLeft) * 5;
+  const careBonus = chances * 200;
+  const levelBonus = level * 300;
+  const score = stoneBonus + timeBonus + careBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('twelveStonesBest', best); } catch (e) {} }
+  lastScore = { stoneBonus, timeBonus, careBonus, levelBonus, score };
+  showMessage('All twelve stones stand firm!', 2.2);
+  flashT = 0.3;
+  sfx.win();
+  endTimer = 3.0;
+}
+
+function fail(why) {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  failWhy = why;
+  showMessage(why, 2.2);
+  sfx.fail();
+  endTimer = 2.4;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LEVELS.length;
+    const scoreHTML = `<p class="score">Stones placed: <b>${s.stoneBonus}</b> (${perfects} perfect)<br>Sunlight left: <b>${s.timeBonus}</b><br>Hearts kept (${chances}): <b>${s.careBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (last) {
+      state = 'done';
+      showOverlay('A memorial for ever!', 'Twelve stones at Gilgal',
+        `${verseHTML('gilgal')}
+         <p style="text-align:center">When children asked, “What do these stones mean?”, their parents told them how God stopped the river and brought His people safely across.</p>
+         ${verseHTML('answer')}
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; levelCard(); });
+    } else {
+      showOverlay('Well built!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML('ask')}
+         <p style="text-align:center">Every stone helps us remember what God has done!</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Next level', () => { level++; levelCard(); });
+    }
+  } else if (state === 'fail') {
+    showOverlay('Oh dear!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${failWhy} Wait until the man is right over the pile, then tap.</p>
+       ${verseHTML('take')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The stone-carriers have a rest. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Playing
+// ============================================================
+function drop() {
+  if (state !== 'play') return;
+  const c = lv.carrier;
+  if (!c || lv.falling || c.inT > 0) return;
+  const st = c.stone;
+  st.x = c.x; st.y = carryY() + 30 - st.h / 2; st.vy = 0; st.vx = 0;
+  lv.falling = st;
+  lv.carrier = null;
+  sfx.whoosh();
+}
+
+function windNow() {
+  if (!cfg.wind) return 0;
+  return cfg.wind * (0.55 * Math.sin(lv.windPh) + 0.45 * Math.sin(lv.windPh * 2.3 + 1));
+}
+
+function updateCarrier(dt) {
+  const c = lv.carrier;
+  if (!c) return;
+  if (c.inT > 0) { c.inT -= dt; return; }
+  c.x += c.dir * cfg.speed * dt;
+  const R = carryRange();
+  if (c.x > pileX() + R) { c.x = pileX() + R; c.dir = -1; }
+  if (c.x < pileX() - R) { c.x = pileX() - R; c.dir = 1; }
+  if (!told.tap && playT > 2.5 && lv.pile.length === 0) { told.tap = true; showMessage('Tap when he is over the flat rock!', 2.4); }
+}
+
+function updateFalling(dt) {
+  const s = lv.falling;
+  if (!s) return;
+  s.vy += GRAV * dt;
+  s.vx += windNow() * dt * 1.6;
+  s.x += s.vx * dt;
+  s.y += s.vy * dt;
+  const sup = topSupport();
+  const surf = topY();
+  if (s.y + s.h / 2 >= surf) {
+    s.y = surf - s.h / 2;
+    land(s, sup);
+  }
+}
+
+function land(s, sup) {
+  lv.falling = null;
+  let off = s.x - sup.x;
+  // round stones roll a little outward
+  if ((s.round || sup.round) && Math.abs(off) > 3) off *= 1.3;
+  if (Math.abs(off) <= 6) { off = 0; perfects++; levelPts += 150; popupMsg('Perfect!'); sfx.perfect(); }
+  else levelPts += Math.max(20, Math.round(100 - Math.abs(off)));
+  s.x = sup.x + off;
+  if (Math.abs(off) > sup.w / 2) {
+    // missed the pile: it rolls off
+    tumble([s], Math.sign(off) || 1);
+    lostHeart('The stone rolled off the pile!');
+    return;
+  }
+  s.vx = 0; s.vy = 0;
+  lv.pile.push(s);
+  sfx.thud();
+  shakeT = 0.12;
+  for (let i = 0; i < 6; i++) spawn(s.x + rand(-s.w / 2, s.w / 2), s.y + s.h / 2, rand(-40, 40), rand(-60, -20), 0.6, 'rgba(200,180,150,0.7)', rand(3, 6), 100);
+  // does the pile still balance?
+  const k = unstableLevel();
+  if (k !== null) {
+    const fallen = lv.pile.splice(k + 1);
+    const dir = Math.sign(comX(fallen) - (k >= 0 ? lv.pile[k].x : lv.base.x)) || 1;
+    tumble(fallen, dir);
+    lostHeart(fallen.length > 1 ? `Too far over! ${fallen.length} stones tumbled off.` : 'Too far over! The stone tumbled off.');
+    return;
+  }
+  if (lv.pile.length >= STONES) { winLevel(); return; }
+  newCarrier();
+  if (lv.pile.length === 1 && level === 1) showMessage('Well done! Now the next tribe…', 1.6);
+}
+
+function comX(stones) {
+  let m = 0, mx = 0;
+  for (const s of stones) { const a = s.w * s.h; m += a; mx += a * s.x; }
+  return m ? mx / m : 0;
+}
+
+// The lowest support (-1 = the flat rock, k = stone k) that can't hold up everything above it, or null if all is steady
+function unstableLevel() {
+  const P = lv.pile;
+  // check the base first, then each stone, from the bottom up
+  for (let k = -1; k < P.length - 1; k++) {
+    const sup = k < 0 ? lv.base : P[k];
+    const above = P.slice(k + 1);
+    const cx = comX(above);
+    if (Math.abs(cx - sup.x) > sup.w / 2) return k;
+  }
+  return null;
+}
+
+function tumble(stones, dir) {
+  sfx.rumble();
+  shakeT = 0.3;
+  stones.forEach((s, i) => {
+    s.vx = dir * rand(140, 240); s.vy = -rand(80, 200) - i * 20; s.spin = dir * rand(3, 6);
+    lv.tumbling.push(s);
+  });
+}
+
+function lostHeart(why) {
+  chances--;
+  if (chances <= 0) { fail('The pile kept tumbling down!'); return; }
+  showMessage(why + (chances === 1 ? ' Last heart!' : ''), 2);
+  newCarrier();
+}
+
+function popupMsg(text) {
+  showMessage(text, 0.9);
+}
+
+function updateTumbling(dt) {
+  for (let i = lv.tumbling.length - 1; i >= 0; i--) {
+    const s = lv.tumbling[i];
+    s.vy += GRAV * dt;
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.rot += (s.spin || 0) * dt;
+    if (s.y - s.h > GROUND + 200 || s.x < -200 || s.x > viewW + 200) lv.tumbling.splice(i, 1);
+    else if (s.y + s.h / 2 > GROUND + 40 && s.vy > 0) {
+      // bounce on the ground and roll away
+      s.vy *= -0.35; s.y = GROUND + 40 - s.h / 2;
+      if (Math.abs(s.vy) < 60) s.vy = -60;
+    }
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (['Space', 'Enter', 'ArrowDown', 'KeyS'].includes(e.code)) drop();
+});
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play') drop();
+});
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.6, p.size * 0.7);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStar(x, y, R, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+
+// ============================================================
+//  Sounds for this game
+// ============================================================
+Object.assign(sfx, {
+  whoosh() { this.noiseBurst(1400, 0.25, 0.12, 0.8, 500); },
+  thud() { this.tone(120, 0.22, 'sine', 0.45, 0, 60); this.noiseBurst(300, 0.2, 0.25, 0.7, 150, 'lowpass'); if (this.ctx) Music.tap(clamp(lv.pile.length / STONES, 0, 1)); },
+  perfect() { [1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.35, 'sine', 0.1, i * 0.06)); },
+  rumble() { this.noiseBurst(200, 0.7, 0.4, 0.7, 80, 'lowpass'); this.tone(90, 0.5, 'sine', 0.3, 0.05, 50); },
+});
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawStone(s, x, y, rot = 0, glow = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  if (glow > 0) { ctx.shadowColor = `rgba(255,230,140,${glow})`; ctx.shadowBlur = 16; }
+  ctx.fillStyle = s.col;
+  ctx.strokeStyle = shade(s.col, -45); ctx.lineWidth = 2;
+  ctx.beginPath();
+  s.pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+  // highlight and speckles
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.ellipse(-s.w * 0.15, -s.h * 0.2, s.w * 0.22, s.h * 0.14, -0.1, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(60,50,40,0.25)';
+  for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(Math.sin(s.i * 3 + k * 2) * s.w * 0.3, Math.cos(s.i * 5 + k) * s.h * 0.2, 2, 0, TAU); ctx.fill(); }
+  // the tribe's name, carved small
+  ctx.fillStyle = 'rgba(60,45,30,0.75)';
+  ctx.font = `600 ${Math.min(13, s.h * 0.34)}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (s.w > 70) ctx.fillText(s.tribe, 0, 2);
+  ctx.restore();
+}
+
+function drawCarrier(c) {
+  const y = carryY();
+  const x = c.x;
+  const walk = Math.sin(t * 9) * (c.inT > 0 ? 0 : 1);
+  ctx.save();
+  ctx.translate(x, y + 120);
+  // legs
+  ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-5, -22); ctx.lineTo(-5 + walk * 8, 0); ctx.moveTo(5, -22); ctx.lineTo(5 - walk * 8, 0); ctx.stroke();
+  const robe = ['#3f6fb5', '#6b8e3a', '#b5503f', '#7a4fa0', '#d9a13a', '#3c8f86'][c.stone.i % 6];
+  ctx.fillStyle = robe; ctx.strokeStyle = shade(robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-17, -14); ctx.quadraticCurveTo(-16, -44, -10, -52); ctx.quadraticCurveTo(0, -56, 10, -52); ctx.quadraticCurveTo(16, -44, 17, -14); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // arms up holding the stone
+  ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(-10, -48); ctx.lineTo(-18, -84); ctx.moveTo(10, -48); ctx.lineTo(18, -84); ctx.stroke();
+  const hy = -66;
+  ctx.fillStyle = '#d39a66'; ctx.beginPath(); ctx.arc(0, hy, 14, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8dcc0';
+  ctx.beginPath(); ctx.arc(0, hy - 1, 15, Math.PI * 0.95, Math.PI * 2.05); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3a2716';
+  ctx.beginPath(); ctx.moveTo(-12, hy + 2); ctx.quadraticCurveTo(0, hy + 20, 12, hy + 2); ctx.quadraticCurveTo(0, hy + 8, -12, hy + 2); ctx.fill();
+  eyes(0, hy - 1, c.dir, true, 0.9);
+  ctx.restore();
+  drawStone(c.stone, x, y + 30 - c.stone.h / 2);
+  // the drop guide: a dotted line straight down
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2; ctx.setLineDash([4, 8]);
+  ctx.beginPath(); ctx.moveTo(x, y + 128); ctx.lineTo(x, topY() - 4); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.strokeStyle = 'rgba(40,20,10,0.7)'; ctx.lineWidth = 4; ctx.fillStyle = '#fff6d0';
+  ctx.strokeText(c.stone.tribe, x, y - 10); ctx.fillText(c.stone.tribe, x, y - 10);
+}
+
+function drawScene() {
+  // sky, the river behind, the camp at Gilgal
+  const g = ctx.createLinearGradient(0, -offY + camY, 0, GROUND);
+  const dusk = state === 'play' || state === 'pause' ? 1 - clamp(timeLeft / cfg.time, 0, 1) : 0;
+  g.addColorStop(0, dusk > 0.7 ? '#4a4a8a' : '#6aa8e0'); g.addColorStop(1, dusk > 0.7 ? '#f0a070' : '#f4dfb0');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, -offY - 600, viewW, GROUND + offY + 600);
+  ctx.fillStyle = dusk > 0.7 ? '#ffb86b' : '#ffe08a';
+  ctx.beginPath(); ctx.arc(viewW * 0.82, lerp(Math.max(-offY + camY + 90, 140), 560, dusk), 38, 0, TAU); ctx.fill();
+  // hills
+  ctx.fillStyle = '#b8a070';
+  ctx.beginPath(); ctx.moveTo(0, 620);
+  for (let x = 0; x <= viewW + 40; x += 40) ctx.lineTo(x, 600 - Math.sin(x * 0.009 + 2) * 30);
+  ctx.lineTo(viewW, 700); ctx.lineTo(0, 700); ctx.fill();
+  // the Jordan, flowing again behind the camp
+  ctx.fillStyle = '#5aa0d0';
+  ctx.fillRect(0, 660, viewW, 44);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+  for (let k = 0; k < 8; k++) { const x = ((k * 140 + t * 30) % (viewW + 100)) - 50; ctx.beginPath(); ctx.moveTo(x, 676 + (k % 3) * 9); ctx.lineTo(x + 30, 676 + (k % 3) * 9); ctx.stroke(); }
+  // grass bank and ground
+  ctx.fillStyle = '#8fb860';
+  ctx.fillRect(0, 700, viewW, 50);
+  const gg = ctx.createLinearGradient(0, 740, 0, H + 40);
+  gg.addColorStop(0, '#d6b886'); gg.addColorStop(1, '#bf9c66');
+  ctx.fillStyle = gg;
+  ctx.fillRect(0, 740, viewW, H + 200);
+  // tents and watching people
+  for (const [tx, col] of [[viewW * 0.1, '#e8dcc0'], [viewW * 0.9, '#d9c7a0']]) {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(tx - 40, 760); ctx.lineTo(tx, 690); ctx.lineTo(tx + 40, 760); ctx.fill();
+    ctx.fillStyle = '#7a5a3a';
+    ctx.beginPath(); ctx.moveTo(tx - 9, 760); ctx.lineTo(tx, 720); ctx.lineTo(tx + 9, 760); ctx.fill();
+  }
+  for (let i = 0; i < 6; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = pileX() + side * (BASE_W / 2 + 50 + Math.floor(i / 2) * 50);
+    if (x < 20 || x > viewW - 20) continue;
+    watcher(x, 880, ['#3f6fb5', '#c46b8c', '#6b8e3a', '#d9a13a', '#7a4fa0', '#e07a5f'][i], i);
+  }
+}
+
+function watcher(x, y, robe, i) {
+  const happy = state === 'win' || state === 'done';
+  const jump = happy ? Math.abs(Math.sin(t * 7 + i)) * 10 : 0;
+  ctx.save(); ctx.translate(x, y - jump); ctx.scale(0.75, 0.75);
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-15, 0); ctx.quadraticCurveTo(-14, -28, -9, -34); ctx.quadraticCurveTo(0, -38, 9, -34); ctx.quadraticCurveTo(14, -28, 15, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d7a070'; ctx.beginPath(); ctx.arc(0, -48, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3a2716'; ctx.beginPath(); ctx.arc(0, -50, 13.5, Math.PI * 0.95, Math.PI * 2.05); ctx.closePath(); ctx.fill();
+  eyes(0, -49, 0, true, 0.85);
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -43, 4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+
+function drawWindFlag() {
+  if (!cfg.wind) return;
+  const w = windNow() / cfg.wind;
+  const x = viewW - 70, y = Math.max(160, -offY + camY + 160);
+  ctx.save();
+  ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x, y + 70); ctx.lineTo(x, y); ctx.stroke();
+  ctx.fillStyle = '#d0302a';
+  const len = 20 + Math.abs(w) * 40;
+  const dir = w >= 0 ? 1 : -1;
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x + dir * len / 2, y + 4 + Math.sin(t * 12) * 4, x + dir * len, y + 10 + (1 - Math.abs(w)) * 12);
+  ctx.lineTo(x, y + 22); ctx.closePath(); ctx.fill();
+  ctx.font = '600 13px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#4a3a20';
+  ctx.fillText('WIND', x, y + 88);
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!lv) return;
+  const sx = shakeT > 0 ? rand(-4, 4) * shakeT * 2 : 0;
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, (offY + camY) * scale);
+  drawScene();
+  // the flat rock base
+  ctx.fillStyle = '#8a8276';
+  roundRect(lv.base.x - BASE_W / 2, lv.base.top, BASE_W, BASE_H + 20, 10); ctx.fill();
+  ctx.fillStyle = '#a49c90';
+  roundRect(lv.base.x - BASE_W / 2 + 6, lv.base.top, BASE_W - 12, 8, 4); ctx.fill();
+  // a soft glow around the finished memorial
+  if ((state === 'win' || state === 'done') && lv.pile.length) {
+    const top = topY();
+    const gl = ctx.createRadialGradient(pileX(), (top + GROUND) / 2, 20, pileX(), (top + GROUND) / 2, 320);
+    gl.addColorStop(0, 'rgba(255,236,150,0.5)'); gl.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = gl; ctx.fillRect(0, top - 200, viewW, GROUND - top + 300);
+  }
+  // the pile sways a tiny bit when it's close to toppling
+  const lean = pileLean();
+  lv.pile.forEach((s, k) => {
+    const sw = Math.sin(t * 3) * lean * (k + 1) * 0.6;
+    drawStone(s, s.x + sw, s.y, sw * 0.004, state === 'win' || state === 'done' ? 0.8 : 0);
+  });
+  for (const s of lv.tumbling) drawStone(s, s.x, s.y, s.rot);
+  if (lv.falling) drawStone(lv.falling, lv.falling.x, lv.falling.y);
+  if (lv.carrier && state !== 'win' && state !== 'done') drawCarrier(lv.carrier);
+  drawParticles();
+  drawWindFlag();
+  if ((state === 'win' || state === 'done') && winT > 0.8) {
+    const top = topY();
+    bubbleAt(pileX() + Math.min(120, viewW * 0.25), Math.max(top - 40, -offY + camY + 170), 'What do these stones mean?', '#fff3c4', 0.9);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (state === 'play' && playT < 0.5) { ctx.fillStyle = `rgba(20,14,34,${1 - playT / 0.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`; ctx.fillRect(0, 0, viewW, viewH); }
+  drawHudStrip(state === 'title' ? 'Twelve Stones' : `Level ${level} · ${cfg.name}`, state === 'title' ? null : 'SUN', clamp(timeLeft / cfg.time, 0, 1), chances, CHANCES,
+    state === 'title' ? '' : `Stones ${lv.pile.length}/${STONES}`);
+  drawMessage(Math.max(150, offY + 150));
+}
+
+// how close the pile is to tipping (0..1), for a gentle sway
+function pileLean() {
+  const P = lv.pile;
+  let worst = 0;
+  for (let k = -1; k < P.length - 1; k++) {
+    const sup = k < 0 ? lv.base : P[k];
+    const f = Math.abs(comX(P.slice(k + 1)) - sup.x) / (sup.w / 2);
+    worst = Math.max(worst, f);
+  }
+  return worst > 0.6 ? (worst - 0.6) * 2.5 : 0;
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (!lv) return;
+  if (state === 'play') {
+    playT += dt;
+    timeLeft -= dt;
+    lv.windPh += dt * 0.7;
+    if (timeLeft <= 0) { timeLeft = 0; fail('The sun went down before the twelve stones were set up!'); }
+    else { updateCarrier(dt); updateFalling(dt); }
+  } else if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, viewW), rand(topY() - 100, GROUND - 100), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'fail') failT += dt;
+  if (state !== 'pause') updateTumbling(dt);
+  // keep the top of the pile and the carrier on screen
+  const want = 170 - carryY() - offY;
+  camY += (Math.max(0, want) - camY) * Math.min(1, dt * 3);
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

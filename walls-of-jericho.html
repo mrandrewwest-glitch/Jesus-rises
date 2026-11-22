@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a1f3e">
+<title>The Walls of Jericho</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2a1f3e;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 30, 70, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">The Walls of Jericho</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'crowd', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  around: { ref: 'Joshua 6:3', KJV: 'And ye shall compass the city, all ye men of war, and go round about the city once. Thus shalt thou do six days.', NKJV: 'You shall march around the city, all you men of war; you shall go all around the city once. This you shall do six days.', NIV: 'March around the city once with all the armed men. Do this for six days.', NLT: 'You and your fighting men should march around the town once a day for six days.' },
+  // Level cards
+  sixdays: { ref: 'Joshua 6:3', KJV: 'Go round about the city once. Thus shalt thou do six days.', NKJV: 'You shall go all around the city once. This you shall do six days.', NIV: 'March around the city once... Do this for six days.', NLT: 'March around the town once a day for six days.' },
+  seven: { ref: 'Joshua 6:4', KJV: 'And seven priests shall bear before the ark seven trumpets of rams’ horns: and the seventh day ye shall compass the city seven times, and the priests shall blow with the trumpets.', NKJV: 'And seven priests shall bear seven trumpets of rams’ horns before the ark. But the seventh day you shall march around the city seven times, and the priests shall blow the trumpets.', NIV: 'Have seven priests carry trumpets of rams’ horns in front of the ark. On the seventh day, march around the city seven times, with the priests blowing the trumpets.', NLT: 'Seven priests will walk ahead of the Ark, each carrying a ram’s horn. On the seventh day you are to march around the town seven times, with the priests blowing the horns.' },
+  shout: { ref: 'Joshua 6:5', KJV: 'When they make a long blast with the ram’s horn, and when ye hear the sound of the trumpet, all the people shall shout with a great shout; and the wall of the city shall fall down flat.', NKJV: 'When they make a long blast with the ram’s horn, and when you hear the sound of the trumpet, that all the people shall shout with a great shout; then the wall of the city will fall down flat.', NIV: 'When you hear them sound a long blast on the trumpets, have the whole army give a loud shout; then the wall of the city will collapse.', NLT: 'When you hear the priests give one long blast on the rams’ horns, have all the people shout as loud as they can. Then the walls of the town will collapse.' },
+  // Final win card
+  fell: { ref: 'Joshua 6:20', KJV: 'So the people shouted when the priests blew with the trumpets: and it came to pass, when the people heard the sound of the trumpet, and the people shouted with a great shout, that the wall fell down flat.', NKJV: 'So the people shouted when the priests blew the trumpets. And it happened when the people heard the sound of the trumpet, and the people shouted with a great shout, that the wall fell down flat.', NIV: 'When the trumpets sounded, the army shouted, and at the sound of the trumpet, when the men gave a loud shout, the wall collapsed.', NLT: 'When the people heard the sound of the rams’ horns, they shouted as loud as they could. Suddenly, the walls of Jericho collapsed.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+// Small seeded random so every level has the same, tested layout
+function seeded(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(s ^ (s >>> 15), 1 | s);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const LANE_Y = 800;        // middle of the rhythm lane (playfield y)
+const HIT_X = 92;          // where the notes must be tapped
+const PX_BEAT = 150;       // how far apart one beat is on the lane
+const LEAD = 4;            // count-in beats
+const SHOUT_TIME = 6;      // seconds to shout on the seventh day
+const WALL_H = 62;         // height of the city wall
+
+const LEVELS = [
+  { name: 'Day One', verse: 'sixdays', bpm: 72, notes: 16, half: 0, hush: 0, horn: 0, laps: 1, perfect: 0.095, good: 0.19, lapWord: 'Day',
+    tip: 'Tap <b>in time</b> when each <b>footprint</b> reaches the circle. One tap = one marching step!' },
+  { name: 'Not a Sound', verse: 'around', bpm: 80, notes: 22, half: 0, hush: 0.22, horn: 0, laps: 1, perfect: 0.085, good: 0.17, lapWord: 'Day',
+    tip: 'The people marched <b>quietly</b>. When a <b>“Shh!”</b> face comes, <b>don’t tap</b>, just let it pass.' },
+  { name: 'Seven Trumpets', verse: 'seven', bpm: 88, notes: 28, half: 0.15, hush: 0.18, horn: 0.22, laps: 1, perfect: 0.075, good: 0.155, lapWord: 'Day',
+    tip: 'Tap the golden <b>rams’ horns</b> too, and the priests blow their trumpets! Some steps come <b>quicker</b> now.' },
+  { name: 'Days Two to Six', verse: 'sixdays', bpm: 96, notes: 36, half: 0.25, hush: 0.2, horn: 0.18, laps: 5, perfect: 0.07, good: 0.145, lapWord: 'Day', firstLap: 2,
+    tip: 'Once around the city each day, for five more days. Keep a steady beat!' },
+  { name: 'The Seventh Day', verse: 'shout', bpm: 104, notes: 44, half: 0.3, hush: 0.18, horn: 0.2, laps: 7, perfect: 0.065, good: 0.135, lapWord: 'Lap', shout: 24,
+    tip: 'Seven times around! Then comes the <b>long blast</b>, and everyone <b>SHOUTS</b>: tap as fast as you can!' },
+];
+function makeConfig(n) { return { ...LEVELS[n - 1], n }; }
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | level | play | pause | win | fail | done
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('jerichoBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let lv = null;            // { notes, lastBeat }
+let songT = 0;            // seconds since the count-in started (game time, stops while paused)
+let readyT = 0;           // a short "ready…" hold after resuming
+let steady = 100;         // the march meter: empty = the march falls apart
+let levelPts = 0, combo = 0, bestCombo = 0, perfects = 0, misses = 0;
+let phase = 'march';      // march | blast | shout | fall | end
+let phaseT = 0, shouts = 0;
+let lastBeatInt = -99;
+let popups = [];
+let particles = [];
+let bricks = [];
+let message = { text: '', t: 0 };
+let flashT = 0, shakeT = 0, endTimer = 0;
+let lastScore = null;
+let playT = 0, winT = 0, failT = 0;
+let failWhy = '';
+let stumbleT = 0, hornT = 0;
+let told = {};
+
+function beatNow() { return songT * cfg.bpm / 60 - LEAD; }
+function secPerBeat() { return 60 / cfg.bpm; }
+
+// ============================================================
+//  Building a level: the marching pattern
+// ============================================================
+function buildLevel() {
+  const rng = seeded(level * 389 + 21);
+  const notes = [];
+  let b = 0, hushRun = 0;
+  for (let i = 0; i < cfg.notes; i++) {
+    let kind = 'step';
+    if (i >= 4) {
+      if (hushRun > 0) { kind = 'hush'; hushRun--; }
+      else if (rng() < cfg.hush) { kind = 'hush'; hushRun = rng() < 0.5 ? 1 : 0; }
+      else if (rng() < cfg.horn) kind = 'horn';
+    }
+    notes.push({ b, kind, res: null });
+    // the next step: usually one beat on, sometimes half a beat (never two halves running)
+    const prevHalf = notes.length > 1 && notes[notes.length - 1].b - notes[notes.length - 2].b < 0.75;
+    b += i >= 3 && kind !== 'hush' && !prevHalf && rng() < cfg.half ? 0.5 : 1;
+  }
+  // a hush note never ends the march
+  if (notes[notes.length - 1].kind === 'hush') notes[notes.length - 1].kind = 'step';
+  lv = { notes, lastBeat: notes[notes.length - 1].b };
+  bricks = makeBricks();
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  particles = []; popups = [];
+  songT = 0; readyT = 0;
+  steady = 100;
+  levelPts = 0; combo = 0; bestCombo = 0; perfects = 0; misses = 0;
+  phase = 'march'; phaseT = 0; shouts = 0;
+  lastBeatInt = -99;
+  playT = 0; winT = 0; failT = 0;
+  flashT = shakeT = 0;
+  stumbleT = 0; hornT = 0;
+  endTimer = 0;
+  message = { text: '', t: 0 };
+  told = {};
+  buildLevel();
+}
+
+// ============================================================
+//  Cards
+// ============================================================
+// ============================================================
+//  Overlay cards
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+  overlay.querySelector('.card').scrollTop = 0;
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  note(h) { if (this.ctx) Music.tap(h); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Drawing helpers shared by the scenes
+// ============================================================
+function eyes(x, y, lookX, open, big = 1) {
+  const dark = '#2b1d12';
+  for (const sx of [-6, 6]) {
+    if (!open) {
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x + sx, y, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(x + sx, y, 4 * big, 5 * big, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big, y + 0.5, 2.2 * big, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x + sx + lookX * 1.8 * big - 0.8, y - 0.8, 0.8, 0, TAU); ctx.fill();
+  }
+}
+function bubbleAt(x, y, text, col, s = 1) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const w = ctx.measureText(text).width + 22;
+  ctx.fillStyle = col; ctx.strokeStyle = 'rgba(80,50,20,0.6)'; ctx.lineWidth = 2;
+  roundRect(-w / 2, -17, w, 32, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(0, 26); ctx.lineTo(6, 14); ctx.fill();
+  ctx.fillStyle = '#5a3210'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+function drawHudButtons() {
+  ctx.save();
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+// The HUD strip: title line, a time bar, chances, score
+function drawHudStrip(label, barName, frac, chancesLeft, chancesMax, extra) {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const hg = ctx.createLinearGradient(0, 0, 0, 112);
+  hg.addColorStop(0, 'rgba(20,14,34,0.8)'); hg.addColorStop(1, 'rgba(20,14,34,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, 112);
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffe9a8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(label, 12, 26);
+  if (barName) {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText(barName, 12, 50);
+    ctx.shadowBlur = 0;
+    const bx = 18 + ctx.measureText(barName).width;
+    ctx.fillStyle = 'rgba(255,233,168,0.22)';
+    roundRect(bx, 40, 120, 13, 6.5); ctx.fill();
+    ctx.fillStyle = frac < 0.2 && Math.sin(t * 10) > 0 ? '#ff6b6b' : '#ffd860';
+    if (frac > 0) { roundRect(bx, 40, 120 * frac, 13, 6.5); ctx.fill(); }
+    for (let i = 0; i < chancesMax; i++) {
+      const cx = bx + 140 + i * 22;
+      ctx.fillStyle = i < chancesLeft ? '#ff6b7a' : 'rgba(255,255,255,0.25)';
+      ctx.beginPath(); ctx.moveTo(cx, 54); ctx.bezierCurveTo(cx - 12, 46, cx - 8, 36, cx, 42); ctx.bezierCurveTo(cx + 8, 36, cx + 12, 46, cx, 54); ctx.fill();
+    }
+    if (extra) { ctx.fillStyle = '#ffe9a8'; ctx.font = '600 13px Fredoka, sans-serif'; ctx.fillText(extra, bx + 150 + chancesMax * 22, 52); }
+  }
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#ffe9a8'; ctx.font = '700 16px Fredoka, sans-serif';
+  ctx.shadowBlur = 4;
+  if (state !== 'title') ctx.fillText(`Score ${totalScore}`, viewW - 14, 26);
+  ctx.restore();
+  drawHudButtons();
+}
+function drawMessage(y0) {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 23px Fredoka, sans-serif';
+  const lines = wrapText(message.text, Math.min(viewW - 40, 640));
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,12,34,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('The Walls of Jericho', 'March, blow the trumpets, SHOUT!',
+    `${verseHTML('around')}
+     <ul>
+       <li>God told Joshua how to win Jericho: not by fighting, but by <b>marching around the city</b> and trusting Him.</li>
+       <li><b>Tap in time</b> as each <b>footprint</b> reaches the circle at the bottom. Every good tap is a marching step.</li>
+       <li>Tap the golden <b>rams’ horns</b> to blow the trumpets. When a <b>“Shh!”</b> face comes, <b>don’t tap</b>: march quietly.</li>
+       <li>Miss too many steps and the march falls into a muddle!</li>
+       <li>On the seventh day, everyone <b>SHOUTS</b>: tap as fast as you can, and the walls fall down flat!</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> or any arrow key to step.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+// The level card: the new level is built at the same time, so the scene behind it is ready
+function levelCard() {
+  resetLevel();
+  state = 'level';
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(cfg.verse)}
+     <p style="text-align:center">${cfg.tip}</p>`,
+    'Begin', () => startLevel());
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const stepPts = levelPts;
+  const comboBonus = bestCombo * 20;
+  const steadyBonus = Math.round(steady) * 5;
+  const levelBonus = level * 300 + (cfg.shout ? Math.min(shouts, cfg.shout * 2) * 10 : 0);
+  const score = stepPts + comboBonus + steadyBonus + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('jerichoBest', best); } catch (e) {} }
+  lastScore = { stepPts, comboBonus, steadyBonus, levelBonus, score };
+  if (!cfg.shout) showMessage(`Back to camp. ${cfg.laps > 1 ? 'Six days done!' : 'Day ' + level + ' done!'}`, 2.2);
+  sfx.win();
+  endTimer = cfg.shout ? 1.6 : 2.4;
+}
+
+function fail(why) {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  failWhy = why;
+  showMessage(why, 2.2);
+  sfx.fail();
+  endTimer = 2.2;
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= LEVELS.length;
+    const scoreHTML = `<p class="score">Steps: <b>${s.stepPts}</b> (${perfects} perfect)<br>Best run: ${bestCombo} &rarr; <b>${s.comboBonus}</b><br>Steady march: <b>${s.steadyBonus}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>`;
+    if (last) {
+      state = 'done';
+      showOverlay('The walls fell down!', 'God gave them the city',
+        `${verseHTML('fell')}
+         <p style="text-align:center">They did it God’s way, and God did what He promised. (Rahab’s house with the <b>scarlet cord</b> was kept safe too!)</p>
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Play again', () => { level = 1; totalScore = 0; levelCard(); });
+    } else {
+      showOverlay('Well marched!', `Level ${level} complete — ${cfg.name}`,
+        `${verseHTML(level === 3 ? 'seven' : 'sixdays')}
+         ${scoreHTML}
+         ${creditHTML()}`,
+        'Next level', () => { level++; levelCard(); });
+    }
+  } else if (state === 'fail') {
+    showOverlay('Oops!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${failWhy} Listen to the drum and tap just as each footprint reaches the circle.</p>
+       ${verseHTML('around')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Everyone stands still. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+    // a moment to get ready before the beat carries on
+    if (phase === 'march' && beatNow() > -1) readyT = 1.2;
+  }
+}
+
+// ============================================================
+//  Playing
+// ============================================================
+function popup(text, col) { popups.push({ text, col, t: 0.8 }); }
+
+function judgeTap() {
+  if (state !== 'play') return;
+  if (phase === 'shout') { shoutTap(); return; }
+  if (phase !== 'march' || readyT > 0) return;
+  const bn = beatNow();
+  const spb = secPerBeat();
+  // the nearest note still waiting to be judged
+  let best = null, bd = Infinity;
+  for (const n of lv.notes) {
+    if (n.res) continue;
+    const d = Math.abs(n.b - bn) * spb;
+    if (d < bd) { bd = d; best = n; }
+    if (n.b - bn > 2) break;
+  }
+  if (best && best.kind === 'hush' && bd <= cfg.good) {
+    best.res = 'noisy';
+    hurt(15, 'Shh!', '#7cc4f2');
+    sfx.shh();
+    if (!told.shh) { told.shh = true; showMessage('Shh! Don’t tap on the quiet faces.', 2); }
+    return;
+  }
+  // a hush note nearby but outside the window shouldn't hide a step behind it
+  if (best && best.kind === 'hush') {
+    best = null; bd = Infinity;
+    for (const n of lv.notes) { if (n.res || n.kind === 'hush') continue; const d = Math.abs(n.b - bn) * spb; if (d < bd) { bd = d; best = n; } if (n.b - bn > 2) break; }
+  }
+  if (best && bd <= cfg.good) {
+    const perfect = bd <= cfg.perfect;
+    best.res = perfect ? 'perfect' : 'good';
+    if (perfect) perfects++;
+    combo++; bestCombo = Math.max(bestCombo, combo);
+    const pts = (perfect ? 100 : 50) + Math.min(combo, 20) * 5;
+    levelPts += pts;
+    steady = Math.min(100, steady + (perfect ? 3 : 1));
+    popup(perfect ? 'Perfect!' : 'Good', perfect ? '#ffe27a' : '#c8f0a0');
+    if (best.kind === 'horn') { hornT = 0.6; sfx.horn(); } else sfx.stepHit(combo);
+    const lx = HIT_X;
+    for (let i = 0; i < (perfect ? 8 : 4); i++) spawn(lx, LANE_Y, rand(-80, 80), rand(-140, -40), 0.6, perfect ? '#ffe27a' : '#c8f0a0', 3, 200, 'star');
+  } else if (best && bd <= 0.4) {
+    // way off the beat: that step is lost
+    best.res = 'miss';
+    missed();
+  } else {
+    hurt(10, 'Oops', '#ffb0a0');
+    sfx.stumble();
+  }
+}
+
+function hurt(n, text, col) {
+  steady -= n;
+  combo = 0;
+  stumbleT = 0.5;
+  popup(text, col);
+  if (steady <= 0) { steady = 0; fail('The march fell into a muddle!'); }
+}
+function missed() {
+  misses++;
+  sfx.stumble();
+  hurt(20, 'Miss', '#ffb0a0');
+  if (!told.miss && state === 'play') { told.miss = true; showMessage('Tap when the footprint is inside the circle!', 2); }
+}
+
+function updateMarch(dt) {
+  if (readyT > 0) { readyT -= dt; return; }
+  songT += dt;
+  const bn = beatNow();
+  // the drum keeps the beat (and counts in)
+  const bi = Math.floor(bn + 1e-6);
+  if (bi !== lastBeatInt) {
+    lastBeatInt = bi;
+    if (bi < 0) { sfx.click(true); popup(String(-bi), '#ffffff'); }
+    else if (bi <= lv.lastBeat + 1) sfx.click(false);
+    if (bi === 0 && level === 1 && !told.go) { told.go = true; showMessage('March!', 1.2); }
+  }
+  // steps that went by without a tap
+  const late = cfg.good / secPerBeat();
+  for (const n of lv.notes) {
+    if (n.res) continue;
+    if (n.b > bn) break;
+    if (bn - n.b > late) {
+      if (n.kind === 'hush') { n.res = 'quiet'; popup('Shh ✓', '#a8dcff'); levelPts += 30; }
+      else { n.res = 'miss'; missed(); if (state !== 'play') return; }
+    }
+  }
+  if (bn > lv.lastBeat + 1.5) {
+    if (cfg.shout) { phase = 'blast'; phaseT = 0; sfx.longBlast(); hornT = 2.2; showMessage('A long blast on the rams’ horns…', 2); }
+    else winLevel();
+  }
+}
+
+function shoutTap() {
+  shouts++;
+  sfx.shout();
+  shakeT = Math.min(0.35, shakeT + 0.05);
+  for (let i = 0; i < 3; i++) spawn(viewW / 2 + rand(-200, 200), 600 + rand(-30, 30), rand(-30, 30), rand(-120, -60), 0.7, '#fff6d0', 3, 0, 'star');
+}
+
+function updateShout(dt) {
+  phaseT += dt;
+  if (phase === 'blast') {
+    if (phaseT > 2.2) { phase = 'shout'; phaseT = 0; showMessage('Now everyone SHOUT! Tap, tap, tap!', 2.2); }
+  } else if (phase === 'shout') {
+    if (shouts >= cfg.shout) { phase = 'fall'; phaseT = 0; wallsFall(); }
+    else if (phaseT > SHOUT_TIME) fail('The shout wasn’t loud enough! Tap faster!');
+  } else if (phase === 'fall') {
+    if (phaseT > 3.2) { phase = 'end'; winLevel(); }
+  }
+}
+
+// ============================================================
+//  The city and its wall
+// ============================================================
+function city() {
+  const cx = viewW / 2, cy = 430;
+  const rx = Math.min(viewW * 0.33, 300), ry = 130;
+  return { cx, cy, rx, ry, px: rx + 70, py: ry + 90 };
+}
+
+function makeBricks() {
+  // the front of the wall, as blocks that can tumble down flat
+  const out = [];
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI * (i + 0.5) / n;   // 0..PI: the front half of the ring
+    out.push({ a, fall: 0, vr: rand(-1, 1), delay: rand(0, 0.6), rahab: i === 4 });
+  }
+  return out;
+}
+
+function wallsFall() {
+  flashT = 0.4; shakeT = 0.8;
+  sfx.crumble();
+  const C = city();
+  for (const b of bricks) {
+    for (let k = 0; k < 4; k++) spawn(C.cx + Math.cos(b.a) * C.rx, C.cy + Math.sin(b.a) * C.ry, rand(-60, 60), rand(-90, -10), rand(1, 2), 'rgba(200,170,130,0.6)', rand(8, 16), -10, 'dot');
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyJ', 'KeyF'].includes(e.code)) judgeTap();
+});
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 8) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play') judgeTap();
+});
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.6, p.size * 0.7);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStar(x, y, R, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+
+// ============================================================
+//  Sounds for this game
+// ============================================================
+let melodyStep = 0;
+Object.assign(sfx, {
+  click(loud) { this.tone(loud ? 880 : 110, loud ? 0.08 : 0.16, loud ? 'triangle' : 'sine', loud ? 0.18 : 0.32, 0, loud ? null : 60); },
+  stepHit() { if (this.ctx) { Music.tap((melodyStep++ % 8) / 7); } this.noiseBurst(500, 0.08, 0.15, 1, 250, 'lowpass'); },
+  horn() {
+    if (!this.ctx) return;
+    this.tone(233, 0.5, 'sawtooth', 0.07, 0, 262); this.tone(349, 0.45, 'sawtooth', 0.05, 0.03, 392);
+    Music.tap(1);
+  },
+  longBlast() {
+    if (!this.ctx) return;
+    this.tone(233, 2.0, 'sawtooth', 0.08, 0, 247); this.tone(349, 2.0, 'sawtooth', 0.06, 0.05, 370); this.tone(466, 1.8, 'sawtooth', 0.04, 0.1, 494);
+  },
+  shh() { this.noiseBurst(5000, 0.35, 0.18, 0.8, 4000, 'highpass'); },
+  stumble() { this.tone(180, 0.18, 'triangle', 0.18, 0, 120); },
+  shout() { this.noiseBurst(700 + Math.random() * 400, 0.25, 0.3, 0.6, 400); this.tone(200 + Math.random() * 80, 0.2, 'sawtooth', 0.04); },
+  crumble() {
+    if (!this.ctx) return;
+    for (let i = 0; i < 8; i++) setTimeout(() => this.noiseBurst(200 + Math.random() * 200, 0.5, 0.35, 0.7, 80, 'lowpass'), i * 120);
+  },
+});
+
+// ============================================================
+//  Rendering
+// ============================================================
+function drawSky() {
+  const g = ctx.createLinearGradient(0, -offY, 0, 600);
+  g.addColorStop(0, '#6aa8e0'); g.addColorStop(1, '#f6dcae');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, -offY, viewW, 600 + offY);
+  ctx.fillStyle = '#ffe08a';
+  ctx.beginPath(); ctx.arc(viewW * 0.84, Math.max(-offY + 80, 160), 40, 0, TAU); ctx.fill();
+  // distant hills and the plain
+  ctx.fillStyle = '#c9b07a';
+  ctx.beginPath(); ctx.moveTo(0, 270);
+  for (let x = 0; x <= viewW + 40; x += 40) ctx.lineTo(x, 250 - Math.sin(x * 0.01) * 22);
+  ctx.lineTo(viewW, 300); ctx.lineTo(0, 300); ctx.fill();
+  const pg = ctx.createLinearGradient(0, 260, 0, H);
+  pg.addColorStop(0, '#d9c08a'); pg.addColorStop(1, '#c4a46a');
+  ctx.fillStyle = pg;
+  ctx.fillRect(0, 262, viewW, H - 262);
+  // palms of the City of Palms
+  for (const [x, s] of [[viewW * 0.06, 0.55], [viewW * 0.95, 0.6], [viewW * 0.2, 0.42], [viewW * 0.8, 0.45]]) drawPalm(x, 300 + s * 60, s);
+}
+
+function drawPalm(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#8a6038'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, -70, 2, -140); ctx.stroke();
+  ctx.fillStyle = '#4f9a4a';
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i - 2.5) * 0.55 + Math.sin(t + i) * 0.04;
+    ctx.save(); ctx.translate(2, -140); ctx.rotate(a);
+    ctx.beginPath(); ctx.ellipse(36, 0, 38, 9, 0.25, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function wallSeg(C, a0, a1, h, col) {
+  // a stretch of the round wall between two angles, with battlements
+  const steps = 10;
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) { const a = lerp(a0, a1, i / steps); ctx.lineTo(C.cx + Math.cos(a) * C.rx, C.cy + Math.sin(a) * C.ry - h); }
+  for (let i = steps; i >= 0; i--) { const a = lerp(a0, a1, i / steps); ctx.lineTo(C.cx + Math.cos(a) * C.rx, C.cy + Math.sin(a) * C.ry); }
+  ctx.closePath(); ctx.fill();
+}
+
+function fallFrac() {
+  if (!cfg.shout) return 0;
+  if (state === 'play' && phase === 'fall') return ease(clamp(phaseT / 1.3, 0, 1));
+  if ((state === 'play' && phase === 'end') || state === 'win' || state === 'done') return 1;
+  return 0;
+}
+function drawCityBack(C) {
+  // the back half of the wall, the houses inside
+  const ff = fallFrac();
+  wallSeg(C, Math.PI, TAU, (WALL_H + 10) * (1 - 0.86 * ff), ff > 0 ? '#c9a77a' : '#b8936a');
+  ctx.fillStyle = '#a07a52';
+  for (let i = 0; i < 16 && ff <= 0; i++) {
+    const a = Math.PI + (i + 0.5) * Math.PI / 16;
+    const x = C.cx + Math.cos(a) * C.rx, y = C.cy + Math.sin(a) * C.ry - WALL_H - 10;
+    ctx.fillRect(x - 7, y - 12, 14, 12);
+  }
+  ctx.fillStyle = '#cfb48a';
+  ctx.beginPath(); ctx.ellipse(C.cx, C.cy, C.rx, C.ry, 0, 0, TAU); ctx.fill();
+  // houses: flat roofs, little windows
+  for (let i = 0; i < 14; i++) {
+    const hx = C.cx + (hash(i, 1) - 0.5) * C.rx * 1.5, hy = C.cy + (hash(i, 2) - 0.5) * C.ry * 1.1;
+    const w = 34 + hash(i, 3) * 26, h = 50 + hash(i, 4) * 50;
+    ctx.fillStyle = ['#e2c39a', '#d9b48a', '#cfa77a'][i % 3];
+    ctx.fillRect(hx - w / 2, hy - h, w, h);
+    ctx.fillStyle = '#a8855a'; ctx.fillRect(hx - w / 2 - 2, hy - h - 4, w + 4, 5);
+    ctx.fillStyle = '#5a3a22'; roundRect(hx - 5, hy - h + 10, 9, 10, 3); ctx.fill();
+  }
+  // a tower at the back (it tumbles down too)
+  ctx.fillStyle = '#b08a60';
+  const th = 90 * (1 - ff * 0.85);
+  if (ff < 0.6) ctx.fillRect(C.cx - 26, C.cy - C.ry - 60 - th, 52, th);
+  if (ff <= 0) for (let k = 0; k < 3; k++) ctx.fillRect(C.cx - 26 + k * 20, C.cy - C.ry - 164, 12, 16);
+}
+
+function drawCityFront(C) {
+  const fallen = phase === 'fall' || phase === 'end' || (state === 'win' && cfg.shout) || state === 'done' && cfg.shout;
+  const crack = clamp((level - 1) / 4, 0, 1);
+  for (const b of bricks) {
+    const a0 = b.a - Math.PI / 36, a1 = b.a + Math.PI / 36;
+    let f = 0;
+    if (fallen) f = clamp((phaseT - b.delay) / 0.9, 0, 1);
+    if (phase === 'end' || state === 'done' || state === 'win') f = fallen ? 1 : 0;
+    if (b.rahab) {
+      // Rahab's house in the wall, with the scarlet cord: it stays standing
+      wallSeg(C, a0, a1, WALL_H, '#b8936a');
+      const x = C.cx + Math.cos(b.a) * C.rx, y = C.cy + Math.sin(b.a) * C.ry;
+      ctx.fillStyle = '#e2c39a'; ctx.fillRect(x - 22, y - WALL_H - 38, 44, 44);
+      ctx.fillStyle = '#6a4a2a'; ctx.fillRect(x - 25, y - WALL_H - 42, 50, 6);
+      ctx.fillStyle = '#ffd860'; roundRect(x - 8, y - WALL_H - 30, 16, 16, 5); ctx.fill();
+      ctx.strokeStyle = '#d0302a'; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(x, y - WALL_H - 16); ctx.quadraticCurveTo(x + 4 + Math.sin(t * 2) * 3, y - 40, x, y - 10); ctx.stroke();
+      continue;
+    }
+    const h = WALL_H * (1 - ease(f) * 0.86);
+    ctx.save();
+    if (f > 0 && f < 1) { const x = C.cx + Math.cos(b.a) * C.rx, y = C.cy + Math.sin(b.a) * C.ry; ctx.translate(x, y); ctx.rotate(b.vr * 0.2 * Math.sin(f * Math.PI)); ctx.translate(-x, -y); }
+    wallSeg(C, a0, a1, h, f > 0 ? '#c9a77a' : '#c49e72');
+    ctx.restore();
+    const x = C.cx + Math.cos(b.a) * C.rx, y = C.cy + Math.sin(b.a) * C.ry;
+    if (f <= 0) {
+      ctx.fillStyle = '#a8855a';
+      ctx.fillRect(x - 9, y - WALL_H - 12, 18, 14);
+      ctx.strokeStyle = 'rgba(90,60,30,0.25)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 14, y - 42); ctx.lineTo(x + 14, y - 42); ctx.moveTo(x - 14, y - 20); ctx.lineTo(x + 14, y - 20); ctx.stroke();
+      // cracks grow day by day (and while the people shout)
+      const c = crack + (phase === 'shout' ? phaseT / SHOUT_TIME * 0.5 + shouts / cfg.shout * 0.5 : 0);
+      if (hash(b.a * 10, 3) < c) {
+        ctx.strokeStyle = 'rgba(60,40,20,0.55)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - 4, y - 58); ctx.lineTo(x + 3, y - 44); ctx.lineTo(x - 2, y - 32); ctx.lineTo(x + 5, y - 18); ctx.stroke();
+      }
+    } else if (f >= 1) {
+      // rubble lying flat, with a few cartoon stars
+      ctx.fillStyle = '#b8936a';
+      for (let k = 0; k < 3; k++) { roundRect(x - 18 + k * 12, y - 10 - (k % 2) * 6, 14, 10, 3); ctx.fill(); }
+    }
+  }
+  // the gate
+  if (!fallen) {
+    const gx = C.cx, gy = C.cy + C.ry;
+    ctx.fillStyle = '#5a3a22';
+    roundRect(gx - 22, gy - 48, 44, 48, [22, 22, 0, 0]); ctx.fill();
+    ctx.strokeStyle = '#3a2412'; ctx.lineWidth = 2;
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(gx + k * 12, gy - 42); ctx.lineTo(gx + k * 12, gy); ctx.stroke(); }
+  }
+}
+
+const MARCHERS = [
+  ...Array.from({ length: 7 }, (_, i) => ({ kind: 'priest', i })),
+  { kind: 'ark' },
+  ...Array.from({ length: 6 }, (_, i) => ({ kind: 'person', i, robe: ['#3f6fb5', '#6b8e3a', '#b5503f', '#7a4fa0', '#d9a13a', '#3c8f86'][i] })),
+];
+
+function procAngle() {
+  // the leader's place around the city (the procession starts at the gate, bottom)
+  const total = lv.lastBeat + 1.5;
+  const f = clamp(beatNow() / total, 0, 1);
+  return Math.PI / 2 + f * cfg.laps * TAU;
+}
+
+function drawMarchers(C, front) {
+  const lead = procAngle();
+  const marching = state === 'play' && phase === 'march' && beatNow() >= 0 && readyT <= 0;
+  MARCHERS.forEach((m, k) => {
+    const a = lead - k * 0.16 - (k > 7 ? 0.08 : 0);
+    const sinA = Math.sin(a);
+    if ((sinA >= 0) !== front) return;
+    const x = C.cx + Math.cos(a) * C.px, y = C.cy + Math.sin(a) * C.py;
+    const s = 0.55 + 0.12 * sinA;
+    const bob = marching ? Math.abs(Math.sin(beatNow() * Math.PI)) * 4 : 0;
+    const trip = stumbleT > 0 && k === 9;
+    drawMarcher(m, x, y - bob, s, Math.cos(a) > 0 ? -1 : 1, trip);
+  });
+}
+
+function drawMarcher(m, x, y, s, face, trip) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 18 * s, 5 * s, 0, 0, TAU); ctx.fill();
+  ctx.scale(s * face, s);
+  if (trip) ctx.rotate(-0.25);
+  if (m.kind === 'ark') {
+    ctx.fillStyle = '#a8741a'; roundRect(-50, -46, 100, 5, 2); ctx.fill();
+    ctx.fillStyle = '#e0a526'; roundRect(-24, -70, 48, 26, 3); ctx.fill();
+    ctx.fillStyle = '#f7c948'; roundRect(-27, -75, 54, 7, 3); ctx.fill();
+    ctx.fillStyle = '#f7d460';
+    ctx.beginPath(); ctx.moveTo(-20, -75); ctx.quadraticCurveTo(-12, -96, 0, -86); ctx.lineTo(-4, -75); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(20, -75); ctx.quadraticCurveTo(12, -96, 0, -86); ctx.lineTo(4, -75); ctx.fill();
+    const g = ctx.createRadialGradient(0, -60, 4, 0, -60, 60);
+    g.addColorStop(0, 'rgba(255,236,150,0.45)'); g.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -60, 60, 0, TAU); ctx.fill();
+    for (const px of [-36, 36]) person(px, '#f2efe6', '#d39a66', '#3a2716', true);
+  } else if (m.kind === 'priest') {
+    person(0, '#f2efe6', '#c98d56', '#4a2f1a', true);
+    // a ram's horn trumpet, raised when blowing
+    const blow = hornT > 0;
+    ctx.save();
+    ctx.translate(8, -58);
+    ctx.rotate(blow ? -0.7 : 0.4);
+    ctx.fillStyle = '#e8d3a0'; ctx.strokeStyle = '#a8855a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(18, -4, 26, -16); ctx.lineTo(32, -10); ctx.quadraticCurveTo(22, 6, 0, 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (blow) {
+      ctx.strokeStyle = 'rgba(255,240,180,0.8)'; ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(34, -88, 8 + k * 7 + (t * 30 % 7), -0.8, 0.8); ctx.stroke(); }
+    }
+  } else {
+    person(0, m.robe, '#d7a070', '#3a2716', m.i % 2 === 0);
+    if (phase === 'shout' || phase === 'fall' || (state === 'win' && cfg.shout)) {
+      ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(0, -46, 4, 6, 0, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function person(x, robe, skin, hair, beard) {
+  ctx.fillStyle = robe; ctx.strokeStyle = shade(robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 15, 0); ctx.quadraticCurveTo(x - 14, -28, x - 9, -34); ctx.quadraticCurveTo(x, -38, x + 9, -34); ctx.quadraticCurveTo(x + 14, -28, x + 15, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  const hy = -48;
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x, hy, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.arc(x, hy - 2, 13.5, Math.PI * 0.95, Math.PI * 2.05); ctx.quadraticCurveTo(x + 5, hy - 9, x, hy - 8); ctx.closePath(); ctx.fill();
+  if (beard) { ctx.beginPath(); ctx.moveTo(x - 12, hy + 2); ctx.quadraticCurveTo(x, hy + 22, x + 12, hy + 2); ctx.quadraticCurveTo(x, hy + 8, x - 12, hy + 2); ctx.fill(); }
+  eyes(x + 2, hy - 1, 1, true, 0.85);
+}
+
+// ---- The rhythm lane ----
+function drawLane() {
+  const y = LANE_Y;
+  ctx.fillStyle = 'rgba(60,40,20,0.55)';
+  roundRect(8, y - 52, viewW - 16, 104, 30); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,240,200,0.35)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(HIT_X, y); ctx.lineTo(viewW - 24, y); ctx.stroke();
+  const bn = beatNow();
+  // beat lines
+  for (let b = Math.ceil(bn); b < bn + (viewW - HIT_X) / PX_BEAT + 1; b++) {
+    const x = HIT_X + (b - bn) * PX_BEAT;
+    ctx.strokeStyle = 'rgba(255,240,200,0.18)';
+    ctx.beginPath(); ctx.moveTo(x, y - 34); ctx.lineTo(x, y + 34); ctx.stroke();
+  }
+  // the target circle, pulsing with the beat
+  const pulse = 1 + 0.12 * Math.max(0, 1 - ((bn % 1) + 1) % 1 * 4);
+  ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(HIT_X, y, 38 * pulse, 0, TAU); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,226,122,0.15)';
+  ctx.beginPath(); ctx.arc(HIT_X, y, 38 * pulse, 0, TAU); ctx.fill();
+  // the notes
+  for (const n of lv.notes) {
+    const x = HIT_X + (n.b - bn) * PX_BEAT;
+    if (x > viewW + 40) break;
+    if (x < -40) continue;
+    if (n.res === 'perfect' || n.res === 'good') continue;
+    let a = 1;
+    if (n.res === 'miss' || n.res === 'noisy') a = 0.35;
+    if (n.res === 'quiet') a = clamp(1 - (HIT_X - x) / 60, 0, 1);
+    ctx.globalAlpha = a;
+    drawNote(n.kind, x, y);
+    ctx.globalAlpha = 1;
+  }
+  if (readyT > 0) {
+    ctx.font = '700 26px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(40,20,10,0.8)'; ctx.lineWidth = 5; ctx.fillStyle = '#fff';
+    ctx.strokeText('Ready…', viewW / 2, y - 70); ctx.fillText('Ready…', viewW / 2, y - 70);
+  }
+  // popups over the circle
+  for (const p of popups) {
+    const k = 1 - p.t / 0.8;
+    ctx.globalAlpha = clamp(p.t / 0.3, 0, 1);
+    ctx.font = '700 22px Fredoka, sans-serif'; ctx.textAlign = 'left';
+    ctx.strokeStyle = 'rgba(40,20,10,0.8)'; ctx.lineWidth = 4;
+    ctx.strokeText(p.text, HIT_X + 46, y - 50 - k * 30); ctx.fillStyle = p.col; ctx.fillText(p.text, HIT_X + 46, y - 50 - k * 30);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawNote(kind, x, y) {
+  if (kind === 'step') {
+    ctx.fillStyle = '#f2e2c0'; ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 28, 0, TAU); ctx.fill(); ctx.stroke();
+    // a sandal footprint
+    ctx.fillStyle = '#8a5a2a';
+    ctx.beginPath(); ctx.ellipse(x, y + 4, 8, 13, 0.15, 0, TAU); ctx.fill();
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x - 6 + k * 4.5, y - 13 + Math.abs(k - 1.5) * 1.5, 2.6, 0, TAU); ctx.fill(); }
+  } else if (kind === 'horn') {
+    ctx.fillStyle = '#ffe27a'; ctx.strokeStyle = '#a8741a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 30, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f6ecd0'; ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - 16, y + 8); ctx.quadraticCurveTo(x + 2, y + 4, x + 10, y - 12); ctx.lineTo(x + 18, y - 8); ctx.quadraticCurveTo(x + 8, y + 16, x - 16, y + 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    // "Shh!": a face with a finger to its lips
+    ctx.fillStyle = '#bfe3ff'; ctx.strokeStyle = '#4a8ac0'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 28, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e3b184'; ctx.beginPath(); ctx.arc(x, y, 18, 0, TAU); ctx.fill();
+    eyes(x, y - 4, 0, false, 0.8);
+    ctx.fillStyle = '#d39a66'; roundRect(x - 2.5, y - 2, 5, 16, 2.5); ctx.fill();
+    ctx.fillStyle = '#4a8ac0'; ctx.font = '700 12px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Shh', x, y + 40);
+  }
+}
+
+function drawSteadyMeter() {
+  // the march meter, top right under the score
+  const w = 120, x = viewW - w - 14, y = 40;
+  ctx.save();
+  ctx.font = '600 12px Fredoka, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#ffe9a8';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillText('MARCH', x - 6, y + 11);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,233,168,0.22)'; roundRect(x, y, w, 13, 6.5); ctx.fill();
+  ctx.fillStyle = steady < 30 && Math.sin(t * 10) > 0 ? '#ff6b6b' : steady < 50 ? '#ffb347' : '#8fdc6a';
+  if (steady > 0) { roundRect(x, y, w * steady / 100, 13, 6.5); ctx.fill(); }
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!lv) return;
+  const sx = shakeT > 0 ? rand(-5, 5) * shakeT * 2 : 0, sy = shakeT > 0 ? rand(-3, 3) * shakeT * 2 : 0;
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, (offY + sy) * scale);
+  drawSky();
+  const C = city();
+  drawMarchers(C, false);
+  drawCityBack(C);
+  drawCityFront(C);
+  drawMarchers(C, true);
+  drawParticles();
+  if (state !== 'title') drawLane();
+  // shout meter
+  if (phase === 'shout' && state === 'play') {
+    const f = clamp(shouts / cfg.shout, 0, 1);
+    const w = Math.min(360, viewW - 60), x = viewW / 2 - w / 2, y = 660;
+    ctx.fillStyle = 'rgba(60,40,20,0.6)'; roundRect(x - 6, y - 6, w + 12, 34, 17); ctx.fill();
+    ctx.fillStyle = '#ffd860'; roundRect(x, y, w * f, 22, 11); ctx.fill();
+    ctx.font = '700 34px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(60,20,10,0.85)'; ctx.lineWidth = 6; ctx.fillStyle = '#fff';
+    const s = 1 + Math.sin(t * 20) * 0.05;
+    ctx.save(); ctx.translate(viewW / 2, y - 30); ctx.scale(s, s);
+    ctx.strokeText('SHOUT!', 0, 0); ctx.fillText('SHOUT!', 0, 0); ctx.restore();
+    ctx.font = '600 16px Fredoka, sans-serif'; ctx.fillStyle = '#5a3210';
+    ctx.fillText(`${Math.ceil(Math.max(0, SHOUT_TIME - phaseT))}s`, x + w + 30, y + 17);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  let extra = '';
+  if (state !== 'title' && cfg.laps > 1) {
+    const lap = clamp(Math.floor((procAngle() - Math.PI / 2) / TAU) + 1, 1, cfg.laps);
+    extra = `${cfg.lapWord} ${lap + (cfg.firstLap || 1) - 1}${cfg.lapWord === 'Lap' ? ' of ' + cfg.laps : ''}`;
+  }
+  drawHudStrip(state === 'title' ? 'The Walls of Jericho' : `Level ${level} · ${cfg.name}`, null, 1, 0, 0, '');
+  if (state !== 'title') {
+    drawSteadyMeter();
+    ctx.save();
+    ctx.font = '700 16px Fredoka, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffe9a8';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+    ctx.fillText(cfg.laps > 1 ? extra : '', 12, 52);
+    if (combo >= 3) ctx.fillText(`Run ×${combo}`, 130, 52);
+    ctx.restore();
+  }
+  drawMessage(Math.max(150, offY + 150));
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  for (let i = popups.length - 1; i >= 0; i--) { popups[i].t -= dt; if (popups[i].t <= 0) popups.splice(i, 1); }
+  stumbleT = Math.max(0, stumbleT - dt);
+  hornT = Math.max(0, hornT - dt);
+  if (!lv) return;
+  if (state === 'play') {
+    playT += dt;
+    if (phase === 'march') updateMarch(dt);
+    else updateShout(dt);
+  } else if (state === 'win') {
+    winT += dt;
+    if (cfg.shout) phaseT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, viewW), rand(150, 500), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  } else if (state === 'fail') {
+    failT += dt;
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

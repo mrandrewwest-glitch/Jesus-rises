@@ -1,0 +1,1390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a3a24">
+<title>A Little Coat for Samuel</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #5a3a24;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(60, 35, 20, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">A Little Coat for Samuel</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'pipe', ambience: 'none', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  coat: { ref: '1 Samuel 2:19', KJV: 'Moreover his mother made him a little coat, and brought it to him from year to year, when she came up with her husband to offer the yearly sacrifice.', NKJV: 'Moreover his mother used to make him a little robe, and bring it to him year by year when she came up with her husband to offer the yearly sacrifice.', NIV: 'Each year his mother made him a little robe and took it to him when she went up with her husband to offer the annual sacrifice.', NLT: 'Each year his mother made a small coat for him and brought it to him when she came with her husband for the sacrifice.' },
+  // Level cards
+  ephod: { ref: '1 Samuel 2:18', KJV: 'But Samuel ministered before the Lord, being a child, girded with a linen ephod.', NKJV: 'But Samuel ministered before the Lord, even as a child, wearing a linen ephod.', NIV: 'But Samuel was ministering before the Lord—a boy wearing a linen ephod.', NLT: 'But Samuel, though he was only a boy, served the Lord. He wore a linen garment like that of a priest.' },
+  yearly: { ref: '1 Samuel 2:19', KJV: 'his mother made him a little coat, and brought it to him from year to year', NKJV: 'his mother used to make him a little robe, and bring it to him year by year', NIV: 'Each year his mother made him a little robe and took it to him', NLT: 'Each year his mother made a small coat for him and brought it to him' },
+  favour: { ref: '1 Samuel 2:26', KJV: 'And the child Samuel grew on, and was in favour both with the Lord, and also with men.', NKJV: 'And the child Samuel grew in stature, and in favor both with the Lord and men.', NIV: 'And the boy Samuel continued to grow in stature and in favor with the Lord and with people.', NLT: 'Meanwhile, the boy Samuel grew taller and grew in favor with the Lord and with the people.' },
+  // Win card
+  grew: { ref: '1 Samuel 2:21', KJV: 'And the child Samuel grew before the Lord.', NKJV: 'Meanwhile the child Samuel grew before the Lord.', NIV: 'Meanwhile, the boy Samuel grew up in the presence of the Lord.', NLT: 'Meanwhile, Samuel grew up in the presence of the Lord.' },
+  // Fail card and the final card
+  prayed: { ref: '1 Samuel 1:27', KJV: 'For this child I prayed; and the Lord hath given me my petition which I asked of him:', NKJV: 'For this child I prayed, and the Lord has granted me my petition which I asked of Him.', NIV: 'I prayed for this child, and the Lord has granted me what I asked of him.', NLT: 'I asked the Lord to give me this boy, and he has granted my request.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes wall above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip at the top
+const PIN_R = 9;           // tapping this close to a pin pricks your finger
+const GRACE = 0.2;         // a second tap this soon after a good stitch is ignored (no tangle)
+const NUM_LEVELS = 6;
+
+const LEVEL_NAMES = [
+  'Samuel\'s First Coat',
+  'A Gold Thread',
+  'Mind the Pins!',
+  'A Pretty Hem',
+  'Bands on the Sleeves',
+  'The Finest Coat Yet',
+];
+const FABRICS = ['#3f7fc0', '#c0533f', '#4f9a58', '#8a5ab0', '#d98a2a', '#2f9a96'];
+const THREADS = ['#fff3c8', '#ffe27a', '#fff3c8', '#ffd27a', '#ffffff', '#ffe27a'];
+
+function makeConfig(n) {
+  return {
+    name: LEVEL_NAMES[n - 1] || `Year ${n}`,
+    age: n + 2,                                   // Samuel's age this year
+    size: [0.66, 0.74, 0.82, 0.9, 0.98, 1.06][n - 1] || 1.06,
+    gap: [58, 52, 48, 46, 44, 42][n - 1] || 42,   // distance between stitch dots
+    speed: [72, 92, 106, 118, 130, 142][n - 1] || 142,
+    win: [30, 26, 23, 20, 18, 16][n - 1] || 16,   // how close (either side) counts as a stitch
+    lives: [5, 5, 4, 4, 4, 3][n - 1] || 3,
+    pins: [0, 0, 3, 4, 6, 8][n - 1] || 8,
+    gold: n >= 2,
+    wobble: [0, 0, 0, 0.22, 0.28, 0.34][n - 1] || 0.34,   // the needle speeds up and slows down
+    hem: n >= 3,
+    sleeves: n >= 5,
+    front: n >= 6,
+    fabric: FABRICS[(n - 1) % FABRICS.length],
+    thread: THREADS[(n - 1) % THREADS.length],
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('samuelCoatBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let pieces = [];          // the seams to sew this year: { pts, cum, len, dots, pins, name }
+let pieceIdx = 0;         // which seam the needle is on
+let needleP = 0;          // how far along that seam the needle is
+let hopT = 0;             // > 0 while the needle hops to the next seam
+let readyT = 0;           // count-in before the needle starts
+let runT = 0;             // time the needle has been moving (for the wobble)
+let mistakes = 0;
+let combo = 0, bestCombo = 0;
+let perfects = 0, goods = 0, misses = 0;
+let stitchPts = 0;
+let lastGoodT = -9;
+let dipT = 0;             // needle dips into the cloth after a stitch
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let endTimer = 0;
+let winT = 0, failT = 0;
+let lastScore = null;
+let told = {};
+let hannahMood = 'watch', moodT = 0;
+let shakeT = 0;
+let wornCoat = null;      // the coat Samuel is wearing (colour), null = only the linen ephod
+
+// ============================================================
+//  The coat pattern
+// ============================================================
+// Outline of the little coat (a tunic with short sleeves), centred on (0, 0), at size 1
+const OUTLINE = [
+  [-28, -150], [-95, -140], [-150, -128], [-150, -72], [-72, -66], [-92, 165],
+  [92, 165], [72, -66], [150, -72], [150, -128], [95, -140], [28, -150],
+  [14, -131], [0, -126], [-14, -131], [-28, -150],
+];
+
+function zigzag(x0, y0, x1, y1, amp, step) {
+  const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy);
+  const nx = -dy / l, ny = dx / l;
+  const n = Math.max(2, Math.round(l / step));
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, s = i === 0 || i === n ? 0 : (i % 2 ? 1 : -1);
+    pts.push([x0 + dx * f + nx * amp * s, y0 + dy * f + ny * amp * s]);
+  }
+  return pts;
+}
+
+function makePiece(rawPts, name, sz) {
+  const pts = rawPts.map(([x, y]) => [x * sz, y * sz]);
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, cum, len: cum[cum.length - 1], dots: [], pins: [], name };
+}
+
+// position and direction at distance p along a seam
+function pathAt(pc, p) {
+  if (!pc || !pc.pts.length) return { x: 0, y: 0, a: 0 };
+  p = clamp(p, 0, pc.len);
+  let i = 1;
+  while (i < pc.cum.length - 1 && pc.cum[i] < p) i++;
+  const a = pc.pts[i - 1], b = pc.pts[i] || a;
+  const seg = (pc.cum[i] - pc.cum[i - 1]) || 1;
+  const f = clamp((p - pc.cum[i - 1]) / seg, 0, 1);
+  return { x: lerp(a[0], b[0], f), y: lerp(a[1], b[1], f), a: Math.atan2(b[1] - a[1], b[0] - a[0]) };
+}
+
+// Build this year's seams, their stitch dots and the pins
+function buildPieces() {
+  const sz = cfg.size;
+  const list = [makePiece(OUTLINE, 'seam', sz)];
+  if (cfg.hem) list.push(makePiece(zigzag(-84, 140, 84, 140, 9, 21), 'hem', sz));
+  if (cfg.sleeves) {
+    list.push(makePiece(zigzag(-136, -124, -136, -76, 8, 16), 'sleeve', sz));
+    list.push(makePiece(zigzag(136, -124, 136, -76, 8, 16), 'sleeve', sz));
+  }
+  if (cfg.front) list.push(makePiece([[0, -112], [0, 120]], 'front', sz));
+  let goldCount = 0;
+  for (const pc of list) {
+    const start = pc === list[0] ? 60 : 22;
+    for (let p = start; p <= pc.len - 8; p += cfg.gap) {
+      const gold = cfg.gold && pc.dots.length > 1 && Math.random() < 0.16 && goldCount < 6;
+      if (gold) goldCount++;
+      pc.dots.push({ p, state: 'open', gold, popT: 0 });
+    }
+  }
+  // Pins lie across the seam, half way between two dots (never two in a row)
+  const outline = list[0];
+  const slots = [];
+  for (let i = 1; i < outline.dots.length - 1; i++) slots.push(i);
+  slots.sort(() => Math.random() - 0.5);
+  const used = new Set();
+  for (const i of slots) {
+    if (outline.pins.length >= cfg.pins) break;
+    if (used.has(i - 1) || used.has(i) || used.has(i + 1)) continue;
+    used.add(i);
+    const p = (outline.dots[i].p + outline.dots[i + 1].p) / 2;
+    outline.pins.push({ p, hit: false, col: pick(['#e05a5a', '#5a8ae0', '#e0c05a', '#7ac06a']), tilt: rand(-0.5, 0.5) });
+  }
+  // On the last coats a pin or two also sits on the borders
+  for (let k = 1; k < list.length && cfg.pins >= 6; k++) {
+    const pc = list[k];
+    if (pc.dots.length >= 4 && Math.random() < 0.7) {
+      const i = 1 + Math.floor(Math.random() * (pc.dots.length - 3));
+      pc.pins.push({ p: (pc.dots[i].p + pc.dots[i + 1].p) / 2, hit: false, col: pick(['#e05a5a', '#5a8ae0']), tilt: rand(-0.5, 0.5) });
+    }
+  }
+  pieces = list;
+}
+
+function curPiece() { return pieces[pieceIdx] || null; }
+function nextDot() {
+  const pc = curPiece();
+  if (!pc) return null;
+  return pc.dots.find((d) => d.state === 'open') || null;
+}
+function totalDots() { return pieces.reduce((s, pc) => s + pc.dots.length, 0); }
+function doneDots() { return pieces.reduce((s, pc) => s + pc.dots.filter((d) => d.state !== 'open').length, 0); }
+
+// ============================================================
+//  Layout (the table with the cloth, Hannah and Samuel)
+// ============================================================
+function layout() {
+  const wide = W >= 860;
+  let cloth, hannah, samuel;
+  if (wide) {
+    const cw = Math.min(W - 400, 720);
+    const top = Math.max(TOPH + 14, offY + 120);
+    cloth = { x: offX + W / 2 - cw / 2, y: top, w: cw, h: offY + 860 - top };
+    hannah = { x: cloth.x - 105, y: offY + 860 };
+    samuel = { x: cloth.x + cloth.w + 105, y: offY + 860 };
+  } else {
+    const top = Math.max(TOPH + 10, offY + 118);
+    cloth = { x: offX + 16, y: top, w: W - 32, h: offY + 676 - top };
+    hannah = { x: offX + W * 0.27, y: offY + 878 };
+    samuel = { x: offX + W * 0.72, y: offY + 878 };
+  }
+  const maxS = 1.06 * 1.13;
+  const k = Math.min((cloth.w - 20) / (300 * maxS), (cloth.h - 20) / (318 * maxS));
+  const cx = cloth.x + cloth.w / 2, cy = cloth.y + cloth.h / 2 - 7 * k;
+  return { wide, cloth, hannah, samuel, k, cx, cy };
+}
+function toScreen(L, x, y) { return [L.cx + x * L.k, L.cy + y * L.k]; }
+
+// ============================================================
+//  Sewing
+// ============================================================
+function curSpeed() {
+  return cfg.speed * (1 + cfg.wobble * Math.sin(runT * 1.9));
+}
+
+function stitch() {
+  if (state !== 'play' || readyT > 0 || hopT > 0) return;
+  const pc = curPiece();
+  if (!pc) return;
+  const d = nextDot();
+  const L = layout();
+  const pos = pathAt(pc, needleP);
+  const [sx, sy] = toScreen(L, pos.x, pos.y);
+  if (d && Math.abs(needleP - d.p) <= cfg.win) {
+    const off = Math.abs(needleP - d.p);
+    const perfect = off <= cfg.win * 0.42;
+    d.state = perfect ? 'perfect' : 'good';
+    d.popT = 0.4;
+    combo++; bestCombo = Math.max(bestCombo, combo);
+    let pts = perfect ? 100 : 50;
+    if (d.gold) pts *= 2;
+    pts += Math.min(combo, 10) * 5;
+    stitchPts += pts;
+    if (perfect) perfects++; else goods++;
+    lastGoodT = runT;
+    dipT = 0.16;
+    const [dx, dy] = toScreen(L, pathAt(pc, d.p).x, pathAt(pc, d.p).y);
+    popups.push({ x: dx, y: dy - 18, text: perfect ? (d.gold ? 'Golden!' : 'Neat!') : 'Good', t: 0.9, col: perfect ? '#fff2a8' : '#ffffff' });
+    sparkle(dx, dy, perfect ? 10 : 5, d.gold ? ['#ffe27a', '#fff6d0', '#ffd040'] : ['#ffffff', '#fff6d0', cfg.thread]);
+    const idx = doneDots();
+    sfx.stitch(perfect, idx);
+    if (combo > 0 && combo % 8 === 0) { setHannah('joy', 1.2); showMessage(`${combo} in a row!`, 1.2); }
+    return;
+  }
+  // a pin lying under the needle?
+  const pin = pc.pins.find((q) => !q.hit && Math.abs(needleP - q.p) <= PIN_R + cfg.win * 0.35);
+  if (pin) {
+    pin.hit = true;
+    mistake('Ouch! Not on the pin!', sx, sy);
+    sfx.pin();
+    return;
+  }
+  if (runT - lastGoodT < GRACE) return;           // a double tap on one stitch is fine
+  mistake('Tangle! Wait for a dot.', sx, sy);
+  sfx.tangle();
+}
+
+function mistake(text, x, y) {
+  mistakes++;
+  combo = 0;
+  setHannah('worried', 1.2);
+  shakeT = 0.25;
+  popups.push({ x, y: y - 22, text: 'Oops', t: 0.9, col: '#ffb0a0' });
+  for (let i = 0; i < 6; i++) spawn(x, y, rand(-60, 60), rand(-80, -20), 0.6, cfg.thread, rand(2, 3.5), 160);
+  if (!told[text]) { told[text] = true; showMessage(text, 1.8); }
+  if (mistakes > cfg.lives - 1 + 1e-9 && mistakes >= cfg.lives) fail();
+}
+
+function updateSewing(dt) {
+  if (readyT > 0) {
+    readyT -= dt;
+    if (readyT <= 0) {
+      showMessage(level === 1 ? 'Tap as the needle reaches each dot!' : 'Sew!', level === 1 ? 2.4 : 1);
+    }
+    return;
+  }
+  if (hopT > 0) {
+    hopT -= dt;
+    if (hopT <= 0) { hopT = 0; needleP = 0; }
+    return;
+  }
+  const pc = curPiece();
+  if (!pc) return;
+  runT += dt;
+  needleP += curSpeed() * dt;
+  // dots the needle went past without a stitch hang loose
+  for (const d of pc.dots) {
+    if (d.state === 'open' && needleP - d.p > cfg.win) {
+      d.state = 'miss';
+      misses++;
+      const pos = pathAt(pc, d.p);
+      const [x, y] = toScreen(layout(), pos.x, pos.y);
+      mistake('Missed a stitch! Tap at the dot.', x, y);
+      if (state !== 'play') return;
+    }
+  }
+  // first pins: a warning
+  if (!told.pins) {
+    const pin = pc.pins.find((q) => q.p > needleP && q.p - needleP < 160);
+    if (pin) { told.pins = true; showMessage('Pins! Don\'t stitch on a pin.', 2.2); }
+  }
+  if (needleP >= pc.len) {
+    if (pieceIdx < pieces.length - 1) {
+      pieceIdx++;
+      hopT = 0.9;
+      const nm = pieces[pieceIdx].name;
+      const key = 'hop_' + nm;
+      if (!told[key]) { told[key] = true; showMessage(nm === 'hem' ? 'Now a pretty zigzag hem!' : nm === 'sleeve' ? 'Now a band on the sleeve!' : 'Last: a line down the front!', 1.8); }
+      sfx.hop();
+    } else {
+      winLevel();
+    }
+  }
+}
+
+function setHannah(m, d) { hannahMood = m; moodT = d; }
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const neat = Math.max(0, cfg.lives - mistakes) * 150;
+  const levelBonus = level * 300;
+  const score = stitchPts + neat + levelBonus;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('samuelCoatBest', best); } catch (e) {} }
+  lastScore = { stitchPts, neat, levelBonus, score };
+  setHannah('joy', 99);
+  showMessage(`A new coat for Samuel!`, 2.4);
+  sfx.win();
+  endTimer = 3.4;
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  setHannah('dismay', 99);
+  showMessage('The thread is all in a muddle…', 2.2);
+  sfx.fail();
+  endTimer = 2.4;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Particles and popups
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkle(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), s = rand(40, 150);
+    spawn(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.4, 0.9), pick(cols), rand(2, 4), 60, Math.random() < 0.4 ? 'star' : 'dot');
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) {
+    popups[i].t -= dt; popups[i].y -= 30 * dt;
+    if (popups[i].t <= 0) popups.splice(i, 1);
+  }
+}
+function drawStar(x, y, r) {
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.8);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = '700 18px Fredoka, sans-serif';
+  for (const q of popups) {
+    ctx.globalAlpha = clamp(q.t / 0.4, 0, 1);
+    ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(60,30,10,0.85)';
+    ctx.strokeText(q.text, q.x, q.y);
+    ctx.fillStyle = q.col; ctx.fillText(q.text, q.x, q.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  showOverlay('A Little Coat for Samuel', 'Hannah sews a new coat every year',
+    `${verseHTML('coat')}
+     <ul>
+       <li>Little Samuel lives at God's house in Shiloh. Every year his mother <b>Hannah</b> sews him a new coat, a bit bigger each time!</li>
+       <li>The <b>needle</b> runs along the dotted line. <b>Tap</b> just as it reaches each <b>dot</b> to make a stitch.</li>
+       <li>Too early, too late or tapping on a <b>pin</b> tangles the thread. Too many tangles and the coat must start again.</li>
+       <li>Neat stitches right on the dot score the most. <b>Gold dots</b> score double!</li>
+       <li><b>Keys:</b> <kbd>Space</kbd> stitches, <kbd>P</kbd> pauses.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+// Everything a level needs is rebuilt together, right here, before its card is shown
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildPieces();
+  pieceIdx = 0; needleP = 0; hopT = 0; readyT = 1.6; runT = 0;
+  mistakes = 0; combo = 0; bestCombo = 0; perfects = 0; goods = 0; misses = 0; stitchPts = 0;
+  lastGoodT = -9; dipT = 0;
+  particles = []; popups = [];
+  endTimer = 0; winT = 0; failT = 0;
+  told = {};
+  hannahMood = 'watch'; moodT = 0; shakeT = 0;
+  wornCoat = level > 1 ? makeConfig(level - 1).fabric : null;
+  keys.clear();
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  sfx.levelStart();
+  if (retry) { beginPlay(); return; }
+  state = 'card';
+  syncAmbience();
+  const li = [`<li>Samuel is <b>${cfg.age} years old</b> now. This coat has <b>${totalDots()} stitches</b>.</li>`];
+  if (level === 1) li.push('<li>Watch the needle. <b>Tap</b> when it touches a <b>dot</b>.</li>');
+  if (level === 2) li.push('<li>New: <b>gold dots</b> score double. The needle is a little quicker.</li>');
+  if (level === 3) li.push('<li>New: <b>pins</b> hold the cloth. <b>Don\'t tap</b> when the needle is on a pin! Then sew a <b>zigzag hem</b>.</li>');
+  if (level === 4) li.push('<li>The needle <b>speeds up and slows down</b>. Keep your eyes on it!</li>');
+  if (level === 5) li.push('<li>New: <b>bands on both sleeves</b>, and more pins.</li>');
+  if (level === 6) li.push('<li>The finest coat: seams, hem, sleeves <b>and</b> a line down the front. Fast!</li>');
+  li.push(`<li>You can make <b>${cfg.lives - 1}</b> mistake${cfg.lives - 1 === 1 ? '' : 's'}.</li>`);
+  showOverlay(`Year ${level}`, cfg.name,
+    `${verseHTML(level % 3 === 1 ? 'yearly' : level % 3 === 2 ? 'ephod' : 'favour')}
+     <ul>${li.join('')}</ul>`,
+    'Start sewing', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(`Year ${level}: ${cfg.name}`, 1.5);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'Samuel grew up!' : 'What a lovely coat!', `Year ${level} complete — ${cfg.name}`,
+      `${verseHTML('grew')}
+       ${last ? `<p style="text-align:center">Hannah asked God for a child, and God gave her Samuel. She loved him and made him a coat every single year.</p>${verseHTML('prayed')}` : ''}
+       <p class="score">Stitches (${perfects} neat, ${goods} good): <b>${s.stitchPts}</b><br>Neat sewing (${mistakes} mistake${mistakes === 1 ? '' : 's'}): <b>${s.neat}</b><br>Year bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next year', last ? () => { level = 1; totalScore = 0; startLevel(); } : () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    showOverlay('Oh… let\'s try again', `Year ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The thread got tangled. Watch the needle and <b>tap just as it touches each dot</b>. Never on a pin!</p>
+       ${verseHTML('prayed')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    keys.clear();
+    showOverlay('Paused', `Year ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+    // a short count-in so the needle doesn't surprise you
+    if (state === 'play' && readyT <= 0 && hopT <= 0) readyT = 0.7;
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowDown') && !e.repeat) stitch();
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play') stitch();
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  stitch(perfect, i) {
+    if (!this.ctx) return;
+    this.noiseBurst(4200, 0.05, 0.12, 2);
+    Music.tap(perfect ? 0.35 + 0.6 * ((i % 8) / 7) : 0.2);
+  },
+  pin() { this.tone(1800, 0.12, 'triangle', 0.2); this.tone(1400, 0.16, 'triangle', 0.14, 0.06); },
+  tangle() { this.tone(260, 0.22, 'sine', 0.3, 0, 150); },
+  hop() { this.tone(660, 0.12, 'sine', 0.15, 0, 990); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+
+// ============================================================
+//  People
+// ============================================================
+const HANNAH = { robe: '#b0548a', skin: '#d9a066', hair: '#3a2716', scarf: '#f0dcb0', phase: 0, blink: 0, blinkT: 2 };
+const SAMUEL = { robe: '#f3eedd', skin: '#e0ac78', hair: '#4a2c14', phase: 1.3, blink: 0, blinkT: 3 };
+
+function drawFace(d, mood, hy) {
+  const ex = 6, ey = hy - 1, dark = '#2b1d12', mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'joy';
+  ctx.lineCap = 'round';
+  if (mood === 'joy') {
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.fillStyle = '#7a2e22';
+    ctx.beginPath(); ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); ctx.fill();
+  } else {
+    for (const sx of [-ex, ex]) {
+      if (blink) { ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke(); continue; }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(sx, ey, 3.8, 4.8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(sx + 0.6, ey + 1, 2.1, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx + 1.3, ey, 0.7, 0, TAU); ctx.fill();
+    }
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (mood === 'worried' || mood === 'dismay') { ctx.arc(0, mouthY + 4, 4, 1.2 * Math.PI, 1.8 * Math.PI); }
+    else ctx.arc(0, mouthY - 3, 4.5, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+    if (mood === 'worried' || mood === 'dismay') {
+      ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-ex - 4, ey - 6); ctx.lineTo(-ex + 3, ey - 9); ctx.moveTo(ex - 3, ey - 9); ctx.lineTo(ex + 4, ey - 6); ctx.stroke();
+    }
+  }
+  ctx.fillStyle = 'rgba(255,120,120,0.35)';
+  ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+}
+
+// d: colours; coat: colour of the coat over the robe (or null); kid draws a child's proportions
+function drawPerson(d, x, y, s, mood, opts = {}) {
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 6 + d.phase)) * 8;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 22 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const kid = !!opts.kid;
+  const bodyH = kid ? 30 : 40;
+  const arm = (x1, y1, x2, y2, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const robe = opts.coat || d.robe;
+  // feet
+  ctx.fillStyle = '#7a4a26';
+  ctx.beginPath(); ctx.ellipse(-7, -1, 6, 3, 0, 0, TAU); ctx.ellipse(7, -1, 6, 3, 0, 0, TAU); ctx.fill();
+  // robe (the linen ephod shows at the hem under a coat)
+  if (opts.coat) {
+    ctx.fillStyle = d.robe;
+    ctx.beginPath(); ctx.moveTo(-15, -2); ctx.lineTo(-13, -12); ctx.lineTo(13, -12); ctx.lineTo(15, -2); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe.startsWith('#') ? robe : '#888888', -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, opts.coat ? -8 : 0);
+  ctx.quadraticCurveTo(-17, -bodyH * 0.75, -11, -bodyH + 3);
+  ctx.quadraticCurveTo(0, -bodyH - 1, 11, -bodyH + 3);
+  ctx.quadraticCurveTo(17, -bodyH * 0.75, 18, opts.coat ? -8 : 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (opts.coat) {
+    // a zigzag hem like the ones Hannah sews
+    ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 0; i <= 8; i++) ctx.lineTo(-16 + i * 4, -11 + (i % 2 ? -2 : 1));
+    ctx.stroke();
+  } else if (kid) {
+    // the little linen ephod's sash
+    ctx.strokeStyle = '#c9a54a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-15, -14); ctx.quadraticCurveTo(0, -11, 15, -14); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#e8c068'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -bodyH * 0.45); ctx.quadraticCurveTo(0, -bodyH * 0.38, 16, -bodyH * 0.45); ctx.stroke();
+  }
+  const sh = -bodyH + 6;
+  const sleeve = shade(robe, -22);
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, sh, -24 + wave, sh - 30, sleeve); arm(11, sh, 24 - wave, sh - 30, sleeve);
+  } else if (opts.sewing) {
+    // hands busy with needle and thread
+    const bob = Math.sin(t * 8) * 2;
+    arm(-11, sh, 6, sh + 16 + bob, sleeve); arm(11, sh, 16, sh + 12 - bob, sleeve);
+    ctx.strokeStyle = '#c8ccd4'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(16, sh + 12 - bob); ctx.lineTo(24, sh + 2 - bob); ctx.stroke();
+  } else if (mood === 'worried' || mood === 'dismay') {
+    arm(-11, sh, -2, sh + 4, sleeve); arm(11, sh, 2, sh + 4, sleeve);
+  } else {
+    arm(-11, sh, -15, sh + 20, sleeve); arm(11, sh, 15, sh + 20, sleeve);
+  }
+  const hr = kid ? 15 : 16;
+  const hy = -bodyH - hr + 3;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, hr, 0, TAU); ctx.fill();
+  if (d.scarf) {
+    ctx.fillStyle = d.scarf;
+    ctx.beginPath();
+    ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.lineTo(18, hy + 12); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+    ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 12);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  } else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, hr + 0.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 10, 0, hy - 9);
+    ctx.quadraticCurveTo(-8, hy - 11, -hr, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  drawFace(d, mood, hy);
+  ctx.restore();
+}
+
+function updatePeople(dt) {
+  for (const d of [HANNAH, SAMUEL]) {
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+  moodT -= dt;
+  if (moodT <= 0 && state === 'play') hannahMood = 'watch';
+}
+
+// ============================================================
+//  Rendering: the room, the table and the coat
+// ============================================================
+function drawRoom(L) {
+  // plaster wall
+  const g = ctx.createLinearGradient(0, 0, 0, viewH);
+  g.addColorStop(0, '#e9cf9e'); g.addColorStop(1, '#d4b07a');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, viewH);
+  // a window with the hills of Ephraim
+  const wx = L.wide ? offX + 60 : offX + W - 120, wy = Math.max(TOPH + 8, offY + 30);
+  if (L.wide || offY > 60) {
+    ctx.fillStyle = '#9ac6e8'; roundRect(wx, wy, 80, 70, 30); ctx.fill();
+    ctx.fillStyle = '#7fae5c'; ctx.beginPath(); ctx.ellipse(wx + 30, wy + 70, 50, 22, 0, Math.PI, TAU); ctx.fill();
+    ctx.strokeStyle = '#8a6440'; ctx.lineWidth = 6; roundRect(wx, wy, 80, 70, 30); ctx.stroke();
+  }
+  // floor
+  ctx.fillStyle = '#b08458'; ctx.fillRect(0, offY + 800, viewW, viewH - offY - 800 + 2);
+  ctx.fillStyle = 'rgba(80,50,20,0.15)';
+  for (let x = (offX % 70) - 70; x < viewW; x += 70) ctx.fillRect(x, offY + 800, 3, 100);
+  // a woven mat under the table
+  const c = L.cloth;
+  ctx.fillStyle = '#8c5a34';
+  roundRect(c.x - 8, c.y - 8, c.w + 16, c.h + 16, 24); ctx.fill();
+  ctx.fillStyle = '#a8703f';
+  roundRect(c.x, c.y, c.w, c.h, 18); ctx.fill();
+  ctx.strokeStyle = 'rgba(80,45,15,0.25)'; ctx.lineWidth = 2;
+  for (let y = c.y + 30; y < c.y + c.h - 10; y += 34) { ctx.beginPath(); ctx.moveTo(c.x + 12, y); ctx.lineTo(c.x + c.w - 12, y); ctx.stroke(); }
+}
+
+function coatPath(L, sz, grow = 1.0) {
+  ctx.beginPath();
+  OUTLINE.forEach(([x, y], i) => {
+    const [sx, sy] = toScreen(L, x * sz * grow, y * sz * grow + (grow - 1) * 6);
+    if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy);
+  });
+  ctx.closePath();
+}
+
+function drawCoat(L) {
+  const sz = cfg.size;
+  // the cut cloth, a bit larger than the seam line
+  ctx.save();
+  ctx.shadowColor = 'rgba(60,30,10,0.35)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
+  ctx.fillStyle = cfg.fabric;
+  coatPath(L, sz, 1.11); ctx.fill();
+  ctx.restore();
+  // woven texture
+  ctx.save();
+  coatPath(L, sz, 1.11); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 2;
+  const c = L.cloth;
+  for (let x = c.x; x < c.x + c.w; x += 7) { ctx.beginPath(); ctx.moveTo(x, c.y); ctx.lineTo(x, c.y + c.h); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  for (let y = c.y; y < c.y + c.h; y += 7) { ctx.beginPath(); ctx.moveTo(c.x, y); ctx.lineTo(c.x + c.w, y); ctx.stroke(); }
+  ctx.restore();
+  // dotted chalk line for each seam, solid thread where it's sewn
+  for (let pi = 0; pi < pieces.length; pi++) {
+    const pc = pieces[pi];
+    drawSeam(L, pc, pi);
+  }
+}
+
+function seamLine(L, pc, p0, p1) {
+  const steps = Math.max(2, Math.ceil((p1 - p0) / 6));
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const q = pathAt(pc, lerp(p0, p1, i / steps));
+    const [x, y] = toScreen(L, q.x, q.y);
+    if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }
+}
+
+function drawSeam(L, pc, pi) {
+  const active = pi === pieceIdx && (state === 'play' || state === 'pause');
+  // chalk line
+  ctx.save();
+  ctx.setLineDash([5, 7]);
+  ctx.strokeStyle = active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 2.5;
+  seamLine(L, pc, 0, pc.len); ctx.stroke();
+  ctx.restore();
+  // sewn thread between the stitches already made
+  let prev = pc === pieces[0] ? 0 : 0;
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const d of pc.dots) {
+    if (d.state === 'open') break;
+    ctx.setLineDash([9 * L.k / 1.2, 5 * L.k / 1.2]);
+    ctx.strokeStyle = 'rgba(40,20,10,0.35)'; ctx.lineWidth = 5;
+    seamLine(L, pc, prev, d.p); ctx.stroke();
+    ctx.strokeStyle = d.state === 'miss' ? 'rgba(255,255,255,0.35)' : cfg.thread; ctx.lineWidth = 3.2;
+    seamLine(L, pc, prev, d.p); ctx.stroke();
+    prev = d.p;
+  }
+  // the rest of the thread up to the needle
+  if (pi === pieceIdx && needleP > prev && (state === 'play' || state === 'pause' || state === 'fail')) {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = cfg.thread; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.8;
+    seamLine(L, pc, prev, Math.min(needleP, pc.len)); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  if (pi < pieceIdx || state === 'win') {
+    if (prev < pc.len) {
+      ctx.setLineDash([9 * L.k / 1.2, 5 * L.k / 1.2]);
+      ctx.strokeStyle = cfg.thread; ctx.lineWidth = 3.2;
+      seamLine(L, pc, prev, pc.len); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  // pins
+  for (const q of pc.pins) {
+    const pos = pathAt(pc, q.p);
+    const [x, y] = toScreen(L, pos.x, pos.y);
+    const a = pos.a + Math.PI / 2 + q.tilt;
+    const len = 22;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(a);
+    ctx.strokeStyle = 'rgba(40,20,10,0.3)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(2, -len + 2); ctx.lineTo(2, len + 2); ctx.stroke();
+    ctx.strokeStyle = '#dfe4ea'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(0, -len); ctx.lineTo(0, len); ctx.stroke();
+    ctx.fillStyle = q.hit ? '#888' : q.col;
+    ctx.beginPath(); ctx.arc(0, -len, 6, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(-2, -len - 2, 2, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // stitch dots
+  const nd = pi === pieceIdx ? nextDot() : null;
+  for (const d of pc.dots) {
+    const pos = pathAt(pc, d.p);
+    const [x, y] = toScreen(L, pos.x, pos.y);
+    if (d.state === 'open') {
+      const isNext = d === nd && state === 'play';
+      if (isNext && hopT <= 0) {
+        // target ring: the needle must be inside it
+        const inside = Math.abs(needleP - d.p) <= cfg.win;
+        ctx.strokeStyle = inside ? 'rgba(140,255,140,0.95)' : 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = inside ? 4 : 2.5;
+        ctx.beginPath(); ctx.arc(x, y, cfg.win * L.k * 0.75 + 6, 0, TAU); ctx.stroke();
+      }
+      const r = (d.gold ? 7.5 : 6.5) * (isNext ? 1 + 0.12 * Math.sin(t * 10) : 1);
+      if (d.gold) {
+        ctx.fillStyle = 'rgba(255,220,90,0.35)'; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = d.gold ? '#ffd23a' : '#ffffff';
+      ctx.strokeStyle = d.gold ? '#a8741a' : 'rgba(60,30,10,0.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.stroke();
+    } else if (d.state === 'miss') {
+      // a loose loop of thread
+      ctx.strokeStyle = cfg.thread; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x + 4, y + 8, 6, 9, 0.4, 0, TAU); ctx.stroke();
+    } else {
+      const pop = d.popT > 0 ? 1 + d.popT : 1;
+      ctx.fillStyle = d.gold ? '#ffd23a' : cfg.thread;
+      ctx.beginPath(); ctx.arc(x, y, 3.5 * pop, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawNeedle(L) {
+  const pc = curPiece();
+  if (!pc) return;
+  let pos;
+  if (hopT > 0) {
+    // hopping across the cloth to the next seam
+    const prevPc = pieces[pieceIdx - 1];
+    const a = pathAt(prevPc, prevPc ? prevPc.len : 0), b = pathAt(pc, 0);
+    const f = ease(1 - hopT / 0.9);
+    pos = { x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f) - Math.sin(f * Math.PI) * 40, a: b.a };
+  } else pos = pathAt(pc, needleP);
+  const [x, y] = toScreen(L, pos.x, pos.y);
+  const dip = dipT > 0 ? Math.sin((dipT / 0.16) * Math.PI) : 0;
+  ctx.save();
+  ctx.translate(x, y - 2);
+  ctx.rotate(pos.a - 0.5);
+  const s = 1 - dip * 0.25;
+  ctx.scale(s, s);
+  // shadow
+  ctx.strokeStyle = 'rgba(40,20,10,0.3)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(4, 6); ctx.lineTo(-38, 6); ctx.stroke();
+  // needle
+  const g = ctx.createLinearGradient(0, -3, 0, 3);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#9aa4b0');
+  ctx.strokeStyle = g; ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-40, 0); ctx.stroke();
+  ctx.fillStyle = '#e8ecf0';
+  ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(2, -2.4); ctx.lineTo(2, 2.4); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#5a6470'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.ellipse(-35, 0, 3.2, 1.2, 0, 0, TAU); ctx.stroke();
+  // thread from the eye
+  ctx.strokeStyle = cfg.thread; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(-35, 0); ctx.quadraticCurveTo(-46, 14 + Math.sin(t * 3) * 4, -58, 4); ctx.stroke();
+  ctx.restore();
+  // the needle's point glows when it's over the next dot
+  const d = nextDot();
+  if (d && state === 'play' && hopT <= 0 && Math.abs(needleP - d.p) <= cfg.win) {
+    ctx.fillStyle = 'rgba(200,255,200,0.5)';
+    ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.fill();
+  }
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(70,40,20,0.85)'); hg.addColorStop(1, 'rgba(70,40,20,0.35)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffe9a8';
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'A Little Coat for Samuel' : `Year ${level} · ${cfg.name}`, 12, 26);
+  if (state !== 'title') {
+    // thread spools = mistakes you can still make
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('THREAD', 12, 52);
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < cfg.lives; i++) {
+      const x = 76 + i * 22, y = 47, ok = i < cfg.lives - mistakes;
+      ctx.globalAlpha = ok ? 1 : 0.28;
+      ctx.fillStyle = '#c89a5a'; ctx.fillRect(x - 7, y - 9, 14, 3); ctx.fillRect(x - 7, y + 6, 14, 3);
+      ctx.fillStyle = ok ? cfg.fabric : '#888'; ctx.fillRect(x - 5, y - 6, 10, 12);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - 5, y - 2); ctx.lineTo(x + 5, y); ctx.moveTo(x - 5, y + 2); ctx.lineTo(x + 5, y + 4); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore + (state === 'play' || state === 'pause' || state === 'fail' ? stitchPts : 0)}`, viewW - 12, 26);
+    ctx.font = '600 14px Fredoka, sans-serif';
+    ctx.fillText(`Stitches ${doneDots() - misses} / ${totalDots()}`, viewW - 12, 50);
+    if (combo >= 3) ctx.fillText(`${combo} in a row!`, viewW - 12, 72);
+    // progress bar
+    ctx.shadowBlur = 0;
+    const bw = Math.min(180, viewW - 260), bx = viewW - 12 - bw;
+    if (bw > 60) {
+      ctx.fillStyle = 'rgba(255,233,168,0.25)'; roundRect(bx, 82, bw, 10, 5); ctx.fill();
+      ctx.fillStyle = '#ffe27a'; const f = totalDots() ? doneDots() / totalDots() : 0;
+      if (f > 0) { roundRect(bx, 82, bw * f, 10, 5); ctx.fill(); }
+    }
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const L = layout();
+  const y0 = L.cloth.y + 34;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(60,30,10,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const L = layout();
+  ctx.save();
+  if (shakeT > 0) ctx.translate(rand(-3, 3) * shakeT * 3, rand(-3, 3) * shakeT * 3);
+  drawRoom(L);
+  if (pieces.length) drawCoat(L);
+  if (pieces.length && (state === 'play' || state === 'pause' || state === 'fail')) drawNeedle(L);
+  // Hannah and Samuel (he grows a little every year)
+  const hs = L.wide ? 2.1 : 1.75;
+  drawPerson(HANNAH, L.hannah.x, L.hannah.y, hs, state === 'play' ? (moodT > 0 ? hannahMood : 'watch') : state === 'title' || state === 'card' ? 'watch' : hannahMood, { sewing: state === 'play' && moodT <= 0 });
+  const ks = (L.wide ? 1.6 : 1.35) * (0.82 + 0.06 * Math.min(cfg.age, 9) - 0.12);
+  const coatNow = state === 'win' && winT > 0.6 ? cfg.fabric : wornCoat;
+  drawPerson(SAMUEL, L.samuel.x, L.samuel.y, ks, state === 'win' ? 'joy' : 'watch', { kid: true, coat: coatNow });
+  if (state === 'win' && winT > 0.6 && winT < 0.7) sparkle(L.samuel.x, L.samuel.y - 60 * ks, 1);
+  // name tags
+  ctx.font = '700 15px Fredoka, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillText('Hannah', L.hannah.x, L.hannah.y + 18);
+  ctx.fillText(`Samuel, age ${cfg.age}`, L.samuel.x, L.samuel.y + 18);
+  drawParticles();
+  ctx.restore();
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let winBurst = false;
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  dipT = Math.max(0, dipT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  for (const pc of pieces) for (const d of pc.dots) if (d.popT > 0) d.popT = Math.max(0, d.popT - dt);
+  if (state === 'play') updateSewing(dt);
+  if (state === 'win') {
+    const before = winT;
+    winT += dt;
+    if (before < 0.6 && winT >= 0.6) {
+      const L = layout();
+      sparkle(L.samuel.x, L.samuel.y - 70, 40, ['#ffe27a', '#fff6d0', '#ffffff', cfg.fabric]);
+    }
+    if (Math.random() < dt * 6) {
+      const L = layout();
+      spawn(rand(L.cloth.x, L.cloth.x + L.cloth.w), rand(L.cloth.y, L.cloth.y + L.cloth.h), 0, -25, 1.1, '#fff6d0', 3, 0, 'star');
+    }
+  }
+  if (state === 'fail') failT += dt;
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  try { render(); } catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

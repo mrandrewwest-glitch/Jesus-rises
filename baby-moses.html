@@ -1,0 +1,1648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f73">
+<title>Baby in the Basket</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1f5f73;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(20, 60, 80, 0.25);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Baby in the Basket</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'jesusLovesMe', instrument: 'harp', accent: 'pipe', ambience: 'sea', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  basket: { ref: 'Exodus 2:3', KJV: 'She took for him an ark of bulrushes... and put the child therein; and she laid it in the flags by the river\'s brink.', NKJV: 'She took an ark of bulrushes for him... put the child in it, and laid it in the reeds by the river’s bank.', NIV: 'She got a papyrus basket for him... Then she placed the child in it and put it among the reeds along the bank of the Nile.', NLT: 'She got a basket made of papyrus reeds... She put the baby in the basket and laid it among the reeds along the bank of the Nile River.' },
+  // Miriam on the bank (level cards, fail card)
+  sister: { ref: 'Exodus 2:4', KJV: 'And his sister stood afar off, to wit what would be done to him.', NKJV: 'And his sister stood afar off, to know what would be done to him.', NIV: 'His sister stood at a distance to see what would happen to him.', NLT: 'The baby’s sister then stood at a distance, watching to see what would happen to him.' },
+  // The princess finds the basket (win card)
+  princess: { ref: 'Exodus 2:5', KJV: 'And the daughter of Pharaoh came down to wash herself at the river... and when she saw the ark among the flags, she sent her maid to fetch it.', NKJV: 'Then the daughter of Pharaoh came down to bathe at the river... and when she saw the ark among the reeds, she sent her maid to get it.', NIV: 'Then Pharaoh’s daughter went down to the Nile to bathe... She saw the basket among the reeds and sent her female slave to get it.', NLT: 'Soon Pharaoh’s daughter came down to bathe in the river... When the princess saw the basket among the reeds, she sent her maid to get it for her.' },
+  compassion: { ref: 'Exodus 2:6', KJV: 'She saw the child: and, behold, the babe wept. And she had compassion on him', NKJV: 'She saw the child, and behold, the baby wept. So she had compassion on him', NIV: 'She opened it and saw the baby. He was crying, and she felt sorry for him.', NLT: 'When the princess opened it, she saw the baby. The little boy was crying, and she felt sorry for him.' },
+  // Princess's speech bubble and the big win card
+  drew: { ref: 'Exodus 2:10', KJV: 'And she called his name Moses: and she said, Because I drew him out of the water.', NKJV: 'So she called his name Moses, saying, “Because I drew him out of the water.”', NIV: 'She named him Moses, saying, “I drew him out of the water.”', NLT: 'The princess named him Moses, for she explained, “I lifted him out of the water.”' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes more river above the playfield
+  if (basket) basket.x = basket.tx = laneX(basket.lane);
+}
+window.addEventListener('resize', () => resize());
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const TOPH = 112;          // HUD strip at the top of the screen
+const LANES = 5;           // the river is five lanes wide
+const BHW = 24, BHH = 18;  // the basket's bump box (half sizes)
+const LOTUS_PTS = 50;
+const HEART_PTS = 200;
+const PERFECT_PTS = 300;
+
+const LEVEL_NAMES = [
+  'Among the Reeds',
+  'Hippo Pool',
+  'Swirling Water',
+  'The Fishermen’s Nets',
+  'The Narrow Channel',
+  'Down to the Palace',
+];
+
+// What each level throws at the basket
+function makeConfig(n) {
+  const k = n - 1;
+  return {
+    name: LEVEL_NAMES[n - 1] || `The Long River ${n}`,
+    speed: Math.min(150 + k * 32, 360),                // how fast the river flows (px/s)
+    spacing: Math.max(185, 330 - k * 30),              // gap between rows of hazards
+    rows: Math.min(18 + k * 4, 44),                    // rows before the bathing place
+    perRow: n === 1 ? [1, 1] : n === 2 ? [1, 2] : n < 5 ? [1, 2] : [2, 3],
+    kinds: ['croc'].concat(n >= 2 ? ['hippo'] : [], n >= 3 ? ['whirl'] : [], n >= 4 ? ['net'] : []),
+    reeds: n === 1 ? 0.06 : n < 5 ? 0.12 : 0.24,     // chance a reed bed narrows the channel
+    bothSides: n >= 5,
+    maxStep: n <= 2 ? 2 : 1,                           // how far the safe lane may jump per row
+    hearts: 3,
+    lotus: n === 1 ? 0.5 : 0.4,
+    pull: n >= 3 ? 1 : 0,
+  };
+}
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('babyMosesBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let basket = null;
+let obstacles = [];
+let lotuses = [];
+let decor = [];
+let ripples = [];
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;
+let hearts = 3, lotusGot = 0, bumps = 0;
+let flow = 0;              // how far the water has flowed (for ripples and banks)
+let rowsMade = 0, nextRowAt = 0, dist = 0, totalDist = 1;
+let safeLane = 2;
+let reedL = 0, reedR = 0;  // rows left in a reed bed on each side
+let finish = null;         // the princess's bathing place, once it appears
+let speedNow = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0;
+let lastScore = null;
+let told = {};
+let flashT = 0, shakeT = 0;
+
+// ============================================================
+//  River geometry
+// ============================================================
+function riverHalf() { return clamp((W - 120) / 2, 180, 330); }
+function riverL() { return viewW / 2 - riverHalf(); }
+function riverR() { return viewW / 2 + riverHalf(); }
+function laneW() { return riverHalf() * 2 / LANES; }
+function laneX(l) { return riverL() + laneW() * (l + 0.5); }
+function basketY() { return viewH - 210; }
+
+// ============================================================
+//  People
+// ============================================================
+const MIRIAM = { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#e8a13a', kid: true, i: 1, mood: 'watch', blinkT: 2, blink: 0, phase: 0 };
+const PRINCESS = { robe: '#f6f1e2', hair: '#1b130c', skin: '#c98d56', egypt: true, collar: true, i: 3, mood: 'watch', blinkT: 3, blink: 0, phase: 1, pose: null };
+const MAIDS = [
+  { robe: '#e9dcc0', hair: '#1b130c', skin: '#b87a48', egypt: true, i: 2, mood: 'watch', blinkT: 2.5, blink: 0, phase: 2 },
+  { robe: '#dfe9e0', hair: '#24170d', skin: '#d39a66', egypt: true, i: 4, mood: 'watch', blinkT: 1.5, blink: 0, phase: 3 },
+];
+let miriamMoodT = 0, miriamMood = 'watch';
+
+function blinkTick(d, dt) {
+  d.blinkT -= dt;
+  if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4.5); }
+  if (d.blink > 0) d.blink -= dt;
+}
+
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+      if (d.egypt) { ctx.strokeStyle = '#1b130c'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(sx + (sx < 0 ? -rx - 2 : rx + 2), ey - 1); ctx.lineTo(sx + (sx < 0 ? -rx : rx), ey); ctx.stroke(); }
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2);
+      brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1);
+      brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2);
+      brows(-10, -6, -10, -6);
+      mouthLine(() => {
+        ctx.moveTo(-5, mouthY);
+        ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY);
+        ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY);
+      });
+      break;
+    case 'shock':
+      eyes(5, 6, 1.6);
+      brows(-12, -12, -12, -12);
+      mouthFill(() => ctx.ellipse(0, mouthY + 1, 4.5, 6, 0, 0, TAU));
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+}
+
+// Egyptian hair: a neat black bob with a gold band
+function drawBob(d, hy) {
+  ctx.fillStyle = d.hair;
+  ctx.beginPath();
+  ctx.moveTo(-19, hy + 12);
+  ctx.lineTo(-19, hy - 4);
+  ctx.arc(0, hy - 3, 19, Math.PI, 0);
+  ctx.lineTo(19, hy + 12);
+  ctx.lineTo(12, hy + 12);
+  ctx.lineTo(12, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 13, -12, hy - 6);
+  ctx.lineTo(-12, hy + 12);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e8b53a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 3, 18.5, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  if (d.collar) { ctx.fillStyle = '#3c8fc0'; ctx.beginPath(); ctx.arc(0, hy - 21, 3, 0, TAU); ctx.fill(); }
+}
+
+function drawPerson(d, x, y, s, lookX, lookY) {
+  const mood = d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 12;
+  if (mood === 'shock') jump = Math.max(0, Math.sin(t * 30)) * 1.5;
+  if (d.run) jump = Math.abs(Math.sin(t * 12 + d.phase)) * 4;
+  if (d.kid) s *= 0.78;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s, s);
+  const sleeve = d.egypt ? d.skin : shade(d.robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = d.egypt ? 6 : 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  if (mood === 'joy') {
+    const wave = Math.sin(t * 9 + d.phase) * 4;
+    arm(-11, -32, -24 + wave, -66);
+    arm(11, -32, 24 - wave, -66);
+  }
+  ctx.fillStyle = d.robe;
+  ctx.strokeStyle = shade(d.robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (d.collar) {
+    ctx.fillStyle = '#e8b53a';
+    ctx.beginPath(); ctx.ellipse(0, -36, 13, 6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3c8fc0';
+    ctx.beginPath(); ctx.ellipse(0, -35, 9, 3.5, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = d.egypt ? '#e8b53a' : '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  }
+  if (d.pose === 'reach') { arm(-11, -32, -8, -6); arm(11, -32, 8, -6); }
+  else if (d.pose === 'lift') { arm(-11, -32, -9, -62); arm(11, -32, 9, -62); }
+  else if (mood === 'watch' || mood === 'wow') { arm(-11, -32, -15, -12); arm(11, -32, 15, -12); }
+  else if (mood === 'worried') { arm(-11, -32, -2, -28); arm(11, -32, 2, -28); }
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.egypt) drawBob(d, hy);
+  else if (d.scarf) drawScarf(d, hy);
+  else {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.arc(0, hy - 2, 16.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(6, hy - 11, 0, hy - 10);
+    ctx.quadraticCurveTo(-8, hy - 12, -16, hy + 1);
+    ctx.closePath(); ctx.fill();
+  }
+  drawFace(d, mood, hy, lx, ly);
+  if (mood === 'shock') { arm(-11, -32, -15, hy + 4); arm(11, -32, 15, hy + 4); }
+  ctx.restore();
+}
+
+// ============================================================
+//  The basket and baby Moses
+// ============================================================
+function drawBasket(x, y, s, spin, babyMood) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  // ripple ring around it
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.ellipse(0, 6, 38 + Math.sin(t * 3) * 2, 22, 0, 0, TAU); ctx.stroke();
+  ctx.rotate(Math.sin(t * 2) * 0.05 + spin);
+  // pitch-dark outside
+  ctx.fillStyle = '#5a3a1a';
+  ctx.beginPath(); ctx.ellipse(0, 4, 33, 21, 0, 0, TAU); ctx.fill();
+  // woven papyrus
+  const g = ctx.createLinearGradient(0, -20, 0, 22);
+  g.addColorStop(0, '#e9c36e'); g.addColorStop(1, '#b8873a');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, 31, 19, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,80,30,0.55)'; ctx.lineWidth = 1.4;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath(); ctx.ellipse(0, 0, 31 - Math.abs(i) * 0, 19, 0, Math.PI * (0.1 + i * 0.02), Math.PI * (0.9 + i * 0.02)); ctx.stroke();
+  }
+  for (let i = -24; i <= 24; i += 8) {
+    ctx.beginPath(); ctx.moveTo(i, -16 + Math.abs(i) * 0.15); ctx.lineTo(i + 2, 16 - Math.abs(i) * 0.15); ctx.stroke();
+  }
+  // inside: blanket and the baby
+  ctx.fillStyle = '#7a5226';
+  ctx.beginPath(); ctx.ellipse(0, -2, 24, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8fc3e6';
+  ctx.beginPath(); ctx.ellipse(4, 1, 19, 9, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6aa3cc'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-6, -4); ctx.quadraticCurveTo(4, 2, 18, -2); ctx.stroke();
+  drawBaby(-11, -3, babyMood);
+  ctx.restore();
+}
+
+function drawBaby(x, y, mood) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#d9a066';
+  ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#5a3a1a';
+  ctx.beginPath(); ctx.arc(0, -4, 6, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+  if (mood === 'cry') {
+    ctx.beginPath(); ctx.moveTo(-4.5, 0); ctx.lineTo(-1.5, 1); ctx.moveTo(4.5, 0); ctx.lineTo(1.5, 1); ctx.stroke();
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(0, 4.5, 2.2, 2.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#7cc4f2'; ctx.beginPath(); ctx.arc(-6, 4, 1.6, 0, TAU); ctx.fill();
+  } else if (mood === 'happy') {
+    ctx.beginPath(); ctx.arc(-3, 0.5, 1.8, Math.PI * 1.1, Math.PI * 1.9); ctx.moveTo(4.8, 0.5); ctx.arc(3, 0.5, 1.8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 3, 2.6, 0.1, Math.PI - 0.1); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,120,0.45)'; ctx.beginPath(); ctx.arc(-5.5, 3, 1.8, 0, TAU); ctx.arc(5.5, 3, 1.8, 0, TAU); ctx.fill();
+  } else {
+    // sleepy and content
+    ctx.beginPath(); ctx.arc(-3, 0, 1.8, 0.1, Math.PI - 0.1); ctx.moveTo(4.8, 0); ctx.arc(3, 0, 1.8, 0.1, Math.PI - 0.1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 3.5, 1.6, 0.2, Math.PI - 0.2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+//  River things
+// ============================================================
+function drawCroc(o) {
+  const x = o.x, y = o.y;
+  ctx.save();
+  ctx.translate(x, y);
+  // water ring
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 4, 30, 54, 0, 0, TAU); ctx.fill();
+  const body = o.awake > 0 ? '#5fa14a' : '#4f8f3e';
+  // tail (upstream, top) swishes a little
+  ctx.fillStyle = shade(body, -15);
+  ctx.beginPath();
+  ctx.moveTo(-10, -20); ctx.quadraticCurveTo(Math.sin(t * 2 + o.ph) * 10, -62, Math.sin(t * 2 + o.ph) * 14, -70);
+  ctx.quadraticCurveTo(4, -40, 10, -20); ctx.fill();
+  // body
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(0, -2, 17, 30, 0, 0, TAU); ctx.fill();
+  // feet paddling
+  ctx.fillStyle = shade(body, -10);
+  for (const [fx, fy] of [[-17, -14], [17, -14], [-16, 12], [16, 12]]) { ctx.beginPath(); ctx.ellipse(fx, fy, 6, 4, 0, 0, TAU); ctx.fill(); }
+  // bumps on the back
+  ctx.fillStyle = shade(body, 20);
+  for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.arc(-5, k * 9 - 4, 2.6, 0, TAU); ctx.arc(5, k * 9 - 4, 2.6, 0, TAU); ctx.fill(); }
+  // snout (downstream, toward the basket)
+  ctx.fillStyle = body;
+  roundRect(-11, 18, 22, 32, 10); ctx.fill();
+  ctx.fillStyle = shade(body, -30);
+  ctx.beginPath(); ctx.arc(-4, 45, 1.6, 0, TAU); ctx.arc(4, 45, 1.6, 0, TAU); ctx.fill();
+  // friendly toothy smile line
+  ctx.strokeStyle = shade(body, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-10, 34); ctx.quadraticCurveTo(0, 40, 10, 34); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  for (const tx of [-7, -2, 3, 8]) { ctx.beginPath(); ctx.moveTo(tx - 1.5, 36); ctx.lineTo(tx, 38.5); ctx.lineTo(tx + 1.5, 36); ctx.fill(); }
+  // big eye bumps
+  for (const sx of [-8, 8]) {
+    ctx.fillStyle = body; ctx.beginPath(); ctx.arc(sx, 17, 7, 0, TAU); ctx.fill();
+    if (o.awake > 0) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, 17, 5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(sx, 19, 2.4, 0, TAU); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#2b3d1a'; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(sx, 16, 3.5, 0.15, Math.PI - 0.15); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  // Zzz while asleep
+  if (o.awake <= 0) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = '700 14px Fredoka, sans-serif';
+    for (let k = 0; k < 3; k++) {
+      const f = (t * 0.5 + k / 3 + o.ph) % 1;
+      ctx.globalAlpha = Math.sin(f * Math.PI);
+      ctx.font = `700 ${10 + f * 8}px Fredoka, sans-serif`;
+      ctx.fillText('z', x + 16 + f * 14, y + 10 - f * 34);
+    }
+    ctx.restore();
+  }
+}
+
+function drawHippo(o) {
+  const up = o.up;          // 0..1, how far out of the water
+  const x = o.x, y = o.y;
+  ctx.save();
+  ctx.translate(x, y);
+  // bubbles before it rises
+  if (up < 1) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let k = 0; k < 6; k++) {
+      const f = (t * 1.3 + k / 6) % 1;
+      ctx.globalAlpha = (1 - f) * (1 - up);
+      ctx.beginPath(); ctx.arc(Math.sin(k * 2.3) * 18, 10 - f * 22, 3 + f * 3, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (up > 0) {
+    ctx.globalAlpha = Math.min(1, up * 1.6);
+    const s = 0.5 + 0.5 * up;
+    ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.ellipse(0, 12, 44, 24, 0, 0, TAU); ctx.fill();
+    // head
+    ctx.fillStyle = '#8b7fa0';
+    ctx.beginPath(); ctx.ellipse(0, -6, 30, 24, 0, 0, TAU); ctx.fill();
+    // ears
+    ctx.beginPath(); ctx.ellipse(-20, -26, 7, 9, -0.4, 0, TAU); ctx.ellipse(20, -26, 7, 9, 0.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#e7a6b8';
+    ctx.beginPath(); ctx.ellipse(-20, -26, 3.5, 5, -0.4, 0, TAU); ctx.ellipse(20, -26, 3.5, 5, 0.4, 0, TAU); ctx.fill();
+    // snout
+    ctx.fillStyle = '#a194b6';
+    ctx.beginPath(); ctx.ellipse(0, 10, 34, 18, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5c516e';
+    ctx.beginPath(); ctx.ellipse(-12, 6, 4, 3, 0, 0, TAU); ctx.ellipse(12, 6, 4, 3, 0, 0, TAU); ctx.fill();
+    // eyes
+    for (const sx of [-12, 12]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, -14, 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(sx, -12.5, 3, 0, TAU); ctx.fill();
+    }
+    ctx.strokeStyle = '#5c516e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 14, 10, 0.25, Math.PI - 0.25); ctx.stroke();
+    if (o.snort > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(-14, -2 - (1 - o.snort) * 20, 4 + (1 - o.snort) * 5, 0, TAU); ctx.arc(14, -2 - (1 - o.snort) * 20, 4 + (1 - o.snort) * 5, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawWhirl(o) {
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  ctx.scale(1, 0.75);
+  const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 40);
+  g.addColorStop(0, 'rgba(10,50,80,0.75)'); g.addColorStop(1, 'rgba(10,60,90,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, 40, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(220,245,255,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let arm = 0; arm < 3; arm++) {
+    ctx.beginPath();
+    for (let k = 0; k <= 24; k++) {
+      const f = k / 24, a = -t * 5 + arm * TAU / 3 + f * 5, r = 4 + f * 34;
+      if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawNet(o) {
+  const x0 = o.x - o.w / 2, x1 = o.x + o.w / 2, y = o.y;
+  ctx.save();
+  // stakes at both ends
+  ctx.fillStyle = '#7a5226';
+  for (const sx of [x0, x1]) { roundRect(sx - 4, y - 26, 8, 40, 3); ctx.fill(); }
+  // the mesh, sagging
+  ctx.strokeStyle = 'rgba(240,230,200,0.9)'; ctx.lineWidth = 1.6;
+  const n = Math.max(4, Math.round(o.w / 16));
+  for (let r = 0; r < 3; r++) {
+    ctx.beginPath();
+    for (let k = 0; k <= n; k++) {
+      const fx = k / n, xx = lerp(x0, x1, fx), yy = y - 14 + r * 10 + Math.sin(fx * Math.PI) * 8;
+      if (k === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  for (let k = 0; k <= n; k++) {
+    const fx = k / n, xx = lerp(x0, x1, fx), sag = Math.sin(fx * Math.PI) * 8;
+    ctx.beginPath(); ctx.moveTo(xx, y - 14 + sag); ctx.lineTo(xx + 4, y + 6 + sag); ctx.stroke();
+  }
+  // corks
+  ctx.fillStyle = '#e07a3a';
+  for (let k = 1; k < n; k += 2) {
+    const fx = k / n, xx = lerp(x0, x1, fx);
+    ctx.beginPath(); ctx.ellipse(xx, y - 16 + Math.sin(fx * Math.PI) * 8 + Math.sin(t * 3 + k) * 1.5, 5, 3.5, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawReedBed(o) {
+  const x0 = o.x - o.w / 2, y0 = o.y - o.h / 2;
+  ctx.save();
+  ctx.fillStyle = 'rgba(70,110,50,0.45)';
+  roundRect(x0 - 4, y0, o.w + 8, o.h, 18); ctx.fill();
+  const n = Math.round(o.h / 14);
+  for (let k = 0; k < n; k++) {
+    for (let c = 0; c < 3; c++) {
+      const rx = x0 + 8 + hash(o.seed + k, c) * (o.w - 16), ry = y0 + 10 + k * 14 + hash(c, k + o.seed) * 10;
+      const sway = Math.sin(t * 1.6 + rx * 0.05 + ry * 0.02) * 3;
+      ctx.strokeStyle = c % 2 ? '#5e9a3a' : '#7bb24a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(rx, ry + 12); ctx.quadraticCurveTo(rx + sway * 0.5, ry, rx + sway, ry - 18); ctx.stroke();
+      if ((k + c) % 3 === 0) { ctx.fillStyle = '#8a5a2a'; roundRect(rx + sway - 3, ry - 26, 6, 12, 3); ctx.fill(); }
+    }
+  }
+  ctx.restore();
+}
+
+function drawLotus(l) {
+  if (l.got) return;
+  ctx.save();
+  ctx.translate(l.x, l.y + Math.sin(t * 2 + l.ph) * 2);
+  ctx.fillStyle = '#4f9a48';
+  ctx.beginPath(); ctx.arc(0, 4, 17, 0.3, TAU - 0.1); ctx.lineTo(0, 4); ctx.fill();
+  for (let k = 0; k < 7; k++) {
+    const a = -Math.PI / 2 + (k - 3) * 0.45;
+    ctx.fillStyle = k % 2 ? '#f6a6c4' : '#fbc8dc';
+    ctx.beginPath(); ctx.ellipse(Math.cos(a) * 7, Math.sin(a) * 7 - 2, 4, 9, a + Math.PI / 2, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(0, -1, 3.5, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// ============================================================
+//  Banks and water
+// ============================================================
+function makeDecor() {
+  decor = [];
+  for (let y = -200; y < viewH + 200; y += 90) addDecor(y);
+}
+function addDecor(y) {
+  for (const side of [-1, 1]) {
+    const r = Math.random();
+    const kind = r < 0.32 ? 'palm' : r < 0.75 ? 'reeds' : r < 0.88 ? 'rock' : 'bush';
+    decor.push({ side, y: y + rand(-30, 30), kind, d: rand(0, 1), seed: Math.random() * 100 });
+  }
+}
+
+function drawBanks() {
+  const L = riverL(), R = riverR();
+  // grass and sand
+  ctx.fillStyle = '#9cc46a';
+  ctx.fillRect(0, 0, L, viewH); ctx.fillRect(R, 0, viewW - R, viewH);
+  ctx.fillStyle = '#e3c98c';
+  ctx.beginPath();
+  ctx.moveTo(L - 26, -10);
+  for (let y = -10; y <= viewH + 10; y += 30) ctx.lineTo(L - 22 + Math.sin((y + flow) * 0.02) * 6, y);
+  ctx.lineTo(L, viewH + 10); ctx.lineTo(L, -10); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(R + 26, -10);
+  for (let y = -10; y <= viewH + 10; y += 30) ctx.lineTo(R + 22 + Math.sin((y + flow) * 0.021 + 2) * 6, y);
+  ctx.lineTo(R, viewH + 10); ctx.lineTo(R, -10); ctx.fill();
+  // things growing on the banks
+  for (const d of decor) {
+    const bankW = d.side < 0 ? L - 24 : viewW - R - 24;
+    if (bankW < 20) continue;
+    const x = d.side < 0 ? L - 24 - d.d * Math.min(bankW, 260) : R + 24 + d.d * Math.min(bankW, 260);
+    if (d.kind === 'palm') drawPalm(x, d.y, d.seed);
+    else if (d.kind === 'reeds') drawBankReeds(x, d.y, d.seed);
+    else if (d.kind === 'rock') { ctx.fillStyle = '#b3a58c'; ctx.beginPath(); ctx.ellipse(x, d.y, 14, 10, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#cfc2a6'; ctx.beginPath(); ctx.ellipse(x - 3, d.y - 3, 7, 4, 0, 0, TAU); ctx.fill(); }
+    else { ctx.fillStyle = '#6fa64a'; ctx.beginPath(); ctx.arc(x - 8, d.y, 11, 0, TAU); ctx.arc(x + 8, d.y, 11, 0, TAU); ctx.arc(x, d.y - 8, 12, 0, TAU); ctx.fill(); }
+  }
+}
+function drawPalm(x, y, seed) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(10, 8, 30, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8a6236';
+  ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
+  for (let k = 0; k < 6; k++) {
+    const a = k * TAU / 6 + seed + Math.sin(t * 0.8 + seed) * 0.05;
+    ctx.fillStyle = k % 2 ? '#4f8f3e' : '#62a64a';
+    ctx.beginPath(); ctx.ellipse(Math.cos(a) * 18, Math.sin(a) * 18, 20, 6, a, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#7a5226'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function drawBankReeds(x, y, seed) {
+  for (let k = 0; k < 6; k++) {
+    const rx = x + (hash(seed, k) - 0.5) * 26, ry = y + (hash(k, seed) - 0.5) * 16;
+    const sway = Math.sin(t * 1.5 + rx * 0.07) * 3;
+    ctx.strokeStyle = k % 2 ? '#5e9a3a' : '#7bb24a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(rx, ry + 10); ctx.quadraticCurveTo(rx, ry - 4, rx + sway, ry - 20); ctx.stroke();
+    if (k % 2 === 0) { ctx.fillStyle = '#8a5a2a'; roundRect(rx + sway - 3, ry - 28, 6, 11, 3); ctx.fill(); }
+  }
+}
+
+function drawWater() {
+  const L = riverL(), R = riverR();
+  const g = ctx.createLinearGradient(L, 0, R, 0);
+  g.addColorStop(0, '#3d93b0'); g.addColorStop(0.5, '#4fb0c9'); g.addColorStop(1, '#3d93b0');
+  ctx.fillStyle = g;
+  ctx.fillRect(L - 2, 0, R - L + 4, viewH);
+  // lane hints: faint lines of flow
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  for (const r of ripples) {
+    const y = (r.y + flow) % (viewH + 100) - 50;
+    ctx.beginPath(); ctx.moveTo(r.x - r.l / 2, y); ctx.quadraticCurveTo(r.x, y - 5, r.x + r.l / 2, y); ctx.stroke();
+  }
+}
+function makeRipples() {
+  ripples = [];
+  for (let k = 0; k < 40; k++) ripples.push({ x: rand(riverL() + 10, riverR() - 10), y: rand(0, viewH + 100), l: rand(16, 40) });
+}
+
+// ============================================================
+//  The princess's bathing place
+// ============================================================
+function drawBathingPlace(f) {
+  const R = riverR(), y = f.y;
+  const sx = viewW / 2 + laneW() * 0.5;
+  ctx.save();
+  // stone steps coming down into the water from the right bank
+  for (let k = 0; k < 4; k++) {
+    const x0 = sx - 20 + k * 22;
+    ctx.fillStyle = k % 2 ? '#e8d6ad' : '#f2e3bf';
+    roundRect(x0, y - 70 - k * 8, viewW - x0 + 40, 120 + k * 16, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,120,70,0.5)'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // a pillar and an awning
+  const px = Math.min(viewW - 40, R + 80);
+  ctx.fillStyle = '#e0c48a';
+  roundRect(px - 10, y - 200, 20, 150, 6); ctx.fill();
+  ctx.fillStyle = '#3c8fc0';
+  ctx.fillRect(px - 16, y - 210, 32, 12);
+  ctx.restore();
+  // the princess and her maids
+  const ph = f.prinX, py = y - 10;
+  drawPerson(MAIDS[0], Math.min(viewW - 30, ph + 70), py - 40, 1, ph, py);
+  drawPerson(MAIDS[1], Math.min(viewW - 26, ph + 120), py + 10, 0.95, ph, py);
+  drawPerson(PRINCESS, ph, py, 1.1, basket.x, basket.y);
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 500) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#f6a6c4']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.6, 1.4), cols[i % cols.length], rand(2, 4.5), 40, i % 3 ? 'dot' : 'star');
+  }
+}
+function splash(x, y, n = 12) {
+  for (let i = 0; i < n; i++) spawn(x + rand(-14, 14), y + rand(-6, 6), rand(-90, 90), rand(-160, -40), rand(0.4, 0.8), pick(['#ffffff', '#d8f2ff', '#a8dcf0']), rand(2.5, 5), 420);
+}
+function stars(x, y) {
+  for (let i = 0; i < 6; i++) { const a = i * TAU / 6; spawn(x + Math.cos(a) * 20, y + Math.sin(a) * 12, Math.cos(a) * 40, Math.sin(a) * 30 - 20, 0.9, '#ffe27a', 4, 0, 'star'); }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'heart') {
+      const s = p.size;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y + s * 0.9);
+      ctx.bezierCurveTo(p.x - s * 1.4, p.y - s * 0.2, p.x - s * 0.5, p.y - s * 1.3, p.x, p.y - s * 0.4);
+      ctx.bezierCurveTo(p.x + s * 0.5, p.y - s * 1.3, p.x + s * 1.4, p.y - s * 0.2, p.x, p.y + s * 0.9);
+      ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Making the river: rows of hazards with a safe way through
+// ============================================================
+function laneFree(row, l) { return !row.includes(l); }
+
+function spawnRow() {
+  const y = -90;
+  rowsMade++;
+  const blocked = [];
+  // Reed beds narrow the channel from the sides
+  if (reedL <= 0 && safeLane !== 0 && Math.random() < cfg.reeds && (cfg.bothSides || reedR <= 0)) {
+    reedL = Math.min(2 + Math.floor(rand(0, 3)), cfg.rows - rowsMade + 1);
+    addReedBed(0, y, reedL);
+  }
+  if (reedR <= 0 && safeLane !== LANES - 1 && Math.random() < cfg.reeds && (cfg.bothSides || reedL <= 0)) {
+    reedR = Math.min(2 + Math.floor(rand(0, 3)), cfg.rows - rowsMade + 1);
+    addReedBed(LANES - 1, y, reedR);
+  }
+  if (reedL > 0) blocked.push(0);
+  if (reedR > 0) blocked.push(LANES - 1);
+  reedL--; reedR--;
+
+  // The safe lane wanders, never into the reeds
+  const prev = safeLane;
+  const options = [];
+  for (let l = 0; l < LANES; l++) if (!blocked.includes(l) && Math.abs(l - prev) <= cfg.maxStep) options.push(l);
+  safeLane = options.length ? pick(options) : prev;
+  const keep = [prev, safeLane];
+  // Hazards go in the other lanes
+  let want = Math.round(rand(cfg.perRow[0], cfg.perRow[1] + 0.49));
+  const freeLanes = () => { const f = []; for (let l = 0; l < LANES; l++) if (!blocked.includes(l) && !keep.includes(l)) f.push(l); return f; };
+  let tries = 0;
+  while (want > 0 && tries++ < 10) {
+    const f = freeLanes();
+    if (!f.length) break;
+    const kind = pick(cfg.kinds);
+    if (kind === 'net') {
+      // a net strung out from one bank across two lanes
+      const side = pick([0, 1]);
+      const ls = side ? [LANES - 2, LANES - 1] : [0, 1];
+      if (ls.every((l) => f.includes(l))) {
+        obstacles.push({ kind: 'net', lanes: ls, lane: (ls[0] + ls[1]) / 2, y, hw: 0, hh: 14, hit: false });
+        blocked.push(...ls); want -= 2;
+      }
+      continue;
+    }
+    // most of the time a hazard drifts down the lane the basket is in now, so the basket must be steered
+    const l = basket && f.includes(basket.lane) && Math.random() < 0.75 ? basket.lane : pick(f);
+    blocked.push(l);
+    want--;
+    if (kind === 'croc') obstacles.push({ kind, lane: l, y, hw: 16, hh: 42, awake: 0, ph: rand(0, 5), hit: false });
+    else if (kind === 'hippo') obstacles.push({ kind, lane: l, y, hw: 26, hh: 22, up: 0, snort: 0, hit: false });
+    else obstacles.push({ kind: 'whirl', lane: l, y, hw: 22, hh: 18, hit: false });
+  }
+  // Lotus flowers: usually in the safe lane, sometimes somewhere a little riskier
+  if (Math.random() < cfg.lotus) {
+    const l = Math.random() < 0.7 ? safeLane : pick([0, 1, 2, 3, 4].filter((q) => !blocked.includes(q)).concat([safeLane]));
+    lotuses.push({ lane: l, y: y - cfg.spacing / 2, got: false, ph: rand(0, 5) });
+  }
+}
+
+function addReedBed(lane, y, rows) {
+  const h = (rows - 1) * cfg.spacing + 120;
+  obstacles.push({ kind: 'reeds', lane, y: y - (rows - 1) * cfg.spacing / 2, hw: laneW() / 2 - 4, hh: h / 2, h, seed: Math.random() * 50, hit: false });
+}
+
+// ============================================================
+//  Steering
+// ============================================================
+function steer(dir) {
+  if (state !== 'play' || finish && finish.arrived) return;
+  const nl = clamp(basket.lane + dir, 0, LANES - 1);
+  if (nl !== basket.lane) {
+    basket.lane = nl;
+    basket.tx = laneX(nl);
+    sfx.paddle();
+    if (!told.steer) told.steer = true;
+  }
+  basket.drag = false;
+}
+function steerTo(x) {
+  if (state !== 'play' || finish && finish.arrived) return;
+  basket.tx = clamp(x, laneX(0), laneX(LANES - 1));
+  basket.lane = clamp(Math.round((basket.tx - riverL()) / laneW() - 0.5), 0, LANES - 1);
+  basket.drag = true;
+}
+
+// ============================================================
+//  Updating
+// ============================================================
+function updatePlay(dt) {
+  playT += dt;
+  const arriving = finish && finish.arrived;
+  // The current carries everything down the screen
+  const target = arriving ? 0 : cfg.speed * Math.min(1, 0.35 + playT * 0.4);
+  speedNow = lerp(speedNow, target, 1 - Math.pow(0.05, dt));
+  const dy = speedNow * dt;
+  flow += dy;
+  dist += dy;
+  if (!finish && dist >= nextRowAt) {
+    if (rowsMade < cfg.rows) { spawnRow(); nextRowAt += cfg.spacing; }
+    else {
+      finish = { y: -260, prinX: Math.min(riverR() - 10, viewW / 2 + laneW() * 1.6), arrived: false, t: 0 };
+    }
+  }
+  for (const o of obstacles) o.y += dy;
+  for (const l of lotuses) l.y += dy;
+  for (const d of decor) d.y += dy;
+  // recycle bank decor
+  decor = decor.filter((d) => d.y < viewH + 160);
+  let top = Math.min(...decor.map((d) => d.y));
+  while (top > -140) { top -= 90; addDecor(top); }
+  obstacles = obstacles.filter((o) => o.y - (o.hh || 30) < viewH + 120);
+  lotuses = lotuses.filter((l) => l.y < viewH + 60);
+
+  // The basket follows the lane (with a little bob)
+  const by = basketY();
+  basket.y = by;
+  let pullX = 0;
+  for (const o of obstacles) {
+    o.x = o.kind === 'net' ? (laneX(o.lanes[0]) + laneX(o.lanes[1])) / 2 : laneX(o.lane);
+    if (o.kind === 'net') { o.w = laneW() * 2 - 8; o.hw = o.w / 2; }
+    if (o.kind === 'reeds') { o.w = laneW() - 6; o.hw = o.w / 2 - 4; }
+    if (o.kind === 'hippo') {
+      const wantUp = o.y > by - viewH * 0.45 ? 1 : 0;
+      o.up = clamp(o.up + (wantUp ? dt * 1.6 : -dt), 0, 1);
+      if (wantUp && o.up > 0.3 && !o.splashed) { o.splashed = true; splash(o.x, o.y, 10); sfx.blub(); if (!told.hippo) { told.hippo = true; showMessage('Bubbles! A hippo is coming up', 2.2); } }
+      o.snort = Math.max(0, o.snort - dt * 1.5);
+    }
+    if (o.kind === 'croc') o.awake = Math.max(0, o.awake - dt);
+    if (o.kind === 'whirl' && cfg.pull) {
+      const dx = o.x - basket.x, dyy = Math.abs(o.y - by);
+      if (dyy < 120 && Math.abs(dx) < laneW() * 1.6) pullX += Math.sign(dx) * (1 - dyy / 120) * 70;
+      if (dyy < 200 && !told.whirl) { told.whirl = true; showMessage('A whirlpool! It pulls the basket', 2.2); }
+    }
+    if (o.kind === 'net' && !told.net && o.y > 120) { told.net = true; showMessage('A fishing net! Steer around it', 2.2); }
+    if (o.kind === 'croc' && !told.croc && o.y > 140) { told.croc = true; showMessage('Shh… a sleepy crocodile. Steer around it!', 2.4); }
+  }
+  // spring toward the lane, nudged by any whirlpool
+  basket.x += (basket.tx - basket.x) * (1 - Math.pow(basket.drag ? 0.002 : 0.0004, dt));
+  basket.x += (pullX * 2 + basket.vx) * dt;
+  basket.vx *= Math.pow(0.02, dt);
+  basket.x = clamp(basket.x, riverL() + 26, riverR() - 26);
+  basket.spin = Math.max(0, basket.spin - dt * 4);
+  basket.inv = Math.max(0, basket.inv - dt);
+  basket.cry = Math.max(0, basket.cry - dt);
+
+  // Bumps
+  if (!arriving) {
+    for (const o of obstacles) {
+      if (o.hit) continue;
+      if (o.kind === 'hippo' && o.up < 0.6) continue;
+      const hitX = Math.abs(basket.x - o.x) < o.hw + BHW, hitY = Math.abs(by - o.y) < o.hh + BHH;
+      if (hitX && hitY && basket.inv <= 0) bump(o);
+    }
+    // Lotus flowers
+    for (const l of lotuses) {
+      if (l.got) continue;
+      l.x = laneX(l.lane);
+      if (Math.abs(basket.x - l.x) < 34 && Math.abs(by - l.y) < 30) {
+        l.got = true; lotusGot++;
+        sparkleBurst(l.x, l.y, 12);
+        sfx.lotus(lotusGot);
+      }
+    }
+  }
+  for (const l of lotuses) l.x = laneX(l.lane);
+
+  // The bathing place comes into view
+  if (finish) {
+    finish.y += dy;
+    if (!finish.arrived && finish.y > by - 110) {
+      finish.arrived = true;
+      sfx.chime();
+      showMessage('Pharaoh’s daughter has come down to the river…', 2.6);
+    }
+    if (finish.arrived) {
+      finish.t += dt;
+      basket.tx = lerp(basket.tx, finish.prinX - 46, 1 - Math.pow(0.2, dt));
+      if (finish.t > 1.6) win();
+    }
+  }
+  // Miriam on the bank
+  miriamMoodT = Math.max(0, miriamMoodT - dt);
+  MIRIAM.mood = miriamMoodT > 0 ? miriamMood : finish && finish.arrived ? 'wow' : 'watch';
+  MIRIAM.run = true;
+}
+
+function bump(o) {
+  o.hit = true;
+  hearts--;
+  bumps++;
+  basket.inv = 1.3;
+  basket.spin = 1;
+  basket.cry = 1.2;
+  basket.vx += (basket.x < o.x ? -1 : 1) * 260;
+  shakeT = 0.25;
+  splash(basket.x, basket.y, 14);
+  stars(basket.x, basket.y - 10);
+  miriamMood = 'shock'; miriamMoodT = 1.2;
+  if (o.kind === 'croc') { o.awake = 2.5; sfx.grumble(); showMessage('The crocodile woke up! Hmph!', 1.6); }
+  else if (o.kind === 'hippo') { o.snort = 1; sfx.snort(); }
+  else if (o.kind === 'whirl') sfx.whoosh();
+  else sfx.bump();
+  sfx.wah();
+  if (hearts <= 0) fail();
+}
+
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const heartBonus = hearts * HEART_PTS;
+  const lotusBonus = lotusGot * LOTUS_PTS;
+  const perfect = bumps === 0 ? PERFECT_PTS : 0;
+  const levelBonus = 100 * level;
+  const sum = heartBonus + lotusBonus + perfect + levelBonus;
+  totalScore += sum;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('babyMosesBest', String(best)); } catch (e) {} }
+  lastScore = { heartBonus, lotusBonus, perfect, levelBonus, sum };
+  sfx.win();
+  endTimer = 4.2;
+}
+
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  sfx.fail();
+  miriamMood = 'worried'; miriamMoodT = 99;
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  cfg = makeConfig(1);
+  resetLevel();
+  showOverlay('Baby in the Basket', 'Float safely down the Nile',
+    `${verseHTML('basket')}
+     <ul>
+       <li>Baby Moses' mother has hidden him in a little <b>papyrus basket</b> on the river. Guide it safely down the Nile!</li>
+       <li><b>Tap left</b> or <b>tap right</b> of the basket to steer one lane. You can also <b>drag</b> it. <b>Keys:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd></li>
+       <li>Keep away from <b>sleepy crocodiles</b>, <b>hippos</b> (watch for bubbles!), <b>whirlpools</b>, <b>nets</b> and thick <b>reeds</b>. Three bumps and the basket gets stuck.</li>
+       <li>Float over the pink <b>lotus flowers</b> for points. His big sister <b>Miriam</b> runs along the bank to watch.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Start floating', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  basket = { lane: 2, x: 0, tx: 0, y: basketY(), vx: 0, spin: 0, inv: 0, cry: 0, drag: false };
+  basket.x = basket.tx = laneX(2);
+  obstacles = []; lotuses = []; particles = [];
+  hearts = cfg.hearts; lotusGot = 0; bumps = 0;
+  rowsMade = 0; dist = 0; nextRowAt = 120; safeLane = 2; reedL = reedR = 0;
+  finish = null; speedNow = 0;
+  playT = 0; winT = 0; failT = 0; endTimer = 0;
+  told = {};
+  flashT = shakeT = 0;
+  miriamMoodT = 0;
+  PRINCESS.pose = null; PRINCESS.mood = 'watch';
+  MAIDS.forEach((m) => (m.mood = 'watch'));
+  keys.clear();
+  down = null;
+  makeDecor(); makeRipples();
+}
+
+function startLevel() {
+  resetLevel();
+  hideOverlay();
+  sfx.levelStart();
+  state = 'play';
+  syncAmbience();
+  showMessage(`Level ${level}: ${cfg.name}`, 2.2);
+  if (level === 1) setTimeout(() => { if (state === 'play' && level === 1 && playT < 6) showMessage('Tap left or right of the basket to steer', 2.8); }, 2400);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    showOverlay(level % 3 === 0 ? 'Drawn out of the water!' : 'Safe with the princess!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(level % 2 ? 'princess' : 'compassion')}
+       ${level % 3 === 0 ? verseHTML('drew') : '<p style="text-align:center">God was watching over baby Moses all the way down the river.</p>'}
+       <p class="score">Hearts left: <b>${s.heartBonus}</b><br>Lotus flowers (${lotusGot}): <b>${s.lotusBonus}</b><br>${s.perfect ? `No bumps at all: <b>${s.perfect}</b><br>` : ''}Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      'Next river', () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    if (totalScore > best) { best = totalScore; try { localStorage.setItem('babyMosesBest', String(best)); } catch (e) {} }
+    showOverlay('Stuck in the reeds!', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The basket bumped too many times. Miriam is still watching — try again! Look ahead and steer <b>early</b>.</p>
+       ${verseHTML('sister')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel());
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">The basket bobs gently in the water. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel());
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+let down = null;          // the press in progress
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state === 'play' && !e.repeat) {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') steer(-1);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') steer(1);
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 2) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  // Tap-first: steer one lane toward the side that was tapped, at once
+  down = { sx: p.vx, sy: p.vy, dragging: false, id: e.pointerId };
+  steer(p.vx < basket.x ? -1 : 1);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!down || state !== 'play') return;
+  const p = toView(e);
+  if (!down.dragging && Math.abs(p.vx - down.sx) > 26) down.dragging = true;
+  if (down.dragging) steerTo(p.vx);
+});
+function endPress() {
+  if (down && down.dragging && basket) { basket.drag = false; basket.tx = laneX(basket.lane); }
+  down = null;
+}
+canvas.addEventListener('pointerup', endPress);
+canvas.addEventListener('pointercancel', endPress);
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  paddle() { this.noiseBurst(1400, 0.16, 0.16, 0.9, 600); },
+  lotus(n) { if (this.ctx) Music.tap(0.3 + (n % 6) * 0.12); },
+  bump() { this.tone(160, 0.2, 'sine', 0.4, 0, 90); this.noiseBurst(500, 0.25, 0.25, 0.7, 200, 'lowpass'); },
+  grumble() { this.tone(110, 0.45, 'sawtooth', 0.12, 0, 80); this.tone(95, 0.35, 'triangle', 0.18, 0.1, 70); },
+  snort() { this.noiseBurst(700, 0.3, 0.35, 1.2, 300); this.tone(140, 0.25, 'triangle', 0.2, 0, 100); },
+  whoosh() { this.noiseBurst(400, 0.5, 0.3, 0.8, 1600); },
+  blub() { for (let i = 0; i < 3; i++) this.tone(300 + i * 90, 0.08, 'sine', 0.14, i * 0.07, 500 + i * 90); },
+  wah() { this.tone(520, 0.25, 'triangle', 0.08, 0.05, 420); this.tone(470, 0.35, 'triangle', 0.07, 0.3, 380); },
+  chime() { [1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.1, i * 0.1)); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHeart(x, y, s, full) {
+  ctx.fillStyle = full ? '#e8506a' : 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9);
+  ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.5, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.5, y - s * 1.3, x + s * 1.4, y - s * 0.2, x, y + s * 0.9);
+  ctx.fill();
+}
+
+function drawHUD() {
+  const playing = state !== 'title';
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, 0, 0, TOPH);
+  hg.addColorStop(0, 'rgba(14,40,52,0.85)'); hg.addColorStop(1, 'rgba(14,40,52,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, viewW, TOPH);
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffe9a8';
+  ctx.textAlign = 'left';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  ctx.fillText(state === 'title' ? 'Baby in the Basket' : `Level ${level} · ${cfg.name}`, 12, 26);
+  if (playing) {
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score ${totalScore}`, viewW - 12, 26);
+    ctx.shadowBlur = 0;
+    for (let k = 0; k < cfg.hearts; k++) drawHeart(22 + k * 24, 48, 8, k < hearts);
+    // how far down the river: a little track from the basket to the bathing place
+    const x0 = 100, x1 = viewW - 40, y = 48;
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(x0, y - 5, x1 - x0, 10, 5); ctx.fill();
+    const f = finish ? 1 : clamp(dist / (cfg.rows * cfg.spacing + 260), 0, 1);
+    ctx.fillStyle = '#7fd0e8';
+    roundRect(x0, y - 5, (x1 - x0) * f, 10, 5); ctx.fill();
+    ctx.fillStyle = '#e9c36e';
+    ctx.beginPath(); ctx.ellipse(x0 + (x1 - x0) * f, y, 9, 6, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#7a5226'; ctx.lineWidth = 1.5; ctx.stroke();
+    // the steps at the end
+    ctx.fillStyle = '#f2e3bf';
+    ctx.fillRect(x1 + 8, y - 8, 16, 4); ctx.fillRect(x1 + 4, y - 4, 20, 4); ctx.fillRect(x1, y, 24, 4);
+    // lotus count
+    ctx.save();
+    ctx.translate(viewW - 70, 84);
+    ctx.fillStyle = '#f6a6c4';
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * 0.5; ctx.beginPath(); ctx.ellipse(Math.cos(a) * 5, Math.sin(a) * 5, 3, 7, a + Math.PI / 2, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.textAlign = 'left';
+    ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.fillText(`× ${lotusGot}`, viewW - 56, 90);
+  }
+  // Home / pause / mute buttons
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = viewH - 40 - (lines.length - 1) * 28;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(14,40,52,0.9)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function drawBubble(text, x, y) {
+  ctx.save();
+  ctx.font = '600 15px Fredoka, sans-serif';
+  const maxW = Math.min(260, viewW - 40);
+  const lines = wrapText(text, maxW - 20);
+  const w = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 24), h = lines.length * 19 + 16;
+  const bx = clamp(x - w / 2, 10, viewW - w - 10), by = y - h - 16;
+  ctx.fillStyle = 'rgba(255,252,240,0.96)';
+  roundRect(bx, by, w, h, 12); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(clamp(x - 8, bx + 10, bx + w - 20), by + h); ctx.lineTo(clamp(x, bx + 14, bx + w - 14), by + h + 12); ctx.lineTo(clamp(x + 8, bx + 20, bx + w - 10), by + h); ctx.fill();
+  ctx.fillStyle = '#5a4210';
+  ctx.textAlign = 'left';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 12, by + 22 + i * 19));
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = rand(-4, 4) * shakeT * 2; sy = rand(-4, 4) * shakeT * 2; }
+  ctx.setTransform(scale, 0, 0, scale, sx * scale, sy * scale);
+  drawWater();
+  drawBanks();
+  for (const o of obstacles) if (o.kind === 'reeds') drawReedBed(o);
+  for (const l of lotuses) drawLotus(l);
+  for (const o of obstacles) {
+    if (o.x === undefined) o.x = o.kind === 'net' ? (laneX(o.lanes[0]) + laneX(o.lanes[1])) / 2 : laneX(o.lane);
+    if (o.kind === 'net' && !o.w) { o.w = laneW() * 2 - 8; }
+    if (o.kind === 'croc') drawCroc(o);
+    else if (o.kind === 'hippo') drawHippo(o);
+    else if (o.kind === 'whirl') drawWhirl(o);
+    else if (o.kind === 'net') drawNet(o);
+  }
+  if (finish) drawBathingPlace(finish);
+  // the basket (lifted up by the princess at the end)
+  if (basket) {
+    let bx = basket.x, by = basket.y, bs = 1;
+    if (state === 'win' && finish) {
+      const f = ease(clamp((winT - 0.5) / 1.2, 0, 1));
+      bx = lerp(basket.x, finish.prinX, f); by = lerp(basket.y, finish.y - 70, f); bs = 1 - 0.25 * f;
+    }
+    const blink = basket.inv > 0 && Math.sin(t * 30) > 0.3;
+    if (!blink) drawBasket(bx, by, bs, basket.spin * Math.sin(t * 20) * 0.4, basket.cry > 0 || state === 'fail' ? 'cry' : state === 'win' ? 'happy' : 'sleep');
+  }
+  // Miriam runs along the left bank, watching her brother
+  if (state !== 'title' && basket) {
+    const mx = Math.max(24, riverL() - 34);
+    drawPerson(MIRIAM, mx, basket.y + 30, 0.95, basket.x, basket.y);
+  }
+  drawParticles();
+  if (state === 'win' && finish && winT > 1.4) drawBubble(Bible.verse(VERSES.drew).text.replace(/^.*?saying, |^.*?said, |^.*?explained, /, ''), finish.prinX, finish.y - 150);
+  if (state === 'play' && playT < 0.5) {
+    ctx.fillStyle = `rgba(14,40,52,${1 - playT / 0.5})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  blinkTick(MIRIAM, dt); blinkTick(PRINCESS, dt); MAIDS.forEach((m) => blinkTick(m, dt));
+  if (state === 'play') {
+    updatePlay(dt);
+  } else if (state === 'title') {
+    // the river keeps flowing gently behind the title card
+    flow += 40 * dt;
+    for (const d of decor) d.y += 40 * dt;
+    decor = decor.filter((d) => d.y < viewH + 160);
+    let top = Math.min(...decor.map((d) => d.y));
+    while (top > -140) { top -= 90; addDecor(top); }
+  } else if (state === 'win') {
+    winT += dt;
+    PRINCESS.pose = winT > 0.4 && winT < 1.8 ? 'reach' : winT >= 1.8 ? null : PRINCESS.pose;
+    PRINCESS.mood = winT > 1.6 ? 'joy' : 'wow';
+    MAIDS.forEach((m) => (m.mood = winT > 1.9 ? 'joy' : 'wow'));
+    MIRIAM.mood = winT > 1.6 ? 'joy' : 'wow';
+    if (winT > 1.6 && Math.random() < dt * 8 && finish) spawn(finish.prinX + rand(-50, 50), finish.y - 90 + rand(-30, 30), rand(-20, 20), -50, 1.4, pick(['#ff7a9a', '#f6a6c4']), rand(5, 8), 0, 'heart');
+  } else if (state === 'fail') {
+    failT += dt;
+    MIRIAM.mood = 'worried';
+  }
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endScreens(dt);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,1356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#6a4a2a">
+<title>Water from the Rock</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #6a4a2a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Water from the Rock</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'doxology', instrument: 'harp', accent: 'pipe', ambience: 'wind', percussion: false };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  strike: { ref: 'Exodus 17:6', KJV: 'thou shalt smite the rock, and there shall come water out of it, that the people may drink.', NKJV: 'you shall strike the rock, and water will come out of it, that the people may drink.', NIV: 'Strike the rock, and water will come out of it for the people to drink.', NLT: 'Strike the rock, and water will come gushing out. Then the people will be able to drink.' },
+  // Level cards
+  thirsted: { ref: 'Exodus 17:3', KJV: 'And the people thirsted there for water', NKJV: 'And the people thirsted there for water', NIV: 'But the people were thirsty for water there', NLT: 'But tormented by thirst, they continued to argue with Moses.' },
+  takeRod: { ref: 'Exodus 17:5', KJV: 'Go on before the people... and thy rod, wherewith thou smotest the river, take in thine hand, and go.', NKJV: 'Go on before the people... Also take in your hand your rod with which you struck the river, and go.', NIV: 'Go out in front of the people... take in your hand the staff with which you struck the Nile, and go.', NLT: 'Walk out in front of the people. Take your staff, the one you used when you struck the water of the Nile' },
+  standBefore: { ref: 'Exodus 17:6', KJV: 'Behold, I will stand before thee there upon the rock in Horeb', NKJV: 'Behold, I will stand before you there on the rock in Horeb', NIV: 'I will stand there before you by the rock at Horeb.', NLT: 'I will stand before you on the rock at Mount Sinai.' },
+  streams: { ref: 'Psalm 78:16', KJV: 'He brought streams also out of the rock, and caused waters to run down like rivers.', NKJV: 'He also brought streams out of the rock, And caused waters to run down like rivers.', NIV: 'he brought streams out of a rocky crag and made water flow down like rivers.', NLT: 'He made streams pour from the rock, making the waters flow down like a river!' },
+  // Win cards
+  gushed: { ref: 'Psalm 105:41', KJV: 'He opened the rock, and the waters gushed out; they ran in the dry places like a river.', NKJV: 'He opened the rock, and water gushed out; It ran in the dry places like a river.', NIV: 'He opened the rock, and water gushed out; it flowed like a river in the desert.', NLT: 'He split open a rock, and water gushed out to form a river through the dry wasteland.' },
+  didSo: { ref: 'Exodus 17:6', KJV: 'And Moses did so in the sight of the elders of Israel.', NKJV: 'And Moses did so in the sight of the elders of Israel.', NIV: 'So Moses did this in the sight of the elders of Israel.', NLT: 'So Moses struck the rock as he was told, and water gushed out as the elders looked on.' },
+  // Speech bubble when the rock is struck
+  drink: { ref: 'Exodus 17:6', KJV: 'there shall come water out of it, that the people may drink', NKJV: 'water will come out of it, that the people may drink', NIV: 'water will come out of it for the people to drink', NLT: 'water will come gushing out. Then the people will be able to drink' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+}
+window.addEventListener('resize', resize);
+resize();
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function lookAt(x, y, tx, ty) {
+  const dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function topSafe() { return Math.max(12, 118 - offY); }
+
+// ============================================================
+//  Levels
+// ============================================================
+const LEVELS = [
+  { name: 'Thirsty at Rephidim',     cols: 4, rows: 4, tents: 1, time: 80,  scramble: 0.5,
+    tip: 'Tap the <b>rock</b> so Moses strikes it. Then <b>tap the channels</b> to turn them, and lead the water to the <b>tent</b>.' },
+  { name: 'Water for the Families',  cols: 4, rows: 5, tents: 2, time: 85,  scramble: 1,
+    tip: 'Two thirsty tents! The water must reach <b>both</b> at once.' },
+  { name: 'Across the Camp',         cols: 5, rows: 5, tents: 3, time: 95,  scramble: 1,
+    tip: 'Three tents. Some channels <b>split</b> the water two ways. Follow it from the rock!' },
+  { name: 'The Tribes Are Waiting',  cols: 5, rows: 6, tents: 3, time: 95,  scramble: 1,
+    tip: 'A bigger camp and less time for each channel. Plan the way first!' },
+  { name: 'Streams in the Desert',   cols: 6, rows: 6, tents: 4, time: 110, scramble: 1,
+    tip: 'Four tents far across the desert. Look for the <b>dead ends</b> that lead nowhere.' },
+  { name: 'Like a River',            cols: 6, rows: 7, tents: 5, time: 120, scramble: 1,
+    tip: 'The whole camp is thirsty! Five tents, and the sun is hot. Be quick and clever.' },
+];
+const NUM_LEVELS = LEVELS.length;
+function makeConfig(n) { return { ...LEVELS[n - 1] }; }
+
+// openings: N=1, E=2, S=4, W=8
+const DIRS = [[0, -1, 1, 4], [1, 0, 2, 8], [0, 1, 4, 1], [-1, 0, 8, 2]];  // dx, dy, bit, opposite bit
+const rot = (m) => ((m << 1) | (m >> 3)) & 15;
+const bits = (m) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | pause | win | fail
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('rockWaterBest') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let grid = null;          // { cols, rows, cells: [{ m, sol, tent, wet, anim, src }], src: col }
+let t = 0;
+let timer = 0, timerMax = 1;
+let struck = false, strikeT = 0;
+let taps = 0, minTaps = 0;
+let particles = [];
+let message = { text: '', t: 0 };
+let bubble = null;
+let told = {};
+let endTimer = 0, winT = 0, failT = 0, flashT = 0, shakeT = 0;
+let lastScore = null;
+let cursor = { c: 0, r: 0, show: false };
+let tentsWet = 0;
+let rockHintT = 0;
+
+const MOSES = { robe: '#8a5a3a', hair: '#b8b0a0', beard: true, skin: '#d39a66', scarf: '#e8dcc0', i: 0, mood: 'watch', blink: 0, blinkT: 2, phase: 0, staff: true };
+const ELDERS = [
+  { robe: '#5a6475', hair: '#d8d0c0', beard: true, skin: '#c88e5a', scarf: '#c9b27a', i: 1, mood: 'watch', blink: 0, blinkT: 3, phase: 1 },
+  { robe: '#6b8e3a', hair: '#9a9080', beard: true, skin: '#c98d56', scarf: '#e8dcc0', i: 2, mood: 'watch', blink: 0, blinkT: 2.5, phase: 2 },
+];
+const FOLK = [
+  { robe: '#c46b8c', hair: '#3a2716', skin: '#d7a070', scarf: '#e8dcc0' },
+  { robe: '#3f6fb5', hair: '#4a2f1a', skin: '#d9a066', beard: true },
+  { robe: '#d9a13a', hair: '#6b3f1d', skin: '#e3b184', scarf: '#f0c9a0' },
+  { robe: '#3c8f86', hair: '#1f140c', skin: '#b87a48', beard: true },
+  { robe: '#b5503f', hair: '#2e1d10', skin: '#c58a55', scarf: '#d8c7a0' },
+].map((d, i) => ({ ...d, i: i + 3, mood: 'worried', blink: 0, blinkT: rand(1, 4), phase: rand(0, TAU) }));
+const TENT_COLS = ['#5a3a2a', '#7a4a2a', '#4a3a30', '#8a5a3a', '#6a3a2a'];
+
+// ============================================================
+//  Building the puzzle
+// ============================================================
+function buildGrid() {
+  const C = cfg.cols, R = cfg.rows;
+  for (let tries = 0; tries < 200; tries++) {
+    const cells = Array.from({ length: C * R }, (_, i) => ({ c: i % C, r: Math.floor(i / C), m: 0, sol: 0, tent: -1, wet: 0, anim: 0, src: false }));
+    const at = (c, r) => (c >= 0 && r >= 0 && c < C && r < R ? cells[r * C + c] : null);
+    const sc = Math.floor(C / 2) - (C % 2 ? 0 : Math.round(Math.random()));
+    const start = at(sc, 0);
+    start.src = true; start.sol |= 1;    // the rock pours in from the top
+    // randomised Prim: a branching tree through every cell
+    const inTree = new Set([start]);
+    const frontier = [];
+    const addF = (cell) => { for (const [dx, dy, b, o] of DIRS) { const n = at(cell.c + dx, cell.r + dy); if (n && !inTree.has(n)) frontier.push([cell, n, b, o]); } };
+    addF(start);
+    while (frontier.length) {
+      const k = Math.floor(Math.random() * frontier.length);
+      const [a, n, b, o] = frontier.splice(k, 1)[0];
+      if (inTree.has(n)) continue;
+      a.sol |= b; n.sol |= o;
+      inTree.add(n); addF(n);
+    }
+    // distance from the rock
+    const dist = new Map([[start, 0]]);
+    const q = [start];
+    while (q.length) {
+      const a = q.shift();
+      for (const [dx, dy, b] of DIRS) { const n = at(a.c + dx, a.r + dy); if (n && (a.sol & b) && !dist.has(n)) { dist.set(n, dist.get(a) + 1); q.push(n); } }
+    }
+    const leaves = cells.filter((x) => !x.src && bits(x.sol) === 1 && dist.get(x) >= 2);
+    if (leaves.length < cfg.tents) continue;
+    // tents at far-away leaves, not touching each other
+    leaves.sort((a, b) => dist.get(b) + Math.random() * 3 - (dist.get(a) + Math.random() * 3));
+    const tents = [];
+    for (const l of leaves) {
+      if (tents.length >= cfg.tents) break;
+      if (tents.some((o) => Math.abs(o.c - l.c) + Math.abs(o.r - l.r) < 2)) continue;
+      tents.push(l);
+    }
+    if (tents.length < cfg.tents) continue;
+    tents.forEach((x, i) => { x.tent = i; });
+    // scramble the channels
+    minTaps = 0;
+    for (const x of cells) {
+      x.m = x.sol;
+      if (x.tent >= 0) continue;
+      if (Math.random() < cfg.scramble || cfg.scramble >= 1) {
+        const k = 1 + Math.floor(Math.random() * 3);
+        for (let j = 0; j < k; j++) x.m = rot(x.m);
+      }
+      minTaps += tapsNeeded(x.m, x.sol);
+    }
+    grid = { cols: C, rows: R, cells, src: sc, at, tents };
+    if (allTentsConnected()) continue;     // never start already solved
+    if (level === 1 && minTaps < 3) continue;
+    return;
+  }
+}
+function tapsNeeded(m, sol) { let k = 0; while (m !== sol && k < 4) { m = rot(m); k++; } return k % 4; }
+
+// cells joined to the rock by open channels on both sides
+function connectedSet() {
+  const set = new Set();
+  if (!grid) return set;
+  const start = grid.at(grid.src, 0);
+  if (!(start.m & 1)) return set;
+  const q = [start]; set.add(start);
+  while (q.length) {
+    const a = q.shift();
+    for (const [dx, dy, b, o] of DIRS) {
+      if (!(a.m & b)) continue;
+      const n = grid.at(a.c + dx, a.r + dy);
+      if (n && (n.m & o) && !set.has(n)) { set.add(n); q.push(n); }
+    }
+  }
+  return set;
+}
+function allTentsConnected() {
+  const s = connectedSet();
+  return grid.tents.every((x) => s.has(x));
+}
+
+// ============================================================
+//  Layout
+// ============================================================
+function layout() {
+  const C = grid ? grid.cols : cfg.cols, R = grid ? grid.rows : cfg.rows;
+  const top = topSafe() + 150;
+  const avail = H - 24 - top;
+  const cs = Math.floor(Math.min((W - 30) / C, avail / R, 112));
+  const gw = cs * C, gh = cs * R;
+  const x0 = Math.round((W - gw) / 2);
+  const y0 = Math.round(top + Math.max(0, avail - gh) * 0.3);
+  return { cs, x0, y0, gw, gh };
+}
+function rockPos() {
+  const L = layout();
+  const c = grid ? grid.src : 1;
+  return { x: L.x0 + (c + 0.5) * L.cs, y: L.y0 - 18, r: 62 };
+}
+
+// ============================================================
+//  Drawing
+// ============================================================
+function drawFace(d, mood, hy, lx, ly) {
+  const ex = 6, ey = hy - 1;
+  const dark = '#2b1d12';
+  const mouthY = hy + 9;
+  const blink = d.blink > 0 && mood !== 'shock' && mood !== 'joy';
+  ctx.lineCap = 'round';
+  const eyes = (rx, ry, pr) => {
+    for (const sx of [-ex, ex]) {
+      if (blink) {
+        ctx.strokeStyle = dark; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 3, ey); ctx.lineTo(sx + 3, ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(sx, ey, rx, ry, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(sx + lx * (rx - pr), ey + ly * (ry - pr), pr, 0, TAU); ctx.fill();
+    }
+  };
+  const brows = (lInner, lOuter, rInner, rOuter) => {
+    ctx.strokeStyle = shade(d.hair, -10); ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-ex - 4, ey + lOuter); ctx.lineTo(-ex + 3, ey + lInner);
+    ctx.moveTo(ex - 3, ey + rInner); ctx.lineTo(ex + 4, ey + rOuter);
+    ctx.stroke();
+  };
+  const mouthFill = (fn) => { ctx.fillStyle = '#7a2e22'; ctx.beginPath(); fn(); ctx.fill(); };
+  const mouthLine = (fn) => { ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2; ctx.beginPath(); fn(); ctx.stroke(); };
+  switch (mood) {
+    case 'watch':
+      eyes(3.5, 4.5, 2); brows(-7, -7, -7, -7);
+      mouthLine(() => ctx.arc(0, mouthY - 3, 4, 0.2 * Math.PI, 0.8 * Math.PI));
+      break;
+    case 'wow':
+      eyes(4, 5.5, 2.1); brows(-10, -9, -10, -9);
+      mouthFill(() => ctx.ellipse(0, mouthY, 3.2, 4.2, 0, 0, TAU));
+      break;
+    case 'doubt':
+      eyes(3.5, 3.5, 2); brows(-7, -6, -10, -12);
+      mouthLine(() => { ctx.moveTo(-4, mouthY); ctx.quadraticCurveTo(1, mouthY + 1, 5, mouthY - 2); });
+      break;
+    case 'worried':
+      eyes(3.5, 4.5, 2); brows(-10, -6, -10, -6);
+      mouthLine(() => { ctx.moveTo(-5, mouthY); ctx.quadraticCurveTo(-2.5, mouthY - 2, 0, mouthY); ctx.quadraticCurveTo(2.5, mouthY + 2, 5, mouthY); });
+      break;
+    case 'joy':
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.moveTo(ex + 3.5 * Math.cos(Math.PI * 1.1), ey + 1.5 + 3.5 * Math.sin(Math.PI * 1.1));
+      ctx.arc(ex, ey + 1.5, 3.5, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      mouthFill(() => { ctx.moveTo(-6, mouthY - 3); ctx.arc(0, mouthY - 3, 6, 0, Math.PI); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(255,120,120,0.45)';
+      ctx.beginPath(); ctx.arc(-11, hy + 4, 3, 0, TAU); ctx.arc(11, hy + 4, 3, 0, TAU); ctx.fill();
+      break;
+  }
+}
+
+function drawScarf(d, hy) {
+  ctx.fillStyle = d.scarf;
+  ctx.beginPath();
+  ctx.arc(0, hy - 1, 18, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.lineTo(18, hy + 10); ctx.lineTo(13, hy + 4); ctx.lineTo(13, hy - 6);
+  ctx.quadraticCurveTo(0, hy - 12, -13, hy - 6); ctx.lineTo(-13, hy + 4); ctx.lineTo(-18, hy + 10);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = shade(d.scarf, -40); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 17, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  ctx.strokeStyle = '#8a3a2a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+}
+
+function drawPerson(d, x, y, s, lookX, lookY, opt = {}) {
+  const mood = opt.mood || d.mood;
+  let jump = 0;
+  if (mood === 'joy') jump = Math.abs(Math.sin(t * 7 + d.phase)) * 10;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20 * s, 6 * s, 0, 0, TAU); ctx.fill();
+  ctx.translate(0, -jump * s);
+  ctx.scale(s * (opt.flip ? -1 : 1), s);
+  const robe = opt.robe || d.robe;
+  const sleeve = shade(robe, -25);
+  const arm = (x1, y1, x2, y2) => {
+    ctx.strokeStyle = sleeve; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.fillStyle = d.skin; ctx.beginPath(); ctx.arc(x2, y2, 4, 0, TAU); ctx.fill();
+  };
+  const [lx, ly] = lookAt(x, y - 60 * s, lookX, lookY);
+  // shepherd's staff
+  const staff = opt.staff !== undefined ? opt.staff : d.staff;
+  if (staff) {
+    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(22, 2); ctx.lineTo(22, -78); ctx.arc(15, -78, 7, 0, Math.PI, true); ctx.stroke();
+  }
+  if (mood === 'joy') { const w = Math.sin(t * 9 + d.phase) * 4; arm(-11, -32, -24 + w, -66); }
+  ctx.fillStyle = robe;
+  ctx.strokeStyle = shade(robe, -40);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.quadraticCurveTo(-17, -30, -11, -37);
+  ctx.quadraticCurveTo(0, -41, 11, -37);
+  ctx.quadraticCurveTo(17, -30, 18, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-16, -17); ctx.quadraticCurveTo(0, -14, 16, -17); ctx.stroke();
+  // stripes of a shepherd's cloak
+  ctx.strokeStyle = 'rgba(255,240,210,0.35)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-11, 0); ctx.moveTo(9, -36); ctx.lineTo(11, 0); ctx.stroke();
+  if (mood !== 'joy') arm(-11, -32, -15, -12);
+  arm(11, -32, staff ? 21 : 15, staff ? -40 : -12);
+  const hy = -53;
+  ctx.fillStyle = d.skin;
+  ctx.beginPath(); ctx.arc(0, hy, 16, 0, TAU); ctx.fill();
+  if (d.scarf) drawScarf(d, hy);
+  if (d.beard) {
+    ctx.fillStyle = d.hair;
+    ctx.beginPath();
+    ctx.moveTo(-15, hy + 2);
+    ctx.quadraticCurveTo(-14, hy + 23, 0, hy + 25);
+    ctx.quadraticCurveTo(14, hy + 23, 15, hy + 2);
+    ctx.quadraticCurveTo(9, hy + 8, 0, hy + 8);
+    ctx.quadraticCurveTo(-9, hy + 8, -15, hy + 2);
+    ctx.fill();
+  }
+  drawFace(d, mood, hy, lx * (opt.flip ? -1 : 1), ly);
+  ctx.restore();
+}
+
+function drawSheep(x, y, s, flip = false, wool = '#f4f0e6', horns = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s * (flip ? -1 : 1), s);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 24, 6, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#3a2e26'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const lx of [-13, -6, 7, 13]) { ctx.beginPath(); ctx.moveTo(lx, -8); ctx.lineTo(lx, 1); ctx.stroke(); }
+  ctx.fillStyle = wool;
+  for (const [dx, dy, r] of [[-12, -16, 10], [0, -20, 12], [12, -16, 10], [-6, -10, 10], [7, -10, 10]]) { ctx.beginPath(); ctx.arc(dx, dy, r, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#3a2e26';
+  ctx.beginPath(); ctx.ellipse(23, -18, 8, 9, 0.3, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(18, -24, 5, 3, -0.6, 0, TAU); ctx.fill();
+  if (horns) {
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(20, -27, 5, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(25, -20, 2.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(25.6, -20, 1.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+
+function drawCloud(cx, cy, w, h) {
+  const n = Math.max(3, Math.round(w / 22));
+  const puffs = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const r = h * (0.42 + 0.38 * Math.sin(f * Math.PI)) * (0.92 + 0.08 * Math.sin(i * 2.7));
+    puffs.push([cx - w / 2 + h * 0.4 + f * (w - h * 0.8), cy - r * 0.3, r]);
+  }
+  for (const [fill, dy] of [['#eee6da', h * 0.18], ['#ffffff', 0]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (const [px, py, r] of puffs) { ctx.moveTo(px + r, py + dy); ctx.arc(px, py + dy, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+function drawDesert() {
+  const top = -offY;
+  const L = layout();
+  const horizon = L.y0 - 90;
+  const g = ctx.createLinearGradient(0, top, 0, horizon);
+  g.addColorStop(0, '#8cc8ec'); g.addColorStop(1, '#f6e6c4');
+  ctx.fillStyle = g; ctx.fillRect(-offX, top, viewW, horizon - top + 2);
+  // the hot sun
+  const sx = W * 0.85, sy = Math.max(top + 70, horizon - 120);
+  const sg = ctx.createRadialGradient(sx, sy, 10, sx, sy, 110);
+  sg.addColorStop(0, 'rgba(255,250,215,1)'); sg.addColorStop(0.3, 'rgba(255,230,150,0.85)'); sg.addColorStop(1, 'rgba(255,230,150,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 110, 0, TAU); ctx.fill();
+  for (let k = 0; k < 3; k++) {
+    const cw = 80 + hash(k, 5) * 60;
+    const cx = ((hash(k, 4) * (viewW + 300) + t * (5 + k * 2)) % (viewW + 300)) - offX - 150;
+    drawCloud(cx, lerp(top + 40, horizon - 60, hash(k, 6)), cw, cw * 0.3);
+  }
+  // Mount Horeb's rocky hills
+  ctx.fillStyle = '#b48a66';
+  ctx.beginPath(); ctx.moveTo(-offX, horizon + 10);
+  ctx.lineTo(W * 0.12, horizon - 50); ctx.lineTo(W * 0.3, horizon - 20); ctx.lineTo(W * 0.48, horizon - 80);
+  ctx.lineTo(W * 0.66, horizon - 30); ctx.lineTo(W * 0.86, horizon - 60); ctx.lineTo(W + offX, horizon);
+  ctx.lineTo(W + offX, horizon + 40); ctx.lineTo(-offX, horizon + 40); ctx.fill();
+  // the dry ground
+  const sand = ctx.createLinearGradient(0, horizon, 0, H);
+  sand.addColorStop(0, '#e8c98a'); sand.addColorStop(1, '#d4ac68');
+  ctx.fillStyle = sand; ctx.fillRect(-offX, horizon, viewW, H - horizon + 30);
+  // cracks in the dry earth
+  ctx.strokeStyle = 'rgba(140,100,50,0.35)'; ctx.lineWidth = 2;
+  for (let k = 0; k < 26; k++) {
+    const px = hash(k, 1) * (W + offX * 2) - offX, py = lerp(horizon + 20, H - 10, hash(k, 2));
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 10, py + 4); ctx.lineTo(px + 16, py - 3); ctx.moveTo(px + 10, py + 4); ctx.lineTo(px + 12, py + 12); ctx.stroke();
+  }
+  // a few tents of the camp in the distance
+  for (let k = 0; k < 5; k++) {
+    const x = (k + 0.5) / 5 * (W + offX * 2) - offX + (hash(k, 9) - 0.5) * 60;
+    if (Math.abs(x - rockPos().x) < 140) continue;
+    drawTentSmall(x, horizon + 22, 0.55, TENT_COLS[k % TENT_COLS.length]);
+  }
+}
+
+function drawTentSmall(x, y, s, col) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(-44, 0); ctx.lineTo(-30, -34); ctx.lineTo(30, -38); ctx.lineTo(46, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8dcc0'; ctx.fillRect(-36, -14, 76, 5);
+  ctx.fillStyle = '#1e140e'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -22); ctx.lineTo(8, 0); ctx.fill();
+  ctx.restore();
+}
+
+function drawRock() {
+  const R = rockPos();
+  const L = layout();
+  ctx.save();
+  // glow while waiting to be struck
+  if (!struck && (state === 'play' || state === 'pause')) {
+    const p = 0.5 + 0.5 * Math.sin(t * 4);
+    const g = ctx.createRadialGradient(R.x, R.y - 30, 10, R.x, R.y - 30, 110);
+    g.addColorStop(0, `rgba(255,240,170,${0.35 + p * 0.35})`); g.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(R.x, R.y - 30, 110, 0, TAU); ctx.fill();
+  }
+  const sh = shakeT > 0 ? Math.sin(shakeT * 60) * shakeT * 8 : 0;
+  ctx.translate(R.x + sh, R.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 8, 74, 14, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#8f8478';
+  ctx.beginPath();
+  ctx.moveTo(-72, 10); ctx.quadraticCurveTo(-80, -40, -46, -66); ctx.quadraticCurveTo(-6, -96, 34, -74);
+  ctx.quadraticCurveTo(76, -56, 72, 10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a69a8c';
+  ctx.beginPath(); ctx.moveTo(-52, -40); ctx.quadraticCurveTo(-30, -82, 14, -78); ctx.quadraticCurveTo(-20, -64, -52, -40); ctx.fill();
+  ctx.strokeStyle = 'rgba(60,50,40,0.35)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(20, -60); ctx.lineTo(30, -36); ctx.lineTo(22, -14); ctx.stroke();
+  if (struck) {
+    // the split where the water gushes out
+    ctx.strokeStyle = '#4a4038'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-6, -56); ctx.lineTo(4, -34); ctx.lineTo(-4, -14); ctx.lineTo(2, 10); ctx.stroke();
+    const f = clamp(strikeT / 0.6, 0, 1);
+    ctx.fillStyle = '#5ab0e8';
+    ctx.beginPath(); ctx.moveTo(-10, -30); ctx.quadraticCurveTo(-16, -4, -14 - f * 4, 10 + L.y0 - R.y); ctx.lineTo(14 + f * 4, 10 + L.y0 - R.y); ctx.quadraticCurveTo(14, -4, 8, -30); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2.5;
+    for (let k = 0; k < 3; k++) { const yy = ((t * 120 + k * 16) % 46) - 30; ctx.beginPath(); ctx.moveTo(-4 + k * 3, yy); ctx.lineTo(-4 + k * 3, yy + 8); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+function drawMosesAndElders() {
+  const R = rockPos();
+  const right = R.x < W / 2 ? 1 : -1;
+  const mx = R.x + right * 104, my = R.y + 6;
+  // the elders watching from the other side
+  const ex = R.x - right * 100;
+  if (ex > 30 - offX && ex < W + offX - 30) drawPerson(ELDERS[0], ex, my - 6, 0.95, R.x, R.y - 40, { flip: right < 0, staff: false });
+  if (ex - right * 46 > 20 - offX && ex - right * 46 < W + offX - 20) drawPerson(ELDERS[1], ex - right * 46, my - 14, 0.85, R.x, R.y - 40, { flip: right < 0, staff: false });
+  // Moses, staff raised to strike, then lowered
+  ctx.save();
+  if (!struck && state === 'play') { MOSES.mood = 'watch'; }
+  drawPerson(MOSES, mx, my, 1.1, R.x, R.y - 30, { flip: right > 0, staff: !strikeAnim() });
+  if (strikeAnim()) {
+    // the staff swinging down onto the rock
+    const f = clamp(strikeT / 0.35, 0, 1);
+    const a = lerp(-2.2, -0.5, ease(f)) * right;
+    ctx.translate(mx - right * 14, my - 44);
+    ctx.rotate(-a * 0 + (right > 0 ? Math.PI : 0) - a);
+    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(86, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
+function strikeAnim() { return struck && strikeT < 0.9; }
+
+function drawTile(x, y, cs, cell, wet, sel) {
+  ctx.save();
+  ctx.translate(x + cs / 2, y + cs / 2);
+  // tile of dry earth
+  ctx.fillStyle = cell.tent >= 0 ? '#e9d29c' : (cell.c + cell.r) % 2 ? '#e0bd7c' : '#dbb674';
+  roundRect(-cs / 2 + 2, -cs / 2 + 2, cs - 4, cs - 4, cs * 0.14); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,80,30,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+  if (sel) { ctx.strokeStyle = `rgba(255,255,255,${0.6 + 0.4 * Math.sin(t * 6)})`; ctx.lineWidth = 4; roundRect(-cs / 2 + 4, -cs / 2 + 4, cs - 8, cs - 8, cs * 0.12); ctx.stroke(); }
+  ctx.rotate(cell.anim);
+  const m = cell.m;
+  const ch = cs * 0.3, inner = cs * 0.19;
+  const arms = [];
+  for (let k = 0; k < 4; k++) if (m & (1 << k)) arms.push(k);
+  const path = () => {
+    ctx.beginPath();
+    for (const k of arms) {
+      const a = -Math.PI / 2 + k * Math.PI / 2;
+      ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * cs / 2, Math.sin(a) * cs / 2);
+    }
+  };
+  ctx.lineCap = arms.length === 1 ? 'round' : 'butt';
+  // the dug channel
+  ctx.strokeStyle = '#9a6a3a'; ctx.lineWidth = ch; path(); ctx.stroke();
+  ctx.fillStyle = '#9a6a3a'; ctx.beginPath(); ctx.arc(0, 0, ch / 2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a5028'; ctx.lineWidth = inner; path(); ctx.stroke();
+  ctx.fillStyle = '#7a5028'; ctx.beginPath(); ctx.arc(0, 0, inner / 2, 0, TAU); ctx.fill();
+  // water
+  if (wet > 0) {
+    ctx.globalAlpha = clamp(wet, 0, 1);
+    ctx.strokeStyle = '#3c9ee0'; ctx.lineWidth = inner; path(); ctx.stroke();
+    ctx.fillStyle = '#3c9ee0'; ctx.beginPath(); ctx.arc(0, 0, inner / 2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = inner * 0.22;
+    ctx.setLineDash([inner * 0.5, inner * 1.2]); ctx.lineDashOffset = -t * 40;
+    path(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function drawTentCell(x, y, cs, cell, wet) {
+  const cx = x + cs / 2, cy = y + cs / 2;
+  // which way is the opening? The channel runs in from that side to a trough in the middle,
+  // with the tent on the far side and the thirsty person beside it
+  const k = [1, 2, 4, 8].indexOf(cell.m);
+  const ox = [0, 1, 0, -1][k], oy = [-1, 0, 1, 0][k];
+  const s = cs / 100;
+  const tentX = cx - ox * cs * 0.18, tentY = cy + (oy < 0 ? cs * 0.42 : oy > 0 ? -cs * 0.05 : cs * 0.12);
+  drawTentSmall(tentX, tentY, s * 0.8, TENT_COLS[cell.tent % TENT_COLS.length]);
+  const tx = cx + ox * cs * 0.12, ty = cy + (oy ? oy * cs * 0.1 : cs * 0.22);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#9a6a3a'; ctx.lineWidth = cs * 0.3;
+  ctx.beginPath(); ctx.moveTo(cx + ox * cs * 0.5, cy + oy * cs * 0.5); ctx.lineTo(tx, oy ? ty : cy); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.strokeStyle = wet > 0.3 ? '#3c9ee0' : '#7a5028'; ctx.lineWidth = cs * 0.19;
+  ctx.beginPath(); ctx.moveTo(cx + ox * cs * 0.5, cy + oy * cs * 0.5); ctx.lineTo(tx, oy ? ty : cy); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.restore();
+  // the trough
+  ctx.fillStyle = '#8a5a2a';
+  roundRect(tx - cs * 0.2, ty - cs * 0.07, cs * 0.4, cs * 0.15, cs * 0.05); ctx.fill();
+  ctx.fillStyle = wet >= 1 ? '#5ab0e8' : '#5a3a1a';
+  roundRect(tx - cs * 0.16, ty - cs * 0.05, cs * 0.32, cs * 0.06, cs * 0.03); ctx.fill();
+  // a thirsty person (happy once the water comes)
+  const d = FOLK[cell.tent % FOLK.length];
+  d.mood = wet >= 1 ? 'joy' : 'worried';
+  const side = ox ? -ox : (cell.c % 2 ? -1 : 1);
+  drawPerson(d, cx + side * cs * 0.32, y + cs * 0.92, s * 0.6, tx, ty, { staff: false, flip: side > 0 });
+}
+
+function drawGrid() {
+  if (!grid) return;
+  const L = layout();
+  // a soft shadow under the board
+  ctx.fillStyle = 'rgba(90,60,20,0.18)';
+  roundRect(L.x0 - 8, L.y0 - 4, L.gw + 16, L.gh + 14, 18); ctx.fill();
+  for (const cell of grid.cells) {
+    const x = L.x0 + cell.c * L.cs, y = L.y0 + cell.r * L.cs;
+    const sel = cursor.show && cursor.c === cell.c && cursor.r === cell.r && state === 'play';
+    if (cell.tent >= 0) {
+      ctx.fillStyle = '#e9d29c';
+      roundRect(x + 2, y + 2, L.cs - 4, L.cs - 4, L.cs * 0.14); ctx.fill();
+      if (sel) { ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
+      drawTentCell(x, y, L.cs, cell, cell.wet);
+    } else drawTile(x, y, L.cs, cell, cell.wet, sel);
+  }
+}
+
+// ============================================================
+//  Particles
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  if (particles.length > 400) return;
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkleBurst(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff', '#ffb33b']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(40, 220);
+    spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.5, 1.1), cols[i % cols.length], rand(2, 4.5), 60, i % 3 ? 'dot' : 'star');
+  }
+}
+function splash(x, y, n) {
+  for (let i = 0; i < n; i++) spawn(x, y, rand(-120, 120), rand(-260, -80), rand(0.5, 1), pick(['#5ab0e8', '#9ad4f6', '#ffffff']), rand(2.5, 5), 600);
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') {
+      const s = p.size * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4, r = k % 2 ? s * 0.35 : s; ctx.lineTo(p.x + Math.cos(an) * r, p.y + Math.sin(an) * r); }
+      ctx.closePath(); ctx.fill();
+    } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Playing
+// ============================================================
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+
+function strikeRock() {
+  if (struck || state !== 'play') return;
+  struck = true; strikeT = 0;
+  const R = rockPos();
+  shakeT = 0.35; flashT = 0.25;
+  splash(R.x, R.y - 30, 30);
+  sfx.crack(); sfx.gush();
+  MOSES.mood = 'wow';
+  ELDERS.forEach((e) => { e.mood = 'wow'; });
+  bubble = { key: 'drink', t: 3 };
+  if (!told.turn) { told.turn = true; showMessage(isTouch() ? 'Now tap the channels to turn them!' : 'Now click the channels to turn them!', 2.4); }
+}
+
+function turnCell(cell) {
+  if (state !== 'play' || !cell || cell.tent >= 0) return;
+  cell.m = rot(cell.m);
+  cell.anim = -Math.PI / 2;
+  taps++;
+  sfx.scrape();
+  if (!struck && !told.strike) { told.strike = true; showMessage('Remember to tap the rock!', 1.8); }
+}
+
+function tapAt(x, y) {
+  const R = rockPos();
+  if (!struck && Math.hypot(x - R.x, y - (R.y - 30)) < R.r + 18) { strikeRock(); return; }
+  const L = layout();
+  const c = Math.floor((x - L.x0) / L.cs), r = Math.floor((y - L.y0) / L.cs);
+  if (grid && c >= 0 && r >= 0 && c < grid.cols && r < grid.rows) turnCell(grid.at(c, r));
+}
+
+function updateWater(dt) {
+  const set = struck ? connectedSet() : new Set();
+  const L = layout();
+  for (const cell of grid.cells) {
+    if (set.has(cell)) {
+      // water creeps in from a wet neighbour (or straight from the rock)
+      let feed = cell.src && struck && strikeT > 0.4;
+      if (!feed) for (const [dx, dy, b, o] of DIRS) {
+        const n = grid.at(cell.c + dx, cell.r + dy);
+        if (n && (cell.m & b) && (n.m & o) && n.wet >= 0.85) { feed = true; break; }
+      }
+      if (feed) {
+        const before = cell.wet;
+        cell.wet = Math.min(1, cell.wet + dt * 5);
+        if (cell.tent >= 0 && before < 1 && cell.wet >= 1) {
+          const x = L.x0 + (cell.c + 0.5) * L.cs, y = L.y0 + (cell.r + 0.5) * L.cs;
+          splash(x, y, 14); sparkleBurst(x, y, 12); sfx.drink();
+        }
+      }
+    } else cell.wet = Math.max(0, cell.wet - dt * 2.5);
+  }
+  tentsWet = grid.tents.filter((x) => x.wet >= 1).length;
+}
+
+function updatePlay(dt) {
+  timer -= dt;
+  if (struck) strikeT += dt;
+  for (const cell of grid.cells) if (cell.anim) cell.anim = Math.min(0, cell.anim + dt * 14);
+  updateWater(dt);
+  if (!struck) {
+    rockHintT += dt;
+    if (rockHintT > 4 && !told.rockHint) { told.rockHint = true; showMessage(isTouch() ? 'Tap the rock to strike it!' : 'Click the rock (or press Space) to strike it!', 2.4); }
+  }
+  if (timer <= 15 && !told.hurry) { told.hurry = true; showMessage('Hurry! The people are so thirsty!', 1.8); }
+  if (struck && tentsWet >= grid.tents.length) { winLevel(); return; }
+  if (timer <= 0) { timer = 0; fail(); }
+}
+
+function updatePeople(dt) {
+  for (const d of [MOSES, ...ELDERS, ...FOLK]) {
+    d.blinkT -= dt;
+    if (d.blinkT <= 0) { d.blink = 0.13; d.blinkT = rand(1.5, 4); }
+    if (d.blink > 0) d.blink -= dt;
+  }
+}
+
+function winLevel() {
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  const timeBonus = Math.round(timer) * 10;
+  const extra = Math.max(0, taps - minTaps);
+  const neat = Math.max(0, 400 - extra * 15);
+  const levelBonus = level * 200;
+  const score = timeBonus + neat + levelBonus + grid.tents.length * 100;
+  totalScore += score;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('rockWaterBest', best); } catch (e) {} }
+  lastScore = { timeBonus, neat, extra, levelBonus, tents: grid.tents.length * 100 };
+  MOSES.mood = 'joy'; ELDERS.forEach((e) => { e.mood = 'joy'; });
+  sfx.win();
+  endTimer = 2.4;
+}
+
+function fail() {
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  MOSES.mood = 'worried';
+  showMessage('Out of time!', 2);
+  sfx.fail();
+  endTimer = 1.8;
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+// Builds everything a level needs at once (config and puzzle together), so the picture
+// behind a level card always matches the level it announces.
+function resetLevel() {
+  cfg = makeConfig(level);
+  buildGrid();
+  timer = timerMax = cfg.time;
+  struck = false; strikeT = 0; rockHintT = 0;
+  taps = 0; tentsWet = 0;
+  particles = []; bubble = null;
+  endTimer = 0; winT = 0; failT = 0; flashT = 0; shakeT = 0;
+  told = level > 1 ? { turn: true } : {};
+  cursor = { c: grid.src, r: 0, show: false };
+  MOSES.mood = 'watch'; ELDERS.forEach((e) => { e.mood = 'watch'; });
+}
+
+function titleScreen() {
+  state = 'title';
+  level = 1;
+  resetLevel();
+  syncAmbience();
+  showOverlay('Water from the Rock', 'God gives His people water in the desert',
+    `${verseHTML('strike')}
+     <ul>
+       <li>God’s people are <b>thirsty</b> in the hot desert. God tells Moses to strike the rock.</li>
+       <li><b>Tap the rock</b> and Moses strikes it with his staff. Water gushes out!</li>
+       <li><b>Tap a channel</b> to turn it. Join them up so the water runs all the way to <b>every tent</b>.</li>
+       <li>Be quick: when the time bar runs out, the people are too thirsty. Fewer turns score more!</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> choose a channel, <kbd>Space</kbd> turns it (or strikes the rock first).</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; levelCard(); });
+}
+
+const CARD_VERSES = ['thirsted', 'takeRod', 'standBefore', 'streams', 'thirsted', 'streams'];
+function levelCard() {
+  state = 'card';
+  resetLevel();
+  syncAmbience();
+  showOverlay(`Level ${level}`, cfg.name,
+    `<p style="text-align:center">${cfg.tip}</p>
+     ${verseHTML(CARD_VERSES[level - 1])}
+     <p class="score">Score so far: <b>${totalScore}</b></p>`,
+    'Go!', () => startLevel());
+}
+
+function startLevel(retry = false) {
+  resetLevel();
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  sfx.levelStart();
+  showMessage(`Level ${level}: ${cfg.name}`, 1.8);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'Like a river!' : 'Water for everyone!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML(last ? 'gushed' : level % 2 ? 'didSo' : 'gushed')}
+       <p style="text-align:center">${last ? 'God gave His thirsty people water from a rock in the desert. He always takes care of His people!' : 'God gave His people water from the rock. Everyone can drink!'}</p>
+       <p class="score">Tents watered: <b>${s.tents}</b><br>Time left: <b>${s.timeBonus}</b><br>Neat turning (${s.extra} extra): <b>${s.neat}</b><br>Level bonus: <b>${s.levelBonus}</b></p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', () => { if (last) titleScreen(); else { level++; levelCard(); } });
+  } else if (state === 'fail') {
+    showOverlay('Still thirsty…', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">The water didn’t reach every tent in time. Strike the rock first, then follow the water from the rock and turn the next channel to join on.</p>
+       ${verseHTML('strike')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state !== 'play' || !grid) return;
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+  if (dir) {
+    if (!cursor.show) { cursor.show = true; return; }
+    cursor.c = clamp(cursor.c + dir[0], 0, grid.cols - 1);
+    cursor.r = clamp(cursor.r + dir[1], 0, grid.rows - 1);
+  } else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
+    if (!struck) strikeRock();
+    else { cursor.show = true; turnCell(grid.at(cursor.c, cursor.r)); }
+  }
+});
+
+function toView(e) {
+  return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state !== 'play') return;
+  cursor.show = false;
+  tapAt(p.vx - offX, p.vy - offY);
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; }
+    syncAmbience();
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noiseBurst(freq, dur, vol, q = 0.8, slideTo = null, type = 'bandpass') {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+    if (slideTo) f.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  scrape() { this.noiseBurst(900, 0.12, 0.2, 1.2, 500); this.tone(300, 0.06, 'triangle', 0.08); },
+  crack() { this.tone(120, 0.3, 'sine', 0.5, 0, 50); this.noiseBurst(400, 0.35, 0.4, 0.6, 150, 'lowpass'); },
+  gush() { this.noiseBurst(1400, 1.4, 0.25, 0.5, 600); },
+  drink() { if (this.ctx) Music.tap(0.5 + Math.random() * 0.5); for (let i = 0; i < 3; i++) this.tone(500 - i * 60, 0.12, 'sine', 0.15, i * 0.1, 300); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawBubble(text, ax, ay) {
+  ctx.save();
+  ctx.font = '700 18px Fredoka, sans-serif';
+  const lines = wrapText('“' + text + '”', Math.min(W - 60, 380));
+  const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = tw + 30, h = lines.length * 23 + 18;
+  const bx = clamp(ax - w / 2, 12, W - w - 12), by = Math.max(-offY + 100, ay - 24 - h);
+  ctx.fillStyle = '#fff6d0'; ctx.strokeStyle = '#f2a93b'; ctx.lineWidth = 3;
+  ctx.shadowColor = 'rgba(255,210,100,0.9)'; ctx.shadowBlur = 14;
+  roundRect(bx, by, w, h, 16); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.fillStyle = '#9a5a00';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, bx + 15, by + 20 + i * 23));
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#3a2a10';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const inGame = state === 'play' || state === 'win' || state === 'fail' || state === 'pause';
+  ctx.fillText(inGame ? `Level ${level} · ${cfg.name}` : 'Water from the Rock', 12, 26);
+  if (inGame) {
+    ctx.font = '600 12px Fredoka, sans-serif';
+    ctx.fillText('TIME', 12, 49);
+    ctx.shadowBlur = 0;
+    const bw = Math.min(170, viewW - 230);
+    ctx.fillStyle = 'rgba(90,50,16,0.22)';
+    roundRect(48, 38, bw, 13, 6.5); ctx.fill();
+    const f = clamp(timer / timerMax, 0, 1);
+    ctx.fillStyle = f < 0.2 && Math.sin(t * 10) > 0 ? '#e0402a' : '#3c9ee0';
+    if (f > 0) { roundRect(48, 38, bw * f, 13, 6.5); ctx.fill(); }
+    ctx.shadowBlur = 4;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#3a2a10'; ctx.font = '700 17px Fredoka, sans-serif';
+    ctx.fillText(`Score ${totalScore}`, viewW - 12, 26);
+    ctx.font = '600 15px Fredoka, sans-serif';
+    if (grid) ctx.fillText(`Tents with water ${tentsWet} / ${grid.tents.length}`, viewW - 12, 48);
+    ctx.fillText(`Turns ${taps}`, viewW - 12, 68);
+  }
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const L = layout();
+  const yGrid = (L.y0 + L.gh) * 1 + offY;
+  const y0 = Math.min(viewH - 18 - (lines.length - 1) * 28, Math.max(yGrid + 34, viewH - 18 - (lines.length - 1) * 28));
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#7a3a00';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawDesert();
+  drawRock();
+  drawMosesAndElders();
+  drawGrid();
+  drawParticles();
+  if (bubble) { const R = rockPos(); drawBubble(Bible.verse(VERSES[bubble.key]).text, R.x, R.y - 90); }
+  if (state === 'win') {
+    ctx.fillStyle = `rgba(200,235,255,${0.25 * clamp(winT, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(90,50,20,${0.25 * clamp(failT, 0, 1)})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  if (flashT > 0) {
+    ctx.fillStyle = `rgba(255,250,225,${flashT * 1.5})`;
+    ctx.fillRect(-offX, -offY, viewW, viewH);
+  }
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  updatePeople(dt);
+  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
+  if (state === 'play') updatePlay(dt);
+  else if (state === 'win') {
+    winT += dt; strikeT += dt;
+    updateWater(dt);
+    if (Math.random() < dt * 8) { const L = layout(); spawn(rand(L.x0, L.x0 + L.gw), rand(L.y0, L.y0 + L.gh), 0, -30, 1.2, pick(['#fff6d0', '#9ad4f6', '#ffffff']), 3, 0, 'star'); }
+  } else if (state === 'fail') failT += dt;
+  flashT = Math.max(0, flashT - dt);
+  shakeT = Math.max(0, shakeT - dt);
+  message.t -= dt;
+  endTimer > 0 && endScreens(dt);
+}
+
+let last = performance.now();
+titleScreen();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

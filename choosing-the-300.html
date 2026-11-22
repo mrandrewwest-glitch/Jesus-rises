@@ -1,0 +1,1216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3d6b8a">
+<title>Choosing the 300</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b2f1e;
+    --gold: #e0a526;
+    --gold-dark: #a8741a;
+    --card: rgba(255, 252, 240, 0.95);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #3d6b8a;
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;     /* no iOS copy/look-up menu on long press */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;       /* no rubber-band bounce */
+    touch-action: none;              /* no double-tap zoom or pinch zoom */
+  }
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(30, 40, 80, 0.22);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 20px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(60, 40, 0, 0.3), inset 0 0 0 3px rgba(224, 165, 38, 0.5);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    touch-action: pan-y;             /* the card may still scroll on small screens */
+  }
+  .card h1 {
+    margin: 0 0 2px;
+    font-size: 2.3rem;
+    line-height: 1.1;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--gold-dark), 0 4px 12px rgba(255, 210, 90, 0.6);
+    letter-spacing: 0.5px;
+  }
+  .card .sub {
+    margin: 0 0 12px;
+    font-weight: 600;
+    color: #6a5a3c;
+  }
+  .card .body {
+    font-size: 0.98rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+  .card .body ul { padding-left: 1.1em; margin: 8px 0; }
+  .card .body li { margin: 3px 0; }
+  .card .verse {
+    font-style: italic;
+    text-align: center;
+    color: #7a6640;
+    font-size: 0.92rem;
+    margin: 10px 0 4px;
+  }
+  .card .credit {
+    font-size: 0.72rem;
+    color: #9a8a6a;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .card .score {
+    text-align: center;
+    font-size: 1.1rem;
+    margin: 8px 0;
+  }
+  .card .score b { color: var(--gold-dark); }
+  kbd {
+    background: #fff;
+    border: 1px solid #cdbf9d;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0 5px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  #ovBtn {
+    touch-action: manipulation;
+    margin-top: 14px;
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(#f7c948, #d9961c);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 30px;
+    box-shadow: 0 4px 0 var(--gold-dark), 0 6px 16px rgba(160, 110, 20, 0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(120, 70, 0, 0.6);
+  }
+  #ovBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+  #ovHome {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8a6a2a;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #ovHome:hover { text-decoration: underline; }
+  #ovBtn2 {
+    touch-action: manipulation;
+    display: block;
+    margin: 12px auto 0;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-dark);
+    background: #fff;
+    border: 2px solid rgba(224, 165, 38, 0.7);
+    border-radius: 999px;
+    padding: 8px 22px;
+    cursor: pointer;
+  }
+  #ovBtn2:active { transform: translateY(2px); }
+  #ovBtn2.hidden { display: none; }
+  /* card-fit */
+  #ovBtn { position: sticky; bottom: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="ovTitle">Choosing the 300</h1>
+    <p class="sub" id="ovSub"></p>
+    <div class="body" id="ovBody"></div>
+    <button id="ovBtn">Begin</button>
+    <button id="ovBtn2" class="hidden"></button>
+    <a id="ovHome" href="index.html">&larr; All games</a>
+  </div>
+</div>
+
+
+<script src="bible.js"></script>
+<script src="music.js"></script>
+<script>
+'use strict';
+// Sound theme for the shared music engine (music.js)
+Music.theme = { tune: 'odeToJoy', instrument: 'pipe', accent: 'harp', ambience: 'sea', percussion: true };
+
+// Scripture shown in this game, in every version the menu offers.
+const VERSES = {
+  // Title card
+  tooMany: { ref: 'Judges 7:2', KJV: 'The people that are with thee are too many for me to give the Midianites into their hands', NKJV: 'The people who are with you are too many for Me to give the Midianites into their hands', NIV: 'You have too many men. I cannot deliver Midian into their hands', NLT: 'You have too many warriors with you.' },
+  // Level cards
+  water: { ref: 'Judges 7:4', KJV: 'bring them down unto the water, and I will try them for thee there', NKJV: 'bring them down to the water, and I will test them for you there.', NIV: 'Take them down to the water, and I will thin them out for you there.', NLT: 'Bring them down to the spring, and I will test them to determine who will go with you and who will not.' },
+  lapped: { ref: 'Judges 7:6', KJV: 'And the number of them that lapped, putting their hand to their mouth, were three hundred men: but all the rest of the people bowed down upon their knees to drink water.', NKJV: 'And the number of those who lapped, putting their hand to their mouth, was three hundred men; but all the rest of the people got down on their knees to drink water.', NIV: 'Three hundred of them drank from cupped hands, lapping like dogs. All the rest got down on their knees to drink.', NLT: 'Only 300 of the men drank from their hands. All the others got down on their knees and drank with their mouths in the stream.' },
+  // Fail card
+  separate: { ref: 'Judges 7:5', KJV: 'Every one that lappeth of the water with his tongue, as a dog lappeth, him shalt thou set by himself; likewise every one that boweth down upon his knees to drink.', NKJV: 'Everyone who laps from the water with his tongue, as a dog laps, you shall set apart by himself; likewise everyone who gets down on his knees to drink.', NIV: 'Separate those who lap the water with their tongues as a dog laps from those who kneel down to drink.', NLT: 'In one group put all those who cup water in their hands and lap it up with their tongues like dogs. In the other group put all those who kneel down and drink with their mouths in the stream.' },
+  // Win card
+  save: { ref: 'Judges 7:7', KJV: 'By the three hundred men that lapped will I save you, and deliver the Midianites into thine hand', NKJV: 'By the three hundred men who lapped I will save you, and deliver the Midianites into your hand.', NIV: 'With the three hundred men that lapped I will save you and give the Midianites into your hands.', NLT: 'With these 300 men I will rescue you and give you victory over the Midianites.' },
+};
+function verseHTML(key, pre = '') {
+  const v = Bible.verse(VERSES[key]);
+  return `<p class="verse">"${pre}${v.text}" &mdash; ${v.cite}</p>`;
+}
+function creditHTML() {
+  return `<p class="credit">${Bible.credits(VERSES).join(' ')}</p>`;
+}
+
+// ============================================================
+//  Setup & helpers
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const TAU = Math.PI * 2;
+const H = 900;          // logical playfield height
+const MIN_W = 480;      // narrowest logical playfield
+const MAX_W = 1300;     // widest logical playfield
+
+let dpr = 1, scale = 1, viewW = 600, viewH = 900, W = 600, offX = 0, offY = 0;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, f) => a + (b - a) * f;
+const rand = (a, b) => a + Math.random() * (b - a);
+const ease = (f) => f * f * (3 - 2 * f);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  scale = Math.min(canvas.height / H, canvas.width / MIN_W);
+  viewW = canvas.width / scale;
+  viewH = canvas.height / scale;
+  W = Math.min(viewW, MAX_W);
+  offX = (viewW - W) / 2;
+  offY = viewH - H;   // any extra height becomes sky above the playfield
+  layoutSlots();
+}
+window.addEventListener('resize', resize);
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp((n >> 16) + amt, 0, 255);
+  const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+  const b = clamp((n & 255) + amt, 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function hash(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// ============================================================
+//  Tuning
+// ============================================================
+const BANK_Y = 520;       // where the men kneel, on the far bank
+const BACK_Y = 474;       // the path behind them, where they walk
+const WATER_Y = 534;      // top of the stream
+const WATER_B = 676;      // bottom of the stream
+const MS = 1.32;          // size of the men
+const WALK = 330;         // walking speed (px/s)
+const TAP_DX = 46;        // how close a tap must be to a man
+
+const LEVELS = [
+  { name: 'Down to the Water',     need: 6,  ratio: 0.5,  max: 2, every: 1.5,  stay: 4.2, reveal: 0.25, mistakes: 3, misses: 3, fake: 0 },
+  { name: 'Thirsty Soldiers',      need: 8,  ratio: 0.42, max: 3, every: 1.2,  stay: 3.4, reveal: 0.35, mistakes: 3, misses: 3, fake: 0 },
+  { name: 'A Crowd at the Stream', need: 10, ratio: 0.36, max: 4, every: 0.95, stay: 2.8, reveal: 0.5,  mistakes: 3, misses: 3, fake: 0 },
+  { name: 'Look Carefully',        need: 12, ratio: 0.32, max: 5, every: 0.8,  stay: 2.4, reveal: 0.6,  mistakes: 3, misses: 3, fake: 0.5 },
+  { name: 'Quick Eyes',            need: 14, ratio: 0.28, max: 6, every: 0.68, stay: 2.1, reveal: 0.7,  mistakes: 3, misses: 3, fake: 0.6 },
+  { name: 'The Three Hundred',     need: 16, ratio: 0.26, max: 7, every: 0.58, stay: 1.85, reveal: 0.8, mistakes: 3, misses: 3, fake: 0.7 },
+];
+const NUM_LEVELS = LEVELS.length;
+function makeConfig(n) { return Object.assign({}, LEVELS[clamp(n, 1, NUM_LEVELS) - 1]); }
+
+const ROBES = ['#3f6fb5', '#c46b8c', '#6b8e3a', '#d9a13a', '#7a4fa0', '#b5503f', '#3c8f86', '#5a6475', '#e07a5f', '#b08a2e', '#4b7f4b', '#a0673a'];
+const SKINS = ['#d9a066', '#d7a070', '#c98d56', '#e3b184', '#c58a55', '#b87a48', '#dca678'];
+const HAIRS = ['#3a2716', '#4a2f1a', '#2e1d10', '#6b3f1d', '#1f140c', '#8a8a8a'];
+const CLOTHS = ['#e8dcc0', '#d8c7a0', '#c9b27a', '#f0c9a0', null, null];
+
+// ============================================================
+//  Game state
+// ============================================================
+let state = 'title';      // title | card | play | win | fail | pause
+let pausedFrom = 'play';
+let level = 1;
+let totalScore = 0;
+let best = 0;
+try { best = +localStorage.getItem('the300Best') || 0; } catch (e) {}
+
+let cfg = makeConfig(1);
+let t = 0;
+let men = [];
+let slots = [];
+let chosen = 0, mistakes = 0, misses = 0, streak = 0, bestStreak = 0;
+let spawnT = 0, sinceLap = 0, nextId = 0;
+let playT = 0, winT = 0, failT = 0, endTimer = 0;
+let lastScore = null;
+let particles = [];
+let popups = [];
+let message = { text: '', t: 0 };
+let told = {};
+let sel = 0, kbUsed = false;
+let gideonMood = 'watch';
+
+function layoutSlots() {
+  const n = clamp(Math.floor((W - 80) / 84), 5, 13);
+  const x0 = 54, x1 = W - 54;
+  slots = Array.from({ length: n }, (_, i) => ({ i, x: n === 1 ? W / 2 : x0 + (x1 - x0) * i / (n - 1) }));
+  // men already kneeling keep their place on the bank
+  for (const m of men) if (m.slot != null && m.slot >= n) m.slot = n - 1;
+}
+
+// ============================================================
+//  The men at the stream
+// ============================================================
+function activeMen() { return men.filter((m) => m.st === 'walkin' || m.st === 'settle' || m.st === 'drink'); }
+function freeSlots() {
+  const used = new Set(activeMen().map((m) => m.slot));
+  return slots.filter((s) => !used.has(s.i));
+}
+
+function spawnMan() {
+  const free = freeSlots();
+  if (!free.length) return false;
+  const s = pick(free);
+  sinceLap++;
+  const lap = sinceLap >= 4 || Math.random() < cfg.ratio;
+  if (lap) sinceLap = 0;
+  const fromLeft = s.x < W / 2;
+  men.push({
+    id: nextId++, slot: s.i, kind: lap ? 'lap' : 'kneel', st: 'walkin', t: 0,
+    x: fromLeft ? -40 : W + 40, y: BACK_Y, dir: fromLeft ? 1 : -1,
+    stay: cfg.stay * rand(0.9, 1.1),
+    robe: pick(ROBES), skin: pick(SKINS), hair: pick(HAIRS), cloth: pick(CLOTHS), beard: Math.random() < 0.6,
+    phase: rand(0, 1), look: rand(0, TAU), wrongT: 0, fakeAt: Math.random() < cfg.fake ? rand(0.25, 0.6) : -1, glow: 0,
+  });
+  return true;
+}
+
+function updateMen(dt) {
+  if (state === 'play') {
+    spawnT -= dt;
+    const busy = activeMen().length;
+    if (spawnT <= 0 && busy < Math.min(cfg.max, slots.length)) {
+      if (spawnMan()) spawnT = cfg.every * rand(0.7, 1.3);
+    }
+    if (busy === 0 && spawnT > 0.4) spawnT = 0.4;   // never leave the bank empty for long
+  }
+  for (const m of men) {
+    m.t += dt;
+    m.wrongT = Math.max(0, m.wrongT - dt);
+    m.glow = Math.max(0, m.glow - dt);
+    const s = slots[clamp(m.slot, 0, slots.length - 1)];
+    if (m.st === 'walkin') {
+      const d = s.x - m.x;
+      const step = WALK * dt;
+      if (Math.abs(d) <= step) { m.x = s.x; m.y = BANK_Y; m.st = 'settle'; m.t = 0; }
+      else { m.x += Math.sign(d) * step; m.dir = Math.sign(d); }
+    } else if (m.st === 'settle') {
+      m.x = s.x; m.y = BANK_Y;
+      if (m.t >= cfg.reveal) { m.st = 'drink'; m.t = 0; }
+    } else if (m.st === 'drink') {
+      m.x = s.x;
+      if (m.t >= m.stay && state === 'play') {
+        m.st = 'leave'; m.t = 0; m.y = BACK_Y;
+        m.dir = m.x < W / 2 ? -1 : 1;
+        if (m.kind === 'lap') missedOne(m);
+        if (state !== 'play') return;
+      }
+    } else if (m.st === 'leave') {
+      m.x += m.dir * WALK * 0.8 * dt;
+    } else if (m.st === 'chosen') {
+      if (m.t > 0.55) { m.x += m.dir * WALK * 1.2 * dt; m.y = BACK_Y; }
+    }
+  }
+  men = men.filter((m) => !((m.st === 'leave' || m.st === 'chosen') && (m.x < -60 || m.x > W + 60)));
+}
+
+// What the man is doing right now (for drawing and for tapping)
+function pose(m) {
+  if (m.st === 'walkin' || m.st === 'leave') return 'walk';
+  if (m.st === 'chosen') return m.t > 0.55 ? 'walk' : 'cheer';
+  if (m.st === 'settle') return 'kneel';
+  if (m.kind === 'lap') return 'lap';
+  if (m.wrongT > 0) return 'puzzled';
+  if (m.fakeAt > 0) {
+    const f = m.t / m.stay;
+    if (f > m.fakeAt && f < m.fakeAt + 0.22) return 'peek';
+  }
+  return 'bow';
+}
+
+function missedOne(m) {
+  misses++; streak = 0;
+  popups.push({ x: m.x, y: BANK_Y - 120, text: 'Missed!', col: '#ffd0a0', t: 1.2 });
+  sfx.miss();
+  if (!told.miss) { told.miss = true; showMessage('He drank from his hands… and went home!', 2.4); }
+  if (misses >= cfg.misses) fail();
+}
+
+function tapMan(m) {
+  if (!m) return;
+  if (m.st === 'settle') {
+    if (!told.wait) { told.wait = true; showMessage('Wait… watch how he drinks!', 1.8); }
+    return;
+  }
+  if (m.st !== 'drink') return;
+  if (m.kind === 'lap') {
+    chosen++; streak++; bestStreak = Math.max(bestStreak, streak);
+    m.st = 'chosen'; m.t = 0; m.glow = 1;
+    m.dir = m.x > W / 2 ? 1 : -1;
+    sparkle(m.x + offX, m.y - 70 * MS + offY, 14);
+    popups.push({ x: m.x, y: BANK_Y - 120, text: streak >= 3 ? `Chosen! ×${streak}` : 'Chosen!', col: '#ffe27a', t: 1.1 });
+    sfx.choose(chosen / cfg.need);
+    gideonMood = 'joy'; gideonT = 0.8;
+    if (chosen >= cfg.need) win();
+  } else {
+    if (m.wrongT > 0) return;
+    mistakes++; streak = 0;
+    m.wrongT = 1.1;
+    popups.push({ x: m.x, y: BANK_Y - 120, text: 'Not him!', col: '#ffb0a0', t: 1.1 });
+    sfx.wrong();
+    gideonMood = 'oops'; gideonT = 0.9;
+    if (!told.wrong) { told.wrong = true; showMessage('He knelt down with his face in the water. Not him!', 2.6); }
+    if (mistakes >= cfg.mistakes) fail();
+  }
+}
+
+function manAt(x, y) {
+  let bestM = null, bd = 1e9;
+  for (const m of men) {
+    if (m.st !== 'drink' && m.st !== 'settle') continue;
+    const dx = Math.abs(x - m.x);
+    if (dx > TAP_DX || y < BANK_Y - 100 * MS || y > WATER_Y + 44) continue;
+    if (dx < bd) { bd = dx; bestM = m; }
+  }
+  return bestM;
+}
+
+// ============================================================
+//  Particles and pop-up words
+// ============================================================
+function spawn(x, y, vx, vy, life, color, size, grav = 0, kind = 'dot') {
+  particles.push({ x, y, vx, vy, life, max: life, color, size, grav, kind });
+}
+function sparkle(x, y, n, cols = ['#ffe27a', '#fff6d0', '#ffffff']) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), s = rand(40, 170);
+    spawn(x, y, Math.cos(a) * s, Math.sin(a) * s - 40, rand(0.5, 1), pick(cols), rand(2, 4), 60, 'star');
+  }
+}
+function updateParticles(dt) {
+  for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.grav * dt; }
+  particles = particles.filter((p) => p.life > 0);
+  for (const p of popups) { p.t -= dt; p.y -= 30 * dt; }
+  popups = popups.filter((p) => p.t > 0);
+}
+function drawStar(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, rr = i % 2 ? r * 0.4 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    if (p.kind === 'star') drawStar(p.x, p.y, p.size * 1.6);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  Win / fail
+// ============================================================
+function win() {
+  if (state !== 'play') return;
+  state = 'win';
+  syncAmbience();
+  winT = 0;
+  endTimer = 3;
+  gideonMood = 'joy'; gideonT = 99;
+  const sc = scoreLevel();
+  lastScore = sc;
+  totalScore += sc.total;
+  if (totalScore > best) { best = totalScore; try { localStorage.setItem('the300Best', String(best)); } catch (e) {} }
+  sfx.win();
+  showMessage(level >= NUM_LEVELS ? 'The three hundred are ready!' : 'Well chosen!', 2.6);
+}
+function fail() {
+  if (state !== 'play') return;
+  state = 'fail';
+  syncAmbience();
+  failT = 0;
+  endTimer = 2.2;
+  gideonMood = 'oops'; gideonT = 99;
+  sfx.fail();
+}
+function scoreLevel() {
+  const ch = chosen * 40;
+  const careful = (cfg.mistakes - mistakes) * 80;
+  const sharp = (cfg.misses - misses) * 60;
+  const st = bestStreak * 10;
+  const lv = level * 100;
+  return { lines: [['Men chosen', ch], ['No wrong taps', careful], ['Nobody missed', sharp], [`Best streak (${bestStreak})`, st], ['Level bonus', lv]], total: ch + careful + sharp + st + lv };
+}
+
+function showMessage(text, dur = 2.2) { message = { text, t: dur }; }
+
+// ============================================================
+//  Overlay screens
+// ============================================================
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub = document.getElementById('ovSub');
+const ovBody = document.getElementById('ovBody');
+const ovBtn = document.getElementById('ovBtn');
+const ovBtn2 = document.getElementById('ovBtn2');
+let ovAction = null, ovAction2 = null;
+
+function showOverlay(title, sub, body, btn, action, btn2 = null, action2 = null) {
+  ovTitle.textContent = title;
+  ovSub.textContent = sub;
+  ovBody.innerHTML = body;
+  ovBtn.textContent = btn;
+  ovAction = action;
+  ovBtn2.textContent = btn2 || '';
+  ovBtn2.classList.toggle('hidden', !btn2);
+  ovAction2 = action2;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); ovAction = null; ovAction2 = null; }
+ovBtn.addEventListener('click', () => { sfx.init(); if (ovAction) ovAction(); });
+ovBtn2.addEventListener('click', () => { sfx.init(); if (ovAction2) ovAction2(); });
+
+function titleScreen() {
+  state = 'title';
+  syncAmbience();
+  level = 1;
+  resetLevel();
+  // a few men drinking behind the title card
+  for (let i = 0; i < 3; i++) { spawnMan(); const m = men[men.length - 1]; if (m) { m.st = 'drink'; m.x = slots[m.slot].x; m.y = BANK_Y; m.stay = 1e9; } }
+  showOverlay('Choosing the 300', 'God picks Gideon’s little army',
+    `${verseHTML('tooMany')}
+     <ul>
+       <li>Gideon has <b>too many</b> soldiers! God says: bring them down to the stream and watch how they drink.</li>
+       <li><b>Tap</b> each man who drinks <b>from his hands</b>: he kneels up tall, scoops water and lifts it to his mouth, still looking around.</li>
+       <li><b>Don't tap</b> the men who bow down with their <b>faces in the water</b>. They go home.</li>
+       <li>Be quick! If a hand-drinker leaves before you choose him, he's missed.</li>
+       <li><b>Keys:</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> pick a man, <kbd>Space</kbd> chooses him.</li>
+     </ul>
+     ${best ? `<p class="score">Best score: <b>${best}</b></p>` : ''}
+     ${creditHTML()}`,
+    'Begin', () => { level = 1; totalScore = 0; startLevel(); });
+}
+
+function resetLevel() {
+  cfg = makeConfig(level);
+  layoutSlots();
+  men = []; particles = []; popups = [];
+  chosen = 0; mistakes = 0; misses = 0; streak = 0; bestStreak = 0;
+  spawnT = 0.5; sinceLap = 2;
+  playT = 0; winT = 0; failT = 0; endTimer = 0;
+  told = {};
+  gideonMood = 'watch'; gideonT = 0;
+  keys.clear();
+}
+
+// Level card: the config and the level's data change together, behind the card
+function startLevel(retry = false) {
+  resetLevel();
+  sfx.levelStart();
+  if (retry) { beginPlay(); return; }
+  state = 'card';
+  syncAmbience();
+  const extra = [];
+  if (cfg.max >= 3) extra.push(`<li>Up to <b>${Math.min(cfg.max, slots.length)} men</b> drink at once.</li>`);
+  if (cfg.fake > 0) extra.push('<li>Look carefully! Some kneelers <b>lift their heads</b> to look around, but their hands stay on the ground. Only choose men with <b>water in their hands</b>.</li>');
+  showOverlay(`Level ${level}`, cfg.name,
+    `${verseHTML(level % 2 ? 'water' : 'lapped')}
+     <ul>
+       <li>Choose <b>${cfg.need} men</b> who drink from their hands.</li>
+       <li>${cfg.mistakes} wrong taps or ${cfg.misses} missed men, and you try again.</li>
+       ${extra.join('')}
+     </ul>`,
+    'Begin', beginPlay);
+}
+
+function beginPlay() {
+  hideOverlay();
+  state = 'play';
+  syncAmbience();
+  showMessage(level === 1 ? 'Tap the men who drink from their hands!' : `Level ${level}: ${cfg.name}`, 2.4);
+}
+
+function endScreens(dt) {
+  if (endTimer <= 0) return;
+  endTimer -= dt;
+  if (endTimer > 0) return;
+  if (state === 'win') {
+    const s = lastScore;
+    const last = level >= NUM_LEVELS;
+    showOverlay(last ? 'The Three Hundred!' : 'Well chosen!', `Level ${level} complete — ${cfg.name}`,
+      `${verseHTML('save')}
+       ${last ? '<p style="text-align:center">Only three hundred men, so everyone would know: it was <b>God</b> who saved Israel!</p>' : ''}
+       <p class="score">${s.lines.map(([k, v]) => `${k}: <b>${v}</b>`).join('<br>')}</p>
+       <p class="score" style="font-size:1.3rem">Total: <b>${totalScore}</b> &nbsp;&middot;&nbsp; Best: <b>${best}</b></p>
+       ${creditHTML()}`,
+      last ? 'Play again' : 'Next level', last ? () => { level = 1; totalScore = 0; startLevel(); } : () => { level++; startLevel(); });
+  } else if (state === 'fail') {
+    const why = mistakes >= cfg.mistakes ? 'Too many men with their <b>faces in the water</b> were chosen.' : 'Too many hand-drinkers went home before you <b>tapped</b> them.';
+    showOverlay('Oh… try again', `Level ${level} — ${cfg.name}`,
+      `<p style="text-align:center">${why} Look for <b>cupped hands</b> lifted to the mouth!</p>
+       ${verseHTML('separate')}
+       <p class="score">Score so far: <b>${totalScore}</b></p>`,
+      'Try Again', () => startLevel(true));
+  }
+}
+
+function togglePause() {
+  if (state === 'play') {
+    pausedFrom = state;
+    state = 'pause';
+    syncAmbience();
+    keys.clear();
+    showOverlay('Paused', `Level ${level} — ${cfg.name}`,
+      '<p style="text-align:center">Take a breath. Press <kbd>P</kbd> to carry on, or <kbd>R</kbd> to restart the level.</p>',
+      'Resume', togglePause, '↻ Restart Level', () => startLevel(true));
+  } else if (state === 'pause') {
+    state = pausedFrom;
+    syncAmbience();
+    hideOverlay();
+  }
+}
+
+// ============================================================
+//  Main update
+// ============================================================
+let gideonT = 0;
+function update(dt) {
+  t += dt;
+  updateParticles(dt);
+  if (state === 'play') playT += dt;
+  if (state === 'play' || state === 'win' || state === 'fail' || state === 'title' || state === 'card') updateMen(dt);
+  if (state === 'win') {
+    winT += dt;
+    if (Math.random() < dt * 8) spawn(rand(0, viewW), rand(120, viewH * 0.5), 0, -20, 1.2, '#fff6d0', 3, 0, 'star');
+  }
+  if (state === 'fail') failT += dt;
+  gideonT -= dt;
+  if (gideonT <= 0 && state === 'play') gideonMood = 'watch';
+  message.t -= dt;
+  endScreens(dt);
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = new Set();
+
+function drinkersBySlot() {
+  return men.filter((m) => m.st === 'drink' || m.st === 'settle').sort((a, b) => a.slot - b.slot);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  sfx.init();
+  if ((e.code === 'Enter' || e.code === 'Space') && ovAction && !e.repeat) { ovAction(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyM') { sfx.toggleMute(); return; }
+  if (e.code === 'KeyR' && state === 'pause') { startLevel(true); return; }
+  if (state === 'win' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play' || e.repeat) return;
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD') {
+    kbUsed = true;
+    const d = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1;
+    sel = clamp(sel + d, 0, slots.length - 1);
+    // jump over empty places on the bank
+    const occupied = new Set(drinkersBySlot().map((m) => m.slot));
+    let k = sel;
+    while (k >= 0 && k < slots.length && !occupied.has(k)) k += d;
+    if (k >= 0 && k < slots.length) sel = k;
+  }
+  if (e.code === 'Space' || e.code === 'Enter') {
+    kbUsed = true;
+    tapMan(men.find((m) => m.slot === sel && (m.st === 'drink' || m.st === 'settle')));
+  }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
+function toView(e) { return { vx: e.clientX * dpr / scale, vy: e.clientY * dpr / scale }; }
+
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  const p = toView(e);
+  for (const b of hudButtons()) {
+    if (Math.hypot(p.vx - b.x, p.vy - b.y) < b.r + 6) { b.action(); return; }
+  }
+  if (state === 'win' && winT > 1.5) { endTimer = Math.min(endTimer, 0.01); return; }
+  if (state !== 'play') return;
+  kbUsed = false;
+  tapMan(manAt(p.vx - offX, p.vy - offY));
+});
+
+// iOS Safari ignores user-scalable=no: stop double-tap zoom, pinch zoom and
+// the long-press menu from hijacking rapid taps. The viewport tag is untouched.
+const stop = (e) => e.preventDefault();
+canvas.addEventListener('touchstart', stop, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); sfx.init(); }, { passive: false });
+canvas.addEventListener('touchmove', stop, { passive: false });
+canvas.addEventListener('dblclick', stop);
+canvas.addEventListener('contextmenu', stop);
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+
+function goHome() { location.href = 'index.html'; }
+
+function hudButtons() {
+  return [
+    { x: 26, y: 84, r: 16, icon: 'home', action: goHome },
+    { x: 64, y: 84, r: 16, icon: state === 'pause' ? 'play' : 'pause', action: togglePause },
+    { x: 102, y: 84, r: 16, icon: sfx.muted ? 'muted' : 'sound', action: () => sfx.toggleMute() },
+  ];
+}
+
+// ============================================================
+//  Sound (tiny WebAudio synth + music.js)
+// ============================================================
+const sfx = {
+  ctx: null, master: null, noise: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      Music.init(this.ctx, this.master);
+      const len = this.ctx.sampleRate * 2;
+      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      syncAmbience();
+    } catch (e) { this.ctx = null; }
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    syncAmbience();
+  },
+  tone(freq, dur, type = 'sine', vol = 0.3, delay = 0, slideTo = null) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  win() { if (this.ctx) Music.win(); },
+  fail() { if (this.ctx) Music.fail(); },
+  levelStart() { if (this.ctx) Music.start(); },
+  choose(h) { if (this.ctx) { Music.tap(clamp(h, 0, 1)); this.tone(880, 0.15, 'triangle', 0.1, 0.05, 1320); } },
+  wrong() { this.tone(220, 0.25, 'triangle', 0.22, 0, 150); this.tone(180, 0.3, 'triangle', 0.16, 0.12, 120); },
+  miss() { this.tone(600, 0.3, 'sine', 0.14, 0, 300); },
+};
+
+// Ambient bed (music.js): only during active play; off behind cards, when paused, muted or hidden
+function syncAmbience() {
+  Music.ambience(!sfx.muted && !document.hidden && state === 'play');
+}
+document.addEventListener('visibilitychange', syncAmbience);
+window.addEventListener('pageshow', syncAmbience);
+window.addEventListener('pagehide', () => Music.ambience(false));
+
+// ============================================================
+//  Rendering: the valley, the stream and the near bank
+// ============================================================
+function drawCloud(cx, cy, w, h) {
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  const n = Math.max(3, Math.round(w / 26));
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    ctx.beginPath(); ctx.arc(cx - w / 2 + f * w, cy - Math.sin(f * Math.PI) * h * 0.5, h * (0.5 + Math.sin(f * Math.PI) * 0.35), 0, TAU); ctx.fill();
+  }
+  ctx.fillRect(cx - w / 2, cy - h * 0.1, w, h * 0.45);
+}
+
+function drawBackground() {
+  const top = -offY;
+  const g = ctx.createLinearGradient(0, top, 0, 460);
+  g.addColorStop(0, '#6fb0e0'); g.addColorStop(1, '#d6efff');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, top, viewW, 470 - top);
+  // sun and clouds
+  ctx.fillStyle = 'rgba(255,240,180,0.5)';
+  ctx.beginPath(); ctx.arc(W - 90, Math.max(top + 90, 190), 62, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffe58a';
+  ctx.beginPath(); ctx.arc(W - 90, Math.max(top + 90, 190), 40, 0, TAU); ctx.fill();
+  const drift = (t * 8) % (W + 300);
+  drawCloud(((120 + drift) % (W + 300)) - 150, Math.max(top + 150, 230), 150, 40);
+  drawCloud(((W * 0.6 + drift * 0.6) % (W + 300)) - 150, Math.max(top + 110, 160), 110, 30);
+  // hills of the valley of Jezreel
+  ctx.fillStyle = '#a9c27a';
+  ctx.beginPath(); ctx.moveTo(-offX, 470);
+  for (let x = -offX; x <= W + offX + 20; x += 20) ctx.lineTo(x, 380 + Math.sin(x * 0.007) * 30 + Math.sin(x * 0.019) * 10);
+  ctx.lineTo(W + offX, 470); ctx.fill();
+  // tents of the camp far away
+  for (let i = 0; i < 5; i++) {
+    const x = W * (0.12 + i * 0.19), y = 410 + Math.sin(i * 2.3) * 8;
+    ctx.fillStyle = i % 2 ? '#c9a46a' : '#b88a55';
+    ctx.beginPath(); ctx.moveTo(x - 18, y + 14); ctx.lineTo(x, y - 6); ctx.lineTo(x + 18, y + 14); ctx.fill();
+  }
+  // far bank grass
+  ctx.fillStyle = '#7fb35a';
+  ctx.fillRect(-offX, 440, viewW, WATER_Y - 440 + 4);
+  ctx.fillStyle = '#6fa24c';
+  ctx.beginPath(); ctx.moveTo(-offX, 440);
+  for (let x = -offX; x <= W + offX + 20; x += 30) ctx.lineTo(x, 436 + Math.sin(x * 0.05) * 5);
+  ctx.lineTo(W + offX, 460); ctx.lineTo(-offX, 460); ctx.fill();
+  // a sandy edge where they kneel
+  ctx.fillStyle = '#d8c08a';
+  ctx.fillRect(-offX, WATER_Y - 18, viewW, 22);
+}
+
+function drawStream() {
+  const g = ctx.createLinearGradient(0, WATER_Y, 0, WATER_B);
+  g.addColorStop(0, '#4f9ccf'); g.addColorStop(1, '#2f78b0');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, WATER_Y, viewW, WATER_B - WATER_Y);
+  // ripples flowing to the right
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let r = 0; r < 4; r++) {
+    const y = WATER_Y + 22 + r * 32;
+    for (let k = 0; k < 9; k++) {
+      const x = ((k * 170 + r * 60 + t * (40 + r * 12)) % (viewW + 200)) - 100 - offX;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 20, y - 6, x + 40, y); ctx.stroke();
+    }
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(-offX, WATER_Y, viewW, 4);
+}
+
+function drawNearBank() {
+  ctx.fillStyle = '#d8c08a';
+  ctx.fillRect(-offX, WATER_B - 4, viewW, 18);
+  const g = ctx.createLinearGradient(0, WATER_B + 10, 0, 900);
+  g.addColorStop(0, '#8cc463'); g.addColorStop(1, '#6aa24a');
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, WATER_B + 10, viewW, 900 - WATER_B);
+  // reeds and flowers
+  for (let i = 0; i < 16; i++) {
+    const x = -offX + hash(i, 3) * viewW, y = WATER_B + 14 + hash(i, 5) * 20;
+    ctx.strokeStyle = '#4f8a35'; ctx.lineWidth = 3;
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(x + k * 5, y); ctx.quadraticCurveTo(x + k * 9, y - 18, x + k * 12 + Math.sin(t * 2 + i) * 2, y - 30); ctx.stroke(); }
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = -offX + hash(i, 9) * viewW, y = 770 + hash(i, 11) * 110;
+    ctx.fillStyle = pick2(i, ['#ffffff', '#ffd94a', '#ff9fb2']);
+    for (let k = 0; k < 5; k++) { const a = k * TAU / 5; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 4, y + Math.sin(a) * 4, 3, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#e0a526'; ctx.beginPath(); ctx.arc(x, y, 2.4, 0, TAU); ctx.fill();
+  }
+}
+function pick2(i, arr) { return arr[i % arr.length]; }
+
+// ============================================================
+//  People
+// ============================================================
+function drawEyes(x, y, lx, ly, closed = false) {
+  for (const sx of [-6, 6]) {
+    if (closed) {
+      ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x + sx, y, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      continue;
+    }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + sx, y, 3.8, 4.8, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(x + sx + lx * 1.6, y + ly * 2, 2.1, 0, TAU); ctx.fill();
+  }
+}
+
+// A head seen from the front. mood: 'watch' | 'happy' | 'puzzled' | 'drink' | 'oops'
+function drawHead(m, x, y, mood, lx = 0, ly = 0) {
+  ctx.fillStyle = m.skin;
+  ctx.beginPath(); ctx.arc(x, y, 15, 0, TAU); ctx.fill();
+  if (m.cloth) {
+    ctx.fillStyle = m.cloth;
+    ctx.beginPath(); ctx.arc(x, y - 2, 16.5, Math.PI * 1.02, Math.PI * 1.98);
+    ctx.lineTo(x + 17, y + 12); ctx.lineTo(x + 12, y + 12); ctx.lineTo(x + 12, y - 4);
+    ctx.quadraticCurveTo(x, y - 10, x - 12, y - 4); ctx.lineTo(x - 12, y + 12); ctx.lineTo(x - 17, y + 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = shade(m.robe, -20); ctx.fillRect(x - 16, y - 8, 32, 3.5);
+  } else {
+    ctx.fillStyle = m.hair;
+    ctx.beginPath(); ctx.arc(x, y - 2, 15.5, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.quadraticCurveTo(x + 6, y - 10, x, y - 9); ctx.quadraticCurveTo(x - 8, y - 11, x - 15, y + 1); ctx.closePath(); ctx.fill();
+  }
+  if (m.beard) {
+    ctx.fillStyle = m.hair;
+    ctx.beginPath(); ctx.moveTo(x - 13, y + 2); ctx.quadraticCurveTo(x - 12, y + 19, x, y + 20); ctx.quadraticCurveTo(x + 12, y + 19, x + 13, y + 2);
+    ctx.quadraticCurveTo(x + 8, y + 8, x, y + 8); ctx.quadraticCurveTo(x - 8, y + 8, x - 13, y + 2); ctx.fill();
+  }
+  drawEyes(x, y - 2, lx, ly, mood === 'happy');
+  ctx.lineCap = 'round';
+  if (mood === 'happy') {
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.moveTo(x - 5, y + 5); ctx.arc(x, y + 5, 5, 0, Math.PI); ctx.closePath(); ctx.fill();
+  } else if (mood === 'puzzled' || mood === 'oops') {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - 4, y + 8); ctx.quadraticCurveTo(x, y + 5, x + 4, y + 9); ctx.stroke();
+  } else if (mood === 'drink') {
+    ctx.fillStyle = '#7a2e22'; ctx.beginPath(); ctx.ellipse(x, y + 7, 3, 3.5, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y + 3, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+}
+
+function arm(x1, y1, x2, y2, robe, skin) {
+  ctx.strokeStyle = shade(robe, -25); ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(x2, y2, 4.5, 0, TAU); ctx.fill();
+}
+
+// Kneeling robe: a wide base with the knees at the water's edge
+function kneelBody(m, topY) {
+  ctx.fillStyle = m.robe; ctx.strokeStyle = shade(m.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-24, 0); ctx.quadraticCurveTo(-22, topY + 12, -11, topY); ctx.quadraticCurveTo(0, topY - 4, 11, topY);
+  ctx.quadraticCurveTo(22, topY + 12, 24, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-18, topY + 20); ctx.quadraticCurveTo(0, topY + 23, 18, topY + 20); ctx.stroke();
+}
+
+function drawMan(m) {
+  const p = pose(m);
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.scale(MS, MS);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 24, 6, 0, 0, TAU); ctx.fill();
+  if (m.glow > 0 || m.st === 'chosen') {
+    const a = m.st === 'chosen' ? 0.6 : m.glow;
+    const g = ctx.createRadialGradient(0, -45, 5, 0, -45, 70);
+    g.addColorStop(0, `rgba(255,230,120,${a})`); g.addColorStop(1, 'rgba(255,230,120,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -45, 70, 0, TAU); ctx.fill();
+  }
+  const lookX = Math.sin(t * 1.3 + m.look), lookY = 0;
+  if (p === 'walk' || p === 'cheer') {
+    const step = p === 'walk' ? Math.sin(m.t * 12) : 0;
+    const bob = p === 'walk' ? Math.abs(step) * 3 : Math.abs(Math.sin(m.t * 10)) * 6;
+    ctx.translate(0, -bob);
+    ctx.strokeStyle = shade(m.skin, -20); ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, -14); ctx.lineTo(-6 - step * 5, 0); ctx.moveTo(6, -14); ctx.lineTo(6 + step * 5, 0); ctx.stroke();
+    ctx.fillStyle = m.robe; ctx.strokeStyle = shade(m.robe, -40); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-17, -10); ctx.quadraticCurveTo(-16, -50, -10, -58); ctx.quadraticCurveTo(0, -62, 10, -58); ctx.quadraticCurveTo(16, -50, 17, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (p === 'cheer') { arm(-10, -52, -24, -84, m.robe, m.skin); arm(10, -52, 24, -84, m.robe, m.skin); }
+    else { arm(-10, -52, -15 + step * 4, -28, m.robe, m.skin); arm(10, -52, 15 - step * 4, -28, m.robe, m.skin); }
+    drawHead(m, 0, -74, p === 'cheer' || m.st === 'chosen' ? 'happy' : 'watch', m.dir * 0.8, 0);
+  } else if (p === 'kneel' || p === 'lap') {
+    kneelBody(m, -44);
+    let hy = -60, hx1 = -14, hy1 = -18, hx2 = 14, hy2 = -18, mood = 'watch';
+    if (p === 'lap') {
+      // scoop: hands down into the stream, then up to the mouth (the head stays up, watching)
+      const cyc = ((m.t * 0.95 + m.phase) % 1);
+      let f;
+      if (cyc < 0.3) f = 1 - cyc / 0.3;          // hands going down
+      else if (cyc < 0.42) f = 0;                 // in the water
+      else if (cyc < 0.72) f = (cyc - 0.42) / 0.3;   // up to the mouth
+      else f = 1;                                 // drinking from the hands
+      f = ease(f);
+      const hy = lerp(24, -50, f);
+      hx1 = -5; hy1 = hy; hx2 = 5; hy2 = hy;
+      if (f > 0.95) mood = 'drink';
+      arm(-11, -38, hx1 - 3, hy1, m.robe, m.skin);
+      arm(11, -38, hx2 + 3, hy2, m.robe, m.skin);
+      // cupped hands holding water
+      ctx.fillStyle = m.skin;
+      ctx.beginPath(); ctx.ellipse(0, hy + 2, 10, 6, 0, 0, Math.PI); ctx.fill();
+      if (cyc > 0.42) {
+        ctx.fillStyle = '#7fc3ee';
+        ctx.beginPath(); ctx.ellipse(0, hy + 1, 7, 2.5, 0, 0, TAU); ctx.fill();
+        if (Math.random() < 0.15) spawn(m.x + offX + rand(-6, 6) * MS, m.y + (hy + 6) * MS + offY, 0, 60, 0.4, '#9fd6ff', 2.2, 400);
+      }
+      drawHead(m, 0, -60, mood, mood === 'drink' ? lookX * 0.6 : lookX, -0.2);
+    } else {
+      arm(-11, -38, hx1, hy1, m.robe, m.skin);
+      arm(11, -38, hx2, hy2, m.robe, m.skin);
+      drawHead(m, 0, hy, mood, 0, 0.3);
+    }
+  } else {
+    // bowing down with his face in the water (or peeking up between gulps)
+    const up = p === 'peek' ? 1 : p === 'puzzled' ? 1 : 0;
+    ctx.fillStyle = m.robe; ctx.strokeStyle = shade(m.robe, -40); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -16, 25, 22, 0, Math.PI, TAU); ctx.lineTo(25, 0); ctx.lineTo(-25, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#c9b07a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, -10, 16, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    // hands flat on the ground by the water
+    arm(-18, -12, -26, 10, m.robe, m.skin);
+    arm(18, -12, 26, 10, m.robe, m.skin);
+    if (up) {
+      drawHead(m, 0, -20, p === 'puzzled' ? 'puzzled' : 'watch', lookX, 0);
+    } else {
+      // the back of his head, face down in the stream
+      const dip = Math.sin(m.t * 4 + m.phase * 6) * 1.5;
+      ctx.fillStyle = m.cloth || m.hair;
+      ctx.beginPath(); ctx.ellipse(0, 8 + dip, 14, 11, 0, 0, TAU); ctx.fill();
+      if (m.cloth) { ctx.fillStyle = shade(m.robe, -20); ctx.fillRect(-14, 2 + dip, 28, 3.5); }
+      if (Math.random() < 0.08) spawn(m.x + offX + rand(-12, 12), m.y + 22 * MS + offY, rand(-10, 10), -30, 0.6, 'rgba(255,255,255,0.8)', 3);
+    }
+  }
+  ctx.restore();
+  if (p === 'puzzled') {
+    ctx.fillStyle = '#fff'; ctx.font = '700 26px Fredoka, sans-serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(60,40,20,0.8)'; ctx.lineWidth = 4;
+    ctx.strokeText('?', m.x + 20, m.y - 62 * MS); ctx.fillText('?', m.x + 20, m.y - 62 * MS);
+  }
+}
+
+// Gideon on the near bank, with the men he has chosen gathering beside him
+function gideonPos() { return { x: W - 64, y: 856 }; }
+function drawGideon() {
+  const g = gideonPos();
+  // the chosen men, in neat rows to his left
+  const perRow = Math.max(4, Math.min(8, Math.floor((W - 170) / 34)));
+  for (let i = 0; i < chosen; i++) {
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const x = g.x - 70 - col * 34 - (row % 2) * 17, y = g.y - 58 + row * 30;
+    drawMini(x, y, ROBES[(i * 5) % ROBES.length], SKINS[i % SKINS.length], state === 'win');
+  }
+  const d = { skin: '#d39a66', hair: '#5c3a1c', cloth: '#e8dcc0', beard: true, robe: '#7a5a2e' };
+  const bob = gideonMood === 'joy' ? Math.abs(Math.sin(t * 8)) * 8 : 0;
+  ctx.save();
+  ctx.translate(g.x, g.y - bob);
+  ctx.scale(1.25, 1.25);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, bob / 1.25, 24, 6, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = d.robe; ctx.strokeStyle = shade(d.robe, -40); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-19, 0); ctx.quadraticCurveTo(-18, -44, -11, -54); ctx.quadraticCurveTo(0, -58, 11, -54); ctx.quadraticCurveTo(18, -44, 19, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#9b7a3e'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-14, -48); ctx.lineTo(-15, 0); ctx.moveTo(14, -48); ctx.lineTo(15, 0); ctx.stroke();
+  if (gideonMood === 'joy') { arm(-10, -48, -24, -80, d.robe, d.skin); arm(10, -48, 24, -80, d.robe, d.skin); }
+  else if (gideonMood === 'oops') { arm(-10, -48, -4, -70, d.robe, d.skin); arm(10, -48, 16, -24, d.robe, d.skin); }
+  else { arm(-10, -48, -16, -22, d.robe, d.skin); arm(10, -48, 22, -40, d.robe, d.skin); }
+  drawHead(d, 0, -70, gideonMood === 'joy' ? 'happy' : gideonMood === 'oops' ? 'oops' : 'watch', -0.6, -0.6);
+  ctx.restore();
+}
+function drawMini(x, y, robe, skin, happy) {
+  const bob = happy ? Math.abs(Math.sin(t * 7 + x)) * 5 : 0;
+  ctx.save(); ctx.translate(x, y - bob);
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-11, 0); ctx.quadraticCurveTo(-10, -26, 0, -28); ctx.quadraticCurveTo(10, -26, 11, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, -35, 9, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b1d12';
+  ctx.beginPath(); ctx.arc(-3, -36, 1.6, 0, TAU); ctx.arc(3, -36, 1.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#6a2a1e'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -33, 2.5, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPopups() {
+  ctx.textAlign = 'center';
+  ctx.font = '700 22px Fredoka, sans-serif';
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.t / 0.4, 0, 1);
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(50,30,10,0.8)'; ctx.lineJoin = 'round';
+    ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawSelector() {
+  if (!kbUsed || state !== 'play') return;
+  const s = slots[clamp(sel, 0, slots.length - 1)];
+  ctx.fillStyle = '#ffe27a';
+  const y = WATER_Y + 26 + Math.sin(t * 6) * 3;
+  ctx.beginPath(); ctx.moveTo(s.x, y); ctx.lineTo(s.x - 12, y + 16); ctx.lineTo(s.x + 12, y + 16); ctx.fill();
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function drawHUD() {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 4;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fffbe8';
+  ctx.font = '700 17px Fredoka, sans-serif';
+  const inLevel = state !== 'title';
+  ctx.fillText(inLevel ? `Level ${level} · ${cfg.name}` : 'Choosing the 300', 12, 26);
+  ctx.shadowBlur = 0;
+  for (const b of hudButtons()) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a4210'; ctx.strokeStyle = '#5a4210'; ctx.lineWidth = 2;
+    if (b.icon === 'home') {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 1); ctx.lineTo(b.x, b.y - 8); ctx.lineTo(b.x + 8, b.y - 1); ctx.fill();
+      ctx.fillRect(b.x - 5.5, b.y - 2, 11, 9);
+    } else if (b.icon === 'pause') { ctx.fillRect(b.x - 5, b.y - 6, 3.5, 12); ctx.fillRect(b.x + 1.5, b.y - 6, 3.5, 12); }
+    else if (b.icon === 'play') { ctx.beginPath(); ctx.moveTo(b.x - 4, b.y - 6); ctx.lineTo(b.x + 6, b.y); ctx.lineTo(b.x - 4, b.y + 6); ctx.fill(); }
+    else {
+      ctx.beginPath(); ctx.moveTo(b.x - 8, b.y - 3); ctx.lineTo(b.x - 4, b.y - 3); ctx.lineTo(b.x + 1, b.y - 7);
+      ctx.lineTo(b.x + 1, b.y + 7); ctx.lineTo(b.x - 4, b.y + 3); ctx.lineTo(b.x - 8, b.y + 3); ctx.fill();
+      ctx.beginPath();
+      if (b.icon === 'sound') { ctx.arc(b.x + 2, b.y, 6, -0.8, 0.8); }
+      else { ctx.moveTo(b.x + 4, b.y - 4); ctx.lineTo(b.x + 9, b.y + 4); ctx.moveTo(b.x + 9, b.y - 4); ctx.lineTo(b.x + 4, b.y + 4); }
+      ctx.stroke();
+    }
+  }
+  if (inLevel) {
+    const rx = viewW - 14;
+    ctx.textAlign = 'right';
+    ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.fillStyle = '#fffbe8'; ctx.shadowBlur = 4;
+    ctx.fillText(`Chosen ${chosen} / ${cfg.need}`, rx, 26);
+    ctx.shadowBlur = 0;
+    const bw = Math.min(170, viewW * 0.34);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; roundRect(rx - bw, 36, bw, 12, 6); ctx.fill();
+    ctx.fillStyle = '#ffd24a'; if (chosen) { roundRect(rx - bw, 36, bw * clamp(chosen / cfg.need, 0, 1), 12, 6); ctx.fill(); }
+    chances(rx, 70, 'Wrong taps:', cfg.mistakes, mistakes, '#ff8a7a');
+    chances(rx, 96, 'Missed:', cfg.misses, misses, '#ffb35a');
+  }
+  ctx.restore();
+}
+function chances(rx, y, label, total, used, col) {
+  ctx.font = '600 13px Fredoka, sans-serif';
+  ctx.fillStyle = '#fffbe8'; ctx.shadowBlur = 4;
+  ctx.fillText(label, rx - total * 22 - 4, y + 5);
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < total; i++) {
+    const x = rx - 10 - (total - 1 - i) * 22;
+    const usedOne = i >= total - used;
+    ctx.fillStyle = usedOne ? col : 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (usedOne) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); ctx.stroke(); }
+  }
+}
+
+function drawMessage() {
+  if (message.t <= 0) return;
+  const a = clamp(message.t / 0.5, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.font = '700 24px Fredoka, sans-serif';
+  const lines = wrapText(message.text, viewW - 40);
+  const y0 = offY + 724;
+  lines.forEach((l, i) => {
+    const y = y0 + i * 28;
+    ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(40,30,10,0.85)';
+    ctx.strokeText(l, viewW / 2, y);
+    ctx.fillStyle = '#fff4c8';
+    ctx.fillText(l, viewW / 2, y);
+  });
+  ctx.restore();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, offX * scale, offY * scale);
+  drawBackground();
+  // walkers on the path behind, then the men kneeling at the edge
+  const sorted = men.slice().sort((a, b) => a.y - b.y);
+  for (const m of sorted) drawMan(m);
+  drawStream();
+  drawNearBank();
+  drawGideon();
+  drawSelector();
+  drawPopups();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawParticles();
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(30,30,50,${clamp(failT / 1.5, 0, 0.35)})`;
+    ctx.fillRect(0, 0, viewW, viewH);
+  }
+  drawHUD();
+  drawMessage();
+}
+
+// ============================================================
+//  Main loop
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (state !== 'pause') { update(dt / 2); update(dt / 2); }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+titleScreen();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
