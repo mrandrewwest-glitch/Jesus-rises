@@ -1,6 +1,6 @@
 # Build queue
 
-Work top to bottom. A scheduled run every 5 hours builds the next **two** batches that aren't done. Mark a batch `DONE` here once its games are on the menu.
+Work top to bottom, two batches at a time. (The every-5-hours routine was stopped at the user's request on 22 November; nothing builds automatically now.) Mark a batch `DONE` here once its games are on the menu.
 
 Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip it, and if it's still BUILDING at the next run with no builder running, treat it as PARTIAL) · `PARTIAL` (some files exist from an earlier interrupted build: read them first and finish them rather than starting over) · `DONE`.
 
@@ -17,8 +17,8 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | I | 25, 28, 30, 31 | Moses | DONE |
 | J | 32, 33, 34, 35 | Joshua | DONE |
 | K | 36, 37, 38 | Gideon | DONE |
-| L | 39, 40, 41, 42 | Samson + Ruth | BUILDING |
-| M | 43, 44, 45 | Samuel | BUILDING |
+| L | 39, 40, 41, 42 | Samson + Ruth | TODO |
+| M | 43, 44, 45 | Samuel | PARTIAL (little-coat-for-samuel exists) |
 | N | 52, 53, 54, 55 | David + Solomon | TODO |
 | O | 56, 57, 58, 59 | Solomon + Elijah | TODO |
 | P | 60, 61, 62 | Elijah | TODO |
