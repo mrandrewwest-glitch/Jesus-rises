@@ -17,8 +17,8 @@ Status: `TODO` (not started) · `BUILDING` (a builder is on it right now: skip i
 | I | 25, 28, 30, 31 | Moses | DONE |
 | J | 32, 33, 34, 35 | Joshua | DONE |
 | K | 36, 37, 38 | Gideon | DONE |
-| L | 39, 40, 41, 42 | Samson + Ruth | TODO |
-| M | 43, 44, 45 | Samuel | TODO |
+| L | 39, 40, 41, 42 | Samson + Ruth | BUILDING |
+| M | 43, 44, 45 | Samuel | BUILDING |
 | N | 52, 53, 54, 55 | David + Solomon | TODO |
 | O | 56, 57, 58, 59 | Solomon + Elijah | TODO |
 | P | 60, 61, 62 | Elijah | TODO |
